@@ -8,7 +8,23 @@ const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(c, m); const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 
-test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 5); assert.ok(Object.keys(S.skills).length >= 55); });
+test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.ok(Object.keys(S.skills).length >= 120); assert.ok(Object.keys(S.items).length >= 50); });
+test('grade: todo nó é alcançável a partir do centro e não há sobreposição', () => {
+  const ns = Object.values(S.skills), seen = new Set([ns.findIndex(s => s.name === 'Golpe Pesado')]), q = [...seen];
+  assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
+  while (q.length) { const a = ns[q.pop()]; ns.forEach((b, i) => { if (!seen.has(i) && Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1) { seen.add(i); q.push(i); } }); }
+  assert.deepEqual(ns.filter((_, i) => !seen.has(i)).map(s => s.name), []);
+});
+test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), it = n => Object.keys(S.items).find(k => S.items[k].name === n);
+  h.attrs.AGI = 95; e.attrs.AGI = 1; h.skills = [sk('Tiro Duplo')]; h.aura = 20; H.battle(gm, { on: true });
+  H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.equal(h.aura, 20); // sem arma de fogo: recusado
+  h.inv[it('Revólver .38')] = 1; H.equip(ana, { id: h.id, item: it('Revólver .38') }); H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.ok(h.aura < 20);
+  while (current() !== h.id) H.next(gm);
+  h.inv[it('Granada')] = 1; const hp = e.hp; H.use(ana, { id: h.id, item: it('Granada'), target: e.id }); assert.equal(e.hp, hp - 28);
+  reset(); const a = mk(ana, {}), b2 = mk(ana, {}); b2.hp = 0; a.inv[it('Sais Aromáticos')] = 1; H.battle(gm, { on: true }); b2.dying = 3; S.battle.ticks[b2.id] = 9999;
+  H.use(ana, { id: a.id, item: it('Sais Aromáticos'), target: b2.id }); assert.equal(b2.hp, 20);
+});
 test('só o mestre altera atributos; jogador só mexe no próprio personagem', () => {
   reset(); const h = mk(ana, {}), o = mk(bia, {});
   H.set(ana, { id: h.id, f: 'attrs.FOR', v: 99 }); assert.equal(h.attrs.FOR, 40);

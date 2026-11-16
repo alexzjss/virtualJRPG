@@ -146,3 +146,4 @@ body[data-role=gm] .mapwrap,body[data-role=table] .mapwrap{height:100vh}
 .party>div{display:flex;gap:8px;align-items:center;background:#0b0b0de6;border-top:5px solid var(--c);padding:8px 12px;min-width:170px}.party img{width:48px;height:48px;object-fit:cover}.party span{flex:1}.party b{font:400 18px Anton,Impact,sans-serif;text-transform:uppercase}.party .bar{height:12px;margin:2px 0}.party .bar span{display:none}
 body[data-role=gm] h1{pointer-events:none;left:auto;right:0;top:0;transform:skewX(-10deg) translateX(8px)}
 .dock button{white-space:nowrap}
+.grid{grid-template-columns:repeat(17,1fr);gap:2px}.best span{font-size:11px;padding:3px 6px}

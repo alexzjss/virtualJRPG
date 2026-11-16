@@ -25,3 +25,7 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 - `npm test` roda os testes de regras e permissões; `npm run sim` roda o simulador de balanceamento.
 - A cada início o servidor copia `data/state.json` para `data/backups/` (guarda as 10 últimas).
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
+
+## Conteúdo padrão
+`content.js` gera a grade de skills (128 nós), o catálogo de itens (56) e o bestiário (22 inimigos comuns e humanos + 9 chefes).
+Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.

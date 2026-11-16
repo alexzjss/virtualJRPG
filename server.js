@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
+import { buildSkills, buildItems, buildBestiary } from './content.js';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(dir, 'public'), DATA = process.env.VJ_DATA || path.join(dir, 'data'), UP = path.join(DATA, 'uploads');
@@ -22,7 +23,8 @@ const EL = ['fis', 'kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amatera
 const KINDS = ['dmg', 'mental', 'heal', 'passive'];
 const DOT = ['burn', 'bleed', 'poison', 'rad'];
 const STK = [...DOT, 'down', 'stun', 'sleep', 'para', 'silence', 'atkUp', 'atkDn', 'defUp', 'defDn', 'agiUp', 'agiDn', 'fear', 'fury', 'confuse'];
-const ITYPES = ['cons', 'arma', 'armadura', 'acess'];
+const STN = { down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
+const ITYPES = ['cons', 'arma', 'armadura', 'acess'], WT = ['', 'lamina', 'lanca', 'fogo', 'punho'], EFF = ['hp', 'aura', 'san', 'cure', 'body', 'rev', 'bomb'];
 const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
 // partes do corpo: atributos penalizados (−10 cada enquanto crítica), status ao ficar crítica, penalidade para mirar, peso no sorteio
 const BODY = { head: [['INT', 'SAB'], 'stun', 30, 6], torso: [['CON'], 'bleed', 0, 40], armL: [['FOR', 'DES'], 'atkDn', 15, 15], armR: [['FOR', 'DES'], 'atkDn', 15, 15], legL: [['AGI'], 'agiDn', 15, 12], legR: [['AGI'], 'agiDn', 15, 12] };
@@ -30,56 +32,22 @@ const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: '
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR']); // campos numéricos que só o mestre altera
 const EXTRA = { body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, per: {}, bio: '', gmNote: '', xpR: 0, goldR: 0 };
-const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', ...o });
-const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', price: 10, ...o });
+const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ...o });
+const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
 const SCH = {
-  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', ...ATTRS] },
-  items: { name: 's', type: ITYPES, eff: ['hp', 'aura', 'san'], attr: ATTRS, power: 'n', price: 'n' },
+  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', ...ATTRS], req: WT, back: ['', ...STK] },
+  items: { name: 's', type: ITYPES, eff: EFF, attr: ATTRS, wt: WT, el: ['', ...EL], power: 'n', price: 'n' },
 };
-// Grade compartilhada gerada: centro físico, anel de passivas e um raio de 5 nós para cada patrono elemental.
-function genGrid() {
-  const C = 7, G = {}, used = new Set();
-  const add = (gx, gy, s) => { used.add(gx + ',' + gy); G['g' + Object.keys(G).length] = { ...s, gx, gy }; };
-  const pas = (name, p, power, xp = 10, el = 'fis') => sk(name, 'passive', 'FOR', el, power, 0, 0, 0, { pas: p, xp });
-  add(C, C, sk('Golpe Pesado', 'dmg', 'FOR', 'fis', 14, 4, 0, 0, { st: 'stun' }));
-  [[0, -1, pas('Vigor', 'hpMax', 10)], [1, -1, sk('Golpe Giratório', 'dmg', 'FOR', 'fis', 10, 6, 0, 0, { area: true })], [1, 0, pas('Foco', 'auraMax', 8)],
-    [1, 1, sk('Tiro Certeiro', 'dmg', 'DES', 'fis', 12, 4, 0, 0, { ct: 60 })], [0, 1, pas('Mente Firme', 'sanMax', 10)],
-    [-1, 1, sk('Grito de Guerra', 'heal', 'CAR', 'fis', 2, 6, 0, 0, { st: 'atkUp', area: true })], [-1, 0, pas('Treino de Força', 'FOR', 5)],
-    [-1, -1, sk('Passo Rápido', 'heal', 'AGI', 'fis', 0, 4, 0, 0, { st: 'agiUp', ct: 50 })]].forEach(([x, y, s]) => add(C + x, C + y, s));
-  const E = [ // elemento, patrono, atributo, tipo, status, [básica, área, forte, suprema], recurso
-    ['kagutsuchi', 'Kagutsuchi', 'INT', 'dmg', 'burn', ['Centelha', 'Mar de Chamas', 'Lâmina de Kagutsuchi', 'Sol de Kagutsuchi']],
-    ['susanoo', 'Susanoo', 'INT', 'dmg', 'agiDn', ['Jato d\'Água', 'Maré Alta', 'Lança de Susanoo', 'Dilúvio de Susanoo']],
-    ['atlas', 'Atlas', 'FOR', 'dmg', 'defDn', ['Estilhaço', 'Terremoto', 'Punho de Atlas', 'Peso do Mundo']],
-    ['indra', 'Indra', 'INT', 'dmg', 'para', ['Faísca', 'Tempestade', 'Raio de Indra', 'Julgamento de Indra']],
-    ['fuhaku', 'Fuhaku', 'DES', 'dmg', 'bleed', ['Lâmina de Vento', 'Vendaval', 'Corte de Fuhaku', 'Tufão de Fuhaku']],
-    ['amaterasu', 'Amaterasu', 'SAB', 'heal', 'defUp', ['Luz Curativa', 'Aurora', 'Bênção de Amaterasu', 'Alvorada de Amaterasu']],
-    ['tsukuyomi', 'Tsukuyomi', 'INT', 'mental', 'fear', ['Sussurro Sombrio', 'Eclipse', 'Véu de Tsukuyomi', 'Noite Eterna']],
-    ['shukketsu', 'Shukketsu', 'INT', 'dmg', 'bleed', ['Sangria', 'Chuva Rubra', 'Pacto de Shukketsu', 'Hemorragia Final'], 'san'],
-    ['radiacao', 'Hiruko', 'INT', 'dmg', 'rad', ['Raio Gama', 'Chuva Ácida', 'Fissão de Hiruko', 'Meia-Vida']],
-  ];
-  E.forEach(([el, patron, attr, kind, st, n, res = 'aura'], i) => {
-    const at = r => [Math.round(C + r * Math.cos(i * 2 * Math.PI / 9)), Math.round(C + r * Math.sin(i * 2 * Math.PI / 9))], h = res === 'san' ? .6 : 1;
-    add(...at(2), sk(n[0], kind, attr, el, 12, Math.round(5 * h), 0, 0, { res }));
-    add(...at(3), pas('Proteção de ' + patron, 'res', 0, 15, el));
-    add(...at(4), sk(n[1], kind, attr, el, 12, Math.round(9 * h), 0, 0, { res, area: true, ct: 125, xp: 20 }));
-    add(...at(5), sk(n[2], kind, attr, el, 20, Math.round(10 * h), 0, 0, { res, st, xp: 25 }));
-    add(...at(6), sk(n[3], kind, attr, el, 26, Math.round(18 * h), 0, 0, { res, st, area: true, ct: 150, xp: 40 }));
-  });
-  const fill = [sk('Golpe Limite', 'dmg', 'FOR', 'fis', 40, 0, 0, 0, { limit: true, xp: 20 }), ...['CON', 'AGI', 'INT', 'SAB', 'DES', 'SOR', 'CAR'].map(a => pas('Treino de ' + a, a, 5))];
-  for (let x = C - 3; x <= C + 3; x++) for (let y = C - 3; y <= C + 3; y++) if (!used.has(x + ',' + y) && fill.length) add(x, y, fill.shift());
-  return G;
-}
-const ITEMS = [it('Poção', 'cons', 20), it('Éter de Aura', 'cons', 15, { eff: 'aura' }), it('Calmante', 'cons', 10, { eff: 'san' }),
-  it('Espada de Ferro', 'arma', 12, { price: 50 }), it('Cota de Couro', 'armadura', 3, { price: 40 }), it('Amuleto da Sorte', 'acess', 10, { price: 60 })];
-
 // ---------- estado ----------
 let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] }, fresh = true;
 try { S = JSON.parse(fs.readFileSync(FILE)); fresh = false; } catch {}
 const newScene = (name, o = {}) => ({ name, cols: 20, rows: 12, bg: '', fogOn: false, seen: {}, ...o });
 if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; delete S.map; }
-S.skills ??= genGrid();
-S.items ??= Object.fromEntries(ITEMS.map((s, i) => ['i' + i, s]));
+S.skills ??= buildSkills(sk);
+S.items ??= buildItems(it);
+for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; }
+for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
 Object.assign(S, { camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, shop: { open: false, stock: [] }, ...S });
 for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
 
@@ -159,6 +127,7 @@ function hurt(t, d) { // dano em HP: enche Limite, acorda, avisa queda
   t.hp = Math.max(0, t.hp - d);
   addLimit(t, Math.ceil(100 * d / (t.hpMax || 1)));
   delete t.st.sleep;
+  if (t.boss && !t.rage && t.hp > 0 && t.hp <= t.hpMax / 2) { t.rage = true; t.st.atkUp = t.st.agiUp = 99; t.limit = 100; return ` ${t.name} entra em fúria!`; }
   if (!was || t.hp) return '';
   if (!t.enemy) t.dying = 3;
   Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && o !== t && o.enemy === t.enemy).forEach(o => addLimit(o, 25));
@@ -191,7 +160,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
 }
 
 function strike(a, s, t, aim) {
-  const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${s.st}]` : '';
+  const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal') {
     const v = Math.max(1, s.power + Math.floor(stat / R.healDiv));
     t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v);
@@ -205,7 +174,7 @@ function strike(a, s, t, aim) {
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, fx: { id: t.id, miss: 1 } });
     return false;
   }
-  const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el), down = w && !t.st.down;
+  const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
   const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1);
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv) - (mental ? 0 : t.armor + (eq(t, 'armadura')?.power || 0))) * mult));
   a.marks[s.attr] = true;
@@ -229,15 +198,15 @@ const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll']);
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
   color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
-if (fresh) { // bestiário inicial de exemplo
-  const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n), B = (name, color, attrs, weak, resist, skills, o = {}) => {
-    const ch = { ...newChar('', true, ''), name, color, weak, resist, skills: skills.map(sk).filter(Boolean), ...o }; Object.assign(ch.attrs, attrs); S.bestiary[rid()] = ch; };
-  B('Oni', '#b3001b', { FOR: 65, CON: 60, AGI: 35 }, ['amaterasu'], ['atlas'], ['Golpe Pesado', 'Estilhaço'], { arma: 12, xpR: 15, goldR: 20 });
-  B('Kappa', '#2f8f6b', { AGI: 55, DES: 55 }, ['indra'], ['susanoo'], ["Jato d'Água", 'Maré Alta']);
-  B('Kitsune', '#ff7a1a', { INT: 65, AGI: 60, CON: 40 }, ['susanoo'], ['kagutsuchi'], ['Centelha', 'Mar de Chamas', 'Sussurro Sombrio'], { xpR: 15 });
-  B('Yurei', '#9a8cff', { INT: 60, SAB: 60, FOR: 30 }, ['amaterasu'], ['fis', 'tsukuyomi'], ['Sussurro Sombrio', 'Eclipse'], { xpR: 15 });
-  B('Tengu', '#3a3f5c', { AGI: 70, DES: 60 }, ['atlas'], ['fuhaku'], ['Lâmina de Vento', 'Vendaval', 'Tiro Certeiro'], { armor: 2, xpR: 20, goldR: 25 });
-}
+const TIER = { fraco: [.8, .6], normal: [1, 1], elite: [1.25, 1.6] }; // multiplicadores de atributos e de recompensa
+// monta um modelo de inimigo a partir das tabelas de content.js (skills por nome ou por filtro)
+const makeFoe = (name, color, attrs, weak, resist, skills, o = {}) => {
+  const ids = typeof skills === 'function' ? Object.keys(S.skills).filter(k => skills(S.skills[k])) : skills.map(n => Object.keys(S.skills).find(k => S.skills[k].name === n)).filter(Boolean);
+  const ch = { ...newChar('', true, ''), name, color, weak, resist, skills: ids, ...o }; Object.assign(ch.attrs, attrs); return ch;
+};
+const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => [rid(), ch])); };
+if (fresh) loadBestiary();
+const wtype = ch => eq(ch, 'arma')?.wt || 'punho'; // sem arma equipada luta com os punhos
 const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, hp: 1, aura: 1, san: 1, x: 1, y: 1 };
 const H = {
   addChar(c, m) {
@@ -345,8 +314,9 @@ const H = {
     const a = S.chars[current()];
     if (c.role !== 'gm' || !S.battle.active || !a?.enemy) return;
     const alive = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o?.hp > 0), foes = alive.filter(o => o.enemy !== a.enemy);
-    const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
-    const skill = usable.length && Math.random() < .7 ? pick(usable) : 'atk', heal = S.skills[skill]?.kind === 'heal';
+    const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && s.kind !== 'passive' && (!s.req || s.req === wtype(a)) && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
+    const lim = usable.find(k => S.skills[k].limit); // Limite carregado tem prioridade
+    const skill = lim || (usable.length && Math.random() < .7 ? pick(usable) : 'atk'), heal = S.skills[skill]?.kind === 'heal';
     const t = heal ? alive.filter(o => o.enemy === a.enemy).sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0] : Math.random() < R.aiFocus ? foes.sort((x, y) => x.hp - y.hp)[0] : pick(foes); // às vezes foca o oponente mais ferido
     if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
   },
@@ -363,8 +333,9 @@ const H = {
     const a = S.chars[current()], t0 = S.chars[m.target];
     if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || !t0 || !(t0.id in S.battle.ticks)) return;
     const basic = m.skill === 'atk';
-    const s = basic ? { name: 'Ataque', kind: 'dmg', attr: 'FOR', el: 'fis', power: eq(a, 'arma')?.power ?? a.arma, cost: 0, res: 'aura' } : a.skills.includes(m.skill) && S.skills[m.skill];
-    if (!s || s.kind === 'passive' || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
+    const wp = eq(a, 'arma');
+    const s = basic ? { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: wp?.power ?? a.arma, cost: 0, res: 'aura' } : a.skills.includes(m.skill) && S.skills[m.skill];
+    if (!s || s.kind === 'passive' || (s.req && s.req !== wtype(a)) || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
     a[s.res] -= s.cost;
     if (s.limit) a.limit = 0;
     const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
@@ -372,6 +343,7 @@ const H = {
     let more = false;
     const aim = !s.area && !heal && PARTS.includes(m.aim) ? m.aim : null;
     for (const t of ts) if (!t.dead) more = strike(a, s, t, aim) || more;
+    if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }
     if (more && a.hp > 0) log(a.name, 'acertou a fraqueza — MAIS UM turno!', 'ok'); else endTurn(a.id, s.ct);
   },
   learn(c, m) {
@@ -404,11 +376,17 @@ const H = {
     const inB = S.battle.active && ch.id in S.battle.ticks;
     if (inB && current() !== ch.id) return;
     const t = inB && S.chars[m.target] && m.target in S.battle.ticks ? S.chars[m.target] : ch;
-    if (t.dead) return;
-    if (i.eff === 'hp') { delete t.dying; healBody(t, i.power); }
-    t[i.eff] = Math.min(t[i.eff + 'Max'], t[i.eff] + i.power);
+    if (t.dead || (i.eff === 'bomb' && (!inB || t === ch)) || (i.eff === 'rev' && t.hp > 0) || (t.hp <= 0 && !['rev', 'hp'].includes(i.eff))) return;
+    let txt = `+${i.power} ${i.eff.toUpperCase()}`, fx;
+    if (i.eff === 'bomb') { // bomba: dano fixo do elemento, sem rolagem
+      const d = Math.max(1, Math.round(i.power * (t.weak.includes(i.el) ? 1.5 : 1) * (t.resist.includes(i.el) ? .5 : 1)));
+      txt = `${d} de dano${hurt(t, d)}`; fx = { fx: { id: t.id, dmg: d, el: i.el } };
+    } else if (i.eff === 'cure') { for (const k of Object.keys(t.st)) if (!k.endsWith('Up')) delete t.st[k]; txt = 'condições removidas'; }
+    else if (i.eff === 'body') { healBody(t, i.power); txt = 'ferimentos tratados'; }
+    else if (i.eff === 'rev') { t.hp = Math.min(t.hpMax, i.power); delete t.dying; txt = 'de volta à luta'; }
+    else { if (i.eff === 'hp') { delete t.dying; healBody(t, i.power); } t[i.eff] = Math.min(t[i.eff + 'Max'], t[i.eff] + i.power); }
     H.drop(c, m);
-    log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (+${i.power} ${i.eff.toUpperCase()})`, 'ok');
+    log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (${txt})`, 'ok', fx);
     if (inB) endTurn(ch.id);
   },
   // ----- descanso e acampamento -----
@@ -454,7 +432,19 @@ const H = {
   },
   // ----- bestiário -----
   bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {} }); },
-  bSpawn(c, m) { if (c.role === 'gm' && Object.hasOwn(S.bestiary, m.id)) { const id = rid(); S.chars[id] = { ...structuredClone(S.bestiary[m.id]), id, x: 0, y: 0, scene: S.scene }; } },
+  bSpawn(c, m) {
+    if (c.role !== 'gm' || !Object.hasOwn(S.bestiary, m.id)) return;
+    const id = rid(), ch = S.chars[id] = { ...structuredClone(S.bestiary[m.id]), id, x: 0, y: 0, scene: S.scene }, [k, rw] = TIER[m.tier] || TIER.normal;
+    if (k !== 1) { for (const a of ATTRS) ch.attrs[a] = int(ch.attrs[a] * k, 1, 100); ch.xpR = Math.round(ch.xpR * rw); ch.goldR = Math.round(ch.goldR * rw); ch.name += ` (${m.tier})`; }
+    ch.hp = ch.aura = ch.san = 999;
+  },
+  content(c, m) { // restaura o conteúdo padrão de uma coleção (skills aprendidas e itens dos personagens são limpos se a coleção mudar)
+    if (c.role !== 'gm') return;
+    if (m.coll === 'skills') { S.skills = buildSkills(sk); Object.values(S.chars).forEach(ch => ch.skills = []); }
+    else if (m.coll === 'items') { S.items = buildItems(it); Object.values(S.chars).forEach(ch => { ch.inv = {}; ch.equip = {}; }); S.shop.stock = []; }
+    else if (m.coll === 'bestiary') loadBestiary();
+    log('Mestre', `restaurou o conteúdo padrão (${m.coll}).`);
+  },
   bDel(c, m) { if (c.role === 'gm') delete S.bestiary[m.id]; },
   // ----- chat: texto livre, /r XdY+Z, /w nome mensagem -----
   chat(c, m) {
@@ -481,7 +471,7 @@ const H = {
   edSet(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(SCH, m.coll) || !Object.hasOwn(SCH[m.coll], m.f) || !Object.hasOwn(S[m.coll], m.id)) return;
     const o = S[m.coll][m.id], r = SCH[m.coll][m.f], v = m.v;
-    o[m.f] = r === 's' ? String(v).slice(0, 40) || '?' : r === 'n' ? int(v, 0, 999) : r === 'g' ? int(v, 0, 14) : r === 'b' ? !!v : r.includes(v) ? v : o[m.f];
+    o[m.f] = r === 's' ? String(v).slice(0, 40) || '?' : r === 'n' ? int(v, 0, 999) : r === 'g' ? int(v, 0, 16) : r === 'b' ? !!v : r.includes(v) ? v : o[m.f];
   },
 };
 
