@@ -74,14 +74,14 @@ const ITEMS = [it('Poção', 'cons', 20), it('Éter de Aura', 'cons', 15, { eff:
   it('Espada de Ferro', 'arma', 12, { price: 50 }), it('Cota de Couro', 'armadura', 3, { price: 40 }), it('Amuleto da Sorte', 'acess', 10, { price: 60 })];
 
 // ---------- estado ----------
-let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] };
-try { S = JSON.parse(fs.readFileSync(FILE)); } catch {}
+let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] }, fresh = true;
+try { S = JSON.parse(fs.readFileSync(FILE)); fresh = false; } catch {}
 const newScene = (name, o = {}) => ({ name, cols: 20, rows: 12, bg: '', fogOn: false, seen: {}, ...o });
 if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; delete S.map; }
 S.skills ??= genGrid();
 S.items ??= Object.fromEntries(ITEMS.map((s, i) => ['i' + i, s]));
 Object.assign(S, { camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, shop: { open: false, stock: [] }, ...S });
-for (const ch of Object.values(S.chars)) Object.assign(ch, { ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
+for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
 
 // ---------- http ----------
 const server = http.createServer((req, res) => {
@@ -116,10 +116,15 @@ let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { fs.mkdirSync(DATA, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(S)); }, 300); };
 const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, note: undefined, gmNote: undefined }]));
 // cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
-const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, scenes: strip(S.scenes), chars: strip(S.chars),
+// jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
+const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name: ch.name, enemy: true, owner: '', color: ch.color, img: ch.img, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, hp: Math.ceil(ch.hp * k), hpMax: 100,
+  body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: [], resist: [], marks: {}, per: {}, bon: {} }; };
+const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
+const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
+const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, scenes: strip(S.scenes), chars: pubChars(),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 const sendState = c => c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
-const push = () => { Object.values(S.chars).forEach(derive); wss.clients.forEach(sendState); save(); };
+const push = () => { Object.values(S.chars).forEach(derive); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -142,7 +147,10 @@ const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 :
 // CTB: quanto maior a AGI, menor o intervalo entre turnos
 const delay = ch => Math.round(1000 / Math.max(1, at(ch, 'AGI') * (ch.st.agiUp ? 1.25 : 1) * (ch.st.agiDn ? .75 : 1)));
 // heróis caídos continuam na fila: o "turno" deles conta para a morte
-const current = () => Object.keys(S.battle.ticks).filter(k => { const ch = S.chars[k]; return ch && !ch.dead && (ch.hp > 0 || !ch.enemy); }).sort((a, b) => S.battle.ticks[a] - S.battle.ticks[b] || a.localeCompare(b))[0];
+const nextOf = T => Object.keys(T).filter(k => { const ch = S.chars[k]; return ch && !ch.dead && (ch.hp > 0 || !ch.enemy); }).sort((a, b) => T[a] - T[b] || a.localeCompare(b))[0];
+const current = () => nextOf(S.battle.ticks);
+const order = () => { const T = { ...S.battle.ticks }, out = []; for (let i = 0; i < 8; i++) { const id = nextOf(T); if (!id) break; out.push(id); T[id] += delay(S.chars[id]); } return out; }; // próximos turnos previstos
+const onMap = ch => ch.x != null && ch.scene === S.scene;
 const tickSt = ch => { for (const k in ch.st) if (--ch.st[k] <= 0) delete ch.st[k]; };
 const addLimit = (ch, v) => ch.limit = Math.min(100, ch.limit + v);
 
@@ -217,14 +225,32 @@ function strike(a, s, t, aim) {
   return down;
 }
 
+const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll']);
+const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
+  color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
+  limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
+if (fresh) { // bestiário inicial de exemplo
+  const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n), B = (name, color, attrs, weak, resist, skills, o = {}) => {
+    const ch = { ...newChar('', true, ''), name, color, weak, resist, skills: skills.map(sk).filter(Boolean), ...o }; Object.assign(ch.attrs, attrs); S.bestiary[rid()] = ch; };
+  B('Oni', '#b3001b', { FOR: 65, CON: 60, AGI: 35 }, ['amaterasu'], ['atlas'], ['Golpe Pesado', 'Estilhaço'], { arma: 12, xpR: 15, goldR: 20 });
+  B('Kappa', '#2f8f6b', { AGI: 55, DES: 55 }, ['indra'], ['susanoo'], ["Jato d'Água", 'Maré Alta']);
+  B('Kitsune', '#ff7a1a', { INT: 65, AGI: 60, CON: 40 }, ['susanoo'], ['kagutsuchi'], ['Centelha', 'Mar de Chamas', 'Sussurro Sombrio'], { xpR: 15 });
+  B('Yurei', '#9a8cff', { INT: 60, SAB: 60, FOR: 30 }, ['amaterasu'], ['fis', 'tsukuyomi'], ['Sussurro Sombrio', 'Eclipse'], { xpR: 15 });
+  B('Tengu', '#3a3f5c', { AGI: 70, DES: 60 }, ['atlas'], ['fuhaku'], ['Lâmina de Vento', 'Vendaval', 'Tiro Certeiro'], { armor: 2, xpR: 20, goldR: 25 });
+}
 const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, hp: 1, aura: 1, san: 1, x: 1, y: 1 };
 const H = {
   addChar(c, m) {
     if (c.role !== 'gm' && c.role !== 'player') return;
     const enemy = c.role === 'gm' && !!m.enemy, id = rid();
-    S.chars[id] = { id, name: enemy ? 'Inimigo' : 'Herói', owner: enemy ? '' : (c.role === 'gm' ? String(m.owner || '').trim().slice(0, 30) : c.name), enemy,
-      color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
-      limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} };
+    S.chars[id] = newChar(id, enemy, enemy ? '' : (c.role === 'gm' ? String(m.owner || '').trim().slice(0, 30) : c.name));
+  },
+  undo(c) { // desfaz a última ação do mestre (até 20)
+    if (c.role !== 'gm' || !undoStack.length) return;
+    const prev = JSON.parse(undoStack.pop()), keep = { log: S.log, users: S.users, seq: S.seq };
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, prev, keep);
+    log('Mestre', 'desfez a última ação.');
   },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
@@ -245,7 +271,7 @@ const H = {
     else if (f.startsWith('per.') && Object.hasOwn(PER, f.slice(4))) ch.per[f.slice(4)] = int(m.v, 0, 60);
   },
   move(c, m) { const ch = S.chars[m.id]; if (can(c, ch)) { ch.x = int(m.x, 0, scene().cols - 1); ch.y = int(m.y, 0, scene().rows - 1); } },
-  place(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) ch.x = ch.y = ch.x == null ? 0 : null; },
+  place(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) { ch.x = ch.y = onMap(ch) ? null : 0; ch.scene = S.scene; } },
   roll(c, m) {
     const ch = S.chars[m.id];
     const per = Object.hasOwn(PER, m.per) ? PER[m.per] : null;
@@ -294,9 +320,9 @@ const H = {
     for (let x = int(m.x) - 1; x <= int(m.x) + 1; x++) for (let y = int(m.y) - 1; y <= int(m.y) + 1; y++)
       if (x >= 0 && y >= 0 && x < sc.cols && y < sc.rows) { if (m.hide) delete sc.seen[x + ',' + y]; else sc.seen[x + ',' + y] = 1; }
   },
-  sceneAdd(c) { if (c.role === 'gm') { const id = rid(); S.scenes[id] = newScene('Cena ' + (Object.keys(S.scenes).length + 1)); S.scene = id; } },
-  sceneGo(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) S.scene = m.id; },
-  sceneDel(c) { if (c.role === 'gm' && Object.keys(S.scenes).length > 1) { delete S.scenes[S.scene]; S.scene = Object.keys(S.scenes)[0]; } },
+  sceneAdd(c) { if (c.role === 'gm') { const id = rid(); S.scenes[id] = newScene('Cena ' + (Object.keys(S.scenes).length + 1)); H.sceneGo(c, { id }); } },
+  sceneGo(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) { S.scene = m.id; Object.values(S.chars).filter(ch => !ch.enemy).forEach(ch => ch.scene = m.id); } }, // heróis acompanham a cena; inimigos ficam na deles
+  sceneDel(c) { if (c.role === 'gm' && Object.keys(S.scenes).length > 1) { delete S.scenes[S.scene]; H.sceneGo(c, { id: Object.keys(S.scenes)[0] }); } },
   // ----- batalha -----
   battle(c, m) {
     if (c.role !== 'gm') return;
@@ -312,7 +338,7 @@ const H = {
       log('Mestre', `Vitória! +${xp} XP e +${gold} de ouro para cada herói.${drops.length ? ' Espólios: ' + drops.join(', ') : ''}`, 'ok');
     }
     S.battle = { active: !!m.on, ticks: {} };
-    if (m.on) Object.values(S.chars).filter(ch => ch.x != null && ch.hp > 0 && !ch.dead).forEach(ch => S.battle.ticks[ch.id] = delay(ch));
+    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => S.battle.ticks[ch.id] = delay(ch));
     log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
   },
   ai(c) { // IA simples: 70% usa uma skill disponível; cura o aliado mais ferido, ataca um oponente aleatório
@@ -428,7 +454,7 @@ const H = {
   },
   // ----- bestiário -----
   bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {} }); },
-  bSpawn(c, m) { if (c.role === 'gm' && Object.hasOwn(S.bestiary, m.id)) { const id = rid(); S.chars[id] = { ...structuredClone(S.bestiary[m.id]), id, x: 0, y: 0 }; } },
+  bSpawn(c, m) { if (c.role === 'gm' && Object.hasOwn(S.bestiary, m.id)) { const id = rid(); S.chars[id] = { ...structuredClone(S.bestiary[m.id]), id, x: 0, y: 0, scene: S.scene }; } },
   bDel(c, m) { if (c.role === 'gm') delete S.bestiary[m.id]; },
   // ----- chat: texto livre, /r XdY+Z, /w nome mensagem -----
   chat(c, m) {
@@ -481,8 +507,17 @@ wss.on('connection', c => {
       const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) });
       return wss.clients.forEach(o => o.readyState === 1 && o.send(p));
     }
+    if (c.role === 'gm' && Object.hasOwn(H, m.t) && !NOUNDO.has(m.t)) { undoStack.push(JSON.stringify({ ...S, log: undefined, users: undefined })); if (undoStack.length > 20) undoStack.shift(); }
     if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
   });
 });
 export { H, S, R, current, derive };
+export { view, order };
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (!fresh) { // cópia de segurança do estado a cada início (mantém as 10 mais recentes)
+    const bk = path.join(DATA, 'backups'); fs.mkdirSync(bk, { recursive: true });
+    fs.copyFileSync(FILE, path.join(bk, `state-${new Date().toISOString().replace(/[:.]/g, '-')}.json`));
+    fs.readdirSync(bk).sort().slice(0, -10).forEach(f => fs.unlinkSync(path.join(bk, f)));
+  }
+}
 if (process.argv[1] === fileURLToPath(import.meta.url)) server.listen(PORT, () => console.log(`virtualJRPG em http://localhost:${PORT}  (chave do mestre: ${KEY})`));
