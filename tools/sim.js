@@ -1,34 +1,55 @@
-// Simulador de balanceamento: roda batalhas 4x4 usando as regras reais do servidor.
-//   node tools/sim.js [batalhas]        VJ_RULES='{"hit":50}' node tools/sim.js
+// Simulador de balanceamento com as regras reais do servidor.
+//   node tools/sim.js [batalhas] [modo]     modos: base (4x4 contra o inimigo padrão), enc (encontros gerados), boss (chefes)
+//   VJ_RULES='{"hit":50}' node tools/sim.js 300 enc   testa uma variação sem editar o código
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjsim-'));
-const { H, S, R, current, derive } = await import('../server.js');
-const gm = { role: 'gm' }, N = +process.argv[2] || 400, sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
-const potion = Object.keys(S.items).find(k => S.items[k].eff === 'hp');
-const KITS = [['Golpe Pesado', 'Golpe Giratório'], ['Centelha', 'Mar de Chamas'], ['Luz Curativa', 'Aurora'], ['Tiro Certeiro', 'Lâmina de Vento']];
-let wins = 0, rounds = 0, falls = 0, deaths = 0;
+const { H, S, R, current, derive, genFoe, partyRef, fitBoss, spawn } = await import('../server.js');
+const gm = { role: 'gm' }, N = +process.argv[2] || 300, MODE = process.argv[3] || 'base', out = s => process.stdout.write(s + '\n');
+const byName = n => Object.keys(S.skills).find(k => S.skills[k].name === n), item = n => Object.keys(S.items).find(k => S.items[k].name === n);
+const TREE = (await import('../tree.js')).TREE, ids = (el, b, n) => TREE[el].branches[b].slice(0, n).map(o => byName(o.n));
 console.log = () => {};
-for (let n = 0; n < N; n++) {
-  S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} };
-  for (let i = 0; i < 4; i++) { H.addChar(gm, { owner: 'p' }); H.addChar(gm, { enemy: true }); }
-  const all = Object.values(S.chars), heroes = all.filter(c => !c.enemy), foes = all.filter(c => c.enemy), acts = {};
-  heroes.forEach((h, i) => { h.skills = KITS[i].map(sk); h.inv[potion] = 1; });
-  all.forEach(c => { derive(c); c.hp = c.hpMax; c.aura = c.auraMax; c.san = c.sanMax; });
-  H.battle(gm, { on: true });
-  for (let step = 0; step < 800; step++) {
-    const a = S.chars[current()], liveF = foes.filter(f => f.hp > 0), liveH = heroes.filter(h => h.hp > 0);
+const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
+// grupo de heróis por nível: 0 = recém-criado, 1 = algumas sessões, 2 = veterano. O 4º herói é curandeiro de Amaterasu.
+const VINC = [['indra', 'AGI', 'INT'], ['fuhaku', 'DES', 'INT'], ['radiacao', 'CON', 'FOR'], ['amaterasu', 'SAB', 'CAR']];
+function party(size, lvl) {
+  return VINC.slice(0, size).map(([el, a1, a2]) => {
+    const had = new Set(Object.keys(S.chars)); H.addChar(gm, { owner: 'p' }); const h = S.chars[Object.keys(S.chars).find(k => !had.has(k))], up = lvl * 8;
+    for (const a in h.attrs) h.attrs[a] = 40 + up; Object.assign(h.attrs, { [a1]: 62 + up, [a2]: 52 + up, AGI: Math.max(h.attrs.AGI, 50 + up), CON: Math.max(h.attrs.CON, 46 + up) });
+    h.vinc = [el]; h.arma = [10, 14, 19][lvl]; h.armor = [0, 2, 4][lvl]; h.bon.hpMax = lvl * 12; h.bon.auraMax = lvl * 6;
+    h.skills = [...ids(el, 0, [1, 4, 7][lvl]), ...ids(el, 3, [0, 2, 4][lvl]), byName('Golpe Pesado'), ...(lvl ? [byName('Golpe Giratório')] : [])].filter(Boolean);
+    h.inv[item(lvl ? 'Tônico Forte' : 'Tônico')] = 1 + lvl;
+    return h;
+  });
+}
+function fight(heroes, foes) {
+  [...heroes, ...foes].forEach(c => { derive(c); c.hp = c.hpMax; c.aura = c.auraMax; c.san = c.sanMax; });
+  H.battle(gm, { on: true }); const acts = {};
+  for (let step = 0; step < 1500; step++) {
+    const live = Object.values(S.chars), liveF = live.filter(f => f.enemy && f.hp > 0), liveH = heroes.filter(h => h.hp > 0), a = S.chars[current()];
     if (!liveF.length || !liveH.length || !a) break;
     acts[a.id] = (acts[a.id] || 0) + 1;
     if (a.enemy) { H.ai(gm); continue; }
-    // heróis: curam quem está mal, usam poção em emergência, senão focam o inimigo mais ferido
-    const hurt = heroes.filter(h => !h.dead && h.hp < h.hpMax * .4).sort((x, y) => x.hp - y.hp)[0], weak = liveF.sort((x, y) => x.hp - y.hp)[0];
-    const can = k => S.skills[k] && a.aura >= S.skills[k].cost, heal = a.skills.find(k => can(k) && S.skills[k].kind === 'heal'), dmg = a.skills.filter(k => can(k) && S.skills[k].kind === 'dmg');
-    if (hurt && heal) H.act(gm, { id: a.id, skill: heal, target: hurt.id });
-    else if (a.hp < a.hpMax * .3 && a.inv[potion]) H.use(gm, { id: a.id, item: potion, target: a.id });
-    else H.act(gm, { id: a.id, skill: dmg.length && Math.random() < .6 ? dmg[Math.floor(Math.random() * dmg.length)] : 'atk', target: weak.id });
+    // heróis: Limite se cheio, cura quem está mal, poção em emergência, senão a skill mais forte que puder pagar no inimigo mais ferido
+    const sks = a.skills.map(k => [k, S.skills[k]]).filter(([, s]) => s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100) && !a.st.silence && !a.st.fury);
+    const hurt = heroes.filter(h => !h.dead && h.hp < h.hpMax * .45).sort((x, y) => x.hp - y.hp)[0], weak = liveF.sort((x, y) => x.hp - y.hp)[0], pot = Object.keys(a.inv).find(k => S.items[k]?.eff === 'hp');
+    const lim = sks.find(([, s]) => s.limit), heal = sks.filter(([, s]) => s.kind === 'heal' && s.power > 0).sort((x, y) => y[1].power - x[1].power)[0], dmg = sks.filter(([, s]) => s.kind !== 'heal' && !s.limit).sort((x, y) => y[1].power - x[1].power)[0];
+    if (lim) H.act(gm, { id: a.id, skill: lim[0], target: weak.id });
+    else if (hurt && heal) H.act(gm, { id: a.id, skill: heal[0], target: hurt.id });
+    else if (a.hp < a.hpMax * .3 && pot) H.use(gm, { id: a.id, item: pot, target: a.id });
+    else H.act(gm, { id: a.id, skill: dmg && Math.random() < .65 ? dmg[0] : 'atk', target: weak.id });
   }
-  if (foes.every(f => f.hp <= 0)) wins++;
-  rounds += Math.max(...Object.values(acts)); falls += S.log.filter(e => / caiu!/.test(e.text) && heroes.some(h => e.text.includes(h.name + ' caiu'))).length; deaths += heroes.filter(h => h.dead).length;
+  const win = !Object.values(S.chars).some(f => f.enemy && f.hp > 0) && heroes.some(h => h.hp > 0);
+  return { win, rounds: Math.max(...heroes.map(h => acts[h.id] || 0)), dead: heroes.filter(h => h.dead).length };
 }
-process.stdout.write(`regras ${JSON.stringify(R)}\n${N} batalhas 4x4 · vitória dos heróis ${(100 * wins / N).toFixed(0)}% · rodadas ${(rounds / N).toFixed(1)} · quedas de herói/batalha ${(falls / N).toFixed(2)} · mortes/batalha ${(deaths / N).toFixed(2)}\n`);
+const run = (label, setup) => { let w = 0, r = 0, d = 0; for (let i = 0; i < N; i++) { reset(); const [hs, fs] = setup(); const o = fight(hs, fs); w += o.win; r += o.rounds; d += o.dead; }
+  out(`${label.padEnd(44)} vitória ${String(Math.round(100 * w / N)).padStart(3)}% · rodadas ${(r / N).toFixed(1).padStart(4)} · mortes ${(d / N).toFixed(2)}`); };
+const foesNow = () => Object.values(S.chars).filter(c => c.enemy);
+out(`regras ${JSON.stringify({ rank: R.rank, diff: R.diff })}\n${N} batalhas por linha`);
+if (MODE === 'base') run('4 heróis nível 0 x 4 inimigos padrão', () => { const hs = party(4, 0); for (let i = 0; i < 4; i++) H.addChar(gm, { enemy: true }); return [hs, foesNow()]; });
+if (MODE === 'enc') for (const size of (process.env.SIZES || '3,4').split(',').map(Number)) for (const lvl of (process.env.LVLS || '0,1,2').split(',').map(Number)) for (const diff of Object.keys(R.diff))
+  run(`${size} heróis nível ${lvl} · encontro ${diff}`, () => { const hs = party(size, lvl); H.foeEnc(gm, { diff }); return [hs, foesNow()]; });
+if (MODE === 'boss') {
+  for (const size of [3, 4]) for (const lvl of [0, 2]) run(`${size} heróis nível ${lvl} · chefe gerado`, () => { const hs = party(size, lvl); H.foeGen(gm, { el: ['kagutsuchi', 'atlas', 'tsukuyomi', 'indra'][Math.floor(Math.random() * 4)], role: ['bruto', 'conjurador'][Math.floor(Math.random() * 2)], rank: 'chefe' }); return [hs, foesNow()]; });
+  for (const [id, b] of Object.entries(S.bestiary).filter(([, b]) => b.boss)) for (const lvl of [0, 2]) run(`4 heróis nível ${lvl} · ${b.name}`, () => { const hs = party(4, lvl); H.bSpawn(gm, { id }); return [hs, foesNow()]; });
+}
 process.exit(0);

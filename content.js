@@ -13,8 +13,8 @@ export function buildSkills(sk) {
   const put = (x, y, s) => { used.set(x + ',' + y, s.el); G['g' + Object.keys(G).length] = { ...s, gx: x, gy: y }; return [x, y]; };
   const around = (x, y) => { const o = []; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) o.push([x + dx, y + dy]); return o; };
   // encadeia nós para fora do centro; o primeiro precisa encostar numa casa já usada que sirva de âncora (anchor)
-  const chain = (deg, r0, nodes, anchor) => {
-    let prev = null; const placed = [];
+  const chain = (deg, r0, nodes, anchor, start) => {
+    let prev = start || null; const placed = [];
     nodes.forEach((s, i) => {
       const a = deg * Math.PI / 180, tx = C + (r0 + i) * Math.cos(a), ty = C + (r0 + i) * Math.sin(a);
       let cand = prev ? around(...prev).filter(p => free(...p)) : [...used.keys()].filter(k => anchor(k)).flatMap(k => around(...k.split(',').map(Number))).filter(p => free(...p));
@@ -23,23 +23,32 @@ export function buildSkills(sk) {
     });
     return placed;
   };
+  // ramo de 10 nós bifurcado: tronco (1-4), caminho A (5-7) e caminho B (8-9) saindo do nó 4, e o nó final na ponta de A ou de B
+  const forked = (deg, r0, nodes, anchor, capB) => {
+    if (nodes.length !== 10) return chain(deg, r0, nodes, anchor);
+    const at = k => k.split(',').map(Number), trunk = chain(deg, r0, nodes.slice(0, 4), anchor), fork = at(trunk[3]);
+    const A = chain(deg - 5, r0 + 4, nodes.slice(4, 7), null, fork), B = chain(deg + 5, r0 + 4, nodes.slice(7, 9), null, fork);
+    return [...trunk, ...A, ...B, ...chain(deg + (capB ? 5 : -5), r0 + (capB ? 6 : 7), [nodes[9]], null, at((capB ? B : A).at(-1)))];
+  };
   const M = TREE.marcial.branches, fis = k => used.get(k) === 'fis';
   put(C, C, node(M[0][0], 'fis'));
   around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis')));
   // 1ª passada: o ramo 0 de cada Vínculo (ataque, com a skill raiz) abre o eixo do setor
-  const main = EL9.map((el, i) => chain(i * 40, 3, TREE[el].branches[0].map((o, n) => node(o, el, n ? {} : { root: true })), fis));
+  const main = EL9.map((el, i) => forked(i * 40, 3, TREE[el].branches[0].map((o, n) => node(o, el, n ? {} : { root: true })), fis, false));
   [20, 100, 220, 300].forEach((deg, i) => chain(deg, 2, M[i + 1].map(o => node(o, 'fis')), fis)); // estilos de arma nos vãos entre setores
   const train = M[5].map(o => node(o, 'fis')); // treinos de atributo nas casas livres junto ao centro (reservadas antes dos ramos laterais)
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
     if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
   // 2ª passada: os demais ramos se abrem em leque nas laterais, presos à base do ramo 0. Um ramo em que todo nó exige
   // arma é dividido em uma trilha por tipo de arma, para ninguém precisar comprar nó de arma que não usa.
-  EL9.forEach((el, i) => {
-    const B = TREE[el].branches, deg = i * 40, rest = B.slice(1), base = new Set(main[i].slice(0, B.length > 3 ? 5 : 4)), ext = rest.length > 2 ? 17 : 13, step = ext / Math.ceil(rest.length / 2);
-    rest.forEach((br, j) => {
-      const off = (j % 2 ? 1 : -1) * Math.ceil((j + 1) / 2) * step, groups = br.every(o => o.req) ? Object.values(br.reduce((g, o) => ((g[o.req] ||= []).push(o), g), {})) : [br];
-      groups.forEach((g, m) => chain(deg + off + (m - (groups.length - 1) / 2) * 4, 5, g.map(o => node(o, el)), k => base.has(k)));
-    });
+  // Um ramo lateral de cada Vínculo por vez (e não um Vínculo inteiro por vez), para nenhum setor cercar o vizinho.
+  const most = Math.max(...EL9.map(el => TREE[el].branches.length));
+  for (let j = 0; j < most - 1; j++) EL9.forEach((el, i) => {
+    const B = TREE[el].branches, br = B[j + 1], deg = i * 40;
+    if (!br) return;
+    const base = new Set(main[i].slice(0, B.length > 3 ? 5 : 4)), step = (B.length > 3 ? 12 : 13) / Math.ceil((B.length - 1) / 2), off = (j % 2 ? 1 : -1) * Math.ceil((j + 1) / 2) * step;
+    const groups = br.every(o => o.req) ? Object.values(br.reduce((g, o) => ((g[o.req] ||= []).push(o), g), {})) : [br];
+    groups.forEach((g, m) => groups.length > 1 ? chain(deg + off + (m - (groups.length - 1) / 2) * 3, 5, g.map(o => node(o, el)), k => base.has(k)) : forked(deg + off, 5, g.map(o => node(o, el)), k => base.has(k), j % 2 === 0));
   });
   return G;
 }
@@ -100,12 +109,12 @@ export function buildBestiary(make) {
     ['Caçador Rival', '#0f766e', { FOR: 60, DES: 60, AGI: 55 }, [], [], ['Golpe Pesado', 'Tiro Certeiro', 'Passo Rápido', 'Luz Curativa'], { arma: 14, armor: 3, xpR: 30, goldR: 60 }],
   ];
   // um chefe por patrono: usa o raio inteiro do elemento, tem muito HP e entra em fúria com metade da vida
-  const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT', 'torso'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT', 'head'], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR', 'legL'], ['indra', 'Arconte da Tempestade', 'atlas', 'INT', 'armR'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES', 'armL'],
-    ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR'], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head'], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso'], ['radiacao', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
+  const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT', 'torso'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT', 'head'], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR', 'legL', { hp: .7 }], ['indra', 'Arconte da Tempestade', 'atlas', 'INT', 'armR'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES', 'armL'],
+    ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR', { arma: 6, hp: .7 }], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head', { hp: .85 }], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso'], ['radiacao', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
   const PN = { head: 'cabeça', torso: 'torso', armL: 'braço esquerdo', armR: 'braço direito', legL: 'perna esquerda', legR: 'perna direita' };
   const ray = el => s => s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back);
   return [...B.map(([name, color, attrs, weak, resist, skills, o], i) => make(name, color, attrs, weak, resist, skills, { cat: i < 16 ? 'demonio' : 'humano', ...o })),
-    ...BOSS.map(([el, name, weak, attr, wp]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, cat: 'chefe', weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
+    ...BOSS.map(([el, name, weak, attr, wp, tune]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, cat: 'chefe', tune: tune || {}, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
 }
 
 // cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local

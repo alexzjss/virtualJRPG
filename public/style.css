@@ -353,3 +353,6 @@ body[data-role=player] h1{display:none}body[data-role=player] #app{padding:0}
 .bsk{color:var(--paper)}.bcard .row{margin:4px 0 0;gap:4px}.bcard button{min-height:28px;padding:3px 8px;font-size:12px}
 .benc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.benc .card{padding:10px}.benc h3{font-size:15px}
 .nd .lb{font-size:10px}
+.nd .rq{font:600 8px var(--cond);fill:var(--gold);text-anchor:start;pointer-events:none;paint-order:stroke;stroke:#000;stroke-width:2.5px}
+.nd.rqno .rq{fill:var(--bad)}.nd.rqno.av circle,.nd.rqno.av rect{stroke:var(--bad)}.skmap.far .nd .rq{display:none}
+.gen{padding:10px}.gen h3{font-size:15px}.gen .row{margin:6px 0}

@@ -17,7 +17,12 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 // ---------- regras ----------
 // Números de balanceamento (ajustados com tools/sim.js). VJ_RULES='{"hit":50}' sobrescreve para testar.
-const R = { hit: 60, dmgDiv: 10, healDiv: 5, hpCon: 2, hpBase: 10, enemyAttr: 50, enemyXp: 10, aiFocus: .5, ...JSON.parse(process.env.VJ_RULES || '{}') };
+const R = { hit: 60, dmgDiv: 10, healDiv: 5, hpCon: 2, hpBase: 10, enemyAttr: 50, enemyXp: 10, aiFocus: .5,
+  // gerador de inimigos: por patente, d = diferença do atributo principal em relação ao poder do grupo; hp = bônus de HP; sk = nº de skills; cost = peso no orçamento do encontro
+  rank: { lacaio: { d: -7, hp: -25, sk: 1, xp: 5, cost: .5 }, comum: { d: 1, hp: 0, sk: 2, xp: 10, cost: 1 }, elite: { d: 7, hp: 40, sk: 4, xp: 25, cost: 2 }, chefe: { d: -8, hpPer: 34, sk: 8, xp: 80, arma: 8, tpl: -5, g: .78 } }, // tpl: desconto extra dos chefes do bestiário (têm atributos altos em tudo); g: quanto do crescimento do grupo o chefe acompanha
+  diff: { facil: 1.3, normal: 1.5, dificil: 1.68, mortal: 1.86 },
+  grow: { attr: .85, hp: 7, arma: .5, armor: .2 }, // quanto os inimigos gerados acompanham cada ponto de poder do grupo acima de 58 // orçamento do encontro em "inimigos comuns por herói"
+  ...JSON.parse(process.env.VJ_RULES || '{}') };
 const ATTRS = ['FOR', 'CON', 'DES', 'AGI', 'INT', 'SAB', 'CAR', 'SOR'];
 const EL = ['fis', 'kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao'];
 const KINDS = ['dmg', 'mental', 'heal', 'passive'];
@@ -33,7 +38,7 @@ const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: '
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR']); // campos numéricos que só o mestre altera
 const EXTRA = { vinc: [], body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
-const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', ...o });
+const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', rq: null, ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
 const SCH = {
@@ -60,7 +65,7 @@ if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; del
   S.skills ??= built; S.skillsSig = sig;
 }
 S.items ??= buildItems(it);
-for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; }
+for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; }
@@ -137,8 +142,9 @@ const nextOf = T => Object.keys(T).filter(k => { const ch = S.chars[k]; return c
 const current = () => nextOf(S.battle.ticks);
 const order = () => { const T = { ...S.battle.ticks }, out = []; for (let i = 0; i < 8; i++) { const id = nextOf(T); if (!id) break; out.push(id); T[id] += delay(S.chars[id]); } return out; }; // próximos turnos previstos
 const onMap = ch => ch.x != null && ch.scene === S.scene;
-const applySt = (t, k, n = 3) => t.st[k] = t.boss && CTRL.includes(k) ? 1 : n;
-const tickSt = ch => { for (const k in ch.st) if (--ch.st[k] <= 0) delete ch.st[k]; };
+// quem acabou de perder um turno fica 2 turnos imune a novo controle (evita ficar travado para sempre)
+const applySt = (t, k, n = 3) => { if (CTRL.includes(k) && t.imm > 0) return; t.st[k] = t.boss && CTRL.includes(k) ? 1 : n; };
+const tickSt = ch => { for (const k in ch.st) if (--ch.st[k] <= 0) delete ch.st[k]; if (ch.imm > 0) ch.imm--; };
 const addLimit = (ch, v) => ch.limit = Math.min(100, ch.limit + v);
 
 function hurt(t, d) { // dano em HP: enche Limite, acorda, avisa queda
@@ -148,8 +154,8 @@ function hurt(t, d) { // dano em HP: enche Limite, acorda, avisa queda
   delete t.st.sleep; delete t.st.frozen;
   if (t.boss && !t.rage && t.hp > 0 && t.hp <= t.hpMax / 2) { // fúria: buffs, Limite cheio e dois lacaios do mesmo elemento
     t.rage = true; t.st.atkUp = t.st.agiUp = 99; t.limit = 100;
-    const el = t.resist.find(e => e !== 'fis'), pool = Object.values(S.bestiary).filter(b => !b.boss && b.resist.includes(el));
-    if (S.battle.active && t.id in S.battle.ticks) for (let i = 0; i < 2 && pool.length; i++) { const mn = spawn(pick(pool), 'fraco', t.x ?? 0, t.y ?? 0); derive(mn); S.battle.ticks[mn.id] = S.battle.ticks[t.id] + delay(mn); }
+    const el = t.resist.find(e => e !== 'fis') || 'fis', ref = partyRef();
+    if (S.battle.active && t.id in S.battle.ticks) for (let i = 0; i < 2; i++) { const mn = spawn(genFoe(el, pick(Object.keys(ROLES)), 'lacaio', ref), 'normal', t.x ?? 0, t.y ?? 0); derive(mn); mn.hp = mn.hpMax; S.battle.ticks[mn.id] = S.battle.ticks[t.id] + delay(mn); }
     return ` ${t.name} entra em fúria e invoca lacaios!`;
   }
   if (!was || t.hp) return '';
@@ -178,7 +184,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
     }
     const skip = n.st.stun ? 'atordoado' : n.st.frozen ? 'congelado' : n.st.sleep ? 'dormindo' : n.st.para && d100() <= 50 ? 'paralisado' : '';
     if (!skip) return;
-    log(n.name, `está ${skip} e perde o turno`, 'bad');
+    log(n.name, `está ${skip} e perde o turno`, 'bad'); n.imm = 3;
     tickSt(n); S.battle.ticks[n.id] += delay(n);
   }
 }
@@ -239,9 +245,9 @@ const spot = k => { const sc = scene(), C = Math.ceil(sc.cols), Rw = Math.ceil(s
 if (fresh) loadBestiary();
 if (fresh) { // personagens base, sem dono: o mestre atribui ou o jogador assume
   const item = n => Object.keys(S.items).find(k => S.items[k].name === n);
-  [['Shinkai', 'indra', '#f5c518', { AGI: 65, DES: 60, FOR: 50, CON: 40, INT: 40, SAB: 35 }, 'Katana de Caçador', 'Veloz e ofensivo: age muitas vezes e pune com lâmina e raio.', [3, 5]],
+  [['Shinkai', 'indra', '#f5c518', { AGI: 65, DES: 60, FOR: 50, CON: 40, INT: 50, SAB: 35 }, 'Katana de Caçador', 'Veloz e ofensivo: age muitas vezes e pune com lâmina e raio.', [3, 5]],
     ['Mikhail', 'fuhaku', '#3ddc97', { AGI: 60, INT: 60, DES: 55, CAR: 50, FOR: 35, SAB: 45 }, 'Revólver .38', 'Ágil e estrategista: controla o campo e a ordem dos turnos.', [2, 6]],
-    ['Thomas', 'radiacao', '#8fd400', { FOR: 65, CON: 65, AGI: 30, SAB: 45, INT: 35, CAR: 35 }, 'Manoplas de Aço', 'Pesado e ofensivo: aguenta o castigo e devolve em dobro.', [3, 7]]]
+    ['Thomas', 'radiacao', '#8fd400', { FOR: 65, CON: 65, AGI: 30, SAB: 45, INT: 45, CAR: 35 }, 'Manoplas de Aço', 'Pesado e ofensivo: aguenta o castigo e devolve em dobro.', [3, 7]]]
     .forEach(([name, el, color, attrs, weapon, bio, [x, y]]) => {
       const id = rid(), ch = S.chars[id] = { ...newChar(id, false, ''), name, color, bio, xp: 30, x, y, vinc: [el] };
       Object.assign(ch.attrs, attrs);
@@ -249,6 +255,39 @@ if (fresh) { // personagens base, sem dono: o mestre atribui ou o jogador assume
       if (w) { ch.inv[w] = 1; ch.equip.arma = w; } if (tonic) ch.inv[tonic] = 2; if (root) ch.skills.push(root);
     });
 }
+// ----- gerador de inimigos sob medida para o grupo -----
+const ROLES = { bruto: ['FOR', 'CON'], agil: ['AGI', 'DES'], conjurador: ['INT', 'SAB'], suporte: ['SAB', 'CAR'] }, ROLE_N = { bruto: 'Bruto', agil: 'Espreitador', conjurador: 'Conjurador', suporte: 'Arauto' };
+const FOIL = { kagutsuchi: 'susanoo', susanoo: 'indra', atlas: 'fuhaku', indra: 'atlas', fuhaku: 'kagutsuchi', amaterasu: 'tsukuyomi', tsukuyomi: 'amaterasu', shukketsu: 'amaterasu', radiacao: 'susanoo' };
+const ELCOL = { fis: '#8d8478', kagutsuchi: '#c2410c', susanoo: '#1d6fa5', atlas: '#8a6a3a', indra: '#b89400', fuhaku: '#2f8f6b', amaterasu: '#b8a44a', tsukuyomi: '#5b3fb0', shukketsu: '#8f0019', radiacao: '#5a8f00' };
+// referência do grupo: quantos heróis estão na cena e o "poder" deles (média dos três maiores atributos de cada um)
+const partyRef = () => {
+  const pcs = Object.values(S.chars).filter(c => !c.enemy && !c.dead && c.scene === S.scene), top3 = c => ATTRS.map(a => at0(c, a)).sort((x, y) => y - x).slice(0, 3).reduce((a, b) => a + b, 0) / 3;
+  return { n: pcs.length || 4, p: pcs.length ? Math.round(pcs.reduce((a, c) => a + top3(c), 0) / pcs.length) : 58 };
+};
+function genFoe(el, role, rank, ref = partyRef()) {
+  const K = R.rank[rank], [m1, m2] = ROLES[role], ch = newChar('', true, ''), up = Math.max(0, ref.p - 58) * (rank === 'chefe' ? R.rank.chefe.g : 1), P = ref.p + up * R.grow.attr, pool = Object.entries(S.skills).filter(([, s]) => s.el === el && s.kind !== 'passive' && !s.req && !s.back && (!s.limit || rank === 'chefe'));
+  const use = {}; pool.forEach(([, s]) => use[s.attr] = (use[s.attr] || 0) + 1);
+  const elAttr = Object.keys(use).sort((a, b) => use[b] - use[a])[0]; // atributo que as skills do elemento mais usam
+  for (const a of ATTRS) ch.attrs[a] = int(P + K.d - (a === m1 ? 0 : a === m2 ? 6 : a === elAttr ? (role === 'bruto' || role === 'agil' ? 10 : 2) : 18), 15, 95);
+  ch.bon.hpMax = Math.round(rank === 'chefe' ? (K.hpPer + up * R.grow.hp * .5) * ref.n * (ref.n / 4) : K.hp + up * R.grow.hp);
+  ch.arma = int(8 + (ref.p - 45) / 4 + up * R.grow.arma + ({ lacaio: -2, comum: 0, elite: 2, chefe: R.rank.chefe.arma - 8 })[rank] + (role === 'bruto' ? 2 : 0), 4, 40); ch.armor = Math.round((role === 'bruto' ? (rank === 'lacaio' ? 1 : 3) : rank === 'chefe' ? 2 : 0) + up * R.grow.armor);
+  // skills conforme o papel: suporte prefere cura e buffs, ágil prefere as rápidas, os demais as de dano; sempre das mais simples para as mais caras
+  const pri = ([, s]) => (role === 'suporte' ? (s.kind === 'heal' ? 0 : 2) : role === 'agil' ? ((s.ct || 100) < 100 ? 0 : 1) : s.kind === 'heal' ? 3 : 0) * 1000 + s.xp + (s.limit ? -500 : 0);
+  ch.skills = pool.sort((a, b) => pri(a) - pri(b)).slice(0, K.sk).map(([k]) => k);
+  if (role === 'bruto' || role === 'agil') { const basic = Object.keys(S.skills).find(k => S.skills[k].name === (role === 'bruto' ? 'Golpe Pesado' : 'Tiro Certeiro')); if (basic && !ch.skills.includes(basic)) ch.skills[Math.max(0, ch.skills.length - 1)] = basic; }
+  Object.assign(ch, { name: el === 'fis' ? ({ bruto: 'Capanga', agil: 'Batedor', conjurador: 'Ocultista', suporte: 'Capelão' })[role] : `${ROLE_N[role]} de ${VN[el]}`, color: ELCOL[el], resist: el === 'fis' ? [] : [el], weak: FOIL[el] ? [FOIL[el]] : [],
+    cat: rank === 'chefe' ? 'chefe' : el === 'fis' ? 'humano' : 'demonio', xpR: K.xp, goldR: K.xp * 2, rank, role });
+  if (rank === 'chefe') Object.assign(ch, { boss: true, weakPart: pick(PARTS), name: `Senhor ${el === 'fis' ? 'da Guerra' : 'de ' + VN[el]}`, gmNote: 'Chefe gerado para o grupo. Age duas vezes por rodada, resiste a controle, invoca lacaios em fúria.' });
+  else if (rank !== 'comum') ch.name += ` (${rank})`;
+  if (ch.weakPart) ch.gmNote += ` Ponto fraco: ${PL[ch.weakPart]}.`;
+  ch.tpl = ch.name;
+  return ch;
+}
+// chefes do bestiário são reescalados para o grupo: atributos proporcionais e HP por herói
+const fitBoss = (ch, ref = partyRef()) => { const up = Math.max(0, ref.p - 58) * R.rank.chefe.g, P = ref.p + up * R.grow.attr + R.rank.chefe.tpl, f = (P + R.rank.chefe.d) / Math.max(...ATTRS.map(a => ch.attrs[a])); for (const a of ATTRS) ch.attrs[a] = int(ch.attrs[a] * f, 15, 95); ch.attrs.FOR = Math.max(ch.attrs.FOR, int(P + R.rank.chefe.d - 6, 15, 95)); const T = ch.tune || {}; // ajuste fino por chefe, medido no simulador
+  ch.bon.hpMax = Math.round((R.rank.chefe.hpPer + up * R.grow.hp * .5) * ref.n * (ref.n / 4) * (T.hp || 1)); ch.bon.sanMax = 60;
+  ch.arma = int(R.rank.chefe.arma + (ref.p - 45) / 4 + up * R.grow.arma + (T.arma || 0), 4, 40); ch.armor = Math.round(2 + up * R.grow.armor);
+  const cap = 20 + up * 2.5; ch.skills = ch.skills.filter(k => S.skills[k] && (S.skills[k].limit || S.skills[k].xp <= cap)); }; // só as skills do estágio do grupo
 function spawn(tpl, tier = 'normal', x = 0, y = 0) { // cria um inimigo a partir de um modelo, no nível de ameaça pedido
   const id = rid(), ch = S.chars[id] = { ...structuredClone(tpl), id, x, y, scene: S.scene, tpl: tpl.tpl || tpl.name }, [k, rw] = TIER[tier] || TIER.normal;
   if (k !== 1) { for (const a of ATTRS) ch.attrs[a] = int(ch.attrs[a] * k, 1, 100); ch.xpR = Math.round(ch.xpR * rw); ch.goldR = Math.round(ch.goldR * rw); ch.name += ` (${tier})`; }
@@ -388,8 +427,15 @@ const H = {
     const alive = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o?.hp > 0), foes = alive.filter(o => o.enemy !== a.enemy);
     const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && s.kind !== 'passive' && (!s.req || s.req === wtype(a)) && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
     const lim = usable.find(k => S.skills[k].limit); // Limite carregado tem prioridade
-    const skill = lim || (usable.length && Math.random() < .7 ? pick(usable) : 'atk'), heal = S.skills[skill]?.kind === 'heal';
-    const t = heal ? alive.filter(o => o.enemy === a.enemy).sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0] : Math.random() < R.aiFocus ? foes.sort((x, y) => x.hp - y.hp)[0] : pick(foes); // às vezes foca o oponente mais ferido
+    const mates = alive.filter(o => o.enemy === a.enemy), hurt = mates.sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0], K = k => S.skills[k];
+    // só cura quem está abaixo de metade; buffs puros são raros; dano mental não serve contra quem já está sem Sanidade
+    const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => K(k).kind === 'heal' && !K(k).power), hits = usable.filter(k => K(k).kind === 'dmg' && !K(k).limit), mental = usable.filter(k => K(k).kind === 'mental' && !K(k).limit);
+    const tgt = Math.random() < R.aiFocus ? foes.sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
+    if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
+    const skill = lim || (heals.length && !a.hcd && hurt.hp < hurt.hpMax * .5 && Math.random() < .6 ? pick(heals) : buffs.length && Math.random() < .12 ? pick(buffs)
+      : hits.length && Math.random() < (mOk ? .45 : .7) ? pick(hits) : mOk && Math.random() < .6 ? pick(mental) : 'atk'), heal = S.skills[skill]?.kind === 'heal';
+    const t = heal ? (K(skill).power ? hurt : pick(mates)) : tgt;
+    if (heal && K(skill).power) a.hcd = 4;
     if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
   },
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
@@ -412,7 +458,7 @@ const H = {
     if (s.limit) a.limit = 0;
     const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
     const mates = inB.filter(o => o.hp > 0 && o.enemy === a.enemy && o !== a);
-    const ts = !heal && a.st.possess && mates.length ? [pick(mates)] // possuído ataca os próprios aliados
+    const ts = !heal && (a.st.possess || a.san <= 0) && mates.length ? [pick(mates)] // possuído, ou em colapso de Sanidade, ataca os próprios aliados
       : s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : t0];
     let more = false;
     const aim = !s.area && !heal && PARTS.includes(m.aim) ? m.aim : null;
@@ -425,6 +471,7 @@ const H = {
     if (!can(c, ch) || !s || ch.skills.includes(m.skill) || ch.xp < s.xp) return;
     if (s.el !== 'fis' && !ch.vinc.includes(s.el)) return; // só o tronco marcial e os próprios Vínculos
     if (s.ex && ch.skills.some(k => S.skills[k]?.ex === s.ex)) return; // escolha excludente já feita
+    if (s.rq && Object.entries(s.rq).some(([a, v]) => at0(ch, a) < v)) return; // requisito de atributo
     if (ch.skills.length && !ch.skills.some(k => S.skills[k] && Math.max(Math.abs(S.skills[k].gx - s.gx), Math.abs(S.skills[k].gy - s.gy)) <= 1)) return;
     ch.xp -= s.xp; ch.skills.push(m.skill);
     if (s.kind === 'passive') { // passivas aplicam o bônus de forma permanente
@@ -539,8 +586,26 @@ const H = {
   bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {}, body: {}, rage: false, tpl: ch.name, cat: ch.cat || (ch.boss ? 'chefe' : 'demonio') }); },
   bSpawn(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(S.bestiary, m.id)) return;
+    const base = Object.values(S.chars).filter(ch => ch.enemy && ch.scene === S.scene && ch.x != null).length, ref = partyRef();
+    for (let i = 0; i < int(m.n || 1, 1, 12); i++) { const ch = spawn(S.bestiary[m.id], m.tier, ...spot(base + i)); if (ch.boss && m.fit !== false) fitBoss(ch, ref); }
+  },
+  foeGen(c, m) { // cria (ou salva no bestiário) um inimigo gerado para o grupo atual
+    if (c.role !== 'gm' || !EL.includes(m.el) || !Object.hasOwn(ROLES, m.role) || !Object.hasOwn(R.rank, m.rank)) return;
+    const ref = partyRef(), base = Object.values(S.chars).filter(ch => ch.enemy && ch.scene === S.scene && ch.x != null).length;
+    if (m.save) { const id = rid(); S.bestiary[id] = { ...genFoe(m.el, m.role, m.rank, ref), id }; return; }
+    for (let i = 0; i < int(m.n || 1, 1, 12); i++) spawn(genFoe(m.el, m.role, m.rank, ref), 'normal', ...spot(base + i));
+  },
+  foeEnc(c, m) { // encontro automático: gasta um orçamento proporcional ao grupo e à dificuldade
+    if (c.role !== 'gm' || !Object.hasOwn(R.diff, m.diff)) return;
+    const ref = partyRef(), el = () => EL.includes(m.el) ? m.el : pick(EL.filter(e => e !== 'fis')), main = el(), made = [];
+    let budget = ref.n * R.diff[m.diff] * (4 / ref.n) ** .3; // grupos pequenos aguentam proporcionalmente mais
+    while (budget >= .5 && made.length < 9) {
+      const rank = budget >= 3 && !made.some(f => f.rank === 'elite') ? 'elite' : budget >= 1 && (made.length < ref.n + 1 || budget < 1.5) ? 'comum' : 'lacaio';
+      made.push(genFoe(Math.random() < .75 ? main : el(), pick(Object.keys(ROLES)), rank, ref)); budget -= R.rank[rank].cost;
+    }
     const base = Object.values(S.chars).filter(ch => ch.enemy && ch.scene === S.scene && ch.x != null).length;
-    for (let i = 0; i < int(m.n || 1, 1, 12); i++) spawn(S.bestiary[m.id], m.tier, ...spot(base + i));
+    made.forEach((f, i) => spawn(f, 'normal', ...spot(base + i)));
+    log('Mestre', `Encontro ${({ facil: 'fácil', normal: 'normal', dificil: 'difícil', mortal: 'mortal' })[m.diff]} gerado: ${made.length} inimigos para ${ref.n} heróis (poder ${ref.p}).`, '', { to: GM });
   },
   encSave(c, m) { // encontro: grupo de modelos com nível e quantidade
     if (c.role !== 'gm' || !Array.isArray(m.list)) return;
@@ -616,6 +681,7 @@ wss.on('connection', c => {
   });
 });
 prep();
+export { genFoe, partyRef, fitBoss, spawn };
 export { H, S, R, current, derive };
 export { view, order };
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
