@@ -342,3 +342,14 @@ body[data-role=player] h1{display:none}body[data-role=player] #app{padding:0}
 .nd .lb{font-size:9.5px;letter-spacing:0}.skmap.far .nd.own .lb,.skmap.far .nd.sel .lb,.skmap.far .nd:hover .lb{font-size:20px}
 .skmap.far .nd.own .lb tspan + tspan,.skmap.far .nd.sel .lb tspan + tspan,.skmap.far .nd:hover .lb tspan + tspan{dy:22px}
 .nd .lb{font-size:8.2px}.nd .mk{font-size:16px}
+
+/* ===== janela do bestiário ===== */
+.bq{flex:1;min-width:160px}.sep{width:10px}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;max-height:46vh;overflow:auto;padding-right:4px}
+.bcard{background:var(--ink);border:1px solid var(--line);border-top:3px solid var(--e);padding:9px 10px;display:flex;flex-direction:column;gap:4px}
+.bhead{display:flex;gap:9px;align-items:center}.bhead i{font:800 30px/1 var(--glyph);font-style:normal;color:var(--e);width:38px;text-align:center}
+.bhead b{display:block;font:400 17px/1.1 var(--disp);letter-spacing:.4px;text-transform:uppercase}
+.bstats{display:flex;gap:10px;flex-wrap:wrap;font:600 12px var(--cond);letter-spacing:.5px;text-transform:uppercase;color:var(--dim)}.bstats b{color:var(--paper);font-size:14px}
+.bsk{color:var(--paper)}.bcard .row{margin:4px 0 0;gap:4px}.bcard button{min-height:28px;padding:3px 8px;font-size:12px}
+.benc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.benc .card{padding:10px}.benc h3{font-size:15px}
+.nd .lb{font-size:10px}

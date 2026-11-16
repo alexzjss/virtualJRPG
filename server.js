@@ -45,11 +45,24 @@ let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] }, fresh = tr
 try { S = JSON.parse(fs.readFileSync(FILE)); fresh = false; } catch {}
 const newScene = (name, o = {}) => ({ name, cols: 20, rows: 12, ar: 20 / 12, crop: { x: 0, y: 0, w: 1, h: 1 }, ox: 0, oy: 0, cam: null, bg: '', fogOn: false, seen: {}, shop: { open: false, stock: [] }, ...o });
 if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; delete S.map; }
-S.skills ??= buildSkills(sk);
+{
+  const built = buildSkills(sk), sig = crypto.createHash('sha1').update(JSON.stringify(built)).digest('hex');
+  if (S.skills && S.skillsSig !== sig) {
+    const byName = Object.fromEntries(Object.entries(built).map(([k, s]) => [s.name, k])), old = S.skills; let lost = 0;
+    for (const ch of [...Object.values(S.chars), ...Object.values(S.bestiary || {})]) {
+      const keep = [];
+      for (const k of ch.skills || []) { const nk = byName[old[k]?.name]; if (nk) keep.push(nk); else { lost++; if (!ch.enemy) ch.xp = (ch.xp || 0) + (old[k]?.xp || 0); } }
+      ch.skills = [...new Set(keep)];
+    }
+    S.log.push({ n: S.seq = (S.seq || 0) + 1, who: 'Sistema', text: `Árvore de habilidades atualizada. Skills aprendidas foram mantidas pelo nome${lost ? `; ${lost} que deixaram de existir devolveram o XP.` : '.'}`, kind: 'ok' });
+    S.skills = built;
+  }
+  S.skills ??= built; S.skillsSig = sig;
+}
 S.items ??= buildItems(it);
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
-Object.assign(S, { camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
+Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
@@ -92,10 +105,12 @@ const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name:
   body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: [], resist: [], marks: {}, bon: {} }; };
 const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
 const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
-const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, scenes: strip(S.scenes), chars: pubChars(),
+const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 const sendState = c => c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
-const push = () => { Object.values(S.chars).forEach(derive); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+// recalcula máximos de personagens e modelos antes de enviar o estado
+const prep = () => { Object.values(S.chars).forEach(derive); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
+const push = () => { prep(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -217,7 +232,10 @@ const makeFoe = (name, color, attrs, weak, resist, skills, o = {}) => {
 };
 const loadScenes = () => SCENES.forEach(sc => { S.scenes[rid()] = newScene(sc.name, { bg: sc.bg, note: sc.note, shop: { open: false, stock: sc.stock.map(n => Object.keys(S.items).find(k => S.items[k].name === n)).filter(Boolean) } }); });
 if (fresh) loadScenes();
-const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => [rid(), ch])); };
+const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => { const id = rid(); return [id, { ...ch, id }]; })); };
+// o mestre também edita os modelos do bestiário com as mesmas ações de ficha
+const getCh = (c, id) => S.chars[id] || (c.role === 'gm' && Object.hasOwn(S.bestiary, id) ? S.bestiary[id] : undefined);
+const spot = k => { const sc = scene(), C = Math.ceil(sc.cols), Rw = Math.ceil(sc.rows); return [Math.min(C - 1, Math.floor(C * .7) + k % 3), Math.min(Rw - 1, 1 + Math.floor(k / 3) % Math.max(1, Rw - 1))]; }; // espalha inimigos novos no lado direito
 if (fresh) loadBestiary();
 if (fresh) { // personagens base, sem dono: o mestre atribui ou o jogador assume
   const item = n => Object.keys(S.items).find(k => S.items[k].name === n);
@@ -254,7 +272,7 @@ const H = {
   },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
-    const ch = S.chars[m.id], f = String(m.f);
+    const ch = getCh(c, m.id), f = String(m.f);
     if (!can(c, ch)) return;
     const g = c.role === 'gm';
     if (f.startsWith('attrs.')) { if (g && ATTRS.includes(f.slice(6))) ch.attrs[f.slice(6)] = int(m.v, 1, 100); } // o mestre define os atributos
@@ -295,7 +313,7 @@ const H = {
     log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok', { d: r });
   },
   vinc(c, m) { // mestre concede ou remove um Vínculo; ao ganhar, o personagem já aprende a skill raiz dele
-    const ch = S.chars[m.id];
+    const ch = getCh(c, m.id);
     if (c.role !== 'gm' || !ch || !EL.includes(m.el) || m.el === 'fis') return;
     if (ch.vinc.includes(m.el)) { ch.vinc = ch.vinc.filter(e => e !== m.el); return; }
     ch.vinc.push(m.el);
@@ -305,13 +323,13 @@ const H = {
   },
   claim(c, m) { const ch = S.chars[m.id]; if (c.role === 'player' && ch && !ch.enemy && !ch.owner) ch.owner = c.name; }, // jogador assume um personagem sem dono
   aff(c, m) { // cicla normal → fraqueza → resistência
-    const ch = S.chars[m.id];
+    const ch = getCh(c, m.id);
     if (c.role !== 'gm' || !ch || !EL.includes(m.el)) return;
     if (ch.weak.includes(m.el)) { ch.weak = ch.weak.filter(e => e !== m.el); ch.resist.push(m.el); }
     else if (ch.resist.includes(m.el)) ch.resist = ch.resist.filter(e => e !== m.el);
     else ch.weak.push(m.el);
   },
-  part(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch && PARTS.includes(m.k)) ch.body[m.k] = lvl(ch, m.k) ? 0 : Math.ceil(ch.hpMax * .3); }, // mestre cura ou fere uma parte
+  part(c, m) { const ch = getCh(c, m.id); if (c.role === 'gm' && ch && PARTS.includes(m.k)) ch.body[m.k] = lvl(ch, m.k) ? 0 : Math.ceil(ch.hpMax * .3); }, // mestre cura ou fere uma parte
   st(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch && STK.includes(m.k)) { if (ch.st[m.k]) delete ch.st[m.k]; else applySt(ch, m.k); } },
   // ----- cenas -----
   map(c, m) {
@@ -417,14 +435,14 @@ const H = {
     log(ch.name, `aprendeu ${s.name}`, 'ok');
   },
   // ----- itens -----
-  give(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch && Object.hasOwn(S.items, m.item)) ch.inv[m.item] = (ch.inv[m.item] || 0) + 1; },
+  give(c, m) { const ch = getCh(c, m.id); if (c.role === 'gm' && ch && Object.hasOwn(S.items, m.item)) ch.inv[m.item] = (ch.inv[m.item] || 0) + 1; },
   drop(c, m) {
-    const ch = S.chars[m.id];
+    const ch = getCh(c, m.id);
     if (!can(c, ch) || !(ch.inv[m.item] > 0)) return;
     if (--ch.inv[m.item] <= 0) { delete ch.inv[m.item]; for (const k in ch.equip) if (ch.equip[k] === m.item) delete ch.equip[k]; }
   },
   equip(c, m) {
-    const ch = S.chars[m.id], i = S.items[m.item];
+    const ch = getCh(c, m.id), i = S.items[m.item];
     if (!can(c, ch) || !i || i.type === 'cons' || !(ch.inv[m.item] > 0)) return;
     if (ch.equip[i.type] === m.item) delete ch.equip[i.type]; else ch.equip[i.type] = m.item;
   },
@@ -518,8 +536,20 @@ const H = {
   ctAdd(c, m) { const b = S.bestiary[m.id]; if (c.role === 'gm' && b) S.contracts[rid()] = { target: b.tpl || b.name, gold: int(m.gold, 0, 99999), xp: int(m.xp, 0, 999), done: false }; },
   ctDel(c, m) { if (c.role === 'gm') delete S.contracts[m.id]; },
   // ----- bestiário -----
-  bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {}, body: {}, rage: false, tpl: ch.name }); },
-  bSpawn(c, m) { if (c.role === 'gm' && Object.hasOwn(S.bestiary, m.id)) spawn(S.bestiary[m.id], m.tier); },
+  bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {}, body: {}, rage: false, tpl: ch.name, cat: ch.cat || (ch.boss ? 'chefe' : 'demonio') }); },
+  bSpawn(c, m) {
+    if (c.role !== 'gm' || !Object.hasOwn(S.bestiary, m.id)) return;
+    const base = Object.values(S.chars).filter(ch => ch.enemy && ch.scene === S.scene && ch.x != null).length;
+    for (let i = 0; i < int(m.n || 1, 1, 12); i++) spawn(S.bestiary[m.id], m.tier, ...spot(base + i));
+  },
+  encSave(c, m) { // encontro: grupo de modelos com nível e quantidade
+    if (c.role !== 'gm' || !Array.isArray(m.list)) return;
+    const list = m.list.slice(0, 12).filter(e => e && Object.hasOwn(S.bestiary, e.b)).map(e => ({ b: e.b, tier: Object.hasOwn(TIER, e.tier) ? e.tier : 'normal', n: int(e.n || 1, 1, 12) }));
+    if (list.length) S.encounters[rid()] = { name: String(m.name || 'Encontro').slice(0, 40), list };
+  },
+  encDel(c, m) { if (c.role === 'gm') delete S.encounters[m.id]; },
+  encSpawn(c, m) { const e = S.encounters[m.id]; if (c.role === 'gm' && e) { for (const x of e.list) H.bSpawn(c, { id: x.b, tier: x.tier, n: x.n }); log('Mestre', `Encontro: ${e.name}.`); } },
+  skTog(c, m) { const ch = getCh(c, m.id); if (c.role === 'gm' && ch?.enemy && Object.hasOwn(S.skills, m.skill)) ch.skills = ch.skills.includes(m.skill) ? ch.skills.filter(k => k !== m.skill) : [...ch.skills, m.skill]; }, // inimigos recebem skills livremente
   content(c, m) { // restaura o conteúdo padrão de uma coleção (skills aprendidas e itens dos personagens são limpos se a coleção mudar)
     if (c.role !== 'gm') return;
     if (m.coll === 'skills') { S.skills = buildSkills(sk); Object.values(S.chars).forEach(ch => ch.skills = []); }
@@ -585,6 +615,7 @@ wss.on('connection', c => {
     if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
   });
 });
+prep();
 export { H, S, R, current, derive };
 export { view, order };
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

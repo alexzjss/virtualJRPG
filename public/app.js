@@ -16,8 +16,10 @@ const BODY = { head: ['INT', 'SAB'], torso: ['CON'], armL: ['FOR', 'DES'], armR:
 const PL = { head: 'Cabeça', torso: 'Torso', armL: 'Braço esq.', armR: 'Braço dir.', legL: 'Perna esq.', legR: 'Perna dir.' }, LV = ['ileso', 'ferido', 'crítico'];
 const SHAPE = { head: ['circle', 'cx="60" cy="28" r="20"'], torso: ['rect', 'x="38" y="52" width="44" height="82"'], armL: ['rect', 'x="14" y="54" width="20" height="80"'], armR: ['rect', 'x="86" y="54" width="20" height="80"'], legL: ['rect', 'x="38" y="138" width="20" height="108"'], legR: ['rect', 'x="62" y="138" width="20" height="108"'] };
 const VEH = { pe: 'A pé', cavalo: 'Cavalo', moto: 'Motocicleta', auto: 'Automóvel', caminhao: 'Caminhão' }, cz = { a: null, b: null, va: 'auto', vb: 'moto' };
-const WIN = { chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
-const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'skills', 'items'] }; // arranjos de janelas
+const CAT = { demonio: 'Demônio', humano: 'Humano', chefe: 'Chefe' }, bf = { q: '', el: '', cat: '', n: 1, enc: '' }; let encDraft = [];
+const ent = id => S.chars[id] || S.bestiary?.[id]; // personagem em jogo ou modelo do bestiário
+const WIN = { best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
+const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'best', 'items'] }; // arranjos de janelas
 const view = { z: 1, x: 0, y: 0 }; // zoom e deslocamento do mapa (local de cada tela)
 let ctx = null, pan = null, ruler = null, spaceDown = false, zc = 1, pings = [];
 const CAMPL = { vigiar: 'Vigiar (AGI↑)', cozinhar: 'Cozinhar (grupo ATQ↑)', conversar: 'Conversar (+5 Sanidade)', treinar: 'Treinar (+5 XP)', meditar: 'Meditar (+30 Limite)' };
@@ -27,7 +29,7 @@ const ED = {
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Efeito', 'eff', EFF], ['Atr. (acess.)', 'attr', AO], ['Tipo de arma', 'wt', WT], ['Elemento', 'el', { '': '—', ...EL }], ['Preço', 'price']],
 };
 let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
-let wins = { chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
+let wins = { best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur;
 const mods = {}, tabs = {}, selNode = {}, open = {};
@@ -149,6 +151,25 @@ function chaseWin() {
   const who = k => `<div class="row chips">${Object.values(S.chars).filter(c => c.x != null && c.scene === S.scene).map(c => `<span class="${cz[k] === c.id ? 'weak' : ''}" data-cz="${k}" data-v="${c.id}">${esc(c.name)}</span>`).join('') || '<small>ponha personagens no mapa</small>'}</div><div class="row chips">${chips(VEH, (v, l) => `<span class="${cz['v' + k] === v ? 'weak' : ''}" data-cz="v${k}" data-v="${v}">${l}</span>`)}</div>`;
   return `<b>Fugitivo</b>${who('a')}<b>Perseguidor</b>${who('b')}<div class="row"><button data-a="chaseStart" ${cz.a && cz.b && cz.a !== cz.b ? '' : 'disabled'}>Iniciar perseguição</button></div>`;
 }
+// janela do bestiário: cartões filtráveis, criação em quantidade, encontros salvos, contratos e edição de modelos
+function bestWin() {
+  const q = bf.q.trim().toLowerCase(), catOf = b => b.cat || (b.boss ? 'chefe' : 'demonio');
+  const list = Object.entries(S.bestiary).filter(([, b]) => (!q || b.name.toLowerCase().includes(q)) && (!bf.el || mainEl(b) === bf.el) && (!bf.cat || catOf(b) === bf.cat)).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  const chip = (k, v, l, st = '') => `<span class="${bf[k] === v ? 'weak' : ''}" data-a="bfSet" data-k="${k}" data-v="${v}" ${st}>${l}</span>`, nm = e => S.bestiary[e.b]?.name || '?';
+  const card = ([id, b]) => { const el = mainEl(b), sks = b.skills.map(k => S.skills[k]?.name).filter(Boolean);
+    return `<div class="bcard" style="--e:${ELC[el]}"><div class="bhead"><i>${KANJI[el]}</i><div><b>${esc(b.name)}</b><small>${CAT[catOf(b)]} · ${EL[el]}</small></div></div>
+      <div class="bstats"><span>HP <b>${b.hpMax}</b></span><span>XP <b>${b.xpR}</b></span><span>Ouro <b>${b.goldR}</b></span><span>Armadura <b>${b.armor}</b></span></div>
+      <small>${b.weak.length ? 'Fraco: ' + b.weak.map(e => EL[e]).join(', ') : 'Sem fraqueza'}${b.resist.length ? ' · Resiste: ' + b.resist.map(e => EL[e]).join(', ') : ''}</small>
+      <small class="bsk">${sks.slice(0, 4).map(esc).join(' · ')}${sks.length > 4 ? ` +${sks.length - 4}` : ''}</small>
+      <div class="row"><button class="own" data-a="bSpawn" data-id="${id}">Criar ×${+bf.n || 1}</button><button data-a="encAdd" data-id="${id}">+ Encontro</button><button class="ghost" data-a="openSheet" data-id="${id}">Editar</button><button class="ghost" data-a="bContract" data-id="${id}">Contrato</button><button class="ghost" data-a="bDel" data-id="${id}" aria-label="Apagar modelo">×</button></div></div>`; };
+  return `<div class="row"><input class="bq" data-bf="q" placeholder="Buscar inimigo…" aria-label="Buscar inimigo" value="${esc(bf.q)}"><label>Quantidade <input type="number" min="1" max="12" data-bf="n" value="${+bf.n || 1}"></label><button data-a="tier">Nível: ${tier}</button><button class="ghost" data-a="content" data-coll="bestiary">Restaurar padrão</button></div>
+    <div class="row chips">${chips(CAT, (k, l) => chip('cat', k, l))}<i class="sep"></i>${Object.keys(KANJI).map(e => chip('el', e, KANJI[e], `title="${EL[e]}" style="color:${ELC[e]}"`)).join('')}</div>
+    <div class="bgrid">${list.map(card).join('') || '<small>Nenhum inimigo com esse filtro.</small>'}</div>
+    <div class="benc"><div class="card"><h3>Montar encontro</h3>${encDraft.map((e, i) => `<div class="row inv"><span>${e.n}× ${esc(nm(e))} <small>${e.tier}</small></span><button class="ghost" data-a="encRm" data-k="${i}" aria-label="Tirar">×</button></div>`).join('') || '<small>Use "+ Encontro" nos cartões; vale a quantidade e o nível escolhidos acima.</small>'}
+        ${encDraft.length ? `<div class="row"><input data-bf="enc" placeholder="Nome do encontro" aria-label="Nome do encontro" value="${esc(bf.enc)}"><button class="own" data-a="encSave">Salvar encontro</button></div>` : ''}</div>
+      <div class="card"><h3>Encontros salvos</h3>${chips(S.encounters || {}, (id, e) => `<div class="row inv"><span><b>${esc(e.name)}</b> <small>${e.list.map(x => `${x.n}× ${esc(nm(x))}${x.tier === 'normal' ? '' : ' (' + x.tier + ')'}`).join(', ')}</small></span><button class="own" data-a="encSpawn" data-id="${id}">Colocar na cena</button><button class="ghost" data-a="encDel" data-id="${id}" aria-label="Apagar encontro">×</button></div>`) || '<small>Nenhum encontro salvo.</small>'}</div>
+      <div class="card"><h3>Contratos de caça</h3>${chips(S.contracts, (id, c) => `<div class="row inv"><span>${c.done ? '✓ ' : ''}${esc(c.target)} <small>${c.gold} ouro · ${c.xp} XP</small></span><button class="ghost" data-a="ctDel" data-id="${id}" aria-label="Remover contrato">×</button></div>`) || '<small>Use "Contrato" no cartão do alvo.</small>'}</div></div>`;
+}
 function iniWin() {
   const T = S.battle.ticks, ids = Object.keys(T).filter(k => S.chars[k]).sort((a, b) => T[a] - T[b] || a.localeCompare(b)), b = (k, id, l, t) => `<button data-a="ini" data-k="${k}" data-id="${id}" aria-label="${t}" title="${t}">${l}</button>`;
   if (!S.battle.active) return '<small>Nenhuma batalha em andamento.</small>';
@@ -185,20 +206,20 @@ const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <=
 const figCard = (c, w) => `<div class="unit hero cur static" style="--c:${esc(c.color)};--w:${w}"><div class="figw"><div class="fig">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div></div>`;
 
 // grade de habilidades como constelação: círculo = ativa, losango = passiva; brilho = aprendida, tracejado = disponível
-const lab2 = n => { const w = n.split(' '), a = []; let l = ''; for (const x of w) { if (l && (l + ' ' + x).length > 11) { a.push(l); l = x; } else l = l ? l + ' ' + x : x; } a.push(l); return a.slice(0, 2).map((t, i) => `<tspan x="0" dy="${i ? 9 : 0}">${esc(i === 1 && a.length > 2 ? t + '…' : t)}</tspan>`).join(''); };
+const lab2 = n => { const w = n.split(' '), a = []; let l = ''; for (const x of w) { if (l && (l + ' ' + x).length > 14) { a.push(l); l = x; } else l = l ? l + ' ' + x : x; } a.push(l); return a.slice(0, 2).map((t, i) => `<tspan x="0" dy="${i ? 11 : 0}">${esc(i === 1 && a.length > 2 ? t + '…' : t)}</tspan>`).join(''); };
 const gv = { z: 1, x: 0, y: 0 }; let skd = null, skMoved = false;
 function skillPage(c) {
-  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 60, G = Math.max(17, ...N.map(([, s]) => Math.max(s.gx, s.gy) + 1)), mid = (G - 1) / 2, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
-  const mineV = s => s.el === 'fis' || (c.vinc || []).includes(s.el), exTaken = s => s.ex && ownL.some(o => o.ex === s.ex && o !== s);
+  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 86, G = Math.max(17, ...N.map(([, s]) => Math.max(s.gx, s.gy) + 1)), mid = (G - 1) / 2, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
+  const mineV = s => c.enemy || s.el === 'fis' || (c.vinc || []).includes(s.el), exTaken = s => s.ex && ownL.some(o => o.ex === s.ex && o !== s);
   const avail = s => mineV(s) && !exTaken(s) && (!ownL.length || ownL.some(o => near(o, s))), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
   let lines = '';
   for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) { const a = N[i][1], b = N[j][1];
     if (near(a, b) && (a.el === b.el || a.el === 'fis' || b.el === 'fis')) { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''} ${mineV(a) && mineV(b) ? '' : 'out'}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
   const cen = {}; for (const [, s] of N) { const o = cen[s.el] ||= [0, 0, 0]; o[0] += s.gx; o[1] += s.gy; o[2]++; }
   const halos = Object.entries(cen).filter(([el]) => el !== 'fis').map(([el, [x, y, n]]) => { const dx = x / n - mid, dy = y / n - mid, d = Math.hypot(dx, dy) || 1, px = (mid + dx / d * G * .46) * U + U / 2, py = (mid + dy / d * G * .46) * U + U / 2, mineS = (c.vinc || []).includes(el);
-    return `<g class="${mineS ? 'vmine' : 'vout'}"><text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]};font-size:${G * 9}px">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + G * 2.9}" style="--e:${ELC[el]};font-size:${G * 1.35}px">${PATRON[el]}${mineS ? ' · seu Vínculo' : ''}</text></g>`; }).join('');
+    return `<g class="${mineS ? 'vmine' : 'vout'}"><text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]};font-size:${G * 12}px">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + G * 4}" style="--e:${ELC[el]};font-size:${G * 1.9}px">${PATRON[el]}${mineS ? ' · seu Vínculo' : ''}</text></g>`; }).join('');
   const nodes = N.map(([id, s]) => { const [x, y] = P(s), st = own.has(id) ? 'own' : !mineV(s) ? 'out' : avail(s) ? 'av' : 'lock', pas = s.kind === 'passive', mark = s.back ? '禁' : s.limit ? '極' : pas ? '+' : KANJI[s.el];
-    return `<g class="nd ${st} ${id === sel ? 'sel' : ''} ${c.xp >= s.xp ? '' : 'poor'}" data-node="${id}" data-id="${c.id}" transform="translate(${x} ${y})" style="--e:${ELC[s.el]}"><title>${esc(s.name)} · ${s.xp} XP</title>${pas ? '<rect x="-12" y="-12" width="24" height="24" transform="rotate(45)"/>' : `<circle r="${s.limit || s.back ? 19 : 15}"/>`}<text class="mk" y="6">${mark}</text><text class="lb" y="27">${lab2(s.name)}</text></g>`; }).join('');
+    return `<g class="nd ${st} ${id === sel ? 'sel' : ''} ${c.xp >= s.xp ? '' : 'poor'}" data-node="${id}" data-id="${c.id}" transform="translate(${x} ${y})" style="--e:${ELC[s.el]}"><title>${esc(s.name)} · ${s.xp} XP</title>${pas ? '<rect x="-12" y="-12" width="24" height="24" transform="rotate(45)"/>' : `<circle r="${s.limit || s.back ? 19 : 15}"/>`}<text class="mk" y="6">${mark}</text><text class="lb" y="30">${lab2(s.name)}</text></g>`; }).join('');
   const tag = (l, v) => `<div><small>${l}</small><b>${v}</b></div>`;
   const why = !ss || own.has(sel) ? '' : !mineV(ss) ? `Exige Vínculo com ${PATRON[ss.el]}.` : exTaken(ss) ? 'Trancada: você escolheu o outro caminho.' : !avail(ss) ? 'Precisa de um nó vizinho já aprendido.' : c.xp < ss.xp ? `Faltam ${ss.xp - c.xp} XP.` : '';
   const exOther = ss?.ex ? N.filter(([k, s]) => s.ex === ss.ex && k !== sel).map(([, s]) => s.name).join(', ') : '';
@@ -206,7 +227,7 @@ function skillPage(c) {
       <div class="tags">${ss.kind === 'passive' ? tag('Efeito', ss.pas === 'res' ? 'Resistência a ' + EL[ss.el] : '+' + ss.power + ' ' + PASL[ss.pas])
         : tag('Poder', ss.power) + tag('Atributo', ss.attr) + tag('Custo', ss.limit ? 'Limite 100%' : ss.cost + ' ' + RES[ss.res]) + tag('Alvo', ss.area ? 'Área' : 'Único') + ((ss.ct || 100) !== 100 ? tag('Tempo', ss.ct + '%') : '') + (ss.st ? tag('Causa', ST[ss.st]) : '') + (ss.req ? tag('Exige', WT[ss.req]) : '') + (ss.back ? tag('Sequela', ST[ss.back]) : '')}</div>
       ${exOther ? `<small class="exw">Escolha excludente: aprender esta tranca ${esc(exOther)}.</small>` : ''}
-      ${own.has(sel) ? '<div class="learned">Aprendida</div>' : `<button class="learn" data-a="learn" data-id="${c.id}" data-skill="${sel}" ${mine(c) && !why ? '' : 'disabled'}>Aprender · ${ss.xp} XP</button>${why ? `<small class="why">${why}</small>` : ''}`}</div>`
+      ${gm && c.enemy ? `<button class="learn" data-a="skTog" data-id="${c.id}" data-skill="${sel}">${own.has(sel) ? 'Remover do inimigo' : 'Dar ao inimigo'}</button>` : own.has(sel) ? '<div class="learned">Aprendida</div>' : `<button class="learn" data-a="learn" data-id="${c.id}" data-skill="${sel}" ${mine(c) && !why ? '' : 'disabled'}>Aprender · ${ss.xp} XP</button>${why ? `<small class="why">${why}</small>` : ''}`}</div>`
     : '<div class="ndcard empty"><h2>Escolha um nó</h2><small>Clique em um nó para ver o que ele faz. Você aprende o tronco Marcial e as skills do seu Vínculo, sempre a partir de um nó vizinho de um que já tem.</small></div>';
   const mineL = c.skills.filter(k => S.skills[k]).map(k => `<li style="--e:${ELC[S.skills[k].el]}" data-node="${k}" data-id="${c.id}"><b>${esc(S.skills[k].name)}</b><small>${esc(desc(S.skills[k]))}</small></li>`).join('');
   return `<section class="skp"><div class="skmap ${gv.z < 1.7 ? 'far' : 'near'}"><svg viewBox="0 0 ${G * U} ${G * U}" role="group" aria-label="Grade de habilidades" style="transform:translate(${gv.x}px,${gv.y}px) scale(${gv.z})">${halos}<g class="ln">${lines}</g>${nodes}</svg>
@@ -276,10 +297,6 @@ function render() {
     const cena = `<div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
       <div class="row">${b ? '<button data-a="battle" data-win="1" class="own">Vitória</button><button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
       <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button></div>
-      <div class="row"><b>Contratos</b><button data-a="ctMode" ${on(ctMode)}>Novo contrato</button>${ctMode ? '<small>Clique no alvo no bestiário.</small>' : ''}</div>
-      ${chips(S.contracts, (id, ct) => `<div class="row inv"><span>${ct.done ? '✓ ' : ''}${esc(ct.target)} <small>${ct.gold} ouro · ${ct.xp} XP</small></span><button data-a="ctDel" data-id="${id}" aria-label="Remover contrato">×</button></div>`)}
-      <div class="row"><b>Bestiário</b><button data-a="tier">Nível: ${tier}</button><button data-a="content" data-coll="bestiary">Restaurar padrão</button></div>
-      <div class="row chips best">${chips(S.bestiary, (id, m) => `<span data-a="bSpawn" data-id="${id}" title="Clique: criar cópia · Shift+clique: apagar modelo">${m.boss ? '★ ' : '+ '}${esc(m.name)}</span>`) || '<small>salve um inimigo pela ficha</small>'}</div>
       <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span><span data-a="content" data-coll="scenes">+ cenas de exemplo</span></div>
       <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"></div>
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
@@ -289,10 +306,10 @@ function render() {
 
       <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
-    const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && S.chars[k.slice(2)]), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [S.chars[k.slice(2)].name, 1080]])) };
+    const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && ent(k.slice(2))), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [ent(k.slice(2)).name + (S.chars[k.slice(2)] ? '' : ' · modelo do bestiário'), 1080]])) };
     const rank = Object.keys(ALL).sort((x, y) => (wins[x].z || 0) - (wins[y].z || 0));
     const lays = chips(LAYD, k => `<button class="lay" data-a="lay" data-k="${k}" title="Clique: aplicar arranjo · Shift+clique: salvar o arranjo atual">${k}</button>`);
-    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(S.chars[k.slice(2)])])), ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
+    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(ent(k.slice(2)))])), best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
     app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : Math.min(w, innerWidth - 24)}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
       ${cropper()}<nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
@@ -369,6 +386,7 @@ app.addEventListener('change', e => {
   else if (d.map) send({ t: 'map', f: d.map, v });
   else if (d.mid) mods[d.mid] = v;
 });
+app.addEventListener('input', e => { const k = e.target.dataset.bf; if (!k) return; bf[k] = e.target.value; if (k === 'q') render(); }); // filtros do bestiário
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open],[data-aim]')) { e.preventDefault(); e.target.click(); }
 });
@@ -407,7 +425,7 @@ app.addEventListener('click', e => {
     if (saved[d.k]) wins = { ...wins, ...structuredClone(saved[d.k]) };
     else { for (const k in wins) wins[k].open = LAYD[d.k].includes(k);
       const W = innerWidth, H = innerHeight, at = (k, x, y) => Object.assign(wins[k], { x, y });
-      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); }
+      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); at('best', 360, 56); }
     localStorage.vj_wins = JSON.stringify(wins); return render();
   }
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
@@ -425,18 +443,19 @@ app.addEventListener('click', e => {
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'gridFull') { gridFull = d.id || null; return render(); }
   if (d.a === 'chaseStart') return send({ t: 'chase', k: 'start', ...cz });
+  if (d.a === 'bfSet') { bf[d.k] = bf[d.k] === d.v ? '' : d.v; return render(); }
+  if (d.a === 'encAdd') { const e = encDraft.find(x => x.b === d.id && x.tier === tier); if (e) e.n = Math.min(12, e.n + (+bf.n || 1)); else encDraft.push({ b: d.id, tier, n: +bf.n || 1 }); return render(); }
+  if (d.a === 'encRm') { encDraft.splice(+d.k, 1); return render(); }
+  if (d.a === 'encSave') { send({ t: 'encSave', name: bf.enc || 'Encontro', list: encDraft }); encDraft = []; bf.enc = ''; return; }
+  if (d.a === 'bContract') { const b = S.bestiary[d.id], gold = prompt(`Recompensa em ouro por caçar ${b.name}?`, b.goldR * 5); return gold === null ? null : send({ t: 'ctAdd', id: d.id, gold: +gold || 0, xp: b.xpR }); }
+  if (d.a === 'bDel' && !confirm('Apagar este modelo do bestiário?')) return;
   if (d.a === 'ctMode') { ctMode = !ctMode; return render(); }
-  if (d.a === 'bSpawn' && ctMode) { // modo contrato: o clique no bestiário escolhe o alvo
-    const b = S.bestiary[d.id], gold = prompt(`Recompensa em ouro por caçar ${b.name}?`, b.goldR * 5);
-    ctMode = false; if (gold === null) return render();
-    return send({ t: 'ctAdd', id: d.id, gold: +gold || 0, xp: b.xpR });
-  }
   if (d.a === 'tier') { tier = { fraco: 'normal', normal: 'elite', elite: 'fraco' }[tier]; return render(); }
   if (d.a === 'content' && d.coll !== 'scenes' && !confirm('Restaurar o conteúdo padrão? Edições nessa coleção serão perdidas' + (d.coll === 'bestiary' ? '.' : ' e os personagens perdem o que tinham dela.'))) return;
   if (d.a === 'logout') { ['vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); return location.reload(); }
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return alert('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
-  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
+  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
   if (d.a === 'addChar' && gm && !d.enemy) m.owner = prompt('Nome do jogador dono?') || '';
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;

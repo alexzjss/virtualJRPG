@@ -97,8 +97,8 @@ export function buildBestiary(make) {
     ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR'], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head'], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso'], ['radiacao', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
   const PN = { head: 'cabeça', torso: 'torso', armL: 'braço esquerdo', armR: 'braço direito', legL: 'perna esquerda', legR: 'perna direita' };
   const ray = el => s => s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back);
-  return [...B.map(([name, color, attrs, weak, resist, skills, o]) => make(name, color, attrs, weak, resist, skills, o)),
-    ...BOSS.map(([el, name, weak, attr, wp]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
+  return [...B.map(([name, color, attrs, weak, resist, skills, o], i) => make(name, color, attrs, weak, resist, skills, { cat: i < 16 ? 'demonio' : 'humano', ...o })),
+    ...BOSS.map(([el, name, weak, attr, wp]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, cat: 'chefe', weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
 }
 
 // cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local
