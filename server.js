@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const PUB = path.join(dir, 'public'), DATA = path.join(dir, 'data'), UP = path.join(DATA, 'uploads');
+const PUB = path.join(dir, 'public'), DATA = process.env.VJ_DATA || path.join(dir, 'data'), UP = path.join(DATA, 'uploads');
 const PORT = process.env.PORT || 3000;
 const KEY = process.env.GM_KEY || 'mestre';
 const FILE = path.join(DATA, 'state.json'), VEND = path.join(dir, 'node_modules', 'three', 'build');
@@ -15,6 +15,8 @@ const IMG = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', ...Object.fromEntries(Object.entries(IMG).map(([m, e]) => [e, m])) };
 
 // ---------- regras ----------
+// Números de balanceamento (ajustados com tools/sim.js). VJ_RULES='{"hit":50}' sobrescreve para testar.
+const R = { hit: 60, dmgDiv: 10, healDiv: 5, hpCon: 2, hpBase: 10, enemyAttr: 50, enemyXp: 10, aiFocus: .5, ...JSON.parse(process.env.VJ_RULES || '{}') };
 const ATTRS = ['FOR', 'CON', 'DES', 'AGI', 'INT', 'SAB', 'CAR', 'SOR'];
 const EL = ['fis', 'kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao'];
 const KINDS = ['dmg', 'mental', 'heal', 'passive'];
@@ -133,7 +135,7 @@ const lvl = (ch, k) => { const d = ch.body[k] || 0; return d >= ch.hpMax * .3 ? 
 const at = (ch, a) => at0(ch, a) - 10 * PARTS.filter(k => BODY[k][0].includes(a) && lvl(ch, k) === 2).length;
 const healBody = (ch, v) => { while (v > 0) { const k = PARTS.filter(p => ch.body[p] > 0).sort((x, y) => ch.body[y] - ch.body[x])[0]; if (!k) break; const d = Math.min(v, ch.body[k]); ch.body[k] -= d; v -= d; } };
 // máximos derivados dos atributos (+ bônus de passivas/mestre); valores atuais nunca passam do máximo
-const BASE = { hpMax: ch => Math.floor(at0(ch, 'CON') / 2) + 10, auraMax: ch => Math.floor((at0(ch, 'INT') + at0(ch, 'SAB')) / 4), sanMax: ch => Math.floor(at0(ch, 'SAB') / 2) + Math.floor(at0(ch, 'CAR') / 4) };
+const BASE = { hpMax: ch => Math.floor(at0(ch, 'CON') * R.hpCon) + R.hpBase, auraMax: ch => Math.floor((at0(ch, 'INT') + at0(ch, 'SAB')) / 4), sanMax: ch => Math.floor(at0(ch, 'SAB') / 2) + Math.floor(at0(ch, 'CAR') / 4) };
 const derive = ch => { for (const k in BASE) { ch[k] = Math.max(1, BASE[k](ch) + (ch.bon[k] || 0)); const c = k.slice(0, -3); ch[c] = Math.min(ch[c], ch[k]); } };
 const evolveCh = ch => { const up = Object.keys(ch.marks).filter(a => d100() > ch.attrs[a] && ch.attrs[a] < 100); up.forEach(a => ch.attrs[a]++); ch.marks = {}; return up; };
 const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
@@ -183,13 +185,13 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
 function strike(a, s, t, aim) {
   const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${s.st}]` : '';
   if (s.kind === 'heal') {
-    const v = Math.max(1, s.power + Math.floor(stat / 5));
+    const v = Math.max(1, s.power + Math.floor(stat / R.healDiv));
     t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v);
     if (s.st) t.st[s.st] = 3;
     log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok', { fx: { id: t.id, heal: v } });
     return false;
   }
-  const chance = int(stat + 30 - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0) - (aim ? BODY[aim][2] : 0), 5, 95), r = d100();
+  const chance = int(stat + R.hit - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0) - (aim ? BODY[aim][2] : 0), 5, 95), r = d100();
   if (r > chance) {
     if (r >= 96) addLimit(a, 20);
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, fx: { id: t.id, miss: 1 } });
@@ -197,7 +199,7 @@ function strike(a, s, t, aim) {
   }
   const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el), down = w && !t.st.down;
   const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1);
-  const d = Math.max(1, Math.round((s.power + Math.floor(stat / 5) - (mental ? 0 : t.armor + (eq(t, 'armadura')?.power || 0))) * mult));
+  const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv) - (mental ? 0 : t.armor + (eq(t, 'armadura')?.power || 0))) * mult));
   a.marks[s.attr] = true;
   let extra = '';
   let part = '';
@@ -221,8 +223,8 @@ const H = {
     if (c.role !== 'gm' && c.role !== 'player') return;
     const enemy = c.role === 'gm' && !!m.enemy, id = rid();
     S.chars[id] = { id, name: enemy ? 'Inimigo' : 'Herói', owner: enemy ? '' : (c.role === 'gm' ? String(m.owner || '').trim().slice(0, 30) : c.name), enemy,
-      color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, 40])), marks: {}, hp: 999, aura: 999, san: 999,
-      limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} };
+      color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
+      limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} };
   },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
@@ -319,7 +321,7 @@ const H = {
     const alive = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o?.hp > 0), foes = alive.filter(o => o.enemy !== a.enemy);
     const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
     const skill = usable.length && Math.random() < .7 ? pick(usable) : 'atk', heal = S.skills[skill]?.kind === 'heal';
-    const t = heal ? alive.filter(o => o.enemy === a.enemy).sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0] : pick(foes);
+    const t = heal ? alive.filter(o => o.enemy === a.enemy).sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0] : Math.random() < R.aiFocus ? foes.sort((x, y) => x.hp - y.hp)[0] : pick(foes); // às vezes foca o oponente mais ferido
     if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
   },
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
@@ -482,4 +484,5 @@ wss.on('connection', c => {
     if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
   });
 });
-server.listen(PORT, () => console.log(`virtualJRPG em http://localhost:${PORT}  (chave do mestre: ${KEY})`));
+export { H, S, R, current, derive };
+if (process.argv[1] === fileURLToPath(import.meta.url)) server.listen(PORT, () => console.log(`virtualJRPG em http://localhost:${PORT}  (chave do mestre: ${KEY})`));

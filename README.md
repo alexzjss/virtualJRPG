@@ -16,3 +16,7 @@ Estado e uploads ficam em `data/`.
 - Clique direito no token = menu; duplo clique no token = abrir a ficha
 - Batalha: `1`–`9` = comandos, Tab = trocar alvo, Enter = chat, Esc = fechar/cancelar
 - Mestre: Shift+clique em Exploração/Batalha/Preparo salva o arranjo de janelas atual
+
+## Balanceamento
+Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula batalhas 4x4 com as regras reais;
+`VJ_RULES='{"enemyAttr":45}' node tools/sim.js` testa uma variação sem editar o código.
