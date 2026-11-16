@@ -29,6 +29,9 @@ export function buildSkills(sk) {
   // 1ª passada: o ramo 0 de cada Vínculo (ataque, com a skill raiz) abre o eixo do setor
   const main = EL9.map((el, i) => chain(i * 40, 3, TREE[el].branches[0].map((o, n) => node(o, el, n ? {} : { root: true })), fis));
   [20, 100, 220, 300].forEach((deg, i) => chain(deg, 2, M[i + 1].map(o => node(o, 'fis')), fis)); // estilos de arma nos vãos entre setores
+  const train = M[5].map(o => node(o, 'fis')); // treinos de atributo nas casas livres junto ao centro (reservadas antes dos ramos laterais)
+  for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
+    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
   // 2ª passada: os demais ramos se abrem em leque nas laterais, presos à base do ramo 0. Um ramo em que todo nó exige
   // arma é dividido em uma trilha por tipo de arma, para ninguém precisar comprar nó de arma que não usa.
   EL9.forEach((el, i) => {
@@ -38,9 +41,6 @@ export function buildSkills(sk) {
       groups.forEach((g, m) => chain(deg + off + (m - (groups.length - 1) / 2) * 4, 5, g.map(o => node(o, el)), k => base.has(k)));
     });
   });
-  const train = M[5].map(o => node(o, 'fis')); // treinos de atributo nas casas livres junto ao centro
-  for (let r = 2; r <= 5 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
-    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
   return G;
 }
 

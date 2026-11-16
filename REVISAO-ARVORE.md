@@ -14,8 +14,22 @@ Invariantes por Vínculo no formato novo: raiz = 1º nó do ramo 1; 1 passiva `r
 proibida (`res:'san'` + `back`) = último do ramo 6; 1 par `ex` vizinho no ramo 6; ramo 5 só com `req`.
 Defaults assumidos (usuário não escolheu): 6 ramos, 10 nós por ramo, curva de XP 10-10-15-15-20-25-30-40-45-60.
 
-**Estado:** só o Kagutsuchi está no formato novo (60 nós). Os outros 8 Vínculos ainda têm 3 ramos (formato antigo) e
-serão migrados depois da aprovação do piloto. Marcial inalterado (41 nós). Total atual: 341 nós.
+**Estado:** os 9 Vínculos estão no formato novo (60 nós cada, 540 no total) + Marcial (41) = **581 nós**.
+Os 8 Vínculos além do Kagutsuchi foram migrados em massa **sem revisão nó a nó**, a pedido do usuário. Todos os nós
+novos ou movidos estão como 🆕 (não revisados). Nós antigos foram todos reaproveitados (nenhum sumiu nem foi renomeado);
+o XP de todo nó segue a curva 10-10-15-15-20-25-30-40-45-60 (armas: lâmina 10/20/60, lança 10/30, fogo 10/25/60, punho 10/35).
+
+## Migração dos outros 8 Vínculos (🆕 sem revisão)
+Conteúdo por Vínculo: 30 nós antigos redistribuídos + 30 novos (10 de armas, 20 distribuídos nos demais ramos).
+- Susanoo: assinatura = cura e água (SAB); ✏️ Maré de Socorro p18 → p24 (era fraca para xp 60).
+- Atlas: assinatura = proteção do grupo (heals CON, defUp, 2 passivas); 2 passivas novas na Maestria.
+- Indra: assinatura = velocidade (ct 50, poucos custos); Maestria ganhou Sangue Elétrico e Faro de Tempestade.
+- Fuhaku: assinatura = controle de grupo (fear, confuse, sleep, stun, silence, para, agiDn).
+- Amaterasu: ramo 1 virou "luz direta" (cura de um alvo + dano de luz, raiz Luz Curativa mantida); assinatura = cura e ressurreição.
+- Tsukuyomi: tudo `mental`, exceto armas; assinatura = sono, medo, possessão e confusão.
+- Shukketsu: nós antigos mantêm custo em Sanidade; **os 10 nós de armas e os novos de Efeitos gastam Aura**, para o Vínculo ter opções sem Sanidade.
+- Radiação: assinatura = mutação e cura aberrante.
+Ramo 5 (armas): trilhas separadas por tipo de arma na grade (lâmina, lança, fogo, punho).
 
 ## Kagutsuchi (piloto, 🆕 todos os 60 nós aguardam revisão nó a nó)
 Reaproveitados dos 30 antigos (mudanças marcadas):
@@ -33,6 +47,8 @@ Ramo 1 · nó 1 (Golpe Pesado) apresentado, ainda sem decisão. Demais nós: nã
 ## Relatório final (nomes referenciados por outros arquivos / testes)
 - Nenhuma renomeação.
 - `tools/test.js` (não editado, conforme regra) falha em 2 testes por causa de contagens fixas:
-  "bestiário inicial e grade são criados" (espera 311 skills, agora 341) e
-  "grade: sem sobreposição…" (espera 30 nós por Vínculo, Kagutsuchi tem 60). Precisa atualizar os números.
+  "bestiário inicial e grade são criados" (espera 311 skills, agora 581) e
+  "grade: sem sobreposição…" (espera 30 nós por Vínculo, cada Vínculo tem 60). Precisa atualizar os números.
+- `buildSkills` (content.js): grade 41×41; a 1ª passada põe o ramo 1 de cada Vínculo e os estilos de arma do Marcial,
+  depois vêm os 8 treinos (agora reservados antes dos ramos laterais, senão não achavam casa) e por fim os ramos 2..6.
 - `README.md` cita "311 nós: 30 por Vínculo + 41 marciais": desatualizado.
