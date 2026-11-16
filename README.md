@@ -13,6 +13,18 @@ Ao iniciar, o servidor abre sozinho um túnel gratuito do Cloudflare (baixa o `c
 Chat: texto livre, `/r 2d6+1` para rolar, `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
 
+## Pedidos e aprovação do mestre
+Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, itens fora de combate (usar, equipar, comprar, vender, forjar, descartar) e ações de acampamento do jogador viram **pedidos**. Mover o token e passar a vez não pedem aprovação.
+- O mestre vê os pedidos numa faixa fixa no alto: **Aprovar** (Enter), **Negar** (Delete), negar com motivo, bônus ou penalidade (−20 a +20) e, nas rolagens, **Secreta**.
+- "Aprovar sozinho" liga ou desliga a aprovação por tipo (rolagens, combate, skills, itens, acampamento).
+- Cada jogador tem um pedido por vez e pode cancelar. Pedido de combate some se a vez passar.
+- HP, Aura, Sanidade e Limite só o mestre altera.
+
+## Ferramentas do mestre
+- Na janela **Fichas**, clique em qualquer número para editar (aceita `+5` ou `-12`). Clique nas fichas para selecionar e aplique dano, cura, Aura, Sanidade, XP, ouro, condição ou item a todas de uma vez.
+- Na ficha aberta: clique no número do atributo para editar e na sigla para rolar; busca por nome para entregar itens e dar ou tirar skills sem custo.
+- **Ver como** abre a tela de um jogador em outra aba, só para olhar.
+
 ## Atalhos no PC
 - Mapa: roda do mouse = zoom, botão do meio ou Espaço+arrastar = mover, `0` = recentrar
 - Alt+arrastar = régua em casas; duplo clique no mapa = ping para todos

@@ -77,6 +77,7 @@ S.items ??= buildItems(it);
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
+S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
@@ -129,12 +130,13 @@ const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene 
 const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
 let net = { status: 'off', url: '', code: '', msg: 'Túnel desligado.' }; // situação do túnel, só para o mestre (não é salva)
 const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => `http://${i.address}:${PORT}`);
-const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.keys(S.users).sort(), net: { ...net, portal: PORTAL, lan: lan() } } : { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(),
+const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.keys(S.users).sort(), net: { ...net, portal: PORTAL, lan: lan() } } :
+   { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 const sendState = c => c.role && c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
 // recalcula máximos de personagens e modelos antes de enviar o estado
 const prep = () => { Object.values(S.chars).forEach(derive); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
-const push = () => { prep(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+const push = () => { prep(); pruneReqs(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -208,7 +210,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
   }
 }
 
-function strike(a, s, t, aim) {
+function strike(a, s, t, aim, bonus = 0) {
   const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal') {
     const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1)));
@@ -217,7 +219,7 @@ function strike(a, s, t, aim) {
     log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok', { fx: { id: t.id, heal: v, a: a.id, s: s.name, el: s.el } });
     return false;
   }
-  const chance = int(stat + R.hit - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0), 5, 95), r = d100();
+  const chance = int(stat + R.hit - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
   if (r > chance) {
     if (r >= 96) addLimit(a, 20);
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } });
@@ -245,7 +247,7 @@ function strike(a, s, t, aim) {
   return down;
 }
 
-const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel']);
+const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet']);
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
   color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
@@ -259,6 +261,13 @@ const loadScenes = () => SCENES.forEach(sc => { S.scenes[rid()] = newScene(sc.na
 if (fresh) loadScenes();
 const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => { const id = rid(); return [id, { ...ch, id }]; })); };
 // o mestre também edita os modelos do bestiário com as mesmas ações de ficha
+// passivas aplicam o bônus de forma permanente; sg = -1 desfaz (quando o mestre tira a skill)
+const passive = (ch, s, sg) => {
+  if (s.kind !== 'passive') return;
+  if (s.pas === 'res') { if (sg > 0) { if (!ch.resist.includes(s.el)) ch.resist.push(s.el); ch.weak = ch.weak.filter(e => e !== s.el); } else ch.resist = ch.resist.filter(e => e !== s.el); }
+  else if (ATTRS.includes(s.pas)) ch.attrs[s.pas] = int(ch.attrs[s.pas] + sg * s.power, 1, 100);
+  else { ch.bon[s.pas] += sg * s.power; ch[s.pas.slice(0, -3)] = Math.max(0, ch[s.pas.slice(0, -3)] + sg * s.power); }
+};
 const getCh = (c, id) => S.chars[id] || (c.role === 'gm' && Object.hasOwn(S.bestiary, id) ? S.bestiary[id] : undefined);
 const spot = k => { const sc = scene(), C = Math.ceil(sc.cols), Rw = Math.ceil(sc.rows); return [Math.min(C - 1, Math.floor(C * .7) + k % 3), Math.min(Rw - 1, 1 + Math.floor(k / 3) % Math.max(1, Rw - 1))]; }; // espalha inimigos novos no lado direito
 if (fresh) loadBestiary();
@@ -335,7 +344,7 @@ const H = {
     const g = c.role === 'gm';
     if (f.startsWith('attrs.')) { if (g && ATTRS.includes(f.slice(6))) ch.attrs[f.slice(6)] = int(m.v, 1, 100); } // o mestre define os atributos
     else if (f.startsWith('bon.')) { if (g && Object.hasOwn(BASE, f.slice(4))) ch.bon[f.slice(4)] = int(m.v, -999, 999); }
-    else if (GMF.has(f) && !g) return;
+    else if ((GMF.has(f) || NUM[f] || f === 'limit') && !g) return; // recursos e posição só pelo mestre (o jogador move o token com 'move')
     else if (f === 'limit') ch.limit = int(m.v, 0, 100);
     else if (NUM[f]) { ch[f] = int(m.v); if (f === 'hp' && ch.hp > 0) { delete ch.dead; delete ch.dying; } }
     else if (f === 'name') ch.name = String(m.v).slice(0, 30) || '?';
@@ -355,7 +364,7 @@ const H = {
     const target = int(at(ch, m.attr) + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r = d100();
     const res = r <= Math.max(1, Math.floor(target / 10)) ? 'CRÍTICO' : r <= target ? 'Sucesso' : r >= 96 ? 'DESASTRE' : 'Falha';
     if (r <= target) ch.marks[m.attr] = true; // atributo usado com sucesso pode evoluir
-    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}`, r <= target ? 'ok' : 'bad', { d: r, ...(c.role === 'gm' && m.secret ? { to: GM } : {}) });
+    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}`, r <= target ? 'ok' : 'bad', { d: r, rr: { l: m.attr, t: target, res, c: ch.id }, ...((c.role === 'gm' || c.appr) && m.secret ? { to: GM } : {}) });
   },
   evolve(c, m) {
     const ch = S.chars[m.id];
@@ -368,7 +377,7 @@ const H = {
     if (c.role !== 'gm' || !ch) return;
     const target = int(at(ch, 'SAB') - sanPen(ch), 1, 95), r = d100(), loss = int(m.loss, 1, 99);
     if (r > target) ch.san = Math.max(0, ch.san - loss);
-    log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok', { d: r });
+    log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok', { d: r, rr: { l: 'Horror · SAB', t: target, res: r > target ? 'Falha' : 'Sucesso', c: ch.id } });
   },
   vinc(c, m) { // mestre concede ou remove um Vínculo; ao ganhar, o personagem já aprende a skill raiz dele
     const ch = getCh(c, m.id);
@@ -505,7 +514,8 @@ const H = {
       : s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : t0];
     let more = false;
     const aim = !s.area && !heal && PARTS.includes(m.aim) ? m.aim : null;
-    for (const t of ts) if (!t.dead) more = strike(a, s, t, aim) || more;
+    const bonus = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0; // bônus ou penalidade dado pelo mestre ao aprovar
+    for (const t of ts) if (!t.dead) more = strike(a, s, t, aim, bonus) || more;
     if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }
     if (more && a.hp > 0) log(a.name, 'acertou a fraqueza — MAIS UM turno!', 'ok'); else endTurn(a.id, s.ct);
   },
@@ -517,11 +527,7 @@ const H = {
     if (s.rq && Object.entries(s.rq).some(([a, v]) => at0(ch, a) < v)) return; // requisito de atributo
     if (ch.skills.length && !ch.skills.some(k => S.skills[k] && Math.max(Math.abs(S.skills[k].gx - s.gx), Math.abs(S.skills[k].gy - s.gy)) <= 1)) return;
     ch.xp -= s.xp; ch.skills.push(m.skill);
-    if (s.kind === 'passive') { // passivas aplicam o bônus de forma permanente
-      if (s.pas === 'res') { if (!ch.resist.includes(s.el)) ch.resist.push(s.el); ch.weak = ch.weak.filter(e => e !== s.el); }
-      else if (ATTRS.includes(s.pas)) ch.attrs[s.pas] = Math.min(100, ch.attrs[s.pas] + s.power);
-      else { ch.bon[s.pas] += s.power; ch[s.pas.slice(0, -3)] += s.power; }
-    }
+    passive(ch, s, 1);
     log(ch.name, `aprendeu ${s.name}`, 'ok');
   },
   // ----- itens -----
@@ -657,7 +663,47 @@ const H = {
   },
   encDel(c, m) { if (c.role === 'gm') delete S.encounters[m.id]; },
   encSpawn(c, m) { const e = S.encounters[m.id]; if (c.role === 'gm' && e) { for (const x of e.list) H.bSpawn(c, { id: x.b, tier: x.tier, n: x.n }); log('Mestre', `Encontro: ${e.name}.`); } },
-  skTog(c, m) { const ch = getCh(c, m.id); if (c.role === 'gm' && ch?.enemy && Object.hasOwn(S.skills, m.skill)) ch.skills = ch.skills.includes(m.skill) ? ch.skills.filter(k => k !== m.skill) : [...ch.skills, m.skill]; }, // inimigos recebem skills livremente
+  skTog(c, m) { // o mestre dá ou tira qualquer skill, sem custo; passivas aplicam ou desfazem o bônus
+    const ch = getCh(c, m.id), s = S.skills[m.skill];
+    if (c.role !== 'gm' || !ch || !s) return;
+    const has = ch.skills.includes(m.skill);
+    ch.skills = has ? ch.skills.filter(k => k !== m.skill) : [...ch.skills, m.skill];
+    if (!ch.enemy) passive(ch, s, has ? -1 : 1);
+  },
+  // ----- pedidos: o jogador pede, o mestre aprova (com bônus, penalidade ou em segredo) ou nega -----
+  reqOk(c, m) {
+    const r = S.reqs[m.id];
+    if (c.role !== 'gm' || !r) return;
+    delete S.reqs[m.id];
+    const mod = int(m.mod, -100, 100), n = S.seq;
+    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll' });
+    tell(r.by, S.seq === n && r.cat !== 'item' && r.cat !== 'camp' ? { kind: 'no', text: `${r.text}: não foi possível agora.` } : { kind: 'ok', text: `Aprovado: ${r.text}${mod ? ` (${mod > 0 ? '+' : ''}${mod})` : ''}` });
+  },
+  reqNo(c, m) {
+    const r = S.reqs[m.id];
+    if (!r || !(c.role === 'gm' || (c.role === 'player' && r.by === c.name))) return;
+    delete S.reqs[m.id];
+    if (c.role === 'gm') tell(r.by, { kind: 'no', text: `Negado: ${r.text}`, why: String(m.why || '').slice(0, 120) });
+  },
+  autoSet(c, m) { if (c.role === 'gm' && Object.hasOwn(S.auto, m.k)) S.auto[m.k] = !!m.v; },
+  // ----- atalhos do mestre: mexer em um ou vários personagens de uma vez -----
+  bulk(c, m) {
+    if (c.role !== 'gm' || !Array.isArray(m.ids)) return;
+    const v = int(m.v, 0, 9999), done = [];
+    for (const ch of m.ids.slice(0, 40).map(id => S.chars[id]).filter(Boolean)) {
+      if (m.k === 'dmg') { if (ch.dead || v < 1) continue; hurt(ch, v); }
+      else if (m.k === 'heal') { if (ch.dead) continue; ch.hp = Math.min(ch.hpMax, ch.hp + v); delete ch.dying; healBody(ch, v); }
+      else if (m.k === 'aura' || m.k === 'san') ch[m.k] = Math.min(ch[m.k + 'Max'], ch[m.k] + v);
+      else if (m.k === 'xp' || m.k === 'gold') ch[m.k] += v;
+      else if (m.k === 'full') { ch.hp = ch.hpMax; ch.aura = ch.auraMax; ch.san = ch.sanMax; ch.body = {}; ch.st = {}; delete ch.dying; delete ch.dead; }
+      else if (m.k === 'st' && STK.includes(m.st)) { if (ch.st[m.st]) delete ch.st[m.st]; else applySt(ch, m.st); }
+      else if (m.k === 'item' && Object.hasOwn(S.items, m.item)) ch.inv[m.item] = (ch.inv[m.item] || 0) + 1;
+      else continue;
+      done.push(ch.name);
+    }
+    const T = { dmg: `${v} de dano`, heal: `cura de ${v} HP`, aura: `+${v} Aura`, san: `+${v} Sanidade`, xp: `+${v} XP`, gold: `+${v} ouro`, full: 'tudo restaurado', st: STN[m.st], item: S.items[m.item]?.name };
+    if (done.length) log('Mestre', `${T[m.k]} → ${done.join(', ')}`, m.k === 'dmg' ? 'bad' : 'ok');
+  },
   content(c, m) { // restaura o conteúdo padrão de uma coleção (skills aprendidas e itens dos personagens são limpos se a coleção mudar)
     if (c.role !== 'gm') return;
     if (m.coll === 'skills') { S.skills = buildSkills(sk); Object.values(S.chars).forEach(ch => ch.skills = []); }
@@ -697,8 +743,37 @@ const H = {
   },
 };
 
+// executa uma mensagem de cliente; pedidos de jogador que exigem aprovação entram na fila em vez de acontecer
+function handle(c, m) {
+  if (!Object.hasOwn(H, m.t)) return;
+  if (c.role === 'gm' && !NOUNDO.has(m.t)) { undoStack.push(JSON.stringify({ ...S, log: undefined, users: undefined })); if (undoStack.length > 20) undoStack.shift(); }
+  const cat = c.role === 'player' ? gateOf(m) : null;
+  if (cat && !S.auto[cat]) { // vira um pedido (um por jogador: o novo substitui o anterior)
+    const ch = S.chars[m.id];
+    if (!can(c, ch) || (cat === 'act' && !(S.battle.active && current() === ch.id))) return;
+    for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
+    S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq,
+      m: { id: m.id, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k } };
+    return push();
+  }
+  try { H[m.t](c, m); } catch (e) { console.error(e); } push();
+}
 const okName = n => !!n && !/[@\s]/.test(n) && n.toLowerCase() !== 'mestre';
 const checkUser = (name, pass) => { const u = S.users[name]; return Object.hasOwn(S.users, name) && crypto.timingSafeEqual(Buffer.from(hash(pass, u.split(':')[0])), Buffer.from(u)); };
+// o que o jogador pede e o mestre precisa aprovar, por tipo (S.auto[tipo] = true dispensa a aprovação)
+const GATE = { roll: 'roll', act: 'act', learn: 'learn', use: 'item', equip: 'item', drop: 'item', buy: 'item', sell: 'item', forge: 'item', campAct: 'camp' };
+const gateOf = m => m.t === 'use' && S.battle.active && m.id in S.battle.ticks ? 'act' : GATE[m.t];
+const reqText = m => { // frase curta que o mestre lê na fila
+  const ch = S.chars[m.id], i = S.items[m.item], tg = S.chars[m.target], sg = v => (v > 0 ? '+' : '') + v;
+  if (m.t === 'roll') return `rolar ${m.attr}${int(m.mod, -100, 100) ? ' ' + sg(int(m.mod, -100, 100)) : ''}`;
+  if (m.t === 'act') return `${m.skill === 'atk' ? 'Ataque' : S.skills[m.skill]?.name || '?'} → ${tg?.name || '?'}${PARTS.includes(m.aim) ? ` (mira: ${PL[m.aim]})` : ''}`;
+  if (m.t === 'learn') return `aprender ${S.skills[m.skill]?.name || '?'} (${S.skills[m.skill]?.xp ?? '?'} XP)`;
+  if (m.t === 'campAct') return `acampamento: ${m.k}`;
+  const V = { use: 'usar', equip: ch?.equip[i?.type] === m.item ? 'tirar' : 'equipar', drop: 'descartar', buy: `comprar (${i?.price} ouro)`, sell: `vender (${Math.floor((i?.price || 0) / 2)} ouro)`, forge: 'forjar' };
+  return `${V[m.t]} ${i?.name || '?'}${m.t === 'use' && tg && tg !== ch ? ' em ' + tg.name : ''}`;
+};
+const pruneReqs = () => { for (const [id, r] of Object.entries(S.reqs)) { const ch = S.chars[r.m.id]; if (!ch || ch.owner !== r.by || (r.cat === 'act' && !(S.battle.active && current() === ch.id))) delete S.reqs[id]; } };
+const tell = (name, o) => wss.clients.forEach(x => x.role === 'player' && x.name === name && x.readyState === 1 && x.send(JSON.stringify({ t: 'note', ...o })));
 const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
 wss.on('connection', c => {
   c.role = null; // sem login não recebe nada
@@ -708,6 +783,10 @@ wss.on('connection', c => {
     if (m.t === 'hello') {
       const bad = msg => c.send(JSON.stringify({ t: 'err', bad: true, msg })), name = String(m.name || '').trim().slice(0, 30), pass = String(m.pass || '');
       // a mesa (TV) entra com a chave do mestre (login "mestre") ou com a conta de um jogador
+      if (m.role === 'player' && m.as) { // o mestre confere a tela de um jogador: mesma visão, sem poder agir
+        if (String(m.key) !== KEY) return bad('Chave do mestre incorreta.');
+        c.role = 'player'; c.name = String(m.as).slice(0, 30); c.peek = true; return sendState(c);
+      }
       const asGm = m.role === 'gm' || (m.role === 'table' && name.toLowerCase() === 'mestre');
       if (asGm) { if (String(m.role === 'gm' ? m.key : pass) !== KEY) return bad('Chave do mestre incorreta.'); c.role = m.role === 'gm' ? 'gm' : 'table'; }
       else if (m.role === 'player' || m.role === 'table') {
@@ -716,20 +795,19 @@ wss.on('connection', c => {
       } else return;
       return sendState(c);
     }
-    if (!c.role) return;
+    if (!c.role || c.peek) return;
     if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
       if (c.role === 'table') return;
       const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) });
       return wss.clients.forEach(o => o.role && o.readyState === 1 && o.send(p));
     }
-    if (c.role === 'gm' && Object.hasOwn(H, m.t) && !NOUNDO.has(m.t)) { undoStack.push(JSON.stringify({ ...S, log: undefined, users: undefined })); if (undoStack.length > 20) undoStack.shift(); }
-    if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
+    handle(c, m);
   });
 });
 prep();
 export { genFoe, partyRef, fitBoss, spawn };
 export { H, S, R, current, derive };
-export { view, order };
+export { view, order, handle };
 const isMain = SEA || process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   if (!fresh) { // cópia de segurança do estado a cada início (mantém as 10 mais recentes)
