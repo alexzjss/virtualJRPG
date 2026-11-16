@@ -6,6 +6,7 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 - `/gm` — painel do mestre (chave padrão `mestre`; troque com `GM_KEY`)
 - `/player` — fichas do jogador (nome + senha criada no primeiro acesso)
 - `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura
+- `/painel` — as três telas lado a lado (mestre, jogador e mesa) para acompanhar e mexer em tudo ao mesmo tempo; cada quadro é a tela real, então o que muda em um aparece nos outros na hora. Pede a chave do mestre, o nome e a senha do jogador uma vez e usa `⤢` para ver uma tela inteira
 
 Chat: texto livre, `/r 2d6+1` para rolar, `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
