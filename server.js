@@ -322,6 +322,14 @@ const H = {
     const t = heal ? alive.filter(o => o.enemy === a.enemy).sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0] : pick(foes);
     if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
   },
+  ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
+    const ch = S.chars[m.id], T = S.battle.ticks;
+    if (c.role !== 'gm' || !S.battle.active || !ch) return;
+    if (m.k === 'in') { if (!(ch.id in T) && ch.hp > 0) T[ch.id] = Math.max(0, ...Object.values(T)) + 1; }
+    else if (!(ch.id in T)) return;
+    else if (m.k === 'out') delete T[ch.id];
+    else T[ch.id] = Math.max(0, T[ch.id] + (m.k === 'up' ? -1 : 1) * Math.ceil(delay(ch) / 2));
+  },
   next(c) { const id = current(); if (S.battle.active && id && can(c, S.chars[id])) endTurn(id, 50); }, // passar custa metade do tempo
   act(c, m) {
     const a = S.chars[current()], t0 = S.chars[m.target];
@@ -465,6 +473,11 @@ wss.on('connection', c => {
         c.role = 'player'; c.name = name;
       }
       return sendState(c);
+    }
+    if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
+      if (c.role === 'table') return;
+      const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) });
+      return wss.clients.forEach(o => o.readyState === 1 && o.send(p));
     }
     if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
   });

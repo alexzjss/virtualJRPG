@@ -130,3 +130,19 @@ body[data-role=table] .sides{margin-top:6vh;gap:6vw}body[data-role=table] .unit{
 .pc .menu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.pc .menu button,.pc .menu button:nth-child(n){margin-left:0}
 body[data-role=player] h1{font-size:22px;padding:6px 26px 6px 18px}
 .pc .cmd-top .body svg{width:84px;height:182px}.pc .aimrow .body svg{width:52px;height:113px}.pc .cmd h2{font-size:28px}
+/* ---- PC: zoom do mapa, régua, ping, menu de contexto, iniciativa, grupo na mesa ---- */
+.mapwrap{overflow:hidden;touch-action:none}.map{transform-origin:0 0}
+body[data-role=gm] .mapwrap,body[data-role=table] .mapwrap{height:100vh}
+.rul{position:absolute;inset:0;pointer-events:none;z-index:6}.rul svg{width:100%;height:100%}.rul line{stroke:#ffe600;stroke-width:3;stroke-dasharray:8 6}
+.rul b{position:absolute;left:calc((var(--x) + 1)*100%/var(--cols));top:calc(var(--y)*100%/var(--rows));background:#ffe600;color:var(--ink);padding:2px 8px;white-space:nowrap}
+.ping{position:absolute;left:calc(var(--x)*100%/var(--cols));top:calc(var(--y)*100%/var(--rows));width:calc(100%/var(--cols));aspect-ratio:1;border:4px solid #ffe600;border-radius:50%;box-sizing:border-box;pointer-events:none;z-index:6;animation:ping .8s ease-out 3}
+@keyframes ping{0%{transform:scale(.4);opacity:1}100%{transform:scale(2.6);opacity:0}}
+.ctx{position:fixed;z-index:300;width:240px;background:var(--ink);box-shadow:6px 6px 0 var(--red);padding:8px;display:flex;flex-direction:column;gap:4px}
+.ctx b{font:400 18px Anton,Impact,sans-serif;text-transform:uppercase}.ctx button{transform:none;text-align:left;min-height:34px}
+.dock{z-index:200}.dock i{width:10px}.dock .lay{background:#26262e;color:#fff;font-size:13px;padding:8px 10px}
+.banner{z-index:400}.caption{z-index:410}
+.menu{counter-reset:k}.menu button{position:relative}.menu button::after{counter-increment:k;content:counter(k);position:absolute;right:10px;top:6px;font:700 12px "Trebuchet MS",sans-serif;opacity:.6;border:1px solid currentColor;padding:0 5px}
+.party{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:10px;z-index:30}
+.party>div{display:flex;gap:8px;align-items:center;background:#0b0b0de6;border-top:5px solid var(--c);padding:8px 12px;min-width:170px}.party img{width:48px;height:48px;object-fit:cover}.party span{flex:1}.party b{font:400 18px Anton,Impact,sans-serif;text-transform:uppercase}.party .bar{height:12px;margin:2px 0}.party .bar span{display:none}
+body[data-role=gm] h1{pointer-events:none;left:auto;right:0;top:0;transform:skewX(-10deg) translateX(8px)}
+.dock button{white-space:nowrap}

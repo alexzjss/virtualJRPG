@@ -9,3 +9,10 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 
 Chat: texto livre, `/r 2d6+1` para rolar, `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
+
+## Atalhos no PC
+- Mapa: roda do mouse = zoom, botão do meio ou Espaço+arrastar = mover, `0` = recentrar
+- Alt+arrastar = régua em casas; duplo clique no mapa = ping para todos
+- Clique direito no token = menu; duplo clique no token = abrir a ficha
+- Batalha: `1`–`9` = comandos, Tab = trocar alvo, Enter = chat, Esc = fechar/cancelar
+- Mestre: Shift+clique em Exploração/Batalha/Preparo salva o arranjo de janelas atual
