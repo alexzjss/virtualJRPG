@@ -32,7 +32,7 @@ Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas j
 
 ## Vínculos e personagens base
 Cada caçador tem um ou mais **Vínculos** (Kagutsuchi, Susanoo, Atlas, Indra, Fuhaku, Amaterasu, Tsukuyomi, Shukketsu, Hiruko). Ele só aprende o tronco Marcial e as skills dos próprios Vínculos, e resiste ao elemento deles. O mestre concede Vínculos na aba **Mestre** da ficha.
-A árvore (311 nós: 30 por Vínculo + 41 marciais) fica em `tree.js`; `content.js` só a distribui na grade.
+A árvore (581 nós: 60 por Vínculo em 6 ramos + 41 marciais; veja `REVISAO-ARVORE.md`) fica em `tree.js`; `content.js` só a distribui na grade.
 Campanha nova começa com Shinkai (Indra), Mikhail (Fuhaku) e Thomas (Hiruko), sem dono: o jogador clica em **Assumir**.
 
 ## Mapas

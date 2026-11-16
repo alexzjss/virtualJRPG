@@ -8,7 +8,7 @@ const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(c, m); const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 
-test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, 311); assert.ok(Object.keys(S.items).length >= 50); });
+test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, 581); assert.ok(Object.keys(S.items).length >= 50); });
 test('grade: sem sobreposição; cada Vínculo alcança todos os seus nós passando só por ele e pelo tronco Marcial', () => {
   const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
   for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao']) {
@@ -16,7 +16,7 @@ test('grade: sem sobreposição; cada Vínculo alcança todos os seus nós passa
     assert.ok(start >= 0, 'raiz de ' + el);
     while (q.length) { const x = set[q.pop()]; set.forEach((y, i) => { if (!seen.has(i) && Math.max(Math.abs(x.gx - y.gx), Math.abs(x.gy - y.gy)) <= 1) { seen.add(i); q.push(i); } }); }
     assert.deepEqual(set.filter((_, i) => !seen.has(i)).map(s => s.name), [], el);
-    assert.equal(ns.filter(s => s.el === el).length, 30);
+    assert.equal(ns.filter(s => s.el === el).length, 60);
   }
 });
 test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {

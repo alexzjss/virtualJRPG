@@ -207,6 +207,7 @@ const figCard = (c, w) => `<div class="unit hero cur static" style="--c:${esc(c.
 
 // grade de habilidades como constelação: círculo = ativa, losango = passiva; brilho = aprendida, tracejado = disponível
 const lab2 = n => { const w = n.split(' '), a = []; let l = ''; for (const x of w) { if (l && (l + ' ' + x).length > 14) { a.push(l); l = x; } else l = l ? l + ' ' + x : x; } a.push(l); return a.slice(0, 2).map((t, i) => `<tspan x="0" dy="${i ? 11 : 0}">${esc(i === 1 && a.length > 2 ? t + '…' : t)}</tspan>`).join(''); };
+let gvFor = null; // personagem para o qual a grade já foi enquadrada
 const gv = { z: 1, x: 0, y: 0 }; let skd = null, skMoved = false;
 function skillPage(c) {
   const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 86, G = Math.max(17, ...N.map(([, s]) => Math.max(s.gx, s.gy) + 1)), mid = (G - 1) / 2, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
@@ -230,8 +231,8 @@ function skillPage(c) {
       ${gm && c.enemy ? `<button class="learn" data-a="skTog" data-id="${c.id}" data-skill="${sel}">${own.has(sel) ? 'Remover do inimigo' : 'Dar ao inimigo'}</button>` : own.has(sel) ? '<div class="learned">Aprendida</div>' : `<button class="learn" data-a="learn" data-id="${c.id}" data-skill="${sel}" ${mine(c) && !why ? '' : 'disabled'}>Aprender · ${ss.xp} XP</button>${why ? `<small class="why">${why}</small>` : ''}`}</div>`
     : '<div class="ndcard empty"><h2>Escolha um nó</h2><small>Clique em um nó para ver o que ele faz. Você aprende o tronco Marcial e as skills do seu Vínculo, sempre a partir de um nó vizinho de um que já tem.</small></div>';
   const mineL = c.skills.filter(k => S.skills[k]).map(k => `<li style="--e:${ELC[S.skills[k].el]}" data-node="${k}" data-id="${c.id}"><b>${esc(S.skills[k].name)}</b><small>${esc(desc(S.skills[k]))}</small></li>`).join('');
-  return `<section class="skp"><div class="skmap ${gv.z < 1.7 ? 'far' : 'near'}"><svg viewBox="0 0 ${G * U} ${G * U}" role="group" aria-label="Grade de habilidades" style="transform:translate(${gv.x}px,${gv.y}px) scale(${gv.z})">${halos}<g class="ln">${lines}</g>${nodes}</svg>
-      <div class="skhint"><button data-a="skReset">Recentrar</button><small>Roda do mouse: zoom · arrastar: mover · de perto aparecem todos os nomes</small></div></div>
+  return `<section class="skp"><div class="skmap ${gv.z < 1.7 ? 'far' : 'near'}" data-cid="${c.id}"><svg viewBox="0 0 ${G * U} ${G * U}" role="group" aria-label="Grade de habilidades" style="transform:translate(${gv.x}px,${gv.y}px) scale(${gv.z})">${halos}<g class="ln">${lines}</g>${nodes}</svg>
+      <div class="skhint"><button data-a="skReset">Minha árvore</button><button data-a="skAll">Ver tudo</button><small>Roda do mouse: zoom · arrastar: mover · de perto aparecem todos os nomes</small></div></div>
     <aside class="skside"><div class="xp"><small>XP disponível de ${esc(c.name)}</small><b>${c.xp}</b></div>${detail}
       <div class="legend"><span><i class="lc"></i>Ativa</span><span><i class="lp"></i>Passiva</span><span><i class="lo"></i>Aprendida</span><span><i class="la"></i>Disponível</span><span><i class="lx"></i>Outro Vínculo</span></div>
       <h3>Aprendidas (${c.skills.length})</h3><ul class="mine">${mineL || '<li class="none"><small>Nenhuma ainda.</small></li>'}</ul></aside></section>`;
@@ -327,6 +328,9 @@ function render() {
       <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg}"><main>${page}</main>${chatOpen ? `<aside class="chatcol"><div class="panel">${log}</div></aside>` : ''}</div>${ctxMenu()}`;
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
   if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
+  { const skm = app.querySelector(".skmap"); // a grade abre já aproximada na árvore do personagem, não no mapa inteiro
+    if (skm && gvFor !== skm.dataset.cid) { gvFor = skm.dataset.cid; Object.assign(gv, { z: 1, x: 0, y: 0 }); applyGv(); const o = skm.querySelector(".nd.own");
+      if (o) { const q = o.getBoundingClientRect(), m = skm.getBoundingClientRect(), z = 4; Object.assign(gv, { z, x: m.width / 2 - (q.left + q.width / 2 - m.left) * z, y: m.height / 2 - (q.top + q.height / 2 - m.top) * z }); applyGv(); } } }
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
   app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody').forEach((el, i) => el.scrollTop = scr[i] || 0);
   { const sc2 = S.scenes[S.scene]; if (sc2.cam && sc2.cam.n !== lastCam) { const w = mapEl()?.offsetWidth; if (w) { lastCam = sc2.cam.n; Object.assign(view, { z: sc2.cam.z, x: sc2.cam.fx * w, y: sc2.cam.fy * w }); applyView(); } } } // vista fixada pelo mestre
@@ -439,7 +443,8 @@ app.addEventListener('click', e => {
   }
   if (d.a === 'camFix') { const w = mapEl().offsetWidth; return send({ t: 'map', f: 'cam', v: { z: view.z, fx: view.x / w, fy: view.y / w } }); }
   if (d.a === 'camFree') return send({ t: 'map', f: 'cam', v: null });
-  if (d.a === 'skReset') { Object.assign(gv, { z: 1, x: 0, y: 0 }); return render(); }
+  if (d.a === 'skReset') { gvFor = null; return render(); }
+  if (d.a === 'skAll') { Object.assign(gv, { z: 1, x: 0, y: 0 }); return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'gridFull') { gridFull = d.id || null; return render(); }
   if (d.a === 'chaseStart') return send({ t: 'chase', k: 'start', ...cz });
@@ -489,7 +494,7 @@ app.addEventListener('wheel', e => {
   const sv = e.target.closest?.('.skmap')?.querySelector('svg');
   if (!sv) return;
   e.preventDefault();
-  const r = sv.getBoundingClientRect(), z = Math.min(5, Math.max(1, gv.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+  const r = sv.getBoundingClientRect(), z = Math.min(8, Math.max(1, gv.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
   gv.x += (e.clientX - r.left) / gv.z * (gv.z - z); gv.y += (e.clientY - r.top) / gv.z * (gv.z - z); gv.z = z; if (z === 1) gv.x = gv.y = 0; applyGv();
 }, { passive: false });
 app.addEventListener('pointerdown', e => { if (e.button === 0 && e.target.closest('.skmap') && !e.target.closest('button')) skd = { sx: e.clientX, sy: e.clientY, x: gv.x, y: gv.y }; const cb = e.target.closest('.cropbox');
