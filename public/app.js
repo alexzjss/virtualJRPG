@@ -39,7 +39,7 @@ const mods = {}, tabs = {}, selNode = {}, open = {};
 // login: a página de entrada (GitHub Pages) manda login e senha no fim do link (#vj=…), que nunca vai ao servidor e é apagado da barra
 const ls = (k, v) => { try { if (v === undefined) return localStorage[k] || ''; if (v === null) delete localStorage[k]; else localStorage[k] = v; } catch { return ''; } };
 try { const h = new URLSearchParams(location.hash.slice(1)).get('vj'); if (h) { const o = JSON.parse(decodeURIComponent(escape(atob(h.replace(/-/g, '+').replace(/_/g, '/'))))); ls('vj_name', o.n || ''); ls('vj_pass', o.p || ''); history.replaceState(null, '', location.pathname); } } catch {}
-const asWho = role === 'player' ? new URLSearchParams(location.search).get('as') : null; // o mestre conferindo a tela de um jogador (só leitura)
+const asWho = role === 'player' ? new URLSearchParams(location.search).get('as') : null, ctl = !!asWho && new URLSearchParams(location.search).has('ctl'); // o mestre olhando a tela de um jogador, ou jogando por ele (ctl)
 let name = asWho || (role === 'gm' ? '' : ls('vj_name')), pass = role === 'gm' || asWho ? '' : ls('vj_pass'), key = gm || asWho ? ls('vj_key') : '';
 const loginForm = msg => { // gm: só a chave; jogador: login e senha; mesa: conta de jogador ou "mestre" + chave
   document.body.classList.remove('off');
@@ -83,7 +83,7 @@ const toast = (text, kind = '', why = '') => { // aviso curto no canto (aprovado
   setTimeout(() => t.classList.add('out'), 4600); setTimeout(() => t.remove(), 5000);
 };
 // pedidos: o que o jogador faz e precisa da aprovação do mestre (S.auto[tipo] dispensa)
-const gated = cat => role === 'player' && !S.auto[cat], askL = (cat, direct, asked = 'Pedir ao mestre') => gated(cat) ? asked : direct;
+const gated = cat => role === 'player' && !ctl && !S.auto[cat], askL = (cat, direct, asked = 'Pedir ao mestre') => gated(cat) ? asked : direct;
 const myReq = () => role === 'player' ? Object.entries(S.reqs || {})[0] : null;
 const sanPen = c => { const p = c.san / (c.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
 let rollDlg = null, lastReq = null, editing = null, editFocus = false;
@@ -106,7 +106,7 @@ let actx; const beep = () => { try { actx ||= new AudioContext(); const o = actx
 
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
-  ws.onopen = () => document.body.classList.remove('off') || send({ t: 'hello', role, name, pass, key, as: asWho || undefined });
+  ws.onopen = () => document.body.classList.remove('off') || send({ t: 'hello', role, name, pass, key, as: asWho || undefined, ctl: ctl || undefined });
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.t === 'state') { S = m.s; render(); }
@@ -134,7 +134,7 @@ function sessWin() {
     ${n.lan.length ? `<p><small>Mesma rede Wi-Fi (sem internet): ${n.lan.map(u => esc(u) + '/player').join(' · ')}</small></p>` : ''}`;
   const acc = S.accounts.map(a => { const own = heroes().filter(c => c.owner === a);
     return `<div class="acct"><b>${esc(a)}</b><span class="chips">${own.map(c => `<span data-a="freeChar" data-id="${c.id}" title="Tirar este personagem da conta">${esc(c.name)} ×</span>`).join('') || '<small>sem personagem</small>'}</span>
-      <span class="row"><button data-a="peek" data-k="${esc(a)}" title="Abre a tela deste jogador em outra aba, só para olhar">Ver como</button><button data-a="giveChar" data-k="${esc(a)}">+ Personagem</button><button data-a="userPass" data-k="${esc(a)}">Nova senha</button><button data-a="userDel" data-k="${esc(a)}">Apagar</button></span></div>`; }).join('') || '<p><small>Nenhuma conta ainda. Crie uma para cada jogador.</small></p>';
+      <span class="row"><button data-a="peek" data-k="${esc(a)}" title="Abre a tela deste jogador em outra aba, só para olhar">Ver como</button><button data-a="peek" data-v="1" data-k="${esc(a)}" title="Abre a tela deste jogador em outra aba para você jogar por ele">Assumir</button><button data-a="giveChar" data-k="${esc(a)}">+ Personagem</button><button data-a="userPass" data-k="${esc(a)}">Nova senha</button><button data-a="userDel" data-k="${esc(a)}">Apagar</button></span></div>`; }).join('') || '<p><small>Nenhuma conta ainda. Crie uma para cada jogador.</small></p>';
   const opts = heroes().map(c => `<option value="${c.id}" ${sess.ch === c.id ? 'selected' : ''}>${esc(c.name)}${c.owner ? ' (de ' + esc(c.owner) + ')' : ''}</option>`).join('');
   const form = `<div class="row"><input data-sess="n" aria-label="Login do jogador" placeholder="Login (sem espaços)" value="${esc(sess.n)}"><input data-sess="p" aria-label="Senha" placeholder="Senha (vazio = gerar)" value="${esc(sess.p)}"></div>
     <div class="row"><select data-sess="ch" aria-label="Personagem da conta"><option value="">Sem personagem por enquanto</option>${opts}</select><button class="own" data-a="userAdd">Criar conta</button></div>
@@ -170,6 +170,7 @@ function unit(c, cur) {
       <div class="lim ${c.limit >= 100 ? 'full' : ''}">${bar('limit', c, true)}<small>${c.limit >= 100 ? 'Limite!' : 'Limite ' + c.limit + '%'}</small></div>`;
   return `<div class="unit ${foe ? 'foe' : 'hero'} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${stats}</div></div>`;
 }
+const BBG = { rubro: 'Rubro', noite: 'Noite', floresta: 'Floresta', brasa: 'Brasa', gelo: 'Gelo', vazio: 'Vazio', santuario: 'Santuário', tempestade: 'Tempestade' }; // fundos prontos da batalha
 function battle() {
   const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
   const side = e => { const l = inB.filter(c => !!c.enemy === e), n = l.length, cols = n > 4 ? Math.ceil(n / 2) : Math.max(1, n), w = Math.min(14.5, 43 / cols - 1.3);
@@ -178,8 +179,10 @@ function battle() {
       return `<button data-a="act" data-id="${c.id}" data-skill="${k}" title="${esc(desc(s))}" ${blocked(c, s) ? 'disabled' : ''}>${esc(s.name)}</button>`; }).join('')}
       ${Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons').map(([k, q]) => `<button class="item" data-a="use" data-id="${c.id}" data-item="${k}">${esc(S.items[k].name)} ×${q}</button>`).join('')}
       <button data-a="next">Passar</button></div>${aimBox()}`;
-  return `<section class="stage battle" style="${sc.bg ? `--bg:url('${esc(sc.bg)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
+  const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
+  const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
+  return `<section class="stage battle heat-${heat} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
+    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {
@@ -267,7 +270,7 @@ const selC = new Set(), qa = { v: 5, st: 'burn', item: '' }; let asking = new Se
 const sheetCard = c => `<div class="scard ${selC.has(c.id) ? 'sel' : ''} ${asking.has(c.id) ? 'asking' : ''}" data-a="selCard" data-id="${c.id}" style="--c:${esc(c.color)}" aria-pressed="${selC.has(c.id)}">
     <div class="sc-h"><i class="chk" aria-hidden="true"></i><b>${esc(c.name)}</b><small>${c.enemy ? 'Inimigo' : esc(c.owner || 'sem dono')}${(c.vinc || []).map(e => ' · ' + PATRON[e]).join('')}</small></div>
     <div class="sc-r">${['hp', 'aura', 'san'].map(k => `<span class="rv ${k}"><em>${L[k]}</em>${edv(c, k, c[k])}<small>/${c[k + 'Max']}</small></span>`).join('')}${c.enemy ? '' : `<span class="rv"><em>XP</em>${edv(c, 'xp', c.xp)}</span><span class="rv"><em>Ouro</em>${edv(c, 'gold', c.gold)}</span>`}</div>
-    ${bar('hp', c, true)}<div class="sc-f"><em>${c.hp > 0 ? stList(c) || 'Sem condições' : c.dead ? 'Morto' : 'Caído'}</em><button class="ghost" data-a="openSheet" data-id="${c.id}">Abrir ficha</button>${!c.enemy && c.owner ? `<button class="ghost" data-a="peek" data-k="${esc(c.owner)}" title="Abre a tela de ${esc(c.owner)} em outra aba, só para olhar">Ver como</button>` : ''}</div></div>`;
+    ${bar('hp', c, true)}<div class="sc-f"><em>${c.hp > 0 ? stList(c) || 'Sem condições' : c.dead ? 'Morto' : 'Caído'}</em><button class="ghost" data-a="openSheet" data-id="${c.id}">Abrir ficha</button>${!c.enemy && c.owner ? `<button class="ghost" data-a="peek" data-k="${esc(c.owner)}" title="Abre a tela de ${esc(c.owner)} em outra aba, só para olhar">Ver como</button><button class="ghost" data-a="peek" data-v="1" data-k="${esc(c.owner)}" title="Abre a tela de ${esc(c.owner)} em outra aba para você jogar por ele">Assumir</button>` : ''}</div></div>`;
 // barra de ações rápidas: vale para as fichas selecionadas (uma ou várias)
 function fichasWin() {
   const cs = Object.values(S.chars), n = [...selC].filter(id => S.chars[id]).length, dis = n ? '' : 'disabled', grp = (l, list) => list.length ? `<h4>${l}</h4>${list.map(sheetCard).join('')}` : '';
@@ -457,6 +460,8 @@ function render() {
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
       <div class="row"><label>Casas na largura <input type="number" step="0.25" min="4" max="80" data-map="cols" value="${sc.cols}"></label><small>${Math.round(sc.rows * 10) / 10} de altura</small></div>
       <div class="row"><label>Grade → <input type="range" min="0" max="0.95" step="0.05" data-map="ox" value="${sc.ox}" aria-label="Deslocar grade na horizontal"></label><label>↓ <input type="range" min="0" max="0.95" step="0.05" data-map="oy" value="${sc.oy}" aria-label="Deslocar grade na vertical"></label></div>
+      <div class="row chips">Fundo da batalha: <span class="${sc.bbg ? '' : 'weak'}" data-a="map" data-f="bbg" data-v="" title="Usa a imagem do mapa desta cena">Mapa da cena</span>${chips(BBG, (k, l) => `<span class="${sc.bbg === k ? 'weak' : ''}" data-a="map" data-f="bbg" data-v="${k}">${l}</span>`)}</div>
+      <div class="row"><input aria-label="Imagem própria para o fundo da batalha" data-map="bbg" placeholder="Ou cole o link de uma imagem" value="${esc(sc.bbg && !BBG[sc.bbg] ? sc.bbg : '')}"><label class="up">Enviar fundo<input type="file" accept="image/*" data-up="bbg"></label></div>
       <div class="row"><button data-a="camFix" title="Todos passam a ver o mapa com o seu zoom e posição atuais">Fixar minha vista para todos</button>${sc.cam ? '<button data-a="camFree" class="own">Liberar vista</button>' : ''}</div>
 
       <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
@@ -481,7 +486,7 @@ function render() {
     app.innerHTML = `<header class="top"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
       <nav class="tnav" aria-label="Páginas">${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}" ${pg === k ? 'aria-current="page"' : ''}>${ico(k)}<span>${k === 'mesa' && b ? 'Batalha' : l}</span></button>`)}<button class="tchat ${chatOpen ? 'on' : ''}" data-a="chatT" aria-pressed="${chatOpen}">${ico('chat')}<span>Chat</span>${unread ? `<i class="bdg">${unread > 9 ? '9+' : unread}</i>` : ''}</button></nav>
       <div class="me"><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? '<div class="pop"><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>' : ''}</div></header>
-      ${asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
+      ${ctl ? `<div class="peek ctl">Você está <b>jogando por ${esc(asWho)}</b>: o que fizer aqui acontece na hora, sem passar pela fila de pedidos.</div>` : asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
       <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`;
     lastReq = (myReq() || [])[0] || null;
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
@@ -498,39 +503,60 @@ function render() {
 }
 
 // efeitos: barras que escoam, investida do atacante, impacto no alvo, faixa da skill, dados, legenda e vitória
-const lastPct = new Map();
+const lastPct = new Map(), DICE_MS = 950;
+let cine = null; // cena em foco: quem age e quem é alvo ficam em destaque e o palco aproxima neles
+function applyCine(fresh) {
+  const st = app.querySelector('.stage'), fld = st?.querySelector('.field');
+  if (!fld) return;
+  if (!cine || performance.now() > cine.until) { cine = null; st.classList.remove('cine'); fld.style.transform = ''; return; }
+  const us = cine.ids.map(id => st.querySelector(`.unit[data-tgt="${id}"]`)).filter(Boolean);
+  if (!us.length) return;
+  us.forEach(u => u.classList.add('inv'));
+  const x0 = Math.min(...us.map(u => u.offsetLeft)), x1 = Math.max(...us.map(u => u.offsetLeft + u.offsetWidth)), y0 = Math.min(...us.map(u => u.offsetTop)), y1 = Math.max(...us.map(u => u.offsetTop + u.offsetHeight));
+  const z = Math.max(1, Math.min(1.55, fld.offsetWidth / ((x1 - x0) * 1.35), st.offsetHeight / ((y1 - y0) * 1.3))), cx = fld.offsetLeft + fld.offsetWidth / 2, cy = st.offsetHeight / 2;
+  fld.style.transition = fresh ? '' : 'none'; st.classList.add('cine');
+  fld.style.transform = `translate(${(cx - (x0 + x1) / 2) * z}px,${(cy - (y0 + y1) / 2) * z}px) scale(${z})`;
+  if (!fresh) { fld.offsetWidth; fld.style.transition = ''; }
+}
+function dicePanel(e, n) { // dados 3D dentro de um painel com o que era preciso tirar e o veredito
+  document.querySelector('.rollfx')?.remove();
+  const rf = document.createElement('div'), ok = e.kind === 'ok', atk = e.rr.atk;
+  rf.className = `rollfx ${ok ? 'ok' : 'bad'} ${/CRÍTICO|DESASTRE/.test(e.rr.res) ? 'big' : ''} ${atk ? 'atk' : ''}`; rf.style.setProperty('--c', S.chars[e.rr.c]?.color || '#fff'); rf.setAttribute('role', 'status');
+  rf.innerHTML = `<small>${esc(e.who)}${e.to ? ' · rolagem secreta' : ''}</small><span>${esc(e.rr.l)} · precisa de <u>${e.rr.t}</u> ou menos${n > 1 ? ` · ${n} alvos` : ''}</span><div class="dice"></div><div class="res"><b>${e.d}</b><em>${esc(e.rr.res)}</em></div>`;
+  document.body.append(rf); import('/dice.js').then(m => m.roll(e.d, rf.querySelector('.dice'))).catch(() => {});
+  setTimeout(() => rf.remove(), atk ? 2700 : 3400);
+}
+function impact(acts) { // reação à ação: faixa com o nome, foco em quem age e nos alvos, golpe, número e carimbo
+  const stage = app.querySelector('.stage'), f0 = acts[0].fx, a = S.chars[f0.a];
+  if (f0.s && stage) { document.querySelector('.callout')?.remove();
+    const co = document.createElement('div'); co.className = 'callout'; co.style.setProperty('--fx', ELC[f0.el] || '#e4002b');
+    co.innerHTML = `<div><small>${esc(a?.name || '')}</small><b>${esc(f0.s)}</b></div>`; document.body.append(co); setTimeout(() => co.remove(), 1900); }
+  if (stage) { cine = { ids: [...new Set([f0.a, ...acts.map(e => e.fx.id)].filter(Boolean))], until: performance.now() + 2100 }; applyCine(true); setTimeout(() => applyCine(true), 2150); }
+  const au = f0.a && app.querySelector(`.unit[data-tgt="${f0.a}"]`);
+  if (au) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); au.classList.add(f0.el && f0.el !== 'fis' || f0.heal ? 'cast' : 'lunge'); }
+  if (acts.some(e => e.fx.crit) && stage) stage.classList.add('shake');
+  acts.forEach((e, i) => setTimeout(() => { const f = e.fx, el = app.querySelector(`.unit[data-tgt="${f.id}"]`) || app.querySelector(`.tok[data-id="${f.id}"]`);
+    if (!el) return;
+    const add = (cls, txt = '') => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; el.append(s); return s; };
+    el.style.setProperty('--fx', ELC[f.el] || '#fff');
+    if (f.dmg) { el.classList.add('hit'); add('slash'); } else if (f.heal) add('mend'); else if (f.miss) el.classList.add('dodge');
+    add('float ' + (f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : ''), f.heal ? '+' + f.heal : f.miss ? 'ERROU' : '−' + f.dmg);
+    if (f.w) add('stamp weak', 'Fraqueza!'); else if (f.crit) add('stamp', 'Crítico!');
+  }, 260 + i * 140));
+}
 function fx() {
-  app.querySelectorAll('[data-bid]').forEach(el => { // anima a barra do valor anterior até o novo
+  const wait = seen != null && S.log.some(e => e.n > seen && e.d && e.fx) ? DICE_MS + 150 : 0;
+  app.querySelectorAll('[data-bid]').forEach(el => { // anima a barra do valor anterior até o novo (depois do dado, quando há rolagem)
     const k = el.dataset.bid, p = el.dataset.p, old = lastPct.get(k);
-    if (old != null && old !== p) { el.style.transition = 'none'; el.style.width = old + '%'; el.offsetWidth; el.style.transition = ''; el.style.width = p + '%'; }
+    if (old != null && old !== p) { el.style.transition = 'none'; el.style.width = old + '%'; el.offsetWidth; el.style.transition = ''; el.style.transitionDelay = wait + 'ms'; el.style.width = p + '%'; }
     lastPct.set(k, p);
   });
-  const news = seen == null ? [] : S.log.filter(e => e.n > seen), cur = S.battle.active ? S.chars[timeline(1)[0]] : null, stage = app.querySelector('.stage');
+  const news = seen == null ? [] : S.log.filter(e => e.n > seen), cur = S.battle.active ? S.chars[timeline(1)[0]] : null;
   seen = S.seq;
-  let called = false;
-  for (const e of news.slice(-6)) {
-    if (e.d) import('/dice.js').then(m => m.roll(e.d)).catch(() => {});
-    if (e.rr) { // teste de atributo: resultado em destaque para todos que podem ver
-      document.querySelector('.rollfx')?.remove();
-      const rf = document.createElement('div'), ok = e.kind === 'ok'; rf.className = `rollfx ${ok ? 'ok' : 'bad'} ${/CRÍTICO|DESASTRE/.test(e.rr.res) ? 'big' : ''}`; rf.style.setProperty('--c', S.chars[e.rr.c]?.color || '#fff'); rf.setAttribute('role', 'status');
-      rf.innerHTML = `<small>${esc(e.who)}${e.to ? ' · rolagem secreta' : ''}</small><span>${esc(e.rr.l)} · precisa de ${e.rr.t} ou menos</span><b>${e.d}</b><em>${esc(e.rr.res)}</em>`; document.body.append(rf); setTimeout(() => rf.remove(), 3200);
-    }
-    const f = e.fx;
-    if (!f) continue;
-    const el = app.querySelector(`.unit[data-tgt="${f.id}"]`) || app.querySelector(`[data-tgt="${f.id}"]`) || app.querySelector(`.tok[data-id="${f.id}"]`);
-    if (f.a) app.querySelector(`.unit[data-tgt="${f.a}"]`)?.classList.add('lunge');
-    if (f.s && stage && !called) { // faixa com o nome da skill (uma por ação, mesmo em área)
-      called = true; document.querySelector('.callout')?.remove();
-      const co = document.createElement('div'); co.className = 'callout'; co.style.setProperty('--fx', ELC[f.el] || '#e4002b');
-      co.innerHTML = `<div><small>${esc(S.chars[f.a]?.name || '')}</small><b>${esc(f.s)}</b></div>`; document.body.append(co); setTimeout(() => co.remove(), 1900);
-    }
-    if (!el) continue;
-    const add = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; el.append(s); };
-    el.style.setProperty('--fx', ELC[f.el] || '#fff');
-    add('float ' + (f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : ''), f.heal ? '+' + f.heal : f.miss ? 'ERROU' : '−' + f.dmg);
-    if (f.dmg) el.classList.add('hit');
-    if (f.w) add('stamp weak', 'Fraqueza!'); else if (f.crit) add('stamp', 'Crítico!');
-  }
+  applyCine(false); // um redesenho no meio da cena mantém o enquadramento
+  const rolls = news.filter(e => e.rr), acts = news.filter(e => e.fx).slice(-8);
+  if (rolls.length) dicePanel(rolls.at(-1), rolls.filter(e => e.rr.atk).length);
+  if (acts.length) setTimeout(() => impact(acts), acts.some(e => e.d) ? DICE_MS : 0); // o golpe só acontece depois que o dado para
   const plain = news.filter(e => !e.fx).at(-1), win = news.find(e => /^Vitória!/.test(e.text));
   if (role === 'table' && plain && !win) { // legenda discreta para o que não é golpe
     document.querySelector('.caption')?.remove(); clearTimeout(capT);
@@ -547,7 +573,7 @@ app.addEventListener('change', e => {
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
-      .then(u => d.up === 'bg' ? setBg(u) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => alert('Falha no upload (PNG/JPG/WEBP/GIF até 5 MB).'));
+      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => alert('Falha no upload (PNG/JPG/WEBP/GIF até 5 MB).'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
   else if (d.map === 'bg') setBg(v);
@@ -638,7 +664,7 @@ app.addEventListener('click', e => {
   if (d.a === 'selCard') { if (selC.has(d.id)) selC.delete(d.id); else selC.add(d.id); return render(); }
   if (d.a === 'selAll') { selC.clear(); if (d.k) Object.values(S.chars).filter(c => !!c.enemy === (d.k === 'e')).forEach(c => selC.add(c.id)); return render(); }
   if (d.a === 'bulk') return send({ t: 'bulk', ids: [...selC], k: d.k, v: qa.v, st: qa.st, item: qa.item || Object.entries(S.items).sort((a, b) => a[1].name.localeCompare(b[1].name))[0]?.[0] });
-  if (d.a === 'peek') return void window.open(`/player?as=${encodeURIComponent(d.k)}`, '_blank', 'noopener');
+  if (d.a === 'peek') return void window.open(`/player?as=${encodeURIComponent(d.k)}${d.v ? '&ctl=1' : ''}`, '_blank', 'noopener');
   if (d.a === 'skOnly') { skOnly = !skOnly; return render(); }
   if (d.a === 'skZoom') { const m = app.querySelector('.skmap').getBoundingClientRect(); zoomGv(m.width / 2, m.height / 2, gv.z * +d.v); return; }
   if (d.a === 'gridFull') { gridFull = d.id || null; return render(); }
