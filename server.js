@@ -2,14 +2,21 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES } from './content.js';
 
-const dir = path.dirname(fileURLToPath(import.meta.url));
+// __SEA__ só existe no executável gerado por tools/build-exe.mjs: arquivos do jogo vêm embutidos e os dados ficam ao lado do .exe
+const SEA = typeof __SEA__ !== 'undefined', seaMod = SEA ? process.getBuiltinModule('node:sea') : null;
+const dir = SEA ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(dir, 'public'), DATA = process.env.VJ_DATA || path.join(dir, 'data'), UP = path.join(DATA, 'uploads');
 const PORT = process.env.PORT || 3000;
-const KEY = process.env.GM_KEY || 'mestre';
+const keyFile = path.join(DATA, 'gm-key.txt');
+const KEY = process.env.GM_KEY || (SEA ? (() => { // no executável a chave do mestre é sorteada na primeira vez e guardada ao lado dos dados
+  try { return fs.readFileSync(keyFile, 'utf8').trim(); } catch {}
+  const k = crypto.randomBytes(5).toString('hex'); fs.mkdirSync(DATA, { recursive: true }); fs.writeFileSync(keyFile, k + '\n'); return k;
+})() : 'mestre');
 const FILE = path.join(DATA, 'state.json'), VEND = path.join(dir, 'node_modules', 'three', 'build');
 const GM = '@gm'; // destinatário "mestre" em entradas privadas do log
 const IMG = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' };
@@ -89,16 +96,22 @@ const server = http.createServer((req, res) => {
   let p; try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return res.writeHead(400).end(); }
   if (p === '/') p = '/index.html';
   if (!path.extname(p)) p += '.html';
+  const done = (d, ext) => res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' }).end(d);
+  if (SEA && !p.startsWith('/uploads/')) { // arquivos embutidos no executável
+    let a = null; try { if (!p.includes('..')) a = seaMod.getAsset(p.startsWith('/vendor/') ? p.slice(1) : 'public' + p); } catch {}
+    return a ? done(Buffer.from(a), path.extname(p)) : res.writeHead(404).end('404');
+  }
   let root = p.startsWith('/uploads/') ? DATA : PUB;
   if (p.startsWith('/vendor/')) { root = VEND; p = p.slice(7); }
   const f = path.join(root, path.normalize(p));
   if (!f.startsWith(root + path.sep)) return res.writeHead(403).end();
   fs.readFile(f, (e, d) => {
     if (e) return res.writeHead(404).end('404');
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' }).end(d);
+    done(d, path.extname(f));
   });
 });
 const wss = new WebSocketServer({ server, maxPayload: 65536 });
+wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('error')
 
 // ---------- utilidades ----------
 let saveT;
@@ -684,11 +697,21 @@ prep();
 export { genFoe, partyRef, fitBoss, spawn };
 export { H, S, R, current, derive };
 export { view, order };
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+const isMain = SEA || process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
   if (!fresh) { // cópia de segurança do estado a cada início (mantém as 10 mais recentes)
     const bk = path.join(DATA, 'backups'); fs.mkdirSync(bk, { recursive: true });
     fs.copyFileSync(FILE, path.join(bk, `state-${new Date().toISOString().replace(/[:.]/g, '-')}.json`));
     fs.readdirSync(bk).sort().slice(0, -10).forEach(f => fs.unlinkSync(path.join(bk, f)));
   }
 }
-if (process.argv[1] === fileURLToPath(import.meta.url)) server.listen(PORT, () => console.log(`virtualJRPG em http://localhost:${PORT}  (chave do mestre: ${KEY})`));
+if (isMain) {
+  server.on('error', e => { // no executável a janela fecha sozinha; segura até o usuário ler a mensagem
+    console.error(e.code === 'EADDRINUSE' ? `\nA porta ${PORT} já está em uso (o jogo já está aberto?). Use outra: defina PORT=3001.` : '\nErro: ' + e.message);
+    if (SEA) { console.error('Feche esta janela para sair.'); setInterval(() => {}, 1 << 30); } else process.exit(1);
+  });
+  server.listen(PORT, () => {
+    const ips = Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
+    console.log(`\n  virtualJRPG rodando\n\n  Mestre:     http://localhost:${PORT}/gm   (chave: ${KEY})\n  Jogadores:  http://localhost:${PORT}/player\n  Mesa (TV):  http://localhost:${PORT}/table${ips.length ? `\n\n  Na mesma rede Wi-Fi, os jogadores usam: ${ips.map(ip => `http://${ip}:${PORT}/player`).join('  ou  ')}` : ''}\n\n  Dados salvos em: ${DATA}\n  Para jogar pela internet, use um túnel (veja o guia). Feche esta janela para encerrar.\n`);
+  });
+}

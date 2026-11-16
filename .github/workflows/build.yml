@@ -1,0 +1,71 @@
+name: Executáveis
+
+# Testa a cada envio. Ao criar uma tag "v*" (ex.: v0.2.0), gera os executáveis e publica na aba Releases.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # só a publicação da Release precisa de escrita
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+
+  executavel:
+    needs: testes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, nome: windows-x64 }
+          - { os: ubuntu-latest, nome: linux-x64 }
+          - { os: macos-latest, nome: macos-arm64 }
+          - { os: macos-13, nome: macos-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: node tools/build-exe.mjs
+      - name: Teste de fumaça do executável
+        shell: bash
+        run: |
+          cd dist
+          (PORT=3099 ./virtualJRPG* > fumaca.log 2>&1 &)
+          sleep 4
+          curl -fsS http://localhost:3099/gm | grep -q "virtualJRPG"
+          curl -fsS http://localhost:3099/vendor/three.module.js -o /dev/null
+          rm -rf data fumaca.log
+      - name: Compactar
+        shell: bash
+        run: |
+          cp GUIA-RODAR.md dist/ 2>/dev/null || true
+          mv dist virtualJRPG-${{ matrix.nome }}
+          if [ "${{ runner.os }}" = "Windows" ]; then 7z a virtualJRPG-${{ matrix.nome }}.zip virtualJRPG-${{ matrix.nome }}; else zip -qr virtualJRPG-${{ matrix.nome }}.zip virtualJRPG-${{ matrix.nome }}; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: virtualJRPG-${{ matrix.nome }}
+          path: virtualJRPG-${{ matrix.nome }}.zip
+
+  publicar:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: executavel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: pacotes, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: pacotes/*.zip
+          generate_release_notes: true

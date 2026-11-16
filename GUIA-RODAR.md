@@ -5,7 +5,19 @@ O caminho mais simples e realmente gratuito é **rodar no computador do mestre**
 
 > Planos gratuitos mudam com frequência. Os nomes e limites abaixo são os que eu conheço; confira na página de cada serviço antes de contar com eles.
 
-## Opção A (recomendada): no seu PC + túnel gratuito
+## Opção 0 (mais fácil): baixar o programa pronto
+
+A cada versão publicada, o GitHub gera um executável que não precisa de Node nem de instalação.
+1. No GitHub do projeto, abra **Releases** e baixe o `.zip` do seu sistema: `windows-x64`, `linux-x64`, `macos-arm64` (Macs com chip M) ou `macos-x64` (Macs Intel).
+2. Extraia e dê dois cliques em `virtualJRPG`. A janela mostra os endereços e a chave do mestre (também guardada em `data/gm-key.txt`).
+3. Para os jogadores de fora da sua rede, abra um túnel (passo 3 da Opção A).
+
+No Windows, se aparecer "PC protegido", clique em **Mais informações → Executar assim mesmo** (o programa não é assinado). No macOS, na primeira vez use botão direito → **Abrir**.
+Para atualizar, troque só o programa e mantenha a pasta `data`.
+
+**Como gerar uma versão (para quem mantém o projeto):** `git tag v0.2.0 && git push origin v0.2.0`. O GitHub Actions roda os testes, compila nas quatro plataformas e publica a Release sozinho. Para gerar localmente: `npm install && node tools/build-exe.mjs` (sai em `dist/`).
+
+## Opção A: no seu PC com Node + túnel gratuito
 
 Serve para uma mesa de amigos durante a sessão. Custa zero, o estado fica no seu disco e não há hibernação.
 
