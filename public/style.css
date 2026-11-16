@@ -301,3 +301,44 @@ body[data-role=player] h1{display:none}body[data-role=player] #app{padding:0}
 @media(max-width:1150px){.pl,.skp{grid-template-columns:minmax(0,1fr)}.chatcol,.skside{position:static;max-height:none}.top{flex-wrap:wrap;gap:6px}.top nav{order:3;flex-basis:100%;overflow:auto}.top nav button{font-size:15px;padding:8px 12px}.skmap{height:auto;aspect-ratio:1;min-height:0}.ip-top{grid-template-columns:1fr 1fr}.pp-hero{flex-direction:column;align-items:flex-start}}
 .nd.lock{opacity:.42}.nd.av .lb{display:none}.nd.av:hover .lb,.nd.av.sel .lb{display:block}
 .tok{align-content:center;justify-content:center;line-height:1}
+
+/* ===== mapa: grade em SVG, tokens com retrato, recorte ===== */
+.map::before{content:none}.gridl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.tok{border:0;border-radius:0;background:none;box-shadow:none;display:block;overflow:visible;z-index:2}
+.tface{position:absolute;inset:6%;border-radius:50%;background:var(--c) center/cover;border:3px solid var(--paper);box-shadow:0 0 0 2px var(--c),0 4px 0 #000a,0 8px 16px #000a;display:grid;place-items:center;font:400 clamp(11px,1.2vw,26px)/1 var(--disp);color:#fff;text-shadow:0 2px 3px #000}
+.tok.foe .tface{background-color:#1a0a0e;font-family:var(--glyph);font-weight:800;color:var(--e);box-shadow:0 0 0 2px var(--red),0 4px 0 #000a,0 8px 16px #000a}
+.tok.mine{cursor:grab}.tok.mine .tface{border-color:var(--gold)}.tok.ko .tface{filter:grayscale(1) brightness(.5)}
+.tok>b{position:absolute;left:50%;top:100%;translate:-50%;font:600 clamp(9px,.8vw,14px)/1.2 var(--cond);letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;background:#000c;padding:1px 6px;pointer-events:none}
+.thp{position:absolute;left:12%;right:12%;top:calc(100% - 7%);height:5%;min-height:3px;background:#000;border:1px solid #000;pointer-events:none}.thp i{display:block;height:100%;background:var(--hp)}.tok.foe .thp i{background:var(--red)}
+.cropper{position:fixed;inset:0;z-index:340;background:#050506f2;display:flex;flex-direction:column;padding:12px;gap:10px}
+.cropper header{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.cropper header b{font:400 22px var(--disp);letter-spacing:1px;text-transform:uppercase;margin-right:8px}.cropper header small{flex:1}
+.cropbox{position:relative;align-self:center;max-width:100%;flex:1;min-height:0;display:flex;cursor:crosshair;touch-action:none;user-select:none}
+.cropbox img{max-width:100%;max-height:calc(100vh - 90px);display:block;opacity:.55}
+.csel{position:absolute;border:2px solid var(--gold);box-shadow:0 0 0 9999px #0009;pointer-events:none}.cropbox{overflow:hidden}
+/* ===== fichas do mestre ===== */
+.scard{background:var(--ink);border:1px solid var(--line);border-left:4px solid var(--c);padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:3px}.scard:hover{background:var(--ink3)}
+.scard b{font:400 17px var(--disp);letter-spacing:.5px;text-transform:uppercase}.scard .bar{height:12px}.scard .bar span{font-size:10px;line-height:10px}.scard em{font:600 12px var(--cond);font-style:normal;color:var(--gold);min-height:0}
+.win[data-win^=f_] .win-body{padding:0;gap:0;max-height:calc(100vh - 120px);overflow:hidden}
+.ftabs{display:flex;background:var(--ink);border-bottom:1px solid var(--line)}.ftabs button{background:none;border:0;border-bottom:3px solid transparent;font:400 16px var(--disp);letter-spacing:1px;color:var(--dim);padding:8px 18px}
+.ftabs .on{color:var(--paper);border-bottom-color:var(--gold)}.ftabs button:last-child{margin-left:auto;color:var(--red)}.ftabs button:last-child.on{color:#fff;background:var(--red);border-bottom-color:var(--red)}
+.fbody{padding:14px;overflow:auto;max-height:calc(100vh - 170px)}
+.fbody .skmap{height:min(66vh,720px);min-height:420px}.fbody .skside{position:static;max-height:min(66vh,720px)}.fbody .skp{grid-template-columns:minmax(0,1fr) 320px}
+.gmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}.gmp label{display:flex;flex-direction:column;gap:2px;font:600 12px var(--cond);letter-spacing:.8px;text-transform:uppercase;color:var(--dim)}
+.gmp .attrs{grid-template-columns:repeat(4,1fr)}.gmp input{width:100%}.fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+/* ===== Vínculo e grade com zoom ===== */
+.vb{position:absolute;left:16%;bottom:4%;z-index:2;font:800 calc(var(--w,13cqw)*.2) var(--glyph);font-style:normal;line-height:1;color:var(--e);text-shadow:0 0 6px #000,0 2px 0 #000}
+.vp{border-color:var(--e)}.vp b{color:var(--e)}
+.skmap{position:relative;display:block;cursor:grab;touch-action:none;user-select:none}.skmap:active{cursor:grabbing}
+.skmap svg{transform-origin:0 0;position:absolute;inset:0}
+.skhint{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:10px;background:#000c;padding:5px 10px 5px 5px}
+.skmap.far .nd .lb{display:none}.skmap.far .nd.own .lb,.skmap.far .nd.sel .lb,.skmap.far .nd:hover .lb{display:block;font-size:22px}
+.skmap.near .nd .lb,.nd.av .lb{display:block}.skmap.far .nd.av .lb{display:none}.skmap.far .nd.av:hover .lb{display:block}
+.nd.out{opacity:.16}.nd.out circle,.nd.out rect{stroke-dasharray:none}.nd.out:hover,.nd.out.sel{opacity:.7}
+.ln line.out{opacity:.05}.vout .halo{opacity:.05}.vout .hname{opacity:.3}.vmine .halo{opacity:.2}.vmine .hname{opacity:1}
+.flav{margin:0;font-style:italic;color:var(--dim)}.exw{color:var(--gold)}
+.legend .lx{border-radius:50%;opacity:.25}
+.gridl path{fill:none;stroke:#fff;stroke-opacity:.28;stroke-width:1}
+.cropper{background:#050506}.cropbox img{opacity:1}
+.nd .lb{font-size:9.5px;letter-spacing:0}.skmap.far .nd.own .lb,.skmap.far .nd.sel .lb,.skmap.far .nd:hover .lb{font-size:20px}
+.skmap.far .nd.own .lb tspan + tspan,.skmap.far .nd.sel .lb tspan + tspan,.skmap.far .nd:hover .lb tspan + tspan{dy:22px}
+.nd .lb{font-size:8.2px}.nd .mk{font-size:16px}

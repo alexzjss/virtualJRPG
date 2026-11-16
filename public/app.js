@@ -81,7 +81,8 @@ const bodyMini = c => `<svg class="mini" viewBox="0 0 120 260" aria-hidden="true
 function unit(c, cur) {
   const foe = !!c.enemy, el = mainEl(c), low = c.hp > 0 && c.hp <= c.hpMax * .25;
   const sts = c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + (n < 90 ? ' ' + n : ''))].filter(Boolean).map(s => `<i>${s}</i>`).join('') : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
-  const fig = `<div class="figw"><div class="fig" style="--e:${ELC[el]}">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${foe ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div>`;
+  const vb = !foe && c.vinc?.[0] ? `<em class="vb" style="--e:${ELC[c.vinc[0]]}" title="Vínculo: ${PATRON[c.vinc[0]]}">${KANJI[c.vinc[0]]}</em>` : '';
+  const fig = `<div class="figw">${vb}<div class="fig" style="--e:${ELC[el]}">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${foe ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div>`;
   const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
     : `<div class="hpn"><span>${c.hp}</span><small>/${c.hpMax}</small><em>HP</em></div>${bar('hp', c, true)}<div class="duo"><div>${bar('aura', c, true)}<small>Aura ${c.aura}/${c.auraMax}</small></div><div>${bar('san', c, true)}<small>Sanidade ${c.san}/${c.sanMax}</small></div></div>
       <div class="lim ${c.limit >= 100 ? 'full' : ''}">${bar('limit', c, true)}<small>${c.limit >= 100 ? 'Limite!' : 'Limite ' + c.limit + '%'}</small></div>`;
@@ -100,21 +101,28 @@ function battle() {
 }
 
 function map() {
-  const m = S.scenes[S.scene], hid = (x, y) => m.fogOn && !m.seen[x + ',' + y];
+  const m = S.scenes[S.scene], C = Math.ceil(m.cols), Rw = Math.ceil(m.rows), cr = m.crop, hid = (x, y) => m.fogOn && !m.seen[x + ',' + y];
   let fog = '';
-  if (m.fogOn) for (let y = 0; y < m.rows; y++) for (let x = 0; x < m.cols; x++) if (hid(x, y)) fog += `<i class="fog" style="--x:${x};--y:${y}"></i>`;
-  return `<div class="mapwrap"><section class="map ${fogMode ? 'fogging' : ''}" style="--cols:${m.cols};--rows:${m.rows};${bgImg(m.bg)}transform:translate(${view.x}px,${view.y}px) scale(${view.z})">${Object.values(S.chars).filter(c => c.x != null && c.scene === S.scene && (mine(c) || !hid(c.x, c.y))).map(c =>
-    `<div class="tok ${mine(c) ? 'mine' : ''}" data-id="${c.id}" style="--x:${c.x};--y:${c.y};--c:${esc(c.color)};${bgImg(c.img)}" title="${esc(c.name)}">${c.img ? '' : esc(c.name.slice(0, 2))}</div>`).join('')}${fog}${pings.map(p => `<i class="ping" style="--x:${p.x};--y:${p.y}"></i>`).join('')}</section></div>`;
+  if (m.fogOn) for (let y = 0; y < Rw; y++) for (let x = 0; x < C; x++) if (hid(x, y)) fog += `<i class="fog" style="--x:${x + m.ox};--y:${y + m.oy}"></i>`;
+  // a imagem inteira é ampliada e deslocada para mostrar só a área recortada pelo mestre
+  const bg = m.bg ? `background-image:url('${esc(m.bg)}');background-size:${100 / cr.w}% ${100 / cr.h}%;background-position:${cr.w < 1 ? cr.x / (1 - cr.w) * 100 : 0}% ${cr.h < 1 ? cr.y / (1 - cr.h) * 100 : 0}%;` : '';
+  let gl = '';
+  for (let x = m.ox; x <= m.cols; x++) gl += `M${x} 0V${m.rows}`;
+  for (let y = m.oy; y <= m.rows; y++) gl += `M0 ${y}H${m.cols}`;
+  const grid = `<svg class="gridl" viewBox="0 0 ${m.cols} ${m.rows}" preserveAspectRatio="none" aria-hidden="true"><path d="${gl}" vector-effect="non-scaling-stroke"/></svg>`;
+  const tok = c => { const el = mainEl(c), hp = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1)));
+    return `<div class="tok ${mine(c) ? 'mine' : ''} ${c.enemy ? 'foe' : ''} ${c.hp > 0 ? '' : 'ko'}" data-id="${c.id}" style="--x:${c.x + m.ox};--y:${c.y + m.oy};--c:${esc(c.color)};--e:${ELC[el]}" title="${esc(c.name)}"><span class="tface" style="${bgImg(c.img)}">${c.img ? '' : c.enemy ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span><b>${esc(c.name)}</b><i class="thp"><i style="width:${hp}%"></i></i></div>`; };
+  return `<div class="mapwrap"><section class="map ${fogMode ? 'fogging' : ''}" style="--cols:${m.cols};--rows:${m.rows};aspect-ratio:${m.ar};${bg}transform:translate(${view.x}px,${view.y}px) scale(${view.z})">${grid}${Object.values(S.chars).filter(c => c.x != null && c.scene === S.scene && (mine(c) || !hid(c.x, c.y))).map(tok).join('')}${fog}${pings.map(p => `<i class="ping" style="--x:${p.x + m.ox};--y:${p.y + m.oy}"></i>`).join('')}</section></div>`;
 }
-
-function grid(c) {
-  const adjTo = s => !c.skills.length || c.skills.some(k => S.skills[k] && Math.max(Math.abs(S.skills[k].gx - s.gx), Math.abs(S.skills[k].gy - s.gy)) <= 1);
-  const sel = selNode[c.id], ss = S.skills[sel];
-  return `<div class="grid">${chips(S.skills, (id, s) => `<i class="${c.skills.includes(id) ? 'own' : adjTo(s) ? 'av' : ''} ${id === sel ? 'sel' : ''} ${s.kind === 'passive' ? 'pas' : ''}" style="grid-column:${s.gx + 1};grid-row:${s.gy + 1};--e:${ELC[s.el]}" data-node="${id}" data-id="${c.id}" title="${esc(s.name)}"></i>`)}</div>
-    ${ss ? `<div class="node"><b>${esc(ss.name)}</b> <small>${esc(desc(ss))}</small><div class="row">${c.skills.includes(sel) ? '<em>Aprendida ✓</em>'
-      : `<button data-a="learn" data-id="${c.id}" data-skill="${sel}" ${mine(c) && adjTo(ss) && c.xp >= ss.xp ? '' : 'disabled'}>Aprender · ${ss.xp} XP</button>${adjTo(ss) ? '' : '<small>Precisa de um nó vizinho aprendido.</small>'}`}</div></div>`
-      : '<small>Toque em um nó para ver detalhes (círculo = skill, quadrado = passiva). O primeiro nó pode ser qualquer um.</small>'}`;
+// troca a imagem do mapa: mede a proporção real e zera o recorte
+function setBg(u) {
+  send({ t: 'map', f: 'bg', v: u });
+  if (!u) return;
+  const im = new Image(); im.onload = () => { send({ t: 'map', f: 'crop', v: { x: 0, y: 0, w: 1, h: 1 } }); send({ t: 'map', f: 'ar', v: im.naturalWidth / im.naturalHeight }); }; im.src = u;
 }
+let cropMode = false, cropSel = null, cdrag = null, lastCam = null;
+const cropper = () => { const sc = S.scenes[S.scene], c = cropSel || sc.crop; return cropMode && sc.bg ? `<div class="cropper"><header><b>Recortar mapa</b><small>Arraste sobre a imagem para marcar a área que vira o mapa.</small><button class="own" data-a="cropOk">Aplicar recorte</button><button data-a="cropAll">Usar imagem inteira</button><button data-a="cropX">Cancelar</button></header>
+  <div class="cropbox"><img src="${esc(sc.bg)}" draggable="false" alt=""><i class="csel" style="left:${c.x * 100}%;top:${c.y * 100}%;width:${c.w * 100}%;height:${c.h * 100}%"></i></div></div>` : ''; };
 
 function editor(coll) {
   const cell = (id, o, [, f, t = 'number']) => { const a = `data-ed="${coll}" data-id="${id}" data-f="${f}"`;
@@ -148,38 +156,25 @@ function iniWin() {
     + `<div class="row chips">Incluir: ${Object.values(S.chars).filter(c => !(c.id in T) && c.x != null && c.scene === S.scene && c.hp > 0).map(c => `<span data-a="ini" data-k="in" data-id="${c.id}">+ ${esc(c.name)}</span>`).join('') || '<small>todos já estão na fila</small>'}</div>`;
 }
 
-function sheet(c, force) {
-  const own = mine(c), ed = own ? '' : 'disabled', tab = tabs[c.id] || 'st';
-  const inp = (f, v, type = 'number') => `<input type="${type}" aria-label="${f}" data-id="${c.id}" data-f="${f}" value="${esc(v)}" ${ed}>`;
-  const gin = (f, v) => gm ? inp(f, v) : `<b class="val">${v}</b>`; // campos que só o mestre edita
-  const isOpen = force || (open[c.id] ?? !gm), head = `<h3 data-open="${c.id}" role="button" tabindex="0" aria-expanded="${isOpen}">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}${esc(c.name)} <small>${c.enemy ? 'NPC' : esc(c.owner)} · XP ${c.xp} ${stList(c)}</small><span class="caret">${isOpen ? '▾' : '▸'}</span></h3>`;
-  if (!isOpen) return `<div class="sheet shut" style="--c:${esc(c.color)}">${head}${bar('hp', c)}</div>`;
-  const btn = (a, label, x = '') => `<button data-a="${a}" data-id="${c.id}" ${x}>${label}</button>`;
-  const body = {
-    st: () => `<div class="row">${inp('name', c.name, 'text')}${inp('color', c.color, 'color')}${own ? `<label class="up">Retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label>` : ''}</div>
-      ${['hp', 'aura', 'san'].map(k => `${bar(k, c)}<div class="row">${inp(k, c[k])}/ <b class="val">${c[k + 'Max']}</b>${gm ? `<small>bônus</small>${inp('bon.' + k + 'Max', c.bon[k + 'Max'])}` : ''}</div>`).join('')}
-      ${S.camp.open && !c.enemy ? `<div class="row chips"><b>Acampamento:</b>${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" ${own ? `data-a="campAct" data-id="${c.id}" data-k="${k}"` : ''}>${l}</span>`)}</div>` : ''}
-      ${bodyFig(c, gm ? 'gm' : '')}
-      ${bar('limit', c)}<div class="row">${inp('limit', c.limit)}% · Mod. da rolagem <input type="number" class="mod" data-mid="${c.id}" value="${mods[c.id] || 0}" ${ed}></div>
-      <div class="attrs">${A.map(a => `<div class="${c.marks[a] ? 'mk' : ''}"><button data-a="roll" data-id="${c.id}" data-attr="${a}" ${ed}>${a}</button>${gin('attrs.' + a, c.attrs[a])}</div>`).join('')}</div>
-      <div class="row">Arma ${gin('arma', eq(c, 'arma')?.power ?? c.arma)} Armadura ${gin('armor', c.armor)}${eq(c, 'armadura') ? `<small>+${eq(c, 'armadura').power}</small>` : ''} Ouro ${gin('gold', c.gold)}</div>
-      <div class="row chips">${chips(EL, (k, l) => `<span class="${c.weak.includes(k) ? 'weak' : c.resist.includes(k) ? 'res' : ''}" ${gm ? `data-a="aff" data-id="${c.id}" data-el="${k}"` : ''} title="${c.weak.includes(k) ? 'Fraqueza' : c.resist.includes(k) ? 'Resistência' : 'Normal'}">${l}</span>`)}</div>
-      ${gm ? `<div class="row chips">${chips(ST, (k, l) => `<span class="${c.st[k] ? 'weak' : ''}" data-a="st" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div>
-      <div class="row">XP ${inp('xp', c.xp)}${c.enemy ? `Recompensa: XP ${inp('xpR', c.xpR)} Ouro ${inp('goldR', c.goldR)}` : ''}</div>
-      <div class="row">${btn('horror', 'Horror')}${btn('evolve', 'Evoluir')}${btn('place', c.x == null || c.scene !== S.scene ? 'Pôr no mapa' : 'Tirar do mapa')}${btn('bSave', '→ Bestiário')}${btn('delChar', 'Excluir')}</div>` : ''}`,
-    sk: () => `<div class="row"><button class="own" data-a="gridFull" data-id="${c.id}">Abrir grade completa</button></div>${grid(c)}${c.skills.filter(k => S.skills[k]).map(k => `<p><b>${esc(S.skills[k].name)}</b> <small>${esc(desc(S.skills[k]))}</small></p>`).join('')}`,
-    inv: () => `<div class="row">Ouro: <b>${c.gold}</b></div>${Object.entries(c.inv).filter(([k]) => S.items[k]).map(([k, q]) => { const i = S.items[k], on = c.equip[i.type] === k, x = `data-item="${k}"`;
-        return `<div class="row inv"><span>${esc(i.name)} ×${q} <small>${esc(idesc(i))}</small></span>
-        ${own ? (i.type === 'cons' ? btn('use', 'Usar', x) : i.type === 'mat' ? '' : btn('equip', on ? 'Desequipar' : 'Equipar', `${x} ${on ? 'class="own"' : ''}`)) + (shop().open ? btn('sell', `Vender ${Math.floor(i.price / 2)}`, x) : '') + btn('drop', '−', x) : ''}</div>`; }).join('') || '<div class="row"><small>vazio</small></div>'}
-      ${own ? Object.entries(S.items).filter(([, i]) => i.el && ['arma', 'acess'].includes(i.type)).map(([k, i]) => { // forja: aparece quando o personagem tem essência do elemento
-        const ess = Object.keys(S.items).find(e => S.items[e].type === 'mat' && S.items[e].el === i.el), have = c.inv[ess] || 0, need = i.type === 'arma' ? 3 : 5, cost = Math.round(i.price / 2);
-        return have ? `<div class="row inv"><span>Forjar ${esc(i.name)} <small>${have}/${need} essências · ${cost} ouro</small></span>${btn('forge', 'Forjar', `data-item="${k}" ${have < need || c.gold < cost ? 'disabled' : ''}`)}</div>` : ''; }).join('') : ''}
-      ${shop().open && own ? `<b>Loja</b>${shop().stock.filter(k => S.items[k]).map(k => `<div class="row inv"><span>${esc(S.items[k].name)} <small>${esc(idesc(S.items[k]))}</small></span>${btn('buy', `Comprar ${S.items[k].price}`, `data-item="${k}" ${c.gold < S.items[k].price ? 'disabled' : ''}`)}</div>`).join('')}` : ''}
-      ${gm ? `<div class="row chips">Dar: ${chips(S.items, (k, i) => `<span data-a="give" data-id="${c.id}" data-item="${k}">+ ${esc(i.name)}</span>`)}</div>` : ''}`,
-    bio: () => `<textarea data-id="${c.id}" data-f="bio" placeholder="História, aparência, anotações…" ${ed}>${esc(c.bio)}</textarea>${gm ? `<textarea data-id="${c.id}" data-f="gmNote" placeholder="Notas secretas do mestre">${esc(c.gmNote)}</textarea>` : ''}`,
-  };
-  return `<div class="sheet" style="--c:${esc(c.color)}">${head}
-    <div class="tabs">${chips(TABS, (k, l) => `<span class="${k === tab ? 'on' : ''}" data-tab="${k}" data-id="${c.id}">${l}</span>`)}</div>${body[tab]()}</div>`;
+// ===== fichas na tela do mestre: cartão resumido na lista e, na janela própria, as mesmas páginas do jogador mais a aba Mestre =====
+const FT = { pers: 'Personagem', hab: 'Habilidades', itens: 'Itens', hist: 'Diário', gm: 'Mestre' }, ftab = {};
+const sheetCard = c => `<div class="scard" data-a="openSheet" data-id="${c.id}" style="--c:${esc(c.color)}"><b>${esc(c.name)}</b><small>${c.enemy ? 'Inimigo' : esc(c.owner || 'sem dono')}${(c.vinc || []).map(e => ' · ' + PATRON[e]).join('')}</small>${bar('hp', c)}<em>${c.hp > 0 ? stList(c) : 'Caído'}</em></div>`;
+function gmPanel(c) {
+  const inp = (f, v, type = 'number') => `<input type="${type}" aria-label="${f}" data-id="${c.id}" data-f="${f}" value="${esc(v)}">`, btn = (a, l) => `<button data-a="${a}" data-id="${c.id}">${l}</button>`, lab = (l, x) => `<label>${l}${x}</label>`;
+  return `<section class="gmp"><div class="card"><h3>Atributos</h3><div class="attrs">${A.map(a => lab(a, inp('attrs.' + a, c.attrs[a]))).join('')}</div>
+      <h3>Recursos <small>máximo = atributos + bônus</small></h3><div class="fgrid">${['hp', 'aura', 'san'].map(k => lab(L[k], inp(k, c[k])) + lab('bônus máx.', inp('bon.' + k + 'Max', c.bon[k + 'Max']))).join('')}${lab('Limite %', inp('limit', c.limit))}${lab('XP', inp('xp', c.xp))}${lab('Ouro', inp('gold', c.gold))}${lab('Arma base', inp('arma', c.arma))}${lab('Armadura base', inp('armor', c.armor))}
+        ${c.enemy ? lab('Recompensa XP', inp('xpR', c.xpR)) + lab('Recompensa ouro', inp('goldR', c.goldR)) : lab('Jogador dono', inp('owner', c.owner, 'text'))}</div></div>
+    <div class="card"><h3>Vínculos <small>conceder dá a skill raiz e resistência</small></h3><div class="row chips">${Object.keys(PATRON).filter(e => e !== 'fis').map(e => `<span class="${c.vinc.includes(e) ? 'weak' : ''}" data-a="vinc" data-id="${c.id}" data-el="${e}">${PATRON[e]}</span>`).join('')}</div>
+      <h3>Fraquezas e resistências <small>clique alterna normal → fraco → resiste</small></h3><div class="row chips">${chips(EL, (k, l) => `<span class="${c.weak.includes(k) ? 'weak' : c.resist.includes(k) ? 'res' : ''}" data-a="aff" data-id="${c.id}" data-el="${k}">${l}</span>`)}</div>
+      <h3>Condições</h3><div class="row chips">${chips(ST, (k, l) => `<span class="${c.st[k] ? 'weak' : ''}" data-a="st" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div></div>
+    <div class="card"><h3>Ferimentos <small>clique numa parte para ferir ou curar</small></h3>${bodyFig(c, 'gm')}
+      <h3>Ações</h3><div class="row">${btn('horror', 'Teste de horror')}${btn('evolve', 'Evoluir atributos')}${btn('place', c.x == null || c.scene !== S.scene ? 'Pôr no mapa' : 'Tirar do mapa')}${btn('bSave', 'Salvar no bestiário')}${btn('delChar', 'Excluir')}</div></div></section>`;
+}
+function gmSheet(c) {
+  const t = ftab[c.id] || 'pers';
+  const page = t === 'pers' ? persPage(c) : t === 'hab' ? skillPage(c) : t === 'itens' ? itemsPage(c) : t === 'gm' ? gmPanel(c)
+    : `<section class="card hist"><h3>Diário</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio">${esc(c.bio)}</textarea><h3>Notas secretas do mestre</h3><textarea aria-label="Notas do mestre" data-id="${c.id}" data-f="gmNote">${esc(c.gmNote)}</textarea></section>`;
+  return `<div class="ftabs">${chips(FT, (k, l) => `<button data-ftab="${k}" data-id="${c.id}" class="${k === t ? 'on' : ''}">${l}</button>`)}</div><div class="fbody">${page}</div>`;
 }
 
 // ===== páginas fora de combate (jogador; o mestre abre a grade em tela cheia pela ficha) =====
@@ -190,28 +185,34 @@ const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <=
 const figCard = (c, w) => `<div class="unit hero cur static" style="--c:${esc(c.color)};--w:${w}"><div class="figw"><div class="fig">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div></div>`;
 
 // grade de habilidades como constelação: círculo = ativa, losango = passiva; brilho = aprendida, tracejado = disponível
+const lab2 = n => { const w = n.split(' '), a = []; let l = ''; for (const x of w) { if (l && (l + ' ' + x).length > 11) { a.push(l); l = x; } else l = l ? l + ' ' + x : x; } a.push(l); return a.slice(0, 2).map((t, i) => `<tspan x="0" dy="${i ? 9 : 0}">${esc(i === 1 && a.length > 2 ? t + '…' : t)}</tspan>`).join(''); };
+const gv = { z: 1, x: 0, y: 0 }; let skd = null, skMoved = false;
 function skillPage(c) {
-  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 60, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
-  const avail = s => !ownL.length || ownL.some(o => near(o, s)), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
+  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 60, G = Math.max(17, ...N.map(([, s]) => Math.max(s.gx, s.gy) + 1)), mid = (G - 1) / 2, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
+  const mineV = s => s.el === 'fis' || (c.vinc || []).includes(s.el), exTaken = s => s.ex && ownL.some(o => o.ex === s.ex && o !== s);
+  const avail = s => mineV(s) && !exTaken(s) && (!ownL.length || ownL.some(o => near(o, s))), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
   let lines = '';
   for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) { const a = N[i][1], b = N[j][1];
-    if (near(a, b) && (a.el === b.el || a.el === 'fis' || b.el === 'fis')) { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
+    if (near(a, b) && (a.el === b.el || a.el === 'fis' || b.el === 'fis')) { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''} ${mineV(a) && mineV(b) ? '' : 'out'}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
   const cen = {}; for (const [, s] of N) { const o = cen[s.el] ||= [0, 0, 0]; o[0] += s.gx; o[1] += s.gy; o[2]++; }
-  const halos = Object.entries(cen).filter(([el]) => el !== 'fis').map(([el, [x, y, n]]) => { const cx = x / n, cy = y / n, dx = cx - 8, dy = cy - 8, d = Math.hypot(dx, dy) || 1, px = (8 + dx / d * 7.6) * U + U / 2, py = (8 + dy / d * 7.6) * U + U / 2;
-    return `<text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]}">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + 46}" style="--e:${ELC[el]}">${PATRON[el]}</text>`; }).join('');
-  const nodes = N.map(([id, s]) => { const [x, y] = P(s), st = own.has(id) ? 'own' : avail(s) ? 'av' : 'lock', pas = s.kind === 'passive', mark = s.back ? '禁' : s.limit ? '極' : pas ? '+' : KANJI[s.el];
-    return `<g class="nd ${st} ${id === sel ? 'sel' : ''} ${c.xp >= s.xp ? '' : 'poor'}" data-node="${id}" data-id="${c.id}" transform="translate(${x} ${y})" style="--e:${ELC[s.el]}"><title>${esc(s.name)} · ${s.xp} XP</title>${pas ? '<rect x="-15" y="-15" width="30" height="30" transform="rotate(45)"/>' : `<circle r="${s.limit || s.back ? 23 : 19}"/>`}<text class="mk" y="7">${mark}</text>${st !== 'lock' || id === sel ? `<text class="lb" y="38">${esc(s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name)}</text>` : ''}</g>`; }).join('');
+  const halos = Object.entries(cen).filter(([el]) => el !== 'fis').map(([el, [x, y, n]]) => { const dx = x / n - mid, dy = y / n - mid, d = Math.hypot(dx, dy) || 1, px = (mid + dx / d * G * .46) * U + U / 2, py = (mid + dy / d * G * .46) * U + U / 2, mineS = (c.vinc || []).includes(el);
+    return `<g class="${mineS ? 'vmine' : 'vout'}"><text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]};font-size:${G * 9}px">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + G * 2.9}" style="--e:${ELC[el]};font-size:${G * 1.35}px">${PATRON[el]}${mineS ? ' · seu Vínculo' : ''}</text></g>`; }).join('');
+  const nodes = N.map(([id, s]) => { const [x, y] = P(s), st = own.has(id) ? 'own' : !mineV(s) ? 'out' : avail(s) ? 'av' : 'lock', pas = s.kind === 'passive', mark = s.back ? '禁' : s.limit ? '極' : pas ? '+' : KANJI[s.el];
+    return `<g class="nd ${st} ${id === sel ? 'sel' : ''} ${c.xp >= s.xp ? '' : 'poor'}" data-node="${id}" data-id="${c.id}" transform="translate(${x} ${y})" style="--e:${ELC[s.el]}"><title>${esc(s.name)} · ${s.xp} XP</title>${pas ? '<rect x="-12" y="-12" width="24" height="24" transform="rotate(45)"/>' : `<circle r="${s.limit || s.back ? 19 : 15}"/>`}<text class="mk" y="6">${mark}</text><text class="lb" y="27">${lab2(s.name)}</text></g>`; }).join('');
   const tag = (l, v) => `<div><small>${l}</small><b>${v}</b></div>`;
-  const why = !ss ? '' : own.has(sel) ? '' : !avail(ss) ? 'Precisa de um nó vizinho já aprendido.' : c.xp < ss.xp ? `Faltam ${ss.xp - c.xp} XP.` : '';
-  const detail = ss ? `<div class="ndcard" style="--e:${ELC[ss.el]}"><small>${PATRON[ss.el]} · ${KIND[ss.kind]}${ss.limit ? ' · Limite' : ''}${ss.back ? ' · Proibida' : ''}</small><h2>${esc(ss.name)}</h2>
+  const why = !ss || own.has(sel) ? '' : !mineV(ss) ? `Exige Vínculo com ${PATRON[ss.el]}.` : exTaken(ss) ? 'Trancada: você escolheu o outro caminho.' : !avail(ss) ? 'Precisa de um nó vizinho já aprendido.' : c.xp < ss.xp ? `Faltam ${ss.xp - c.xp} XP.` : '';
+  const exOther = ss?.ex ? N.filter(([k, s]) => s.ex === ss.ex && k !== sel).map(([, s]) => s.name).join(', ') : '';
+  const detail = ss ? `<div class="ndcard" style="--e:${ELC[ss.el]}"><small>${PATRON[ss.el]} · ${KIND[ss.kind]}${ss.limit ? ' · Limite' : ''}${ss.back ? ' · Proibida' : ''}</small><h2>${esc(ss.name)}</h2>${ss.d ? `<p class="flav">${esc(ss.d)}</p>` : ''}
       <div class="tags">${ss.kind === 'passive' ? tag('Efeito', ss.pas === 'res' ? 'Resistência a ' + EL[ss.el] : '+' + ss.power + ' ' + PASL[ss.pas])
         : tag('Poder', ss.power) + tag('Atributo', ss.attr) + tag('Custo', ss.limit ? 'Limite 100%' : ss.cost + ' ' + RES[ss.res]) + tag('Alvo', ss.area ? 'Área' : 'Único') + ((ss.ct || 100) !== 100 ? tag('Tempo', ss.ct + '%') : '') + (ss.st ? tag('Causa', ST[ss.st]) : '') + (ss.req ? tag('Exige', WT[ss.req]) : '') + (ss.back ? tag('Sequela', ST[ss.back]) : '')}</div>
+      ${exOther ? `<small class="exw">Escolha excludente: aprender esta tranca ${esc(exOther)}.</small>` : ''}
       ${own.has(sel) ? '<div class="learned">Aprendida</div>' : `<button class="learn" data-a="learn" data-id="${c.id}" data-skill="${sel}" ${mine(c) && !why ? '' : 'disabled'}>Aprender · ${ss.xp} XP</button>${why ? `<small class="why">${why}</small>` : ''}`}</div>`
-    : '<div class="ndcard empty"><h2>Escolha um nó</h2><small>Clique em um nó da grade para ver o que ele faz. O primeiro pode ser qualquer um; depois, só nós vizinhos dos que você já tem.</small></div>';
+    : '<div class="ndcard empty"><h2>Escolha um nó</h2><small>Clique em um nó para ver o que ele faz. Você aprende o tronco Marcial e as skills do seu Vínculo, sempre a partir de um nó vizinho de um que já tem.</small></div>';
   const mineL = c.skills.filter(k => S.skills[k]).map(k => `<li style="--e:${ELC[S.skills[k].el]}" data-node="${k}" data-id="${c.id}"><b>${esc(S.skills[k].name)}</b><small>${esc(desc(S.skills[k]))}</small></li>`).join('');
-  return `<section class="skp"><div class="skmap"><svg viewBox="0 0 ${17 * U} ${17 * U}" role="group" aria-label="Grade de habilidades">${halos}<g class="ln">${lines}</g>${nodes}</svg></div>
+  return `<section class="skp"><div class="skmap ${gv.z < 1.7 ? 'far' : 'near'}"><svg viewBox="0 0 ${G * U} ${G * U}" role="group" aria-label="Grade de habilidades" style="transform:translate(${gv.x}px,${gv.y}px) scale(${gv.z})">${halos}<g class="ln">${lines}</g>${nodes}</svg>
+      <div class="skhint"><button data-a="skReset">Recentrar</button><small>Roda do mouse: zoom · arrastar: mover · de perto aparecem todos os nomes</small></div></div>
     <aside class="skside"><div class="xp"><small>XP disponível de ${esc(c.name)}</small><b>${c.xp}</b></div>${detail}
-      <div class="legend"><span><i class="lc"></i>Ativa</span><span><i class="lp"></i>Passiva</span><span><i class="lo"></i>Aprendida</span><span><i class="la"></i>Disponível</span></div>
+      <div class="legend"><span><i class="lc"></i>Ativa</span><span><i class="lp"></i>Passiva</span><span><i class="lo"></i>Aprendida</span><span><i class="la"></i>Disponível</span><span><i class="lx"></i>Outro Vínculo</span></div>
       <h3>Aprendidas (${c.skills.length})</h3><ul class="mine">${mineL || '<li class="none"><small>Nenhuma ainda.</small></li>'}</ul></aside></section>`;
 }
 
@@ -220,7 +221,7 @@ function persPage(c) {
   const res = k => `<div class="resrow">${bar(k, c)}${k === 'limit' ? '' : `<input type="number" aria-label="${L[k]} atual" data-id="${c.id}" data-f="${k}" value="${c[k]}">`}</div>`;
   const cts = Object.values(S.contracts).filter(ct => !ct.done).map(ct => `<li><b>${esc(ct.target)}</b><small>${ct.gold} ouro · ${ct.xp} XP</small></li>`).join('');
   return `<section class="pp" style="--c:${esc(c.color)}"><div class="pp-hero">${figCard(c, '200px')}
-      <div class="pp-id"><input class="pname" aria-label="Nome" data-id="${c.id}" data-f="name" value="${esc(c.name)}"><div class="row"><input type="color" aria-label="Cor" data-id="${c.id}" data-f="color" value="${esc(c.color)}"><label class="up">Enviar retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label><span class="pill">XP <b>${c.xp}</b></span><span class="pill">Ouro <b>${c.gold}</b></span></div>
+      <div class="pp-id"><input class="pname" aria-label="Nome" data-id="${c.id}" data-f="name" value="${esc(c.name)}"><div class="row"><input type="color" aria-label="Cor" data-id="${c.id}" data-f="color" value="${esc(c.color)}"><label class="up">Enviar retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label>${(c.vinc || []).map(e => `<span class="pill vp" style="--e:${ELC[e]}">Vínculo <b>${PATRON[e]}</b></span>`).join('')}<span class="pill">XP <b>${c.xp}</b></span><span class="pill">Ouro <b>${c.gold}</b></span></div>
         ${res('hp')}${res('aura')}${res('san')}${res('limit')}<div class="sts big">${[sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(s => `<i>${s}</i>`).join('') || '<small>Sem condições ativas.</small>'}</div></div></div>
     <div class="pp-grid"><div class="card"><h3>Atributos <small>clique para rolar d100</small></h3><div class="tiles">${A.map(a => `<button class="tile ${c.marks[a] ? 'mk' : ''}" data-a="roll" data-id="${c.id}" data-attr="${a}"><b>${at(c, a)}</b><span>${a}</span>${at(c, a) !== c.attrs[a] ? `<small>base ${c.attrs[a]}</small>` : ''}</button>`).join('')}</div>
         <div class="row"><label>Modificador da rolagem <input type="number" class="mod" data-mid="${c.id}" value="${mods[c.id] || 0}"></label><small>▲ dourado = atributo usado com sucesso, pode evoluir no descanso longo.</small></div></div>
@@ -242,7 +243,8 @@ function itemsPage(c) {
   return `<section class="ip"><div class="ip-top"><div class="gold"><small>Ouro</small><b>${c.gold}</b></div>${slot('arma', 'Arma')}${slot('armadura', 'Armadura')}${slot('acess', 'Acessório')}</div>
     <h3>Inventário</h3><div class="icards">${inv || '<p class="none">Inventário vazio.</p>'}</div>
     ${sh.open ? `<h3>Loja · ${esc(S.scenes[S.scene].name)}</h3><div class="icards">${sh.stock.filter(k => S.items[k]).map(k => card(k, S.items[k], btn('buy', `Comprar · ${S.items[k].price}`, k, c.gold < S.items[k].price ? 'disabled' : ''))).join('') || '<p class="none">Nada à venda.</p>'}</div>` : '<h3>Loja</h3><p class="none">Não há loja aberta nesta cena.</p>'}
-    ${forge ? `<h3>Forja <small>3 essências para arma, 5 para relíquia</small></h3><div class="icards">${forge}</div>` : ''}</section>`;
+    ${forge ? `<h3>Forja <small>3 essências para arma, 5 para relíquia</small></h3><div class="icards">${forge}</div>` : ''}
+    ${gm ? `<h3>Entregar item <small>só o mestre</small></h3><div class="row chips">${chips(S.items, (k, i) => `<span data-a="give" data-id="${c.id}" data-item="${k}">+ ${esc(i.name)}</span>`)}</div>` : ''}</section>`;
 }
 const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat'];
 
@@ -261,14 +263,14 @@ function command(c, cur) {
 
 function render() {
   const ae = document.activeElement;
-  if (drag || wdrag || ae?.matches?.('#app select')) { pending = true; return; }
+  if (drag || wdrag || cdrag || ae?.matches?.('#app select')) { pending = true; return; }
   pending = false;
   // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
     sel: ae.tagName + Object.entries(ae.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, x => '-' + x.toLowerCase())}="${CSS.escape(v)}"]`).join('') } : null;
-  const scr = [...app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main')].map(el => el.scrollTop);
+  const scr = [...app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody')].map(el => el.scrollTop);
   const b = S.battle.active, sc = S.scenes[S.scene], chars = Object.values(S.chars), on = v => v ? 'class="own"' : '';
-  const sheets = chars.filter(mine).map(sheet).join('');
+  const sheets = gm ? chars.map(sheetCard).join('') : '';
   const log = `${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log" aria-live="polite">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div>`;
   if (gm) {
     const cena = `<div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
@@ -279,21 +281,26 @@ function render() {
       <div class="row"><b>Bestiário</b><button data-a="tier">Nível: ${tier}</button><button data-a="content" data-coll="bestiary">Restaurar padrão</button></div>
       <div class="row chips best">${chips(S.bestiary, (id, m) => `<span data-a="bSpawn" data-id="${id}" title="Clique: criar cópia · Shift+clique: apagar modelo">${m.boss ? '★ ' : '+ '}${esc(m.name)}</span>`) || '<small>salve um inimigo pela ficha</small>'}</div>
       <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span><span data-a="content" data-coll="scenes">+ cenas de exemplo</span></div>
-      <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"><input aria-label="Colunas" type="number" data-map="cols" value="${sc.cols}">×<input aria-label="Linhas" type="number" data-map="rows" value="${sc.rows}"></div>
-      <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="URL da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar mapa<input type="file" accept="image/*" data-up="bg"></label></div>
+      <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"></div>
+      <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
+      <div class="row"><label>Casas na largura <input type="number" step="0.25" min="4" max="80" data-map="cols" value="${sc.cols}"></label><small>${Math.round(sc.rows * 10) / 10} de altura</small></div>
+      <div class="row"><label>Grade → <input type="range" min="0" max="0.95" step="0.05" data-map="ox" value="${sc.ox}" aria-label="Deslocar grade na horizontal"></label><label>↓ <input type="range" min="0" max="0.95" step="0.05" data-map="oy" value="${sc.oy}" aria-label="Deslocar grade na vertical"></label></div>
+      <div class="row"><button data-a="camFix" title="Todos passam a ver o mapa com o seu zoom e posição atuais">Fixar minha vista para todos</button>${sc.cam ? '<button data-a="camFree" class="own">Liberar vista</button>' : ''}</div>
+
       <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
-    const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && S.chars[k.slice(2)]), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [S.chars[k.slice(2)].name, 400]])) };
+    const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && S.chars[k.slice(2)]), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [S.chars[k.slice(2)].name, 1080]])) };
     const rank = Object.keys(ALL).sort((x, y) => (wins[x].z || 0) - (wins[y].z || 0));
     const lays = chips(LAYD, k => `<button class="lay" data-a="lay" data-k="${k}" title="Clique: aplicar arranjo · Shift+clique: salvar o arranjo atual">${k}</button>`);
-    const body = { ...Object.fromEntries(fw.map(k => [k, sheet(S.chars[k.slice(2)], true)])), ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
-    app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : w}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
-      <nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
+    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(S.chars[k.slice(2)])])), ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
+    app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : Math.min(w, innerWidth - 24)}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
+      ${cropper()}<nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) pg = 'mesa'; // a batalha começou: leva o jogador para a mesa
     wasBattle = b;
-    const page = !c && pg !== 'mesa' ? '<section class="card"><h3>Sem personagem</h3><p>Crie um personagem para começar; o mestre define os atributos.</p><button data-a="addChar">Criar personagem</button></section>'
+    const free = chars.filter(x => !x.enemy && !x.owner);
+    const page = !c ? `<section class="card"><h3>Escolha seu caçador</h3><p>Assuma um personagem livre ou crie um novo; o mestre define os atributos.</p><div class="icards">${free.map(x => `<div class="icard" style="--e:${esc(x.color)}"><em>${(x.vinc || []).map(e => 'Vínculo: ' + PATRON[e]).join(' · ') || 'Sem Vínculo'}</em><b>${esc(x.name)}</b><small>${esc(x.bio || '')}</small><div class="row"><button class="own" data-a="claim" data-id="${x.id}">Assumir</button></div></div>`).join('')}</div><div class="row"><button data-a="addChar">Criar personagem novo</button></div></section>`
       : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
       : chaseBar() + (actor ? battle() + command(actor, cur) : b ? battle() : map());
@@ -304,8 +311,9 @@ function render() {
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
   if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
-  app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main').forEach((el, i) => el.scrollTop = scr[i] || 0);
-  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],[data-cz],.hud').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
+  app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody').forEach((el, i) => el.scrollTop = scr[i] || 0);
+  { const sc2 = S.scenes[S.scene]; if (sc2.cam && sc2.cam.n !== lastCam) { const w = mapEl()?.offsetWidth; if (w) { lastCam = sc2.cam.n; Object.assign(view, { z: sc2.cam.z, x: sc2.cam.fx * w, y: sc2.cam.fy * w }); applyView(); } } } // vista fixada pelo mestre
+  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   fx();
 }
 
@@ -349,14 +357,15 @@ function fx() {
 }
 
 app.addEventListener('change', e => {
-  const el = e.target, d = el.dataset, v = el.type === 'number' ? +el.value : el.type === 'checkbox' ? el.checked : el.value;
+  const el = e.target, d = el.dataset, v = el.type === 'number' || el.type === 'range' ? +el.value : el.type === 'checkbox' ? el.checked : el.value;
   if (el.tagName === 'SELECT' || el.type === 'file') el.blur();
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
-      .then(u => send(d.up === 'bg' ? { t: 'map', f: 'bg', v: u } : { t: 'set', id: d.id, f: 'img', v: u })).catch(() => alert('Falha no upload (PNG/JPG/WEBP/GIF até 5 MB).'));
+      .then(u => d.up === 'bg' ? setBg(u) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => alert('Falha no upload (PNG/JPG/WEBP/GIF até 5 MB).'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
+  else if (d.map === 'bg') setBg(v);
   else if (d.map) send({ t: 'map', f: d.map, v });
   else if (d.mid) mods[d.mid] = v;
 });
@@ -383,12 +392,15 @@ app.addEventListener('click', e => {
   if (am) { aim = aim === am.dataset.aim ? null : am.dataset.aim; return render(); }
   if (sb) { sub = sb.dataset.sub || null; return render(); }
   if (pvb) { pv = pvb.dataset.pv; return render(); }
+  const ftb = e.target.closest('[data-ftab]');
+  if (ftb) { ftab[ftb.dataset.id] = ftb.dataset.ftab; return render(); }
+  if (skMoved) { skMoved = false; return; } // foi um arrasto na grade, não um clique
   const pgb = e.target.closest('[data-pg]'), sl = e.target.closest('[data-sel]');
   if (pgb) { pg = pgb.dataset.pg; return render(); }
   if (sl) { selCh = sl.dataset.sel; return render(); }
   if (!d && u) { if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
-  if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.min(innerWidth - 420, 380 + 24 * (zc % 8)), y: 70 + 24 * (zc % 8), open: true, z: ++zc }; else { pg = 'pers'; selCh = d.id; } return render(); }
+  if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200 + 24 * (zc % 8))), y: 50 + 20 * (zc % 6), open: true, z: ++zc }; else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
     if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return alert(`Arranjo "${d.k}" salvo.`); }
@@ -401,6 +413,15 @@ app.addEventListener('click', e => {
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
   if (d.a === 'fogMode') { fogMode = !fogMode; return render(); }
   if (d.a === 'secret') { secret = !secret; return render(); }
+  if (d.a === 'cropOn') { cropMode = true; cropSel = { ...S.scenes[S.scene].crop }; return render(); }
+  if (d.a === 'cropX') { cropMode = false; return render(); }
+  if (d.a === 'cropOk' || d.a === 'cropAll') { // a proporção do mapa vem do recorte sobre o tamanho real da imagem
+    const im = app.querySelector('.cropbox img'), c = d.a === 'cropAll' || !cropSel || cropSel.w < .03 ? { x: 0, y: 0, w: 1, h: 1 } : cropSel;
+    send({ t: 'map', f: 'crop', v: c }); send({ t: 'map', f: 'ar', v: (c.w * im.naturalWidth) / (c.h * im.naturalHeight) }); cropMode = false; Object.assign(view, { z: 1, x: 0, y: 0 }); return render();
+  }
+  if (d.a === 'camFix') { const w = mapEl().offsetWidth; return send({ t: 'map', f: 'cam', v: { z: view.z, fx: view.x / w, fy: view.y / w } }); }
+  if (d.a === 'camFree') return send({ t: 'map', f: 'cam', v: null });
+  if (d.a === 'skReset') { Object.assign(gv, { z: 1, x: 0, y: 0 }); return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'gridFull') { gridFull = d.id || null; return render(); }
   if (d.a === 'chaseStart') return send({ t: 'chase', k: 'start', ...cz });
@@ -423,7 +444,7 @@ app.addEventListener('click', e => {
   if (d.a === 'act' || d.a === 'use' || d.a === 'next') { aim = null; sub = null; }
 });
 // mapa: pincel de névoa (mestre) e arrastar tokens
-const cell = (e, el) => { const r = el.getBoundingClientRect(), m = S.scenes[S.scene]; return { x: Math.floor((e.clientX - r.left) / r.width * m.cols), y: Math.floor((e.clientY - r.top) / r.height * m.rows) }; };
+const cell = (e, el) => { const r = el.getBoundingClientRect(), m = S.scenes[S.scene]; return { x: Math.floor((e.clientX - r.left) / r.width * m.cols - m.ox), y: Math.floor((e.clientY - r.top) / r.height * m.rows - m.oy) }; };
 const paint = e => { const mp = e.target.closest?.('.map'); if (!mp) return; const c = cell(e, mp), k = c.x + ',' + c.y + e.shiftKey; if (k !== lastFog) { lastFog = k; send({ t: 'fog', ...c, hide: e.shiftKey }); } };
 app.addEventListener('pointerdown', e => { // arrastar janelas do mestre pela barra de título
   const wn = e.target.closest('.win'), h = e.target.closest('[data-drag]');
@@ -444,17 +465,33 @@ app.addEventListener('wheel', e => {
   const r = m.getBoundingClientRect(), z = Math.min(4, Math.max(.4, view.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
   view.x += (e.clientX - r.left) / view.z * (view.z - z); view.y += (e.clientY - r.top) / view.z * (view.z - z); view.z = z; applyView();
 }, { passive: false });
+const applyGv = () => { const s = app.querySelector('.skmap svg'); if (s) { s.style.transform = `translate(${gv.x}px,${gv.y}px) scale(${gv.z})`; s.parentElement.classList.toggle('far', gv.z < 1.7); s.parentElement.classList.toggle('near', gv.z >= 1.7); } };
+app.addEventListener('wheel', e => {
+  const sv = e.target.closest?.('.skmap')?.querySelector('svg');
+  if (!sv) return;
+  e.preventDefault();
+  const r = sv.getBoundingClientRect(), z = Math.min(5, Math.max(1, gv.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+  gv.x += (e.clientX - r.left) / gv.z * (gv.z - z); gv.y += (e.clientY - r.top) / gv.z * (gv.z - z); gv.z = z; if (z === 1) gv.x = gv.y = 0; applyGv();
+}, { passive: false });
+app.addEventListener('pointerdown', e => { if (e.button === 0 && e.target.closest('.skmap') && !e.target.closest('button')) skd = { sx: e.clientX, sy: e.clientY, x: gv.x, y: gv.y }; const cb = e.target.closest('.cropbox');
+  if (cb && e.button === 0) { const r = cb.querySelector('img').getBoundingClientRect(); cdrag = { r, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; cb.setPointerCapture(e.pointerId); e.preventDefault(); } });
+app.addEventListener('pointermove', e => {
+  if (skd && (Math.abs(e.clientX - skd.sx) + Math.abs(e.clientY - skd.sy) > 5)) { skMoved = true; gv.x = skd.x + e.clientX - skd.sx; gv.y = skd.y + e.clientY - skd.sy; applyGv(); }
+  if (cdrag) { const cl = v => Math.min(1, Math.max(0, v)), x = cl((e.clientX - cdrag.r.left) / cdrag.r.width), y = cl((e.clientY - cdrag.r.top) / cdrag.r.height);
+    cropSel = { x: Math.min(x, cdrag.x), y: Math.min(y, cdrag.y), w: Math.abs(x - cdrag.x), h: Math.abs(y - cdrag.y) }; const s = app.querySelector('.csel'); if (s) Object.assign(s.style, { left: cropSel.x * 100 + '%', top: cropSel.y * 100 + '%', width: cropSel.w * 100 + '%', height: cropSel.h * 100 + '%' }); }
+});
+addEventListener('pointerup', () => { skd = null; cdrag = null; setTimeout(() => skMoved = false, 50); });
 app.addEventListener('mousedown', e => { if (e.button === 1 && e.target.closest('.mapwrap')) e.preventDefault(); });
 app.addEventListener('contextmenu', e => { const t = e.target.closest('.tok'); if (t) { e.preventDefault(); ctx = { id: t.dataset.id, x: e.clientX, y: e.clientY }; render(); } });
 app.addEventListener('dblclick', e => {
   const t = e.target.closest('.tok'), m = e.target.closest('.map');
-  if (t && mine(S.chars[t.dataset.id])) { if (gm) wins['f_' + t.dataset.id] = { x: Math.min(innerWidth - 420, e.clientX), y: Math.min(innerHeight - 300, e.clientY), open: true, z: ++zc }; else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
+  if (t && mine(S.chars[t.dataset.id])) { if (gm) wins['f_' + t.dataset.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200)), y: 50, open: true, z: ++zc }; else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
   if (m && role !== 'table' && !fogMode) send({ t: 'ping', ...cell(e, m) });
 });
 const drawRuler = e => {
   const m = mapEl(), b = cell(e, m), a = ruler.a, sc = S.scenes[S.scene], n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
   m.querySelector('.rul')?.remove();
-  m.insertAdjacentHTML('beforeend', `<div class="rul"><svg viewBox="0 0 ${sc.cols} ${sc.rows}" preserveAspectRatio="none"><line x1="${a.x + .5}" y1="${a.y + .5}" x2="${b.x + .5}" y2="${b.y + .5}" vector-effect="non-scaling-stroke"/></svg><b style="--x:${b.x};--y:${b.y}">${n} ${n === 1 ? 'casa' : 'casas'}</b></div>`);
+  m.insertAdjacentHTML('beforeend', `<div class="rul"><svg viewBox="0 0 ${sc.cols} ${sc.rows}" preserveAspectRatio="none"><line x1="${a.x + sc.ox + .5}" y1="${a.y + sc.oy + .5}" x2="${b.x + sc.ox + .5}" y2="${b.y + sc.oy + .5}" vector-effect="non-scaling-stroke"/></svg><b style="--x:${b.x + sc.ox};--y:${b.y + sc.oy}">${n} ${n === 1 ? 'casa' : 'casas'}</b></div>`);
 };
 app.addEventListener('pointerdown', e => {
   const wrap = e.target.closest('.mapwrap');

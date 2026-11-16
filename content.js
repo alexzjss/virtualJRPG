@@ -1,63 +1,39 @@
 // Conteúdo padrão da campanha: fantasia mística com demônios e caçadores, tecnologia dos anos 1910-1920.
 // buildSkills → grade compartilhada; buildItems → catálogo; buildBestiary → modelos de inimigos.
+import { TREE } from './tree.js';
 const EL9 = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao'];
 const PATRON = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', radiacao: 'Hiruko' };
 
+// A grade é montada a partir de tree.js: o tronco Marcial no centro (comum a todos) e, em volta, um setor por Vínculo
+// com três ramos de dez nós. Cada ramo é uma corrente de casas vizinhas, então sempre dá para percorrê-lo.
 export function buildSkills(sk) {
-  const N = 17, C = 8, G = {}, used = new Set();
+  const N = 31, C = 15, G = {}, used = new Map(); // casa "x,y" → elemento
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !used.has(x + ',' + y);
-  const put = (x, y, s) => { used.add(x + ',' + y); G['g' + Object.keys(G).length] = { ...s, gx: x, gy: y }; return [x, y]; };
-  // encadeia nós para fora do centro num ângulo; cada nó fica colado ao anterior, então o ramo é sempre percorrível
-  const chain = (deg, r0, nodes) => {
-    let prev = null;
+  const node = (o, el, extra = {}) => { const { n, k, a, p, c, ...rest } = o; return sk(n, k, a || 'FOR', el, p || 0, c || 0, 0, 0, { ...rest, ...extra }); };
+  const put = (x, y, s) => { used.set(x + ',' + y, s.el); G['g' + Object.keys(G).length] = { ...s, gx: x, gy: y }; return [x, y]; };
+  const around = (x, y) => { const o = []; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) o.push([x + dx, y + dy]); return o; };
+  // encadeia nós para fora do centro; o primeiro precisa encostar numa casa já usada que sirva de âncora (anchor)
+  const chain = (deg, r0, nodes, anchor) => {
+    let prev = null; const placed = [];
     nodes.forEach((s, i) => {
-      const a = deg * Math.PI / 180, tx = C + (r0 + i) * Math.cos(a), ty = C + (r0 + i) * Math.sin(a), cand = [];
-      if (prev) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (free(prev[0] + dx, prev[1] + dy)) cand.push([prev[0] + dx, prev[1] + dy]);
-      if (!cand.length) for (let x = 0; x < N; x++) for (let y = 0; y < N; y++) if (free(x, y)) cand.push([x, y]);
-      prev = put(...cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0], s);
+      const a = deg * Math.PI / 180, tx = C + (r0 + i) * Math.cos(a), ty = C + (r0 + i) * Math.sin(a);
+      let cand = prev ? around(...prev).filter(p => free(...p)) : [...used.keys()].filter(k => anchor(k)).flatMap(k => around(...k.split(',').map(Number))).filter(p => free(...p));
+      if (!cand.length) cand = [...used.keys()].filter(k => used.get(k) === s.el || used.get(k) === 'fis').flatMap(k => around(...k.split(',').map(Number))).filter(p => free(...p));
+      prev = put(...cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0], s); placed.push(prev.join(','));
     });
+    return placed;
   };
-  const pas = (name, p, power, xp = 10, el = 'fis') => sk(name, 'passive', 'FOR', el, power, 0, 0, 0, { pas: p, xp });
-  const buff = (name, attr, el, st, cost, o = {}) => sk(name, 'heal', attr, el, 0, cost, 0, 0, { st, xp: 15, ...o });
-  // centro físico
-  put(C, C, sk('Golpe Pesado', 'dmg', 'FOR', 'fis', 14, 4, 0, 0, { st: 'stun' }));
-  [[0, -1, pas('Vigor', 'hpMax', 10)], [1, -1, sk('Golpe Giratório', 'dmg', 'FOR', 'fis', 10, 6, 0, 0, { area: true })], [1, 0, pas('Foco', 'auraMax', 8)],
-    [1, 1, sk('Tiro Certeiro', 'dmg', 'DES', 'fis', 12, 4, 0, 0, { ct: 60 })], [0, 1, pas('Mente Firme', 'sanMax', 10)],
-    [-1, 1, sk('Grito de Guerra', 'heal', 'CAR', 'fis', 2, 6, 0, 0, { st: 'atkUp', area: true })], [-1, 0, pas('Treino de FOR', 'FOR', 5)],
-    [-1, -1, buff('Passo Rápido', 'AGI', 'fis', 'agiUp', 4, { ct: 50, xp: 10 })]].forEach(([x, y, s]) => put(C + x, C + y, s));
-  // raios elementais: [elemento, atributo, tipo, status, [básica, área, forte, suprema, limite], suporte [buff, st, debuff, st, área, st, atributo], proibida?]
-  const E = [
-    ['kagutsuchi', 'INT', 'dmg', 'burn', ['Centelha', 'Mar de Chamas', 'Lâmina de Kagutsuchi', 'Sol de Kagutsuchi', 'Inferno Rubro'], ['Brasa Interior', 'atkUp', 'Marca Ardente', 'defDn', 'Cinzas Sufocantes', 'silence', 'FOR'], ['Chama Negra', 48, false, 'burn']],
-    ['susanoo', 'INT', 'dmg', 'agiDn', ["Jato d'Água", 'Maré Alta', 'Lança de Susanoo', 'Dilúvio de Susanoo', 'Fúria dos Mares'], ['Correnteza', 'agiUp', 'Afogar', 'agiDn', 'Névoa Fria', 'frozen', 'AGI']],
-    ['atlas', 'FOR', 'dmg', 'defDn', ['Estilhaço', 'Terremoto', 'Punho de Atlas', 'Peso do Mundo', 'Colapso'], ['Pele de Pedra', 'defUp', 'Fenda', 'stun', 'Tremor', 'agiDn', 'CON']],
-    ['indra', 'INT', 'dmg', 'para', ['Faísca', 'Tempestade', 'Raio de Indra', 'Julgamento de Indra', 'Vajra'], ['Reflexo Elétrico', 'agiUp', 'Choque', 'para', 'Campo Estático', 'silence', 'DES'], ['Relâmpago Vazio', 44, true, 'stun']],
-    ['fuhaku', 'DES', 'dmg', 'bleed', ['Lâmina de Vento', 'Vendaval', 'Corte de Fuhaku', 'Tufão de Fuhaku', 'Mil Lâminas'], ['Vento a Favor', 'agiUp', 'Rajada Cortante', 'bleed', 'Olho do Furacão', 'confuse', 'AGI']],
-    ['amaterasu', 'SAB', 'heal', 'defUp', ['Luz Curativa', 'Aurora', 'Bênção de Amaterasu', 'Alvorada de Amaterasu', 'Sol Nascente'], ['Luz Guardiã', 'defUp', 'Clarão', 'atkDn', 'Julgamento Solar', 'marked', 'SAB']],
-    ['tsukuyomi', 'INT', 'mental', 'fear', ['Sussurro Sombrio', 'Eclipse', 'Véu de Tsukuyomi', 'Noite Eterna', 'Fim do Sonho'], ['Manto da Noite', 'defUp', 'Pesadelo', 'sleep', 'Lua Negra', 'possess', 'INT'], ['Olhar do Abismo', 40, false, 'fear']],
-    ['shukketsu', 'INT', 'dmg', 'bleed', ['Sangria', 'Chuva Rubra', 'Pacto de Shukketsu', 'Hemorragia Final', 'Sacrifício'], ['Frenesi', 'atkUp', 'Hemorragia', 'bleed', 'Maré Vermelha', 'curse', 'CON'], ['Rito de Sangue', 50, false, 'bleed']],
-    ['radiacao', 'INT', 'dmg', 'rad', ['Raio Gama', 'Chuva Ácida', 'Fissão de Hiruko', 'Meia-Vida', 'Ponto Crítico'], ['Mutação', 'atkUp', 'Contaminar', 'rad', 'Nuvem Tóxica', 'poison', 'SOR'], ['Fusão do Núcleo', 38, true, 'rad']],
-  ];
-  E.forEach(([el, attr, kind, st, n, , forb], i) => {
-    const res = el === 'shukketsu' ? 'san' : 'aura', h = res === 'san' ? .6 : 1, c = v => Math.round(v * h), dk = kind === 'heal' ? 'dmg' : kind;
-    chain(i * 40, 2, [sk(n[0], kind, attr, el, 12, c(5), 0, 0, { res }), pas('Proteção de ' + PATRON[el], 'res', 0, 15, el),
-      sk(n[1], kind, attr, el, 12, c(9), 0, 0, { res, area: true, ct: 125, xp: 20 }), sk(n[2], kind, attr, el, 20, c(10), 0, 0, { res, st, xp: 25 }),
-      sk(n[3], kind, attr, el, 26, c(18), 0, 0, { res, st, area: true, ct: 150, xp: 40 }), sk(n[4], kind, attr, el, 45, 0, 0, 0, { limit: true, area: true, st, ct: 150, xp: 40 }),
-      // poderes proibidos: custam Sanidade e deixam uma sequela no próprio usuário
-      ...(forb ? [sk(forb[0], dk, attr, el, forb[1], forb[2] ? 14 : 12, 0, 0, { res: 'san', area: forb[2], back: forb[3], st, xp: 50 })] : [])]);
+  const M = TREE.marcial.branches, fis = k => used.get(k) === 'fis';
+  put(C, C, node(M[0][0], 'fis'));
+  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis')));
+  EL9.forEach((el, i) => { // setor do Vínculo: ataque no eixo, suporte e maestria nas laterais, presos à base do ramo de ataque
+    const B = TREE[el].branches, deg = i * 40, main = chain(deg, 3, B[0].map((o, n) => node(o, el, n ? {} : { root: true })), fis), base = new Set(main.slice(0, 4));
+    chain(deg - 13, 5, B[1].map(o => node(o, el)), k => base.has(k)); chain(deg + 13, 5, B[2].map(o => node(o, el)), k => base.has(k));
   });
-  E.forEach(([el, attr, kind, , , s], i) => {
-    const dk = kind === 'heal' ? 'dmg' : kind;
-    chain(i * 40 + 20, 3, [buff(s[0], attr, el, s[1], 5), sk(s[2], dk, attr, el, 6, 6, 0, 0, { st: s[3], xp: 15 }), sk(s[4], dk, attr, el, 5, 10, 0, 0, { st: s[5], area: true, ct: 120, xp: 25 }), pas('Dom de ' + PATRON[el], s[6], 5, 20, el)]);
-  });
-  // técnicas de arma: exigem o tipo de arma equipado (sem arma = punhos)
-  const W = (name, req, attr, power, cost, o = {}) => sk(name, 'dmg', attr, 'fis', power, cost, 0, 0, { req, xp: 15, ...o });
-  chain(10, 2, [W('Corte Rápido', 'lamina', 'FOR', 10, 3, { ct: 70, xp: 10 }), W('Estocada', 'lamina', 'DES', 16, 5, { st: 'bleed' }), W('Dança de Lâminas', 'lamina', 'DES', 12, 8, { area: true, xp: 20 }), W('Corte do Relâmpago', 'lamina', 'FOR', 28, 9, { ct: 130, xp: 30 })]);
-  chain(90, 2, [W('Investida', 'lanca', 'FOR', 16, 4, { xp: 10 }), W('Varredura', 'lanca', 'FOR', 11, 7, { area: true }), W('Perfurar Armadura', 'lanca', 'DES', 14, 6, { st: 'defDn', xp: 20 }), W('Empalar', 'lanca', 'FOR', 26, 9, { st: 'stun', xp: 30 })]);
-  chain(170, 2, [W('Tiro Duplo', 'fogo', 'DES', 14, 4, { ct: 80, xp: 10 }), W('Tiro na Perna', 'fogo', 'DES', 12, 5, { st: 'agiDn' }), W('Rajada', 'fogo', 'DES', 12, 8, { area: true, xp: 20 }), W('Tiro Fatal', 'fogo', 'DES', 30, 9, { ct: 140, xp: 30 })]);
-  chain(250, 2, [W('Jab', 'punho', 'DES', 8, 2, { ct: 50, xp: 10 }), W('Gancho', 'punho', 'FOR', 14, 5, { st: 'stun' }), W('Chute Giratório', 'punho', 'AGI', 10, 7, { area: true, xp: 20 }), W('Punho de Ferro', 'punho', 'FOR', 24, 8, { st: 'defDn', xp: 30 })]);
-  // passivas de atributo e o Limite físico preenchem os vãos perto do centro
-  const fill = [sk('Golpe Limite', 'dmg', 'FOR', 'fis', 40, 0, 0, 0, { limit: true, xp: 20 }), ...['CON', 'AGI', 'INT', 'SAB', 'DES', 'SOR', 'CAR'].map(a => pas('Treino de ' + a, a, 5))];
-  for (let r = 2; r <= 4 && fill.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++) if (fill.length && free(x, y)) put(x, y, fill.shift());
+  [20, 100, 220, 300].forEach((deg, i) => chain(deg, 2, M[i + 1].map(o => node(o, 'fis')), fis)); // estilos de arma nos vãos entre setores
+  const train = M[5].map(o => node(o, 'fis')); // treinos de atributo nas casas livres junto ao centro
+  for (let r = 2; r <= 5 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
+    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
   return G;
 }
 

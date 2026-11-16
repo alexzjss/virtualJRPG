@@ -8,12 +8,16 @@ const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(c, m); const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 
-test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.ok(Object.keys(S.skills).length >= 120); assert.ok(Object.keys(S.items).length >= 50); });
-test('grade: todo nó é alcançável a partir do centro e não há sobreposição', () => {
-  const ns = Object.values(S.skills), seen = new Set([ns.findIndex(s => s.name === 'Golpe Pesado')]), q = [...seen];
-  assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
-  while (q.length) { const a = ns[q.pop()]; ns.forEach((b, i) => { if (!seen.has(i) && Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1) { seen.add(i); q.push(i); } }); }
-  assert.deepEqual(ns.filter((_, i) => !seen.has(i)).map(s => s.name), []);
+test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, 311); assert.ok(Object.keys(S.items).length >= 50); });
+test('grade: sem sobreposição; cada Vínculo alcança todos os seus nós passando só por ele e pelo tronco Marcial', () => {
+  const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
+  for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao']) {
+    const set = ns.filter(s => s.el === el || s.el === 'fis'), start = set.findIndex(s => s.el === el && s.root), seen = new Set([start]), q = [start];
+    assert.ok(start >= 0, 'raiz de ' + el);
+    while (q.length) { const x = set[q.pop()]; set.forEach((y, i) => { if (!seen.has(i) && Math.max(Math.abs(x.gx - y.gx), Math.abs(x.gy - y.gy)) <= 1) { seen.add(i); q.push(i); } }); }
+    assert.deepEqual(set.filter((_, i) => !seen.has(i)).map(s => s.name), [], el);
+    assert.equal(ns.filter(s => s.el === el).length, 30);
+  }
 });
 test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), it = n => Object.keys(S.items).find(k => S.items[k].name === n);
@@ -30,7 +34,7 @@ test('chefe: ponto fraco dobra o dano, controle dura 1 turno, fúria invoca laca
   const boss = Object.values(S.chars).find(c => c.boss); derive(boss); boss.hp = boss.hpMax; h.attrs.FOR = 95; h.attrs.AGI = 99; boss.attrs.AGI = 1;
   H.battle(gm, { on: true }); H.st(gm, { id: boss.id, k: 'stun' }); assert.equal(boss.st.stun, 1);
   delete boss.st.stun; let hp = boss.hp, dmgWeak = 0, dmgTorso = 0;
-  for (let i = 0; i < 60 && !(dmgWeak && dmgTorso); i++) { if (current() !== h.id) { S.battle.ticks[h.id] = -1; } hp = boss.hp; const other = boss.weakPart === 'torso' ? 'legL' : 'torso', aim = dmgWeak ? other : boss.weakPart;
+  for (let i = 0; i < 60 && !(dmgWeak && dmgTorso); i++) { if (current() !== h.id) { S.battle.ticks[h.id] = -1; } boss.hp = boss.hpMax; boss.body = {}; hp = boss.hp; const other = boss.weakPart === 'torso' ? 'legL' : 'torso', aim = dmgWeak ? other : boss.weakPart;
     H.act(ana, { id: h.id, skill: 'atk', target: boss.id, aim }); const d = hp - boss.hp, crit = /CRÍTICO/.test(S.log.at(-1).text) || /CRÍTICO/.test(S.log.at(-2)?.text || ''); if (d > 0 && !crit) { if (aim === boss.weakPart) dmgWeak = d; else dmgTorso = d; } }
   assert.equal(dmgWeak, dmgTorso * 2);
   const before = Object.keys(S.chars).length; boss.hp = Math.floor(boss.hpMax / 2) + 1; S.battle.ticks[h.id] = -1; for (let i = 0; i < 30 && !boss.rage; i++) { S.battle.ticks[h.id] = -1; H.act(ana, { id: h.id, skill: 'atk', target: boss.id }); }
@@ -50,6 +54,23 @@ test('cenas de exemplo com loja própria e perseguição que termina', () => {
   const a = mk(ana, {}), b = mk(gm, { enemy: true }); H.chase(gm, { k: 'start', a: a.id, b: b.id, va: 'moto', vb: 'pe' }); assert.equal(S.chase.gap, 5);
   for (let i = 0; i < 60 && S.chase; i++) H.chase(gm, { k: 'round' });
   assert.equal(S.chase, null); H.chase(ana, { k: 'start', a: a.id, b: b.id, va: 'moto', vb: 'pe' }); assert.equal(S.chase, null);
+});
+test('Vínculo: só aprende skills do próprio Vínculo, ganha a raiz e resiste ao elemento', () => {
+  reset(); const h = mk(ana, {}); h.xp = 100;
+  H.learn(ana, { id: h.id, skill: sk('Centelha') }); assert.equal(h.skills.length, 0); // sem Vínculo com Kagutsuchi
+  H.vinc(ana, { id: h.id, el: 'kagutsuchi' }); assert.deepEqual(h.vinc, []); // só o mestre concede
+  H.vinc(gm, { id: h.id, el: 'kagutsuchi' }); assert.deepEqual(h.vinc, ['kagutsuchi']); assert.ok(h.skills.includes(sk('Centelha')));
+  H.learn(ana, { id: h.id, skill: sk('Faísca') }); assert.equal(h.skills.length, 1); // Indra continua trancado
+  const e = mk(gm, { enemy: true }); e.skills = [sk('Centelha')]; e.attrs.AGI = 99; e.attrs.INT = 99; h.attrs.AGI = 1; H.battle(gm, { on: true });
+  let seen = false; for (let i = 0; i < 40 && !seen; i++) { S.battle.ticks[e.id] = -1; h.hp = h.hpMax; e.aura = 99; H.act(gm, { id: e.id, skill: sk('Centelha'), target: h.id }); seen = /resistiu/.test(S.log.at(-1).text); }
+  assert.ok(seen);
+});
+test('personagens base e mapa: três caçadores sem dono; recorte e casas ajustáveis; jogador assume', () => {
+  reset(); assert.ok(true);
+  const sc = S.scenes[S.scene]; H.map(gm, { f: 'ar', v: 2 }); H.map(gm, { f: 'cols', v: 22.5 }); assert.equal(sc.cols, 22.5); assert.equal(sc.rows, 11.25);
+  H.map(gm, { f: 'crop', v: { x: .1, y: .2, w: .5, h: 2 } }); assert.deepEqual(sc.crop, { x: .1, y: .2, w: .5, h: .8 });
+  H.map(gm, { f: 'cam', v: { z: 2, fx: -.1, fy: 0 } }); assert.equal(sc.cam.z, 2); H.map(ana, { f: 'cols', v: 5 }); assert.equal(sc.cols, 22.5);
+  const h = mk(gm, { owner: '' }); H.claim(bia, { id: h.id }); assert.equal(h.owner, 'Bia'); H.claim(ana, { id: h.id }); assert.equal(h.owner, 'Bia');
 });
 test('só o mestre altera atributos; jogador só mexe no próprio personagem', () => {
   reset(); const h = mk(ana, {}), o = mk(bia, {});
