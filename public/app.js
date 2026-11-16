@@ -7,12 +7,19 @@ const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passi
 const ST = { down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
 const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório' };
 const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
+const BODY = { head: ['INT', 'SAB'], torso: ['CON'], armL: ['FOR', 'DES'], armR: ['FOR', 'DES'], legL: ['AGI'], legR: ['AGI'] }, PARTS = Object.keys(BODY), AIMP = { head: 30, torso: 0, armL: 15, armR: 15, legL: 15, legR: 15 };
+const PL = { head: 'Cabeça', torso: 'Torso', armL: 'Braço esq.', armR: 'Braço dir.', legL: 'Perna esq.', legR: 'Perna dir.' }, LV = ['ileso', 'ferido', 'crítico'];
+const SHAPE = { head: ['circle', 'cx="60" cy="28" r="20"'], torso: ['rect', 'x="38" y="52" width="44" height="82"'], armL: ['rect', 'x="14" y="54" width="20" height="80"'], armR: ['rect', 'x="86" y="54" width="20" height="80"'], legL: ['rect', 'x="38" y="138" width="20" height="108"'], legR: ['rect', 'x="62" y="138" width="20" height="108"'] };
+const WIN = { cena: ['Cena', 330], batalha: ['Batalha', 600], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
 const CAMPL = { vigiar: 'Vigiar (AGI↑)', cozinhar: 'Cozinhar (grupo ATQ↑)', conversar: 'Conversar (+5 Sanidade)', treinar: 'Treinar (+5 XP)', meditar: 'Meditar (+30 Limite)' };
 const TABS = { st: 'Status', per: 'Perícias', sk: 'Skills', inv: 'Itens', bio: 'História' };
 const ED = {
   skills: [['Skill', 'name', 'text'], ['Tipo', 'kind', KIND], ['Elemento', 'el', EL], ['Atr.', 'attr', AO], ['Poder', 'power'], ['Custo', 'cost'], ['Recurso', 'res', RES], ['Status', 'st', { '': '—', ...ST }], ['Área', 'area', 'checkbox'], ['Tempo%', 'ct'], ['Passiva', 'pas', PASL], ['XP', 'xp'], ['X', 'gx'], ['Y', 'gy'], ['Lim.', 'limit', 'checkbox']],
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Restaura', 'eff', { hp: 'HP', aura: 'Aura', san: 'Sanidade' }], ['Atr. (acess.)', 'attr', AO], ['Preço', 'price']],
 };
+let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
+let wins = { cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
+try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur = null;
 const mods = {}, tabs = {}, selNode = {}, open = {};
 const ask = (k, q) => localStorage[k] || (localStorage[k] = prompt(q) || '');
@@ -24,7 +31,14 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};
 const send = o => ws.readyState === 1 && ws.send(JSON.stringify(o));
 const mine = c => gm || (role === 'player' && c.owner === name);
 const eq = (c, slot) => S.items[c.equip[slot]];
-const at = (c, a) => c.attrs[a] + (eq(c, 'acess')?.attr === a ? eq(c, 'acess').power : 0);
+const lvl = (c, k) => { const d = c.body[k] || 0; return d >= c.hpMax * .3 ? 2 : d >= c.hpMax * .15 ? 1 : 0; };
+const at = (c, a) => c.attrs[a] + (eq(c, 'acess')?.attr === a ? eq(c, 'acess').power : 0) - 10 * PARTS.filter(k => BODY[k].includes(a) && lvl(c, k) === 2).length;
+// figura de corpo: mode 'aim' deixa mirar numa parte; 'gm' deixa o mestre ferir/curar a parte
+function bodyFig(c, mode) {
+  const hurt = PARTS.filter(k => lvl(c, k)).map(k => `${PL[k]}: ${LV[lvl(c, k)]}`);
+  return `<div class="body"><svg viewBox="0 0 120 260" role="img" aria-label="Corpo de ${esc(c.name)}: ${hurt.join(', ') || 'ileso'}">${PARTS.map(k => `<${SHAPE[k][0]} ${SHAPE[k][1]} class="l${lvl(c, k)} ${mode === 'aim' && aim === k ? 'aim' : ''}" ${mode === 'aim' ? `data-aim="${k}"` : mode === 'gm' ? `data-a="part" data-id="${c.id}" data-k="${k}"` : ''}><title>${PL[k]} · ${LV[lvl(c, k)]}</title></${SHAPE[k][0]}>`).join('')}</svg><small>${hurt.join('<br>') || 'Ileso'}</small></div>`;
+}
+const aimBox = () => { const t = S.chars[tgt]; return t && t.id in S.battle.ticks ? `<div class="aimrow">${bodyFig(t, 'aim')}<div>Mira em <b>${esc(t.name)}</b>: <b>${aim ? `${PL[aim]} (−${AIMP[aim]}% de acerto)` : 'sem mira'}</b><br><small>Toque numa parte do corpo para mirar; parte crítica causa penalidade e status.</small></div></div>` : ''; };
 const delay = c => Math.round(1000 / Math.max(1, at(c, 'AGI') * (c.st.agiUp ? 1.25 : 1) * (c.st.agiDn ? .75 : 1)));
 const sanSt = c => { const p = c.san / (c.sanMax || 1); return p <= 0 ? 'Colapso −30' : p <= .25 ? 'Surto −20' : p <= .5 ? 'Abalado −10' : ''; };
 const stList = c => [sanSt(c), ...Object.entries(c.st).map(([k, n]) => `${ST[k]} ${n}`)].filter(Boolean).join(' · ');
@@ -65,9 +79,9 @@ function battle() {
   const acts = c => `<div class="row"><b>${esc(c.name)}:</b>${gm && c.enemy ? '<button class="own" data-a="ai">IA decide</button>' : ''}<button data-a="act" data-id="${c.id}" data-skill="atk">Ataque</button>${c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => { const s = S.skills[k];
       return `<button data-a="act" data-id="${c.id}" data-skill="${k}" title="${esc(desc(s))}" ${c[s.res] < s.cost || (s.limit && c.limit < 100) || c.st.silence || c.st.fury ? 'disabled' : ''}>${esc(s.name)}</button>`; }).join('')}
       ${Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons').map(([k, q]) => `<button class="item" data-a="use" data-id="${c.id}" data-item="${k}">${esc(S.items[k].name)} ×${q}</button>`).join('')}
-      <button data-a="next">Passar</button></div><small>Clique em uma unidade para escolher o alvo.</small>`;
+      <button data-a="next">Passar</button></div><small>Clique em uma unidade para escolher o alvo.</small>${aimBox()}`;
   return `<section class="battle"><div class="tl">${tl.map((id, i) => `<span class="${i ? '' : 'cur'}" style="--c:${esc(S.chars[id].color)}">${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="sides"><div>${side(true)}</div><i>VS</i><div>${side(false)}</div></div>${cur && mine(cur) ? acts(cur) : ''}</section>`;
+    <div class="sides"><div>${side(true)}</div><i>VS</i><div>${side(false)}</div></div>${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {
@@ -107,6 +121,7 @@ function sheet(c) {
     st: () => `<div class="row">${inp('name', c.name, 'text')}${inp('color', c.color, 'color')}${own ? `<label class="up">Retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label>` : ''}</div>
       ${['hp', 'aura', 'san'].map(k => `${bar(k, c)}<div class="row">${inp(k, c[k])}/ <b class="val">${c[k + 'Max']}</b>${gm ? `<small>bônus</small>${inp('bon.' + k + 'Max', c.bon[k + 'Max'])}` : ''}</div>`).join('')}
       ${S.camp.open && !c.enemy ? `<div class="row chips"><b>Acampamento:</b>${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" ${own ? `data-a="campAct" data-id="${c.id}" data-k="${k}"` : ''}>${l}</span>`)}</div>` : ''}
+      ${bodyFig(c, gm ? 'gm' : '')}
       ${bar('limit', c)}<div class="row">${inp('limit', c.limit)}% · Mod. da rolagem <input type="number" class="mod" data-mid="${c.id}" value="${mods[c.id] || 0}" ${ed}></div>
       <div class="attrs">${A.map(a => `<div class="${c.marks[a] ? 'mk' : ''}"><button data-a="roll" data-id="${c.id}" data-attr="${a}" ${ed}>${a}</button>${gin('attrs.' + a, c.attrs[a])}</div>`).join('')}</div>
       <div class="row">Arma ${gin('arma', eq(c, 'arma')?.power ?? c.arma)} Armadura ${gin('armor', c.armor)}${eq(c, 'armadura') ? `<small>+${eq(c, 'armadura').power}</small>` : ''} Ouro ${gin('gold', c.gold)}</div>
@@ -127,31 +142,53 @@ function sheet(c) {
     <div class="tabs">${chips(TABS, (k, l) => `<span class="${k === tab ? 'on' : ''}" data-tab="${k}" data-id="${c.id}">${l}</span>`)}</div>${body[tab]()}</div>`;
 }
 
+// tela do jogador em batalha: barras, figura de corpo e menu de comando
+function command(c, cur) {
+  const my = cur === c, inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead), tl = timeline(5).slice(1).map(id => esc(S.chars[id].name)).join(' › ');
+  const skb = k => { const s = S.skills[k]; return `<button data-a="act" data-id="${c.id}" data-skill="${k}" ${c[s.res] < s.cost || (s.limit && c.limit < 100) || c.st.silence || c.st.fury ? 'disabled' : ''}>${esc(s.name)}<small>${esc(desc(s))}</small></button>`; };
+  const menu = sub === 'sk' ? c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(skb).join('') + '<button class="back" data-sub="">Voltar</button>'
+    : sub === 'it' ? Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons').map(([k, q]) => `<button data-a="use" data-id="${c.id}" data-item="${k}">${esc(S.items[k].name)} ×${q}<small>+${S.items[k].power} ${L[S.items[k].eff]}</small></button>`).join('') + '<button class="back" data-sub="">Voltar</button>'
+    : `<button class="atk" data-a="act" data-id="${c.id}" data-skill="atk">Atacar</button><button data-sub="sk">Skills</button><button data-sub="it">Itens</button><button class="back" data-a="next">Passar</button>`;
+  return `<section class="cmd" style="--c:${esc(c.color)}"><div class="turn ${my ? 'me' : ''}">${my ? 'Seu turno' : 'Turno de ' + esc(cur?.name || '—')}</div><small class="nextup">Próximos: ${tl}</small>
+    <div class="cmd-top" data-tgt="${c.id}"><div class="cmd-bars"><h2>${esc(c.name)}</h2>${bar('hp', c)}${bar('aura', c)}${bar('san', c)}${bar('limit', c)}<em>${c.hp > 0 ? stList(c) : c.dead ? 'Morto' : `Caído ☠ ${c.dying || ''}`}</em></div>${bodyFig(c)}</div>
+    <div class="row chips"><b>Alvo:</b>${inB.sort((x, y) => y.enemy - x.enemy).map(o => `<span class="${o.id === tgt ? 'weak' : ''} ${o.hp > 0 ? '' : 'ko'}" data-tgt="${o.id}">${esc(o.name)}</span>`).join('')}</div>
+    ${aimBox()}${my ? `<div class="menu">${menu}</div>` : ''}</section>`;
+}
+
 function render() {
   const ae = document.activeElement;
-  if (drag || ae?.matches?.('#app select')) { pending = true; return; }
+  if (drag || wdrag || ae?.matches?.('#app select')) { pending = true; return; }
   pending = false;
-  // guarda o campo em edição para devolver foco e texto depois de redesenhar
+  // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
     sel: ae.tagName + Object.entries(ae.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, x => '-' + x.toLowerCase())}="${CSS.escape(v)}"]`).join('') } : null;
+  const scr = {}; app.querySelectorAll('.win').forEach(w => scr[w.dataset.win] = w.querySelector('.win-body').scrollTop);
   const b = S.battle.active, sc = S.scenes[S.scene], chars = Object.values(S.chars), on = v => v ? 'class="own"' : '';
-  const stage = (b ? battle() : '') + (!b || gm ? map() : '') + (gm && showEd ? editor(showEd) : '');
-  const controls = gm ? `<div class="panel"><div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button>
-      ${b ? '<button data-a="battle" data-win="1" class="own">Vitória</button><button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}
-      <button data-a="toggleEd" data-coll="skills" ${on(showEd === 'skills')}>Skills</button><button data-a="toggleEd" data-coll="items" ${on(showEd === 'items')}>Itens/Loja</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button></div>
-      <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button>${S.camp.open ? '<small>Jogadores escolhem ações; o descanso longo encerra.</small>' : ''}</div>
+  const sheets = chars.filter(mine).map(sheet).join('');
+  const log = `${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log" aria-live="polite">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div>`;
+  if (gm) {
+    const cena = `<div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button></div>
+      <div class="row">${b ? '<button data-a="battle" data-win="1" class="own">Vitória</button><button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
+      <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button></div>
       <div class="row chips">Bestiário: ${chips(S.bestiary, (id, m) => `<span data-a="bSpawn" data-id="${id}" title="Clique: criar cópia · Shift+clique: apagar modelo">+ ${esc(m.name)}</span>`) || '<small>salve um inimigo pela ficha</small>'}</div>
       <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span></div>
-      <div class="row"><input data-map="name" value="${esc(sc.name)}"><input type="number" data-map="cols" value="${sc.cols}">×<input type="number" data-map="rows" value="${sc.rows}"></div>
-      <div class="row"><input data-map="bg" placeholder="URL da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar mapa<input type="file" accept="image/*" data-up="bg"></label></div>
-      <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift para esconder.</small>` : ''}</div>
-      <textarea data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea></div>`
-    : role === 'player' ? `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div></div>` : '';
-  const sheets = role === 'table' ? '' : chars.filter(mine).map(sheet).join('');
-  const log = `<div class="panel">${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log" aria-live="polite">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div></div>`;
-  app.innerHTML = `<main>${stage}</main><aside>${controls}${log}${sheets}</aside>`;
-  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt]').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
+      <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"><input aria-label="Colunas" type="number" data-map="cols" value="${sc.cols}">×<input aria-label="Linhas" type="number" data-map="rows" value="${sc.rows}"></div>
+      <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="URL da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar mapa<input type="file" accept="image/*" data-up="bg"></label></div>
+      <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
+      <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
+    const body = { cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
+    app.innerHTML = `<main>${map()}</main>${chips(WIN, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${w}px"><header data-drag="${id}"><span>${title}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${title}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
+      <nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}</nav>`;
+  } else if (role === 'player') {
+    const my = chars.filter(mine), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(c => c.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB[0];
+    const hud = my.map(c => `<div class="hud" data-pv="ficha" style="--c:${esc(c.color)}"><b>${esc(c.name)}</b>${bar('hp', c)}${bar('aura', c)}${bar('san', c)}</div>`).join('');
+    const view = pv === 'ficha' ? `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div></div>${sheets}`
+      : pv === 'chat' ? `<div class="panel">${log}</div>` : actor ? command(actor, cur) : (b ? battle() : map()) + `<div class="huds">${hud}</div>`;
+    app.innerHTML = `<main class="pv">${view}</main><nav class="dock">${chips({ cena: b ? 'Batalha' : 'Mesa', ficha: 'Ficha', chat: 'Chat' }, (k, l) => `<button data-pv="${k}" ${on(pv === k)}>${l}</button>`)}</nav>`;
+  } else app.innerHTML = `<main>${b ? battle() : map()}</main>`;
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
+  app.querySelectorAll('.win').forEach(w => w.querySelector('.win-body').scrollTop = scr[w.dataset.win] || 0);
+  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],.hud').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   fx();
 }
 
@@ -168,6 +205,10 @@ function fx() {
     s.textContent = e.fx.heal ? '+' + e.fx.heal : e.fx.miss ? 'ERROU' : (e.fx.crit ? 'CRÍTICO ' : '') + '−' + e.fx.dmg;
     el.style.setProperty('--fx', ELC[e.fx.el] || '#fff'); el.append(s);
     if (e.fx.dmg) el.classList.add('hit');
+  }
+  if (role === 'table' && news.length) { // legenda cinemática temporária no lugar do log
+    document.querySelector('.caption')?.remove(); clearTimeout(capT);
+    const e = news.at(-1), cp = document.createElement('div'); cp.className = 'caption'; cp.innerHTML = `<b>${esc(e.who)}</b> ${esc(e.text)}`; document.body.append(cp); capT = setTimeout(() => cp.remove(), 6000);
   }
   if (cur && cur.id !== lastCur) { const bn = document.createElement('div'); bn.className = 'banner'; bn.textContent = 'Turno de ' + cur.name; bn.style.setProperty('--c', cur.color); document.body.append(bn); setTimeout(() => bn.remove(), 1400); }
   lastCur = cur?.id;
@@ -186,7 +227,7 @@ app.addEventListener('change', e => {
   else if (d.mid) mods[d.mid] = v;
 });
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open]')) { e.preventDefault(); e.target.click(); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open],[data-aim]')) { e.preventDefault(); e.target.click(); }
 });
 app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.chat && e.target.value.trim()) { send({ t: 'chat', text: e.target.value, secret }); e.target.value = ''; } });
 app.addEventListener('focusout', e => {
@@ -201,23 +242,37 @@ app.addEventListener('click', e => {
   if (op) { open[op.dataset.open] = !(open[op.dataset.open] ?? !gm); return render(); }
   const nd = e.target.closest('[data-node]');
   if (nd) { selNode[nd.dataset.id] = nd.dataset.node; return render(); }
-  if (!d && u) { tgt = u.dataset.tgt; return render(); }
+  const am = e.target.closest('[data-aim]'), sb = e.target.closest('[data-sub]'), pvb = e.target.closest('[data-pv]');
+  if (am) { aim = aim === am.dataset.aim ? null : am.dataset.aim; return render(); }
+  if (sb) { sub = sb.dataset.sub || null; return render(); }
+  if (pvb) { pv = pvb.dataset.pv; return render(); }
+  if (!d && u) { if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
-  if (d.a === 'toggleEd') { showEd = showEd === d.coll ? null : d.coll; return render(); }
+  if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
   if (d.a === 'fogMode') { fogMode = !fogMode; return render(); }
   if (d.a === 'secret') { secret = !secret; return render(); }
   if (d.a === 'logout') { ['vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); return location.reload(); }
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return alert('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
-  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
+  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
   if (d.a === 'addChar' && gm && !d.enemy) m.owner = prompt('Nome do jogador dono?') || '';
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;
   send(m);
+  if (d.a === 'act' || d.a === 'use' || d.a === 'next') { aim = null; sub = null; }
 });
 // mapa: pincel de névoa (mestre) e arrastar tokens
 const cell = (e, el) => { const r = el.getBoundingClientRect(), m = S.scenes[S.scene]; return { x: Math.floor((e.clientX - r.left) / r.width * m.cols), y: Math.floor((e.clientY - r.top) / r.height * m.rows) }; };
 const paint = e => { const mp = e.target.closest?.('.map'); if (!mp) return; const c = cell(e, mp), k = c.x + ',' + c.y + e.shiftKey; if (k !== lastFog) { lastFog = k; send({ t: 'fog', ...c, hide: e.shiftKey }); } };
+app.addEventListener('pointerdown', e => { // arrastar janelas do mestre pela barra de título
+  const h = e.target.closest('[data-drag]');
+  if (!h || e.target.closest('button')) return;
+  const el = h.parentElement, r = el.getBoundingClientRect();
+  wdrag = { id: h.dataset.drag, el, dx: e.clientX - r.left, dy: e.clientY - r.top }; h.setPointerCapture(e.pointerId);
+});
+app.addEventListener('pointermove', e => { if (wdrag) { wdrag.el.style.left = Math.max(0, e.clientX - wdrag.dx) + 'px'; wdrag.el.style.top = Math.max(0, e.clientY - wdrag.dy) + 'px'; } });
+const wdrop = () => { if (!wdrag) return; Object.assign(wins[wdrag.id], { x: parseInt(wdrag.el.style.left), y: parseInt(wdrag.el.style.top) }); localStorage.vj_wins = JSON.stringify(wins); wdrag = null; if (pending) render(); };
+app.addEventListener('pointerup', wdrop); app.addEventListener('pointercancel', wdrop);
 app.addEventListener('pointerdown', e => {
   if (gm && fogMode && S.scenes[S.scene].fogOn) { lastFog = ''; return paint(e); }
   const t = e.target.closest('.tok.mine');

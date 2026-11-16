@@ -22,9 +22,12 @@ const DOT = ['burn', 'bleed', 'poison', 'rad'];
 const STK = [...DOT, 'down', 'stun', 'sleep', 'para', 'silence', 'atkUp', 'atkDn', 'defUp', 'defDn', 'agiUp', 'agiDn', 'fear', 'fury', 'confuse'];
 const ITYPES = ['cons', 'arma', 'armadura', 'acess'];
 const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
+// partes do corpo: atributos penalizados (−10 cada enquanto crítica), status ao ficar crítica, penalidade para mirar, peso no sorteio
+const BODY = { head: [['INT', 'SAB'], 'stun', 30, 6], torso: [['CON'], 'bleed', 0, 40], armL: [['FOR', 'DES'], 'atkDn', 15, 15], armR: [['FOR', 'DES'], 'atkDn', 15, 15], legL: [['AGI'], 'agiDn', 15, 12], legR: [['AGI'], 'agiDn', 15, 12] };
+const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: 'braço esq.', armR: 'braço dir.', legL: 'perna esq.', legR: 'perna dir.' };
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR']); // campos numéricos que só o mestre altera
-const EXTRA = { bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, per: {}, bio: '', gmNote: '', xpR: 0, goldR: 0 };
+const EXTRA = { body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, per: {}, bio: '', gmNote: '', xpR: 0, goldR: 0 };
 const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
@@ -125,9 +128,12 @@ const okUrl = v => /^(https?:\/\/[^\s'"()<>]+|\/uploads\/[\w.]+)$/.test(v);
 const can = (c, ch) => ch && (c.role === 'gm' || (c.role === 'player' && ch.owner === c.name));
 const scene = () => S.scenes[S.scene];
 const eq = (ch, slot) => S.items[ch.equip[slot]];
-const at = (ch, a) => ch.attrs[a] + (eq(ch, 'acess')?.attr === a ? eq(ch, 'acess').power : 0);
+const at0 = (ch, a) => ch.attrs[a] + (eq(ch, 'acess')?.attr === a ? eq(ch, 'acess').power : 0);
+const lvl = (ch, k) => { const d = ch.body[k] || 0; return d >= ch.hpMax * .3 ? 2 : d >= ch.hpMax * .15 ? 1 : 0; }; // 0 ileso, 1 ferido, 2 crítico
+const at = (ch, a) => at0(ch, a) - 10 * PARTS.filter(k => BODY[k][0].includes(a) && lvl(ch, k) === 2).length;
+const healBody = (ch, v) => { while (v > 0) { const k = PARTS.filter(p => ch.body[p] > 0).sort((x, y) => ch.body[y] - ch.body[x])[0]; if (!k) break; const d = Math.min(v, ch.body[k]); ch.body[k] -= d; v -= d; } };
 // máximos derivados dos atributos (+ bônus de passivas/mestre); valores atuais nunca passam do máximo
-const BASE = { hpMax: ch => Math.floor(at(ch, 'CON') / 2) + 10, auraMax: ch => Math.floor((at(ch, 'INT') + at(ch, 'SAB')) / 4), sanMax: ch => Math.floor(at(ch, 'SAB') / 2) + Math.floor(at(ch, 'CAR') / 4) };
+const BASE = { hpMax: ch => Math.floor(at0(ch, 'CON') / 2) + 10, auraMax: ch => Math.floor((at0(ch, 'INT') + at0(ch, 'SAB')) / 4), sanMax: ch => Math.floor(at0(ch, 'SAB') / 2) + Math.floor(at0(ch, 'CAR') / 4) };
 const derive = ch => { for (const k in BASE) { ch[k] = Math.max(1, BASE[k](ch) + (ch.bon[k] || 0)); const c = k.slice(0, -3); ch[c] = Math.min(ch[c], ch[k]); } };
 const evolveCh = ch => { const up = Object.keys(ch.marks).filter(a => d100() > ch.attrs[a] && ch.attrs[a] < 100); up.forEach(a => ch.attrs[a]++); ch.marks = {}; return up; };
 const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
@@ -174,16 +180,16 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
   }
 }
 
-function strike(a, s, t) {
+function strike(a, s, t, aim) {
   const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${s.st}]` : '';
   if (s.kind === 'heal') {
     const v = Math.max(1, s.power + Math.floor(stat / 5));
-    t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying;
+    t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v);
     if (s.st) t.st[s.st] = 3;
     log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok', { fx: { id: t.id, heal: v } });
     return false;
   }
-  const chance = int(stat + 30 - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0), 5, 95), r = d100();
+  const chance = int(stat + 30 - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0) - (aim ? BODY[aim][2] : 0), 5, 95), r = d100();
   if (r > chance) {
     if (r >= 96) addLimit(a, 20);
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, fx: { id: t.id, miss: 1 } });
@@ -194,9 +200,18 @@ function strike(a, s, t) {
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / 5) - (mental ? 0 : t.armor + (eq(t, 'armadura')?.power || 0))) * mult));
   a.marks[s.attr] = true;
   let extra = '';
-  if (mental) t.san = Math.max(0, t.san - d); else extra = hurt(t, d);
+  let part = '';
+  if (mental) t.san = Math.max(0, t.san - d);
+  else { // localiza o golpe: parte mirada ou sorteio ponderado
+    let roll = Math.random() * 100;
+    part = aim || PARTS.find(k => (roll -= BODY[k][3]) < 0) || 'torso';
+    const was = lvl(t, part);
+    t.body[part] = (t.body[part] || 0) + d;
+    extra = hurt(t, d);
+    if (t.hp > 0 && was < 2 && lvl(t, part) === 2) { t.st[BODY[part][1]] = 3; extra += ` ${PL[part]} em estado crítico!`; }
+  }
   if (t.hp > 0) { if (s.st) t.st[s.st] = 3; if (down) t.st.down = 1; }
-  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ''}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, fx: { id: t.id, dmg: d, crit, el: s.el } });
+  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, fx: { id: t.id, dmg: d, crit, el: s.el } });
   return down;
 }
 
@@ -259,6 +274,7 @@ const H = {
     else if (ch.resist.includes(m.el)) ch.resist = ch.resist.filter(e => e !== m.el);
     else ch.weak.push(m.el);
   },
+  part(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch && PARTS.includes(m.k)) ch.body[m.k] = lvl(ch, m.k) ? 0 : Math.ceil(ch.hpMax * .3); }, // mestre cura ou fere uma parte
   st(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch && STK.includes(m.k)) { if (ch.st[m.k]) delete ch.st[m.k]; else ch.st[m.k] = 3; } },
   // ----- cenas -----
   map(c, m) {
@@ -318,7 +334,8 @@ const H = {
     const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
     const ts = s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : t0];
     let more = false;
-    for (const t of ts) if (!t.dead) more = strike(a, s, t) || more;
+    const aim = !s.area && !heal && PARTS.includes(m.aim) ? m.aim : null;
+    for (const t of ts) if (!t.dead) more = strike(a, s, t, aim) || more;
     if (more && a.hp > 0) log(a.name, 'acertou a fraqueza — MAIS UM turno!', 'ok'); else endTurn(a.id, s.ct);
   },
   learn(c, m) {
@@ -352,7 +369,7 @@ const H = {
     if (inB && current() !== ch.id) return;
     const t = inB && S.chars[m.target] && m.target in S.battle.ticks ? S.chars[m.target] : ch;
     if (t.dead) return;
-    if (i.eff === 'hp') delete t.dying;
+    if (i.eff === 'hp') { delete t.dying; healBody(t, i.power); }
     t[i.eff] = Math.min(t[i.eff + 'Max'], t[i.eff] + i.power);
     H.drop(c, m);
     log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (+${i.power} ${i.eff.toUpperCase()})`, 'ok');
@@ -366,6 +383,7 @@ const H = {
     const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), long = !!m.long, notes = [];
     for (const p of pcs) {
       p.aura = p.auraMax; p.hp = long ? p.hpMax : Math.min(p.hpMax, p.hp + Math.ceil(p.hpMax / 2)); delete p.dying;
+      for (const k of PARTS) p.body[k] = long ? 0 : Math.floor((p.body[k] || 0) / 2);
       if (long) { p.st = {}; const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }
     }
     if (long && S.camp.open) {

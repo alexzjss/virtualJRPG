@@ -85,3 +85,40 @@ body.off::after{content:"Reconectando…";position:fixed;left:50%;bottom:16px;tr
 aside{position:sticky;top:0;max-height:100vh;overflow:auto;padding-right:6px}
 @media(max-width:900px){aside{position:static;max-height:none;overflow:visible}body[data-role=player] main{order:2}}
 @media(max-width:600px){button,.tabs span{min-height:40px}input{min-height:36px;font-size:16px}.attrs{gap:4px}}
+/* ---- direção A: janelas do mestre, comando do jogador, mesa cinemática, corpo ---- */
+h1,button,.tabs span,.tl span,.sheet h3,.float,.banner,.turn,.cmd h2,.win header{font-family:Anton,Impact,"Arial Narrow Bold",sans-serif;font-style:normal;font-weight:400;letter-spacing:.5px}
+#app{display:block;padding:12px}main{display:block}
+.dock{position:fixed;left:50%;bottom:12px;transform:translateX(-50%) skewX(-10deg);display:flex;gap:4px;background:var(--ink);padding:6px;box-shadow:6px 6px 0 var(--red);z-index:30}
+.dock button{transform:none;min-height:44px;padding:8px 16px;font-size:15px}
+body[data-role=gm] #app{padding:0}body[data-role=gm] .map{max-width:calc((100vh - 20px)*var(--cols)/var(--rows))}
+body[data-role=gm] h1{position:fixed;z-index:25;font-size:22px;padding:6px 26px 6px 18px}
+.win{position:absolute;z-index:20;background:#0b0b0df2;box-shadow:8px 8px 0 #000;max-width:calc(100vw - 8px)}
+.win header{display:flex;justify-content:space-between;align-items:center;background:var(--paper);color:var(--ink);padding:2px 4px 2px 12px;text-transform:uppercase;font-size:16px;cursor:move;touch-action:none;user-select:none}
+.win header button{transform:none;background:var(--ink);color:#fff;min-height:28px;padding:0 10px}
+.win-body{padding:10px;max-height:min(70vh,640px);overflow:auto;display:flex;flex-direction:column;gap:10px}.win-body .battle,.win-body .editor{margin:0;box-shadow:none}
+.body{display:flex;gap:10px;align-items:center}.body svg{width:92px;height:200px;flex:none}.body small{color:#ffc34d;font-size:12px;line-height:1.5}
+.body svg *{stroke:var(--ink);stroke-width:3;fill:#f4f4f4}.body .l1{fill:#f2b500}.body .l2{fill:#5a0008;stroke:#fff}
+.body [data-aim],.body [data-a]{cursor:pointer}.body .aim{stroke:var(--red);stroke-width:7}
+.aimrow{display:flex;gap:12px;align-items:center;background:#000a;padding:8px;margin-top:8px}.aimrow .body svg{width:64px;height:140px}.aimrow .body small{display:none}
+.pv{padding-bottom:84px;display:flex;flex-direction:column;gap:12px;max-width:760px;margin:0 auto}
+body[data-role=player] .dock{left:0;right:0;transform:none;box-shadow:0 -4px 0 var(--red)}body[data-role=player] .dock button{flex:1}
+.huds{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.hud{background:#131318;border-top:5px solid var(--c);padding:8px;cursor:pointer}
+.cmd{display:flex;flex-direction:column;gap:8px}
+.turn{align-self:flex-start;background:#26262e;padding:8px 34px 8px 16px;font-size:24px;text-transform:uppercase;clip-path:polygon(0 0,100% 0,88% 100%,0 100%)}.turn.me{background:var(--paper);color:var(--ink)}
+.cmd-top{display:flex;gap:12px;align-items:flex-start;cursor:pointer}.cmd-bars{flex:1}.cmd h2{margin:0 0 6px;font-size:40px;line-height:1;text-transform:uppercase}.cmd .bar{height:22px}.cmd em{color:#ffc34d;font-style:normal;font-weight:700}
+.cmd-top .body{flex-direction:column;align-items:flex-start}.cmd-top .body svg{width:130px;height:282px}
+.menu{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.menu button{min-height:52px;text-align:left;font-size:22px;padding:6px 20px;display:flex;flex-direction:column;justify-content:center}
+.menu button:nth-child(2){margin-left:12px}.menu button:nth-child(3){margin-left:24px}.menu button:nth-child(n+4){margin-left:36px}
+.menu small{font:500 12px "Trebuchet MS",sans-serif;text-transform:none;letter-spacing:0}
+.menu .atk{background:var(--red);color:#fff;min-height:58px;font-size:28px;box-shadow:6px 6px 0 #fff}.menu .back{background:#26262e;color:#fff}
+.chips .ko{opacity:.4}
+body[data-role=table] h1{display:none}body[data-role=table] #app{padding:0}
+body[data-role=table] .map{max-width:calc(100vh*var(--cols)/var(--rows))}
+body[data-role=table] .battle{background:none;border:0;box-shadow:none;padding:28px 5vw;min-height:100vh;box-sizing:border-box}
+body[data-role=table] .tl span{font-size:22px;padding:8px 22px}body[data-role=table] .tl .cur{font-size:40px;background:var(--paper);color:var(--ink);opacity:1;box-shadow:6px 6px 0 var(--c)}
+body[data-role=table] .sides{margin-top:6vh;gap:6vw}body[data-role=table] .unit{font-size:22px;padding:14px 18px;margin:16px 0}body[data-role=table] .unit img{width:110px;height:110px}body[data-role=table] .bar{height:20px}
+.caption{position:fixed;left:50%;bottom:36px;transform:translateX(-50%) skewX(-10deg);max-width:86vw;background:var(--paper);color:var(--ink);padding:14px 36px;font:700 24px "Trebuchet MS",sans-serif;box-shadow:8px 8px 0 var(--red);z-index:45;animation:cap 6s forwards}
+.caption b{font:400 24px Anton,Impact,sans-serif;text-transform:uppercase;margin-right:10px}
+@keyframes cap{0%{opacity:0;translate:0 20px}6%,88%{opacity:1;translate:0}100%{opacity:0}}
+.cmd-top .body svg{width:96px;height:208px}.cmd h2{font-size:34px}.menu{gap:6px}.menu button{min-height:48px}.menu .atk{min-height:52px}
