@@ -42,3 +42,11 @@ select{background:#1c1c22;color:#fff;border:1px solid #444;font:inherit}
 .grid .own{background:#ffe600}.grid .lock{background:#333;color:#999;cursor:default}
 button:disabled{opacity:.4;cursor:default}
 .editor{margin-top:16px;overflow:auto;--c:#ffe600}.editor td{padding:1px}.editor th{font-size:11px;text-align:left}.editor input[type=text]{width:150px}.editor input[type=number]{width:48px}
+.fog{position:absolute;left:calc(var(--x)*100%/var(--cols));top:calc(var(--y)*100%/var(--rows));width:calc(100%/var(--cols) + 1px);height:calc(100%/var(--rows) + 1px);background:#050507;pointer-events:none}
+body[data-role=gm] .fog{opacity:.55}.map.fogging{cursor:crosshair}.map.fogging .tok{pointer-events:none}
+.tok{background-size:cover;background-position:center}
+.unit{display:flex;gap:8px;align-items:center}.unit>div{flex:1}.unit img{width:52px;height:52px;object-fit:cover;border:2px solid var(--c)}
+.sheet h3 img{width:36px;height:36px;object-fit:cover;vertical-align:middle;margin-right:8px;border:2px solid var(--c)}
+.up{font-size:12px;background:#333;padding:4px 8px;cursor:pointer}.up input{display:none}
+button.own{background:#ffe600}button.item{background:#9be7a5}
+.inv{justify-content:space-between;margin:2px 0}.inv span{flex:1}
