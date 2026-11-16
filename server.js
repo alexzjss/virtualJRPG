@@ -22,7 +22,9 @@ const DOT = ['burn', 'bleed', 'poison', 'rad'];
 const STK = [...DOT, 'down', 'stun', 'sleep', 'para', 'silence', 'atkUp', 'atkDn', 'defUp', 'defDn', 'agiUp', 'agiDn', 'fear', 'fury', 'confuse'];
 const ITYPES = ['cons', 'arma', 'armadura', 'acess'];
 const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
-const EXTRA = { per: {}, bio: '', gmNote: '', xpR: 0, goldR: 0 };
+const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
+const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR']); // campos numéricos que só o mestre altera
+const EXTRA = { bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, per: {}, bio: '', gmNote: '', xpR: 0, goldR: 0 };
 const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
@@ -73,7 +75,7 @@ const newScene = (name, o = {}) => ({ name, cols: 20, rows: 12, bg: '', fogOn: f
 if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; delete S.map; }
 S.skills ??= genGrid();
 S.items ??= Object.fromEntries(ITEMS.map((s, i) => ['i' + i, s]));
-Object.assign(S, { seq: 0, users: {}, bestiary: {}, shop: { open: false, stock: [] }, ...S });
+Object.assign(S, { camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, shop: { open: false, stock: [] }, ...S });
 for (const ch of Object.values(S.chars)) Object.assign(ch, { ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
 
 // ---------- http ----------
@@ -112,7 +114,7 @@ const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ..
 const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, scenes: strip(S.scenes), chars: strip(S.chars),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 const sendState = c => c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
-const push = () => { wss.clients.forEach(sendState); save(); };
+const push = () => { Object.values(S.chars).forEach(derive); wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -124,6 +126,10 @@ const can = (c, ch) => ch && (c.role === 'gm' || (c.role === 'player' && ch.owne
 const scene = () => S.scenes[S.scene];
 const eq = (ch, slot) => S.items[ch.equip[slot]];
 const at = (ch, a) => ch.attrs[a] + (eq(ch, 'acess')?.attr === a ? eq(ch, 'acess').power : 0);
+// máximos derivados dos atributos (+ bônus de passivas/mestre); valores atuais nunca passam do máximo
+const BASE = { hpMax: ch => Math.floor(at(ch, 'CON') / 2) + 10, auraMax: ch => Math.floor((at(ch, 'INT') + at(ch, 'SAB')) / 4), sanMax: ch => Math.floor(at(ch, 'SAB') / 2) + Math.floor(at(ch, 'CAR') / 4) };
+const derive = ch => { for (const k in BASE) { ch[k] = Math.max(1, BASE[k](ch) + (ch.bon[k] || 0)); const c = k.slice(0, -3); ch[c] = Math.min(ch[c], ch[k]); } };
+const evolveCh = ch => { const up = Object.keys(ch.marks).filter(a => d100() > ch.attrs[a] && ch.attrs[a] < 100); up.forEach(a => ch.attrs[a]++); ch.marks = {}; return up; };
 const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
 // CTB: quanto maior a AGI, menor o intervalo entre turnos
 const delay = ch => Math.round(1000 / Math.max(1, at(ch, 'AGI') * (ch.st.agiUp ? 1.25 : 1) * (ch.st.agiDn ? .75 : 1)));
@@ -194,20 +200,23 @@ function strike(a, s, t) {
   return down;
 }
 
-const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, hp: 1, hpMax: 1, aura: 1, auraMax: 1, san: 1, sanMax: 1, x: 1, y: 1 };
+const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, hp: 1, aura: 1, san: 1, x: 1, y: 1 };
 const H = {
   addChar(c, m) {
     if (c.role !== 'gm' && c.role !== 'player') return;
     const enemy = c.role === 'gm' && !!m.enemy, id = rid();
     S.chars[id] = { id, name: enemy ? 'Inimigo' : 'Herói', owner: enemy ? '' : (c.role === 'gm' ? String(m.owner || '').trim().slice(0, 30) : c.name), enemy,
-      color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, 40])), marks: {}, hp: 30, hpMax: 30, aura: 20, auraMax: 20, san: 40, sanMax: 40,
+      color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, 40])), marks: {}, hp: 999, aura: 999, san: 999,
       limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} };
   },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
     const ch = S.chars[m.id], f = String(m.f);
     if (!can(c, ch)) return;
-    if (f.startsWith('attrs.') && ATTRS.includes(f.slice(6))) ch.attrs[f.slice(6)] = int(m.v, 1, 100);
+    const g = c.role === 'gm';
+    if (f.startsWith('attrs.')) { if (g && ATTRS.includes(f.slice(6))) ch.attrs[f.slice(6)] = int(m.v, 1, 100); } // o mestre define os atributos
+    else if (f.startsWith('bon.')) { if (g && Object.hasOwn(BASE, f.slice(4))) ch.bon[f.slice(4)] = int(m.v, -999, 999); }
+    else if (GMF.has(f) && !g) return;
     else if (f === 'limit') ch.limit = int(m.v, 0, 100);
     else if (NUM[f]) { ch[f] = int(m.v); if (f === 'hp' && ch.hp > 0) { delete ch.dead; delete ch.dying; } }
     else if (f === 'name') ch.name = String(m.v).slice(0, 30) || '?';
@@ -233,9 +242,7 @@ const H = {
   evolve(c, m) {
     const ch = S.chars[m.id];
     if (c.role !== 'gm' || !ch) return;
-    const up = Object.keys(ch.marks).filter(a => d100() > ch.attrs[a] && ch.attrs[a] < 100);
-    up.forEach(a => ch.attrs[a]++);
-    ch.marks = {};
+    const up = evolveCh(ch);
     log(ch.name, up.length ? `evoluiu ${up.join(', ')} (+1)` : 'não evoluiu desta vez', 'ok');
   },
   horror(c, m) {
@@ -322,7 +329,7 @@ const H = {
     if (s.kind === 'passive') { // passivas aplicam o bônus de forma permanente
       if (s.pas === 'res') { if (!ch.resist.includes(s.el)) ch.resist.push(s.el); ch.weak = ch.weak.filter(e => e !== s.el); }
       else if (ATTRS.includes(s.pas)) ch.attrs[s.pas] = Math.min(100, ch.attrs[s.pas] + s.power);
-      else { ch[s.pas] += s.power; ch[s.pas.slice(0, -3)] += s.power; }
+      else { ch.bon[s.pas] += s.power; ch[s.pas.slice(0, -3)] += s.power; }
     }
     log(ch.name, `aprendeu ${s.name}`, 'ok');
   },
@@ -350,6 +357,28 @@ const H = {
     H.drop(c, m);
     log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (+${i.power} ${i.eff.toUpperCase()})`, 'ok');
     if (inB) endTurn(ch.id);
+  },
+  // ----- descanso e acampamento -----
+  camp(c, m) { if (c.role === 'gm') S.camp = { open: !!m.on, acts: {} }; },
+  campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && CAMP.includes(m.k)) S.camp.acts[m.id] = m.k; },
+  rest(c, m) { // Sanidade não volta com descanso: só itens, skills, "conversar" no acampamento ou o mestre
+    if (c.role !== 'gm' || S.battle.active) return;
+    const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), long = !!m.long, notes = [];
+    for (const p of pcs) {
+      p.aura = p.auraMax; p.hp = long ? p.hpMax : Math.min(p.hpMax, p.hp + Math.ceil(p.hpMax / 2)); delete p.dying;
+      if (long) { p.st = {}; const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }
+    }
+    if (long && S.camp.open) {
+      for (const [id, k] of Object.entries(S.camp.acts)) {
+        const p = S.chars[id];
+        if (!p) continue;
+        if (k === 'vigiar') p.st.agiUp = 3; else if (k === 'cozinhar') pcs.forEach(o => o.st.atkUp = 3); else if (k === 'conversar') p.san = Math.min(p.sanMax, p.san + 5);
+        else if (k === 'treinar') p.xp += 5; else addLimit(p, 30);
+        notes.push(`${p.name}: ${k}`);
+      }
+      S.camp = { open: false, acts: {} };
+    }
+    log('Mestre', `${long ? 'Descanso longo: HP e Aura restaurados, condições removidas.' : 'Descanso curto: metade do HP e toda a Aura.'} ${notes.join(' · ')}`, 'ok');
   },
   // ----- loja -----
   shop(c, m) {

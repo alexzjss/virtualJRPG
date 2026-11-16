@@ -7,13 +7,14 @@ const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passi
 const ST = { down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
 const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório' };
 const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
+const CAMPL = { vigiar: 'Vigiar (AGI↑)', cozinhar: 'Cozinhar (grupo ATQ↑)', conversar: 'Conversar (+5 Sanidade)', treinar: 'Treinar (+5 XP)', meditar: 'Meditar (+30 Limite)' };
 const TABS = { st: 'Status', per: 'Perícias', sk: 'Skills', inv: 'Itens', bio: 'História' };
 const ED = {
   skills: [['Skill', 'name', 'text'], ['Tipo', 'kind', KIND], ['Elemento', 'el', EL], ['Atr.', 'attr', AO], ['Poder', 'power'], ['Custo', 'cost'], ['Recurso', 'res', RES], ['Status', 'st', { '': '—', ...ST }], ['Área', 'area', 'checkbox'], ['Tempo%', 'ct'], ['Passiva', 'pas', PASL], ['XP', 'xp'], ['X', 'gx'], ['Y', 'gy'], ['Lim.', 'limit', 'checkbox']],
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Restaura', 'eff', { hp: 'HP', aura: 'Aura', san: 'Sanidade' }], ['Atr. (acess.)', 'attr', AO], ['Preço', 'price']],
 };
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur = null;
-const mods = {}, tabs = {}, selNode = {};
+const mods = {}, tabs = {}, selNode = {}, open = {};
 const ask = (k, q) => localStorage[k] || (localStorage[k] = prompt(q) || '');
 const name = role === 'player' ? ask('vj_name', 'Seu nome de jogador? (sem espaços)') : '';
 const pass = role === 'player' ? ask('vj_pass_' + name, `Senha de ${name}? (no primeiro acesso, você está criando a senha)`) : '';
@@ -33,13 +34,13 @@ const chips = (obj, fn) => Object.entries(obj).map(([k, v]) => fn(k, v)).join(''
 
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
-  ws.onopen = () => send({ t: 'hello', role, name, pass, key });
+  ws.onopen = () => document.body.classList.remove('off') || send({ t: 'hello', role, name, pass, key });
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.t === 'state') { S = m.s; render(); }
     if (m.t === 'err') { alert(m.msg); if (m.bad) { ws.onclose = null; ['vj_key', 'vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); location.reload(); } }
   };
-  ws.onclose = () => setTimeout(connect, 1500);
+  ws.onclose = () => { document.body.classList.add('off'); setTimeout(connect, 1500); };
 }
 
 function timeline(n = 8) {
@@ -97,14 +98,18 @@ function editor(coll) {
 
 function sheet(c) {
   const own = mine(c), ed = own ? '' : 'disabled', tab = tabs[c.id] || 'st';
-  const inp = (f, v, type = 'number') => `<input type="${type}" data-id="${c.id}" data-f="${f}" value="${esc(v)}" ${ed}>`;
+  const inp = (f, v, type = 'number') => `<input type="${type}" aria-label="${f}" data-id="${c.id}" data-f="${f}" value="${esc(v)}" ${ed}>`;
+  const gin = (f, v) => gm ? inp(f, v) : `<b class="val">${v}</b>`; // campos que só o mestre edita
+  const isOpen = open[c.id] ?? !gm, head = `<h3 data-open="${c.id}" role="button" tabindex="0" aria-expanded="${isOpen}">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}${esc(c.name)} <small>${c.enemy ? 'NPC' : esc(c.owner)} · XP ${c.xp} ${stList(c)}</small><span class="caret">${isOpen ? '▾' : '▸'}</span></h3>`;
+  if (!isOpen) return `<div class="sheet shut" style="--c:${esc(c.color)}">${head}${bar('hp', c)}</div>`;
   const btn = (a, label, x = '') => `<button data-a="${a}" data-id="${c.id}" ${x}>${label}</button>`;
   const body = {
     st: () => `<div class="row">${inp('name', c.name, 'text')}${inp('color', c.color, 'color')}${own ? `<label class="up">Retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label>` : ''}</div>
-      ${['hp', 'aura', 'san'].map(k => `${bar(k, c)}<div class="row">${inp(k, c[k])}/ ${inp(k + 'Max', c[k + 'Max'])}</div>`).join('')}
+      ${['hp', 'aura', 'san'].map(k => `${bar(k, c)}<div class="row">${inp(k, c[k])}/ <b class="val">${c[k + 'Max']}</b>${gm ? `<small>bônus</small>${inp('bon.' + k + 'Max', c.bon[k + 'Max'])}` : ''}</div>`).join('')}
+      ${S.camp.open && !c.enemy ? `<div class="row chips"><b>Acampamento:</b>${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" ${own ? `data-a="campAct" data-id="${c.id}" data-k="${k}"` : ''}>${l}</span>`)}</div>` : ''}
       ${bar('limit', c)}<div class="row">${inp('limit', c.limit)}% · Mod. da rolagem <input type="number" class="mod" data-mid="${c.id}" value="${mods[c.id] || 0}" ${ed}></div>
-      <div class="attrs">${A.map(a => `<div class="${c.marks[a] ? 'mk' : ''}"><button data-a="roll" data-id="${c.id}" data-attr="${a}" ${ed}>${a}</button>${inp('attrs.' + a, c.attrs[a])}</div>`).join('')}</div>
-      <div class="row">Arma ${inp('arma', c.arma)} Armadura ${inp('armor', c.armor)} Ouro ${inp('gold', c.gold)}</div>
+      <div class="attrs">${A.map(a => `<div class="${c.marks[a] ? 'mk' : ''}"><button data-a="roll" data-id="${c.id}" data-attr="${a}" ${ed}>${a}</button>${gin('attrs.' + a, c.attrs[a])}</div>`).join('')}</div>
+      <div class="row">Arma ${gin('arma', eq(c, 'arma')?.power ?? c.arma)} Armadura ${gin('armor', c.armor)}${eq(c, 'armadura') ? `<small>+${eq(c, 'armadura').power}</small>` : ''} Ouro ${gin('gold', c.gold)}</div>
       <div class="row chips">${chips(EL, (k, l) => `<span class="${c.weak.includes(k) ? 'weak' : c.resist.includes(k) ? 'res' : ''}" ${gm ? `data-a="aff" data-id="${c.id}" data-el="${k}"` : ''} title="${c.weak.includes(k) ? 'Fraqueza' : c.resist.includes(k) ? 'Resistência' : 'Normal'}">${l}</span>`)}</div>
       ${gm ? `<div class="row chips">${chips(ST, (k, l) => `<span class="${c.st[k] ? 'weak' : ''}" data-a="st" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div>
       <div class="row">XP ${inp('xp', c.xp)}${c.enemy ? `Recompensa: XP ${inp('xpR', c.xpR)} Ouro ${inp('goldR', c.goldR)}` : ''}</div>
@@ -118,7 +123,7 @@ function sheet(c) {
       ${gm ? `<div class="row chips">Dar: ${chips(S.items, (k, i) => `<span data-a="give" data-id="${c.id}" data-item="${k}">+ ${esc(i.name)}</span>`)}</div>` : ''}`,
     bio: () => `<textarea data-id="${c.id}" data-f="bio" placeholder="História, aparência, anotações…" ${ed}>${esc(c.bio)}</textarea>${gm ? `<textarea data-id="${c.id}" data-f="gmNote" placeholder="Notas secretas do mestre">${esc(c.gmNote)}</textarea>` : ''}`,
   };
-  return `<div class="sheet" style="--c:${esc(c.color)}"><h3>${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}${esc(c.name)} <small>${c.enemy ? 'NPC' : esc(c.owner)} · XP ${c.xp} ${stList(c)}</small></h3>
+  return `<div class="sheet" style="--c:${esc(c.color)}">${head}
     <div class="tabs">${chips(TABS, (k, l) => `<span class="${k === tab ? 'on' : ''}" data-tab="${k}" data-id="${c.id}">${l}</span>`)}</div>${body[tab]()}</div>`;
 }
 
@@ -134,6 +139,7 @@ function render() {
   const controls = gm ? `<div class="panel"><div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button>
       ${b ? '<button data-a="battle" data-win="1" class="own">Vitória</button><button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}
       <button data-a="toggleEd" data-coll="skills" ${on(showEd === 'skills')}>Skills</button><button data-a="toggleEd" data-coll="items" ${on(showEd === 'items')}>Itens/Loja</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button></div>
+      <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button>${S.camp.open ? '<small>Jogadores escolhem ações; o descanso longo encerra.</small>' : ''}</div>
       <div class="row chips">Bestiário: ${chips(S.bestiary, (id, m) => `<span data-a="bSpawn" data-id="${id}" title="Clique: criar cópia · Shift+clique: apagar modelo">+ ${esc(m.name)}</span>`) || '<small>salve um inimigo pela ficha</small>'}</div>
       <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span></div>
       <div class="row"><input data-map="name" value="${esc(sc.name)}"><input type="number" data-map="cols" value="${sc.cols}">×<input type="number" data-map="rows" value="${sc.rows}"></div>
@@ -142,8 +148,9 @@ function render() {
       <textarea data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea></div>`
     : role === 'player' ? `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div></div>` : '';
   const sheets = role === 'table' ? '' : chars.filter(mine).map(sheet).join('');
-  const log = `<div class="panel">${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div></div>`;
+  const log = `<div class="panel">${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log" aria-live="polite">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div></div>`;
   app.innerHTML = `<main>${stage}</main><aside>${controls}${log}${sheets}</aside>`;
+  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt]').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
   fx();
 }
@@ -178,6 +185,9 @@ app.addEventListener('change', e => {
   else if (d.map) send({ t: 'map', f: d.map, v });
   else if (d.mid) mods[d.mid] = v;
 });
+app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open]')) { e.preventDefault(); e.target.click(); }
+});
 app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.chat && e.target.value.trim()) { send({ t: 'chat', text: e.target.value, secret }); e.target.value = ''; } });
 app.addEventListener('focusout', e => {
   // campo restaurado após redesenho não dispara "change" sozinho: dispara aqui para não perder a edição
@@ -187,6 +197,8 @@ app.addEventListener('focusout', e => {
 app.addEventListener('click', e => {
   const d = e.target.closest('[data-a]')?.dataset, u = e.target.closest('[data-tgt]'), tb = e.target.closest('[data-tab]');
   if (tb) { tabs[tb.dataset.id] = tb.dataset.tab; return render(); }
+  const op = e.target.closest('[data-open]');
+  if (op) { open[op.dataset.open] = !(open[op.dataset.open] ?? !gm); return render(); }
   const nd = e.target.closest('[data-node]');
   if (nd) { selNode[nd.dataset.id] = nd.dataset.node; return render(); }
   if (!d && u) { tgt = u.dataset.tgt; return render(); }
@@ -197,7 +209,7 @@ app.addEventListener('click', e => {
   if (d.a === 'logout') { ['vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); return location.reload(); }
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return alert('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
-  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, skill: d.skill, el: d.el, target: tgt, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
+  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
   if (d.a === 'addChar' && gm && !d.enemy) m.owner = prompt('Nome do jogador dono?') || '';
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;

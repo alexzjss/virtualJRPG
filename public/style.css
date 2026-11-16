@@ -71,3 +71,17 @@ textarea{width:100%;min-height:70px;margin:4px 0;background:#1c1c22;color:#fff;b
 .grid i.av{opacity:.6;outline:1px dashed #fff}.grid i.own{opacity:1;box-shadow:0 0 7px var(--e)}.grid i.sel{opacity:1;outline:2px solid #fff;outline-offset:1px}
 .node{background:#000a;padding:8px;border-left:4px solid var(--c)}
 .grid i.own{background:var(--e)}
+/* ---- polimento de UX ---- */
+:focus-visible{outline:3px solid #ffe600;outline-offset:2px}
+button,.tabs span,.up{min-height:32px}.chips span{padding:5px 8px;font-size:12px}
+.sheet h3{cursor:pointer;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sheet h3 .caret{margin-left:auto;font-style:normal;opacity:.6}
+.sheet.shut h3{margin:0 0 4px;font-size:16px}
+.val{display:inline-block;min-width:34px;padding:3px 6px;background:#000;text-align:center}
+.attrs .val{width:100%}
+.map{max-width:calc(82vh*var(--cols)/var(--rows));margin:0 auto}
+.log{line-height:1.5}.log p{padding:2px 0;border-bottom:1px solid #ffffff10}
+.sheet small,.unit em{color:#ffc34d}
+body.off::after{content:"Reconectando…";position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--red);color:#fff;padding:8px 18px;font:italic 900 16px Impact,sans-serif;z-index:60}
+aside{position:sticky;top:0;max-height:100vh;overflow:auto;padding-right:6px}
+@media(max-width:900px){aside{position:static;max-height:none;overflow:visible}body[data-role=player] main{order:2}}
+@media(max-width:600px){button,.tabs span{min-height:40px}input{min-height:36px;font-size:16px}.attrs{gap:4px}}
