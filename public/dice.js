@@ -23,18 +23,18 @@ function d10(color, ink, labels) {
 
 function init() {
   R = new T.WebGLRenderer({ alpha: true, antialias: true });
-  Object.assign(R.domElement.style, { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 50 });
+  Object.assign(R.domElement.style, { position: 'fixed', right: '1.2vw', top: '1.4vh', pointerEvents: 'none', zIndex: 430 });
   document.body.append(R.domElement);
-  scene = new T.Scene(); cam = new T.PerspectiveCamera(40, 1, .1, 50); cam.position.z = 8;
+  scene = new T.Scene(); cam = new T.PerspectiveCamera(32, 2, .1, 50); cam.position.z = 6.4;
   scene.add(new T.AmbientLight(0xffffff, 1.6)); const l = new T.DirectionalLight(0xffffff, 2); l.position.set(2, 4, 6); scene.add(l);
   dice = [d10('#e60012', '#fff', ['00', '10', '20', '30', '40', '50', '60', '70', '80', '90']), d10('#f4f4f4', '#0b0b0d', [...'0123456789'])];
-  dice.forEach((d, i) => { d.position.x = i ? 1.3 : -1.3; scene.add(d); });
+  dice.forEach((d, i) => { d.position.x = i ? 1.25 : -1.25; scene.add(d); });
 }
 
 export function roll(n) {
   if (!R) init();
   const faces = [Math.floor(n % 100 / 10), n % 10], Z = new T.Vector3(0, 0, 1);
-  R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix();
+  const w = Math.max(190, Math.min(320, innerWidth * .15)); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.setSize(w, w / 2);
   R.domElement.style.display = '';
   dice.forEach((d, i) => { d.userData.end = new T.Quaternion().setFromUnitVectors(d.userData.normals[faces[i]], Z); d.userData.axis = new T.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize(); });
   cancelAnimationFrame(raf); t0 = performance.now();

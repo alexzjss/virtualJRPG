@@ -29,7 +29,7 @@ const ED = {
 let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
 let wins = { chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
-let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur = null;
+let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur;
 const mods = {}, tabs = {}, selNode = {}, open = {};
 const ask = (k, q) => localStorage[k] || (localStorage[k] = prompt(q) || '');
 const name = role === 'player' ? ask('vj_name', 'Seu nome de jogador? (sem espaços)') : '';
@@ -70,20 +70,33 @@ function connect() {
 
 function timeline(n = 8) { return (S.battle.order || []).filter(id => S.chars[id]).slice(0, n); } // fila calculada pelo servidor
 function bar(k, c, hideNum) {
-  const max = k === 'limit' ? 100 : c[k + 'Max'], pct = Math.max(0, Math.min(100, 100 * c[k] / (max || 1)));
-  return `<div class="bar ${k}"><i style="width:${pct}%"></i><span>${L[k]}${hideNum ? '' : ` ${c[k]}/${max}`}</span></div>`;
+  const max = k === 'limit' ? 100 : c[k + 'Max'], pct = Math.round(Math.max(0, Math.min(100, 100 * c[k] / (max || 1))));
+  return `<div class="bar ${k}"><i data-bid="${c.id}:${k}" data-p="${pct}" style="width:${pct}%"></i><span>${L[k]}${hideNum ? '' : ` ${c[k]}/${max}`}</span></div>`;
 }
 
+// ===== palco de batalha =====
+const KANJI = { fis: '武', kagutsuchi: '火', susanoo: '水', atlas: '土', indra: '雷', fuhaku: '風', amaterasu: '光', tsukuyomi: '闇', shukketsu: '血', radiacao: '核' };
+const mainEl = c => c.el || c.resist?.find(e => e !== 'fis') || 'fis';
+const bodyMini = c => `<svg class="mini" viewBox="0 0 120 260" aria-hidden="true">${PARTS.map(k => `<${SHAPE[k][0]} ${SHAPE[k][1]} class="l${lvl(c, k)}"/>`).join('')}</svg>`;
+function unit(c, cur) {
+  const foe = !!c.enemy, el = mainEl(c), low = c.hp > 0 && c.hp <= c.hpMax * .25;
+  const sts = c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + (n < 90 ? ' ' + n : ''))].filter(Boolean).map(s => `<i>${s}</i>`).join('') : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
+  const fig = `<div class="figw"><div class="fig" style="--e:${ELC[el]}">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${foe ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div>`;
+  const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
+    : `<div class="hpn"><span>${c.hp}</span><small>/${c.hpMax}</small><em>HP</em></div>${bar('hp', c, true)}<div class="duo"><div>${bar('aura', c, true)}<small>Aura ${c.aura}/${c.auraMax}</small></div><div>${bar('san', c, true)}<small>Sanidade ${c.san}/${c.sanMax}</small></div></div>
+      <div class="lim ${c.limit >= 100 ? 'full' : ''}">${bar('limit', c, true)}<small>${c.limit >= 100 ? 'Limite!' : 'Limite ' + c.limit + '%'}</small></div>`;
+  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${stats}</div></div>`;
+}
 function battle() {
-  const tl = timeline(), cur = S.chars[tl[0]];
-  const side = e => Object.values(S.chars).filter(c => !!c.enemy === e && c.id in S.battle.ticks).map(c =>
-    `<div class="unit ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}<div><b>${esc(c.name)}</b> <em>${c.hp > 0 ? stList(c) : c.dead ? 'Morto' : c.dying ? `Caído ☠ ${c.dying}` : 'Caído'}</em>${bar('hp', c, e && !gm)}${e ? '' : bar('aura', c) + bar('san', c) + bar('limit', c)}</div></div>`).join('');
+  const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
+  const side = e => { const l = inB.filter(c => !!c.enemy === e), n = l.length, cols = n > 4 ? Math.ceil(n / 2) : Math.max(1, n), w = Math.min(14.5, 43 / cols - 1.3);
+    return `<div class="side ${e ? 'foes' : 'heroes'} ${n > 4 ? 'two' : ''}" style="--w:${w.toFixed(2)}cqw">${l.map(c => unit(c, cur)).join('')}</div>`; };
   const acts = c => `<div class="row"><b>${esc(c.name)}:</b>${gm && c.enemy ? '<button class="own" data-a="ai">IA decide</button>' : ''}<button data-a="act" data-id="${c.id}" data-skill="atk">Ataque</button>${c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => { const s = S.skills[k];
       return `<button data-a="act" data-id="${c.id}" data-skill="${k}" title="${esc(desc(s))}" ${blocked(c, s) ? 'disabled' : ''}>${esc(s.name)}</button>`; }).join('')}
       ${Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons').map(([k, q]) => `<button class="item" data-a="use" data-id="${c.id}" data-item="${k}">${esc(S.items[k].name)} ×${q}</button>`).join('')}
-      <button data-a="next">Passar</button></div><small>Clique em uma unidade para escolher o alvo.</small>${aimBox()}`;
-  return `<section class="battle"><div class="tl">${tl.map((id, i) => `<span class="${i ? '' : 'cur'}" style="--c:${esc(S.chars[id].color)}">${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="sides"><div>${side(true)}</div><i>VS</i><div>${side(false)}</div></div>${gm && cur ? acts(cur) : ''}</section>`;
+      <button data-a="next">Passar</button></div>${aimBox()}`;
+  return `<section class="stage battle" style="${sc.bg ? `--bg:url('${esc(sc.bg)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
+    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {
@@ -210,7 +223,7 @@ function render() {
     const rank = Object.keys(ALL).sort((x, y) => (wins[x].z || 0) - (wins[y].z || 0));
     const lays = chips(LAYD, k => `<button class="lay" data-a="lay" data-k="${k}" title="Clique: aplicar arranjo · Shift+clique: salvar o arranjo atual">${k}</button>`);
     const body = { ...Object.fromEntries(fw.map(k => [k, sheet(S.chars[k.slice(2)], true)])), ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
-    app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${w}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
+    app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : w}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
       <nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(c => c.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB[0];
@@ -229,26 +242,43 @@ function render() {
   fx();
 }
 
-// efeitos: dados 3D, números flutuantes, flash elemental e faixa de turno
+// efeitos: barras que escoam, investida do atacante, impacto no alvo, faixa da skill, dados, legenda e vitória
+const lastPct = new Map();
 function fx() {
-  const news = seen == null ? [] : S.log.filter(e => e.n > seen), cur = S.battle.active ? S.chars[timeline(1)[0]] : null;
+  app.querySelectorAll('[data-bid]').forEach(el => { // anima a barra do valor anterior até o novo
+    const k = el.dataset.bid, p = el.dataset.p, old = lastPct.get(k);
+    if (old != null && old !== p) { el.style.transition = 'none'; el.style.width = old + '%'; el.offsetWidth; el.style.transition = ''; el.style.width = p + '%'; }
+    lastPct.set(k, p);
+  });
+  const news = seen == null ? [] : S.log.filter(e => e.n > seen), cur = S.battle.active ? S.chars[timeline(1)[0]] : null, stage = app.querySelector('.stage');
   seen = S.seq;
-  for (const e of news.slice(-4)) {
+  let called = false;
+  for (const e of news.slice(-6)) {
     if (e.d) import('/dice.js').then(m => m.roll(e.d)).catch(() => {});
-    const el = e.fx && (app.querySelector(`.unit[data-tgt="${e.fx.id}"]`) || app.querySelector(`.tok[data-id="${e.fx.id}"]`));
+    const f = e.fx;
+    if (!f) continue;
+    const el = app.querySelector(`.unit[data-tgt="${f.id}"]`) || app.querySelector(`[data-tgt="${f.id}"]`) || app.querySelector(`.tok[data-id="${f.id}"]`);
+    if (f.a) app.querySelector(`.unit[data-tgt="${f.a}"]`)?.classList.add('lunge');
+    if (f.s && stage && !called) { // faixa com o nome da skill (uma por ação, mesmo em área)
+      called = true; document.querySelector('.callout')?.remove();
+      const co = document.createElement('div'); co.className = 'callout'; co.style.setProperty('--fx', ELC[f.el] || '#e4002b');
+      co.innerHTML = `<div><small>${esc(S.chars[f.a]?.name || '')}</small><b>${esc(f.s)}</b></div>`; document.body.append(co); setTimeout(() => co.remove(), 1900);
+    }
     if (!el) continue;
-    const s = document.createElement('span');
-    s.className = 'float ' + (e.fx.heal ? 'heal' : e.fx.miss ? 'miss' : e.fx.crit ? 'crit' : '');
-    s.textContent = e.fx.heal ? '+' + e.fx.heal : e.fx.miss ? 'ERROU' : (e.fx.crit ? 'CRÍTICO ' : '') + '−' + e.fx.dmg;
-    el.style.setProperty('--fx', ELC[e.fx.el] || '#fff'); el.append(s);
-    if (e.fx.dmg) el.classList.add('hit');
+    const add = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; el.append(s); };
+    el.style.setProperty('--fx', ELC[f.el] || '#fff');
+    add('float ' + (f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : ''), f.heal ? '+' + f.heal : f.miss ? 'ERROU' : '−' + f.dmg);
+    if (f.dmg) el.classList.add('hit');
+    if (f.w) add('stamp weak', 'Fraqueza!'); else if (f.crit) add('stamp', 'Crítico!');
   }
-  if (role === 'table' && news.length) { // legenda cinemática temporária no lugar do log
+  const plain = news.filter(e => !e.fx).at(-1), win = news.find(e => /^Vitória!/.test(e.text));
+  if (role === 'table' && plain && !win) { // legenda discreta para o que não é golpe
     document.querySelector('.caption')?.remove(); clearTimeout(capT);
-    const e = news.at(-1), cp = document.createElement('div'); cp.className = 'caption'; cp.innerHTML = `<b>${esc(e.who)}</b> ${esc(e.text)}`; document.body.append(cp); capT = setTimeout(() => cp.remove(), 6000);
+    const cp = document.createElement('div'); cp.className = 'caption'; cp.innerHTML = `<b>${esc(plain.who)}</b>${esc(plain.text)}`; document.body.append(cp); capT = setTimeout(() => cp.remove(), 6000);
   }
-  if (cur && cur.id !== lastCur) { const bn = document.createElement('div'); bn.className = 'banner'; bn.textContent = 'Turno de ' + cur.name; bn.style.setProperty('--c', cur.color); document.body.append(bn); setTimeout(() => bn.remove(), 1400); }
-  lastCur = cur?.id;
+  if (win) { const v = document.createElement('div'); v.className = 'victory'; v.innerHTML = `<b>Vitória</b><span>${esc(win.text.replace(/^Vitória!\s*/, ''))}</span>`; document.body.append(v); setTimeout(() => v.remove(), 6500); }
+  if (cur && cur.id !== lastCur && lastCur !== undefined) { const bn = document.createElement('div'); bn.className = 'banner'; bn.textContent = 'Turno de ' + cur.name; bn.style.setProperty('--c', cur.enemy ? '#e4002b' : cur.color); document.body.append(bn); setTimeout(() => bn.remove(), 1200); }
+  lastCur = cur?.id ?? null;
 }
 
 app.addEventListener('change', e => {
@@ -292,7 +322,10 @@ app.addEventListener('click', e => {
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
     if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return alert(`Arranjo "${d.k}" salvo.`); }
-    if (saved[d.k]) wins = { ...wins, ...structuredClone(saved[d.k]) }; else for (const k in wins) wins[k].open = LAYD[d.k].includes(k);
+    if (saved[d.k]) wins = { ...wins, ...structuredClone(saved[d.k]) };
+    else { for (const k in wins) wins[k].open = LAYD[d.k].includes(k);
+      const W = innerWidth, H = innerHeight, at = (k, x, y) => Object.assign(wins[k], { x, y });
+      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); }
     localStorage.vj_wins = JSON.stringify(wins); return render();
   }
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
