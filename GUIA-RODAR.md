@@ -8,7 +8,7 @@ O caminho mais simples e realmente gratuito é **rodar no computador do mestre**
 ## Opção 0 (mais fácil): baixar o programa pronto
 
 A cada versão publicada, o GitHub gera um executável que não precisa de Node nem de instalação.
-1. No GitHub do projeto, abra **Releases** e baixe o `.zip` do seu sistema: `windows-x64`, `linux-x64`, `macos-arm64` (Macs com chip M) ou `macos-x64` (Macs Intel).
+1. No GitHub do projeto, abra **Releases** e baixe o `.zip` do seu sistema: `windows-x64`, `linux-x64`, `macos-arm64` (Macs com chip M). Macs com processador Intel não têm programa pronto: use a Opção A (com Node).
 2. Extraia e dê dois cliques em `virtualJRPG`. A janela mostra os endereços e a chave do mestre (também guardada em `data/gm-key.txt`).
 3. Para os jogadores de fora da sua rede, abra um túnel (passo 3 da Opção A).
 

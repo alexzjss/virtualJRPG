@@ -30,7 +30,6 @@ jobs:
           - { os: windows-latest, nome: windows-x64 }
           - { os: ubuntu-latest, nome: linux-x64 }
           - { os: macos-latest, nome: macos-arm64 }
-          - { os: macos-13, nome: macos-x64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -42,16 +41,23 @@ jobs:
         shell: bash
         run: |
           cd dist
-          (PORT=3099 ./virtualJRPG* > fumaca.log 2>&1 &)
+          PORT=3099 ./virtualJRPG* > fumaca.log 2>&1 &
+          PID=$!
           sleep 4
-          curl -fsS http://localhost:3099/gm | grep -q "virtualJRPG"
-          curl -fsS http://localhost:3099/vendor/three.module.js -o /dev/null
+          RESULT=0
+          curl -fsS http://localhost:3099/gm | grep -q "virtualJRPG" || RESULT=1
+          curl -fsS http://localhost:3099/vendor/three.module.js -o /dev/null || RESULT=1
+          # encerra o programa: no Windows um .exe em execução fica travado e impede mover ou compactar a pasta
+          kill $PID 2>/dev/null || true
+          if [ "$RUNNER_OS" = "Windows" ]; then taskkill //F //IM virtualJRPG.exe //T > /dev/null 2>&1 || true; fi
+          sleep 2
+          [ $RESULT -eq 0 ] || { cat fumaca.log; exit 1; }
           rm -rf data fumaca.log
       - name: Compactar
         shell: bash
         run: |
           cp GUIA-RODAR.md dist/ 2>/dev/null || true
-          mv dist virtualJRPG-${{ matrix.nome }}
+          cp -r dist virtualJRPG-${{ matrix.nome }}
           if [ "${{ runner.os }}" = "Windows" ]; then 7z a virtualJRPG-${{ matrix.nome }}.zip virtualJRPG-${{ matrix.nome }}; else zip -qr virtualJRPG-${{ matrix.nome }}.zip virtualJRPG-${{ matrix.nome }}; fi
       - uses: actions/upload-artifact@v4
         with:
