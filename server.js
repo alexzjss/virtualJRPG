@@ -9,7 +9,8 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(dir, 'public'), DATA = path.join(dir, 'data'), UP = path.join(DATA, 'uploads');
 const PORT = process.env.PORT || 3000;
 const KEY = process.env.GM_KEY || 'mestre';
-const FILE = path.join(DATA, 'state.json');
+const FILE = path.join(DATA, 'state.json'), VEND = path.join(dir, 'node_modules', 'three', 'build');
+const GM = '@gm'; // destinatário "mestre" em entradas privadas do log
 const IMG = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' };
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', ...Object.fromEntries(Object.entries(IMG).map(([m, e]) => [e, m])) };
 
@@ -20,6 +21,8 @@ const KINDS = ['dmg', 'mental', 'heal'];
 const DOT = ['burn', 'bleed', 'poison', 'rad'];
 const STK = [...DOT, 'stun', 'sleep', 'para', 'silence', 'atkUp', 'atkDn', 'defUp', 'defDn', 'agiUp', 'agiDn', 'fear', 'fury', 'confuse'];
 const ITYPES = ['cons', 'arma', 'armadura', 'acess'];
+const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
+const EXTRA = { per: {}, bio: '', gmNote: '', xpR: 0, goldR: 0 };
 const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
@@ -45,7 +48,8 @@ const newScene = (name, o = {}) => ({ name, cols: 20, rows: 12, bg: '', fogOn: f
 if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; delete S.map; }
 S.skills ??= Object.fromEntries(CATALOG.map((s, i) => ['s' + i, s]));
 S.items ??= Object.fromEntries(ITEMS.map((s, i) => ['i' + i, s]));
-for (const ch of Object.values(S.chars)) Object.assign(ch, { arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
+Object.assign(S, { seq: 0, users: {}, bestiary: {}, shop: { open: false, stock: [] }, ...S });
+for (const ch of Object.values(S.chars)) Object.assign(ch, { ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
 
 // ---------- http ----------
 const server = http.createServer((req, res) => {
@@ -64,7 +68,9 @@ const server = http.createServer((req, res) => {
   let p; try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return res.writeHead(400).end(); }
   if (p === '/') p = '/index.html';
   if (!path.extname(p)) p += '.html';
-  const root = p.startsWith('/uploads/') ? DATA : PUB, f = path.join(root, path.normalize(p));
+  let root = p.startsWith('/uploads/') ? DATA : PUB;
+  if (p.startsWith('/vendor/')) { root = VEND; p = p.slice(7); }
+  const f = path.join(root, path.normalize(p));
   if (!f.startsWith(root + path.sep)) return res.writeHead(403).end();
   fs.readFile(f, (e, d) => {
     if (e) return res.writeHead(404).end('404');
@@ -76,8 +82,15 @@ const wss = new WebSocketServer({ server, maxPayload: 65536 });
 // ---------- utilidades ----------
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { fs.mkdirSync(DATA, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(S)); }, 300); };
-const push = () => { const m = JSON.stringify({ t: 'state', s: S }); wss.clients.forEach(c => c.readyState === 1 && c.send(m)); save(); };
-const log = (who, text, kind = '') => { S.log.push({ who, text, kind, ts: Date.now() }); if (S.log.length > 100) S.log.shift(); };
+const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, note: undefined, gmNote: undefined }]));
+// cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
+const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, scenes: strip(S.scenes), chars: strip(S.chars),
+  log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
+const sendState = c => c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
+const push = () => { wss.clients.forEach(sendState); save(); };
+const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
+const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
+const pick = a => a[Math.floor(Math.random() * a.length)];
 const d100 = () => 1 + Math.floor(Math.random() * 100);
 const rid = () => crypto.randomBytes(4).toString('hex');
 const int = (v, lo = 0, hi = 9999) => Math.min(hi, Math.max(lo, Math.round(+v) || 0));
@@ -112,7 +125,7 @@ function endTurn(id) {
     const dots = DOT.filter(k => n.st[k]).length;
     if (dots) {
       const d = dots * Math.max(1, Math.round(n.hpMax / 20));
-      log(n.name, `sofre ${d} de dano contínuo.${hurt(n, d)}`, 'bad');
+      log(n.name, `sofre ${d} de dano contínuo.${hurt(n, d)}`, 'bad', { fx: { id: n.id, dmg: d } });
       if (!n.hp) continue;
     }
     const skip = n.st.stun ? 'atordoado' : n.st.sleep ? 'dormindo' : n.st.para && d100() <= 50 ? 'paralisado' : '';
@@ -122,14 +135,14 @@ function endTurn(id) {
   }
 }
 
-const NUM = { arma: 1, armor: 1, gold: 1, hp: 1, hpMax: 1, aura: 1, auraMax: 1, san: 1, sanMax: 1, x: 1, y: 1 };
+const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, hp: 1, hpMax: 1, aura: 1, auraMax: 1, san: 1, sanMax: 1, x: 1, y: 1 };
 const H = {
   addChar(c, m) {
     if (c.role !== 'gm' && c.role !== 'player') return;
     const enemy = c.role === 'gm' && !!m.enemy, id = rid();
-    S.chars[id] = { id, name: enemy ? 'Inimigo' : 'Herói', owner: enemy ? '' : (c.role === 'gm' ? String(m.owner || '').slice(0, 30) : c.name), enemy,
+    S.chars[id] = { id, name: enemy ? 'Inimigo' : 'Herói', owner: enemy ? '' : (c.role === 'gm' ? String(m.owner || '').trim().slice(0, 30) : c.name), enemy,
       color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, 40])), marks: {}, hp: 30, hpMax: 30, aura: 20, auraMax: 20, san: 40, sanMax: 40,
-      limit: 0, xp: 0, gold: 0, x: 0, y: 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} };
+      limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} };
   },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
@@ -142,16 +155,21 @@ const H = {
     else if (f === 'color' && /^#[0-9a-f]{6}$/i.test(m.v)) ch.color = m.v;
     else if (f === 'img') ch.img = okUrl(m.v) ? m.v : '';
     else if (f === 'xp' && c.role === 'gm') ch.xp = int(m.v);
+    else if (f === 'bio') ch.bio = String(m.v).slice(0, 3000);
+    else if (f === 'gmNote' && c.role === 'gm') ch.gmNote = String(m.v).slice(0, 3000);
+    else if (f.startsWith('per.') && Object.hasOwn(PER, f.slice(4))) ch.per[f.slice(4)] = int(m.v, 0, 60);
   },
   move(c, m) { const ch = S.chars[m.id]; if (can(c, ch)) { ch.x = int(m.x, 0, scene().cols - 1); ch.y = int(m.y, 0, scene().rows - 1); } },
   place(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) ch.x = ch.y = ch.x == null ? 0 : null; },
   roll(c, m) {
     const ch = S.chars[m.id];
-    if (!can(c, ch) || !ATTRS.includes(m.attr)) return;
-    const target = int(at(ch, m.attr) + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r = d100();
+    const per = Object.hasOwn(PER, m.per) ? PER[m.per] : null;
+    if (!can(c, ch) || (!per && !ATTRS.includes(m.attr))) return;
+    const base = per ? Math.round((at(ch, per[0]) + at(ch, per[1])) / 2) + (ch.per[m.per] || 0) : at(ch, m.attr);
+    const target = int(base + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r = d100();
     const res = r <= Math.max(1, Math.floor(target / 10)) ? 'CRÍTICO' : r <= target ? 'Sucesso' : r >= 96 ? 'DESASTRE' : 'Falha';
-    if (r <= target) ch.marks[m.attr] = true; // atributo usado com sucesso pode evoluir
-    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}`, r <= target ? 'ok' : 'bad');
+    if (r <= target) (per || [m.attr]).forEach(a => ch.marks[a] = true); // atributo usado com sucesso pode evoluir
+    log(ch.name, `${per ? m.per : m.attr} ${target}% → ${r}: ${res}`, r <= target ? 'ok' : 'bad', { d: r, ...(c.role === 'gm' && m.secret ? { to: GM } : {}) });
   },
   evolve(c, m) {
     const ch = S.chars[m.id];
@@ -166,7 +184,7 @@ const H = {
     if (c.role !== 'gm' || !ch) return;
     const target = int(at(ch, 'SAB') - sanPen(ch), 1, 95), r = d100(), loss = int(m.loss, 1, 99);
     if (r > target) ch.san = Math.max(0, ch.san - loss);
-    log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok');
+    log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok', { d: r });
   },
   aff(c, m) { // cicla normal → fraqueza → resistência
     const ch = S.chars[m.id];
@@ -184,6 +202,7 @@ const H = {
     if (m.f === 'bg') sc.bg = okUrl(m.v) ? m.v : '';
     if (m.f === 'name') sc.name = String(m.v).slice(0, 30) || '?';
     if (m.f === 'fogOn') sc.fogOn = !!m.v;
+    if (m.f === 'note') sc.note = String(m.v).slice(0, 3000);
   },
   fog(c, m) { // pincel 3x3
     if (c.role !== 'gm') return;
@@ -197,9 +216,29 @@ const H = {
   // ----- batalha -----
   battle(c, m) {
     if (c.role !== 'gm') return;
+    const all = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(Boolean), dead = all.filter(o => o.enemy && o.hp <= 0), pcs = all.filter(o => !o.enemy);
+    all.forEach(o => o.st = {});
+    if (!m.on && m.win && pcs.length && dead.length) { // recompensas divididas entre os heróis
+      const sum = f => Math.floor(dead.reduce((a, o) => a + o[f], 0) / pcs.length), xp = sum('xpR'), gold = sum('goldR'), drops = [];
+      pcs.forEach(p => { p.xp += xp; p.gold += gold; });
+      dead.forEach(d => {
+        for (const [k, q] of Object.entries(d.inv)) if (S.items[k]) { const p = pick(pcs); p.inv[k] = (p.inv[k] || 0) + q; drops.push(`${S.items[k].name} → ${p.name}`); }
+        d.inv = {}; d.equip = {}; d.x = d.y = null;
+      });
+      log('Mestre', `Vitória! +${xp} XP e +${gold} de ouro para cada herói.${drops.length ? ' Espólios: ' + drops.join(', ') : ''}`, 'ok');
+    }
     S.battle = { active: !!m.on, ticks: {} };
     if (m.on) Object.values(S.chars).filter(ch => ch.x != null).forEach(ch => S.battle.ticks[ch.id] = delay(ch));
     log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
+  },
+  ai(c) { // IA simples: 70% usa uma skill disponível; cura o aliado mais ferido, ataca um oponente aleatório
+    const a = S.chars[current()];
+    if (c.role !== 'gm' || !S.battle.active || !a?.enemy) return;
+    const alive = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o?.hp > 0), foes = alive.filter(o => o.enemy !== a.enemy);
+    const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
+    const skill = usable.length && Math.random() < .7 ? pick(usable) : 'atk', heal = S.skills[skill]?.kind === 'heal';
+    const t = heal ? alive.filter(o => o.enemy === a.enemy).sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0] : pick(foes);
+    if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
   },
   next(c) { const id = current(); if (S.battle.active && id && can(c, S.chars[id])) endTurn(id); },
   act(c, m) {
@@ -217,12 +256,12 @@ const H = {
       const v = Math.max(1, s.power + Math.floor(stat / 5));
       t.hp = Math.min(t.hpMax, t.hp + v);
       if (s.st) t.st[s.st] = 3;
-      log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok');
+      log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok', { fx: { id: t.id, heal: v } });
     } else {
       const chance = int(stat + 30 - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0), 5, 95), r = d100();
       if (r > chance) {
         if (r >= 96) addLimit(a, 20);
-        log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad');
+        log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, fx: { id: t.id, miss: 1 } });
       } else {
         const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental';
         const w = t.weak.includes(s.el), rs = t.resist.includes(s.el);
@@ -232,7 +271,7 @@ const H = {
         let extra = '';
         if (mental) t.san = Math.max(0, t.san - d); else extra = hurt(t, d);
         if (s.st && t.hp > 0) t.st[s.st] = 3;
-        log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ''}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok');
+        log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ''}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, fx: { id: t.id, dmg: d, crit, el: s.el } });
       }
     }
     endTurn(a.id);
@@ -267,6 +306,40 @@ const H = {
     log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (+${i.power} ${i.eff.toUpperCase()})`, 'ok');
     if (inB) endTurn(ch.id);
   },
+  // ----- loja -----
+  shop(c, m) {
+    if (c.role !== 'gm') return;
+    if (m.f === 'open') S.shop.open = !!m.v;
+    else if (Object.hasOwn(S.items, m.item)) S.shop.stock = S.shop.stock.includes(m.item) ? S.shop.stock.filter(k => k !== m.item) : [...S.shop.stock, m.item];
+  },
+  buy(c, m) {
+    const ch = S.chars[m.id], i = S.items[m.item];
+    if (!can(c, ch) || !S.shop.open || !i || !S.shop.stock.includes(m.item) || ch.gold < i.price) return;
+    ch.gold -= i.price; ch.inv[m.item] = (ch.inv[m.item] || 0) + 1;
+    log(ch.name, `comprou ${i.name} por ${i.price}`, 'ok');
+  },
+  sell(c, m) {
+    const ch = S.chars[m.id], i = S.items[m.item];
+    if (!can(c, ch) || !S.shop.open || !i || !(ch.inv[m.item] > 0)) return;
+    ch.gold += Math.floor(i.price / 2); H.drop(c, m);
+    log(ch.name, `vendeu ${i.name} por ${Math.floor(i.price / 2)}`, 'ok');
+  },
+  // ----- bestiário -----
+  bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {} }); },
+  bSpawn(c, m) { if (c.role === 'gm' && Object.hasOwn(S.bestiary, m.id)) { const id = rid(); S.chars[id] = { ...structuredClone(S.bestiary[m.id]), id, x: 0, y: 0 }; } },
+  bDel(c, m) { if (c.role === 'gm') delete S.bestiary[m.id]; },
+  // ----- chat: texto livre, /r XdY+Z, /w nome mensagem -----
+  chat(c, m) {
+    if (c.role === 'table') return;
+    const who = c.role === 'gm' ? 'Mestre' : c.name, me = c.role === 'gm' ? GM : c.name, text = String(m.text || '').trim().slice(0, 300), priv = c.role === 'gm' && m.secret ? { to: GM } : {};
+    let mm;
+    if (!text) return;
+    if ((mm = text.match(/^\/r\s+(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i))) {
+      const n = int(mm[1] || 1, 1, 20), f = int(mm[2], 2, 100), b = int((mm[3] || '0').replace(/\s/g, ''), -999, 999), rs = Array.from({ length: n }, () => 1 + Math.floor(Math.random() * f));
+      log(who, `rolou ${n}d${f}${b ? (b > 0 ? '+' : '') + b : ''}: [${rs.join(', ')}] = ${rs.reduce((a, x) => a + x, b)}`, 'ok', priv);
+    } else if ((mm = text.match(/^\/w\s+(\S+)\s+(.+)/i))) log(who, `(sussurro → ${mm[1]}) ${mm[2]}`, 'chat', { to: /^mestre$/i.test(mm[1]) ? GM : mm[1], from: me });
+    else log(who, text, 'chat');
+  },
   // ----- editores do mestre (skills / itens) -----
   edAdd(c, m) { if (c.role === 'gm' && Object.hasOwn(NEW, m.coll)) S[m.coll][rid()] = NEW[m.coll](); },
   edDel(c, m) {
@@ -290,9 +363,16 @@ wss.on('connection', c => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m !== 'object') return;
     if (m.t === 'hello') {
-      if (m.role === 'gm') { if (m.key !== KEY) return c.send(JSON.stringify({ t: 'err', badKey: true, msg: 'Chave do mestre incorreta.' })); c.role = 'gm'; }
-      else if (m.role === 'player') { c.role = 'player'; c.name = String(m.name || 'Jogador').slice(0, 30); }
-      return c.send(JSON.stringify({ t: 'state', s: S }));
+      if (m.role === 'gm') { if (m.key !== KEY) return c.send(JSON.stringify({ t: 'err', bad: true, msg: 'Chave do mestre incorreta.' })); c.role = 'gm'; }
+      else if (m.role === 'player') {
+        const name = String(m.name || '').trim().slice(0, 30), u = S.users[name], bad = msg => c.send(JSON.stringify({ t: 'err', bad: true, msg }));
+        if (!name || /[@\s]/.test(name)) return bad('Nome inválido (sem espaços ou @).');
+        if (String(m.pass || '').length < 3) return bad('Senha precisa de pelo menos 3 caracteres.');
+        if (!Object.hasOwn(S.users, name)) { S.users[name] = hash(m.pass); save(); } // primeiro acesso registra a senha
+        else if (!crypto.timingSafeEqual(Buffer.from(hash(m.pass, u.split(':')[0])), Buffer.from(u))) return bad('Senha incorreta para este nome.');
+        c.role = 'player'; c.name = name;
+      }
+      return sendState(c);
     }
     if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
   });
