@@ -33,3 +33,12 @@ input[type=number]{width:58px}input[type=color]{padding:0;width:28px;height:26px
 .unit{border-left:6px solid var(--c);background:#000a;padding:6px 10px;margin:6px 0}.unit.cur{outline:2px solid #ffe600;transform:translateX(6px)}
 .log{max-height:260px;overflow:auto;font-size:13px}.log p{margin:2px 0}.log .ok b{color:#2ecc40}.log .bad b{color:var(--red)}
 .home{display:flex;gap:20px;padding:40px}.home a{font-size:28px;padding:20px 32px}
+select{background:#1c1c22;color:#fff;border:1px solid #444;font:inherit}
+.unit{cursor:pointer}.unit.tgt{box-shadow:inset 0 0 0 2px var(--red)}.unit.ko{opacity:.4}.unit em,.sheet small{color:#ffb000}
+.chips span{font-size:11px;padding:2px 6px;background:#222;border:1px solid #444;cursor:default}.chips [data-a]{cursor:pointer}
+.chips .weak{background:var(--red);border-color:var(--red)}.chips .res{background:#1560bd;border-color:#1560bd}
+.grid{display:grid;grid-auto-columns:1fr;grid-auto-rows:44px;gap:6px;margin:10px 4px;overflow:auto}
+.grid button{font-size:10px;padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.grid .own{background:#ffe600}.grid .lock{background:#333;color:#999;cursor:default}
+button:disabled{opacity:.4;cursor:default}
+.editor{margin-top:16px;overflow:auto;--c:#ffe600}.editor td{padding:1px}.editor th{font-size:11px;text-align:left}.editor input[type=text]{width:150px}.editor input[type=number]{width:48px}
