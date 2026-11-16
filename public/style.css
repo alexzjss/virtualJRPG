@@ -66,3 +66,8 @@ textarea{width:100%;min-height:70px;margin:4px 0;background:#1c1c22;color:#fff;b
 @keyframes banner{0%{clip-path:inset(0 100% 0 0)}20%,75%{clip-path:inset(0)}100%{clip-path:inset(0 0 0 100%)}}
 @media(max-width:600px){#app{padding:8px;gap:8px}h1{font-size:24px}.attrs{grid-template-columns:repeat(4,1fr)}.sides{grid-template-columns:1fr}.sides>i{display:none}.banner{font-size:28px}}
 @media(prefers-reduced-motion:reduce){.float,.hit,.banner{animation-duration:.01s}}
+.grid{grid-template-columns:repeat(15,1fr);grid-auto-rows:auto;gap:3px;margin:8px 0}
+.grid i{aspect-ratio:1;border-radius:50%;background:var(--e);opacity:.22;cursor:pointer}.grid i.pas{border-radius:3px}
+.grid i.av{opacity:.6;outline:1px dashed #fff}.grid i.own{opacity:1;box-shadow:0 0 7px var(--e)}.grid i.sel{opacity:1;outline:2px solid #fff;outline-offset:1px}
+.node{background:#000a;padding:8px;border-left:4px solid var(--c)}
+.grid i.own{background:var(--e)}
