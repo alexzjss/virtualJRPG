@@ -5,9 +5,9 @@ const EL9 = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', '
 const PATRON = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', radiacao: 'Hiruko' };
 
 // A grade é montada a partir de tree.js: o tronco Marcial no centro (comum a todos) e, em volta, um setor por Vínculo
-// com três ramos de dez nós. Cada ramo é uma corrente de casas vizinhas, então sempre dá para percorrê-lo.
+// com quantos ramos o Vínculo tiver (o primeiro no eixo, os demais em leque). Cada ramo é uma corrente de casas vizinhas, então sempre dá para percorrê-lo.
 export function buildSkills(sk) {
-  const N = 31, C = 15, G = {}, used = new Map(); // casa "x,y" → elemento
+  const N = 41, C = 20, G = {}, used = new Map(); // casa "x,y" → elemento
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !used.has(x + ',' + y);
   const node = (o, el, extra = {}) => { const { n, k, a, p, c, ...rest } = o; return sk(n, k, a || 'FOR', el, p || 0, c || 0, 0, 0, { ...rest, ...extra }); };
   const put = (x, y, s) => { used.set(x + ',' + y, s.el); G['g' + Object.keys(G).length] = { ...s, gx: x, gy: y }; return [x, y]; };
@@ -26,14 +26,21 @@ export function buildSkills(sk) {
   const M = TREE.marcial.branches, fis = k => used.get(k) === 'fis';
   put(C, C, node(M[0][0], 'fis'));
   around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis')));
-  EL9.forEach((el, i) => { // setor do Vínculo: ataque no eixo, suporte e maestria nas laterais, presos à base do ramo de ataque
-    const B = TREE[el].branches, deg = i * 40, main = chain(deg, 3, B[0].map((o, n) => node(o, el, n ? {} : { root: true })), fis), base = new Set(main.slice(0, 4));
-    chain(deg - 13, 5, B[1].map(o => node(o, el)), k => base.has(k)); chain(deg + 13, 5, B[2].map(o => node(o, el)), k => base.has(k));
-  });
+  // 1ª passada: o ramo 0 de cada Vínculo (ataque, com a skill raiz) abre o eixo do setor
+  const main = EL9.map((el, i) => chain(i * 40, 3, TREE[el].branches[0].map((o, n) => node(o, el, n ? {} : { root: true })), fis));
   [20, 100, 220, 300].forEach((deg, i) => chain(deg, 2, M[i + 1].map(o => node(o, 'fis')), fis)); // estilos de arma nos vãos entre setores
-  const train = M[5].map(o => node(o, 'fis')); // treinos de atributo nas casas livres junto ao centro
-  for (let r = 2; r <= 5 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
+  const train = M[5].map(o => node(o, 'fis')); // treinos de atributo nas casas livres junto ao centro (reservadas antes dos ramos laterais)
+  for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
     if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
+  // 2ª passada: os demais ramos se abrem em leque nas laterais, presos à base do ramo 0. Um ramo em que todo nó exige
+  // arma é dividido em uma trilha por tipo de arma, para ninguém precisar comprar nó de arma que não usa.
+  EL9.forEach((el, i) => {
+    const B = TREE[el].branches, deg = i * 40, rest = B.slice(1), base = new Set(main[i].slice(0, B.length > 3 ? 5 : 4)), ext = rest.length > 2 ? 17 : 13, step = ext / Math.ceil(rest.length / 2);
+    rest.forEach((br, j) => {
+      const off = (j % 2 ? 1 : -1) * Math.ceil((j + 1) / 2) * step, groups = br.every(o => o.req) ? Object.values(br.reduce((g, o) => ((g[o.req] ||= []).push(o), g), {})) : [br];
+      groups.forEach((g, m) => chain(deg + off + (m - (groups.length - 1) / 2) * 4, 5, g.map(o => node(o, el)), k => base.has(k)));
+    });
+  });
   return G;
 }
 
