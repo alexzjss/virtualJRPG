@@ -27,5 +27,5 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
 
 ## Conteúdo padrão
-`content.js` gera a grade de skills (128 nós), o catálogo de itens (56) e o bestiário (22 inimigos comuns e humanos + 9 chefes).
+`content.js` gera a grade de skills (128 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
 Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.

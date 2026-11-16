@@ -4,28 +4,30 @@ const L = { hp: 'HP', aura: 'Aura', san: 'Sanidade', limit: 'Limite' };
 const EL = { fis: 'Físico', kagutsuchi: 'Kagutsuchi·Fogo', susanoo: 'Susanoo·Água', atlas: 'Atlas·Terra', indra: 'Indra·Raio', fuhaku: 'Fuhaku·Vento', amaterasu: 'Amaterasu·Luz', tsukuyomi: 'Tsukuyomi·Escuridão', shukketsu: 'Shukketsu·Sangue', radiacao: 'Hiruko·Radiação' };
 const ELC = { fis: '#ffffff', kagutsuchi: '#ff5a1f', susanoo: '#2e8bff', atlas: '#b9853c', indra: '#ffe600', fuhaku: '#7dffb0', amaterasu: '#fff3a0', tsukuyomi: '#8a4dff', shukketsu: '#c10020', radiacao: '#9dff00' };
 const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passiva' }, PASL = { hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx', res: 'Resistência', ...AO }, RES = { aura: 'Aura', san: 'Sanidade' };
-const ST = { down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
-const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório' }, WT = { '': '—', lamina: 'Lâmina', lanca: 'Lança', fogo: 'Arma de fogo', punho: 'Punhos' };
+const ST = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
+const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material' }, WT = { '': '—', lamina: 'Lâmina', lanca: 'Lança', fogo: 'Arma de fogo', punho: 'Punhos' };
 const EFF = { hp: 'HP', aura: 'Aura', san: 'Sanidade', cure: 'Cura condições', body: 'Trata ferimentos', rev: 'Reanima caído', bomb: 'Bomba' };
 const idesc = i => i.type === 'cons' ? (['hp', 'aura', 'san'].includes(i.eff) ? `+${i.power} ${EFF[i.eff]}` : EFF[i.eff] + (i.eff === 'bomb' ? ` ${i.power} ${EL[i.el] || EL.fis}` : i.power ? ' ' + i.power : ''))
-  : i.type === 'arma' ? `${WT[i.wt] || 'Arma'} ${i.power}${i.el ? ' · ' + EL[i.el] : ''}` : i.type === 'acess' ? `${i.attr} +${i.power}${i.el ? ' · resiste ' + EL[i.el] : ''}` : `Armadura ${i.power}`;
+  : i.type === 'arma' ? `${WT[i.wt] || 'Arma'} ${i.power}${i.el ? ' · ' + EL[i.el] : ''}` : i.type === 'acess' ? `${i.attr} +${i.power}${i.el ? ' · resiste ' + EL[i.el] : ''}` : i.type === 'mat' ? 'Material' + (i.el ? ' · ' + EL[i.el] : '') : `Armadura ${i.power}`;
+const shop = () => S.scenes[S.scene].shop; // cada cena tem a sua loja
+let ctMode = false;
 let tier = 'normal';
-const PER = { Atletismo: ['FOR', 'CON'], Furtividade: ['DES', 'AGI'], Ladinagem: ['DES', 'INT'], Percepção: ['SAB', 'INT'], Sobrevivência: ['SAB', 'CON'], Medicina: ['INT', 'SAB'], Conhecimento: ['INT', 'INT'], Persuasão: ['CAR', 'SAB'], Intimidação: ['CAR', 'FOR'], Sorte: ['SOR', 'SOR'] };
 const BODY = { head: ['INT', 'SAB'], torso: ['CON'], armL: ['FOR', 'DES'], armR: ['FOR', 'DES'], legL: ['AGI'], legR: ['AGI'] }, PARTS = Object.keys(BODY), AIMP = { head: 30, torso: 0, armL: 15, armR: 15, legL: 15, legR: 15 };
 const PL = { head: 'Cabeça', torso: 'Torso', armL: 'Braço esq.', armR: 'Braço dir.', legL: 'Perna esq.', legR: 'Perna dir.' }, LV = ['ileso', 'ferido', 'crítico'];
 const SHAPE = { head: ['circle', 'cx="60" cy="28" r="20"'], torso: ['rect', 'x="38" y="52" width="44" height="82"'], armL: ['rect', 'x="14" y="54" width="20" height="80"'], armR: ['rect', 'x="86" y="54" width="20" height="80"'], legL: ['rect', 'x="38" y="138" width="20" height="108"'], legR: ['rect', 'x="62" y="138" width="20" height="108"'] };
-const WIN = { cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
+const VEH = { pe: 'A pé', cavalo: 'Cavalo', moto: 'Motocicleta', auto: 'Automóvel', caminhao: 'Caminhão' }, cz = { a: null, b: null, va: 'auto', vb: 'moto' };
+const WIN = { chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
 const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'skills', 'items'] }; // arranjos de janelas
 const view = { z: 1, x: 0, y: 0 }; // zoom e deslocamento do mapa (local de cada tela)
 let ctx = null, pan = null, ruler = null, spaceDown = false, zc = 1, pings = [];
 const CAMPL = { vigiar: 'Vigiar (AGI↑)', cozinhar: 'Cozinhar (grupo ATQ↑)', conversar: 'Conversar (+5 Sanidade)', treinar: 'Treinar (+5 XP)', meditar: 'Meditar (+30 Limite)' };
-const TABS = { st: 'Status', per: 'Perícias', sk: 'Skills', inv: 'Itens', bio: 'História' };
+const TABS = { st: 'Status', sk: 'Skills', inv: 'Itens', bio: 'História' };
 const ED = {
   skills: [['Skill', 'name', 'text'], ['Tipo', 'kind', KIND], ['Elemento', 'el', EL], ['Atr.', 'attr', AO], ['Poder', 'power'], ['Custo', 'cost'], ['Recurso', 'res', RES], ['Status', 'st', { '': '—', ...ST }], ['Área', 'area', 'checkbox'], ['Tempo%', 'ct'], ['Passiva', 'pas', PASL], ['Arma', 'req', WT], ['Sequela', 'back', { '': '—', ...ST }], ['XP', 'xp'], ['X', 'gx'], ['Y', 'gy'], ['Lim.', 'limit', 'checkbox']],
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Efeito', 'eff', EFF], ['Atr. (acess.)', 'attr', AO], ['Tipo de arma', 'wt', WT], ['Elemento', 'el', { '': '—', ...EL }], ['Preço', 'price']],
 };
 let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
-let wins = { cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
+let wins = { chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur = null;
 const mods = {}, tabs = {}, selNode = {}, open = {};
@@ -107,7 +109,7 @@ function editor(coll) {
       : `<input type="${t}" ${a} ${t === 'checkbox' ? (o[f] ? 'checked' : '') : `value="${esc(o[f])}"`}>`; };
   return `<section class="panel editor"><table><tr>${ED[coll].map(c => `<th>${c[0]}`).join('')}<th></tr>${chips(S[coll], (id, o) =>
     `<tr>${ED[coll].map(c => `<td>${cell(id, o, c)}`).join('')}<td><button data-a="edDel" data-coll="${coll}" data-id="${id}">×</button></tr>`)}</table><div class="row"><button data-a="edAdd" data-coll="${coll}">+ Novo</button><button data-a="content" data-coll="${coll}">Restaurar padrão</button></div>
-    ${coll === 'items' ? `<div class="row chips"><button data-a="shop" data-f="open" data-v="${S.shop.open ? '' : 1}" class="${S.shop.open ? 'own' : ''}">Loja ${S.shop.open ? 'aberta' : 'fechada'}</button>À venda: ${chips(S.items, (k, i) => `<span class="${S.shop.stock.includes(k) ? 'weak' : ''}" data-a="shop" data-item="${k}">${esc(i.name)}</span>`)}</div>` : ''}</section>`;
+    ${coll === 'items' ? `<div class="row chips"><button data-a="shop" data-f="open" data-v="${shop().open ? '' : 1}" class="${shop().open ? 'own' : ''}">Loja de ${esc(S.scenes[S.scene].name)}: ${shop().open ? 'aberta' : 'fechada'}</button>À venda: ${chips(S.items, (k, i) => `<span class="${shop().stock.includes(k) ? 'weak' : ''}" data-a="shop" data-item="${k}">${esc(i.name)}</span>`)}</div>` : ''}</section>`;
 }
 
 // menu de contexto do token (clique direito)
@@ -118,6 +120,14 @@ function ctxMenu() {
     ${gm ? `<button data-a="place" data-id="${c.id}">Tirar do mapa</button><button data-a="bSave" data-id="${c.id}">Salvar no bestiário</button><div class="row chips">${chips(ST, (k, l) => `<span class="${c.st[k] ? 'weak' : ''}" data-a="st" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div>` : ''}</div>`;
 }
 const party = () => `<div class="party">${Object.values(S.chars).filter(c => !c.enemy && !c.dead).map(c => `<div style="--c:${esc(c.color)}">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}<span><b>${esc(c.name)}</b>${bar('hp', c)}${bar('aura', c)}${bar('san', c)}</span></div>`).join('')}</div>`;
+// perseguição: faixa visível a todos e janela de controle do mestre
+const chaseBar = () => { const q = S.chase; if (!q) return ''; const n = k => `${esc(S.chars[q[k].id]?.name || '?')} · ${VEH[q[k].veh]}`;
+  return `<div class="chase"><b>Perseguição</b><span>${n('b')}</span><div class="track">${Array.from({ length: 10 }, (_, i) => `<i class="${i < q.gap ? 'on' : ''}"></i>`).join('')}</div><span>${n('a')}</span><small>distância ${q.gap}/10 · rodada ${q.round}</small></div>`; };
+function chaseWin() {
+  if (S.chase) return chaseBar() + '<div class="row"><button class="own" data-a="chase" data-k="round">Rolar rodada</button><button data-a="chase" data-k="end">Encerrar</button></div><small>Distância 10: o fugitivo escapa. Distância 0: é alcançado.</small>';
+  const who = k => `<div class="row chips">${Object.values(S.chars).filter(c => c.x != null && c.scene === S.scene).map(c => `<span class="${cz[k] === c.id ? 'weak' : ''}" data-cz="${k}" data-v="${c.id}">${esc(c.name)}</span>`).join('') || '<small>ponha personagens no mapa</small>'}</div><div class="row chips">${chips(VEH, (v, l) => `<span class="${cz['v' + k] === v ? 'weak' : ''}" data-cz="v${k}" data-v="${v}">${l}</span>`)}</div>`;
+  return `<b>Fugitivo</b>${who('a')}<b>Perseguidor</b>${who('b')}<div class="row"><button data-a="chaseStart" ${cz.a && cz.b && cz.a !== cz.b ? '' : 'disabled'}>Iniciar perseguição</button></div>`;
+}
 function iniWin() {
   const T = S.battle.ticks, ids = Object.keys(T).filter(k => S.chars[k]).sort((a, b) => T[a] - T[b] || a.localeCompare(b)), b = (k, id, l, t) => `<button data-a="ini" data-k="${k}" data-id="${id}" aria-label="${t}" title="${t}">${l}</button>`;
   if (!S.battle.active) return '<small>Nenhuma batalha em andamento.</small>';
@@ -144,12 +154,14 @@ function sheet(c, force) {
       ${gm ? `<div class="row chips">${chips(ST, (k, l) => `<span class="${c.st[k] ? 'weak' : ''}" data-a="st" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div>
       <div class="row">XP ${inp('xp', c.xp)}${c.enemy ? `Recompensa: XP ${inp('xpR', c.xpR)} Ouro ${inp('goldR', c.goldR)}` : ''}</div>
       <div class="row">${btn('horror', 'Horror')}${btn('evolve', 'Evoluir')}${btn('place', c.x == null || c.scene !== S.scene ? 'Pôr no mapa' : 'Tirar do mapa')}${btn('bSave', '→ Bestiário')}${btn('delChar', 'Excluir')}</div>` : ''}`,
-    per: () => `<div class="pers">${chips(PER, (k, [a, b]) => `<div class="row">${btn('roll', `${k} ${Math.round((at(c, a) + at(c, b)) / 2) + (c.per[k] || 0)}%`, `data-per="${k}" ${ed}`)}<small>${a}${a === b ? '' : '+' + b}</small> treino ${inp('per.' + k, c.per[k] || 0)}</div>`)}</div>`,
     sk: () => `${grid(c)}${c.skills.filter(k => S.skills[k]).map(k => `<p><b>${esc(S.skills[k].name)}</b> <small>${esc(desc(S.skills[k]))}</small></p>`).join('')}`,
     inv: () => `<div class="row">Ouro: <b>${c.gold}</b></div>${Object.entries(c.inv).filter(([k]) => S.items[k]).map(([k, q]) => { const i = S.items[k], on = c.equip[i.type] === k, x = `data-item="${k}"`;
         return `<div class="row inv"><span>${esc(i.name)} ×${q} <small>${esc(idesc(i))}</small></span>
-        ${own ? (i.type === 'cons' ? btn('use', 'Usar', x) : btn('equip', on ? 'Desequipar' : 'Equipar', `${x} ${on ? 'class="own"' : ''}`)) + (S.shop.open ? btn('sell', `Vender ${Math.floor(i.price / 2)}`, x) : '') + btn('drop', '−', x) : ''}</div>`; }).join('') || '<div class="row"><small>vazio</small></div>'}
-      ${S.shop.open && own ? `<b>Loja</b>${S.shop.stock.filter(k => S.items[k]).map(k => `<div class="row inv"><span>${esc(S.items[k].name)} <small>${esc(idesc(S.items[k]))}</small></span>${btn('buy', `Comprar ${S.items[k].price}`, `data-item="${k}" ${c.gold < S.items[k].price ? 'disabled' : ''}`)}</div>`).join('')}` : ''}
+        ${own ? (i.type === 'cons' ? btn('use', 'Usar', x) : i.type === 'mat' ? '' : btn('equip', on ? 'Desequipar' : 'Equipar', `${x} ${on ? 'class="own"' : ''}`)) + (shop().open ? btn('sell', `Vender ${Math.floor(i.price / 2)}`, x) : '') + btn('drop', '−', x) : ''}</div>`; }).join('') || '<div class="row"><small>vazio</small></div>'}
+      ${own ? Object.entries(S.items).filter(([, i]) => i.el && ['arma', 'acess'].includes(i.type)).map(([k, i]) => { // forja: aparece quando o personagem tem essência do elemento
+        const ess = Object.keys(S.items).find(e => S.items[e].type === 'mat' && S.items[e].el === i.el), have = c.inv[ess] || 0, need = i.type === 'arma' ? 3 : 5, cost = Math.round(i.price / 2);
+        return have ? `<div class="row inv"><span>Forjar ${esc(i.name)} <small>${have}/${need} essências · ${cost} ouro</small></span>${btn('forge', 'Forjar', `data-item="${k}" ${have < need || c.gold < cost ? 'disabled' : ''}`)}</div>` : ''; }).join('') : ''}
+      ${shop().open && own ? `<b>Loja</b>${shop().stock.filter(k => S.items[k]).map(k => `<div class="row inv"><span>${esc(S.items[k].name)} <small>${esc(idesc(S.items[k]))}</small></span>${btn('buy', `Comprar ${S.items[k].price}`, `data-item="${k}" ${c.gold < S.items[k].price ? 'disabled' : ''}`)}</div>`).join('')}` : ''}
       ${gm ? `<div class="row chips">Dar: ${chips(S.items, (k, i) => `<span data-a="give" data-id="${c.id}" data-item="${k}">+ ${esc(i.name)}</span>`)}</div>` : ''}`,
     bio: () => `<textarea data-id="${c.id}" data-f="bio" placeholder="História, aparência, anotações…" ${ed}>${esc(c.bio)}</textarea>${gm ? `<textarea data-id="${c.id}" data-f="gmNote" placeholder="Notas secretas do mestre">${esc(c.gmNote)}</textarea>` : ''}`,
   };
@@ -185,9 +197,11 @@ function render() {
     const cena = `<div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
       <div class="row">${b ? '<button data-a="battle" data-win="1" class="own">Vitória</button><button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
       <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button></div>
+      <div class="row"><b>Contratos</b><button data-a="ctMode" ${on(ctMode)}>Novo contrato</button>${ctMode ? '<small>Clique no alvo no bestiário.</small>' : ''}</div>
+      ${chips(S.contracts, (id, ct) => `<div class="row inv"><span>${ct.done ? '✓ ' : ''}${esc(ct.target)} <small>${ct.gold} ouro · ${ct.xp} XP</small></span><button data-a="ctDel" data-id="${id}" aria-label="Remover contrato">×</button></div>`)}
       <div class="row"><b>Bestiário</b><button data-a="tier">Nível: ${tier}</button><button data-a="content" data-coll="bestiary">Restaurar padrão</button></div>
       <div class="row chips best">${chips(S.bestiary, (id, m) => `<span data-a="bSpawn" data-id="${id}" title="Clique: criar cópia · Shift+clique: apagar modelo">${m.boss ? '★ ' : '+ '}${esc(m.name)}</span>`) || '<small>salve um inimigo pela ficha</small>'}</div>
-      <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span></div>
+      <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span><span data-a="content" data-coll="scenes">+ cenas de exemplo</span></div>
       <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"><input aria-label="Colunas" type="number" data-map="cols" value="${sc.cols}">×<input aria-label="Linhas" type="number" data-map="rows" value="${sc.rows}"></div>
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="URL da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar mapa<input type="file" accept="image/*" data-up="bg"></label></div>
       <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
@@ -195,22 +209,23 @@ function render() {
     const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && S.chars[k.slice(2)]), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [S.chars[k.slice(2)].name, 400]])) };
     const rank = Object.keys(ALL).sort((x, y) => (wins[x].z || 0) - (wins[y].z || 0));
     const lays = chips(LAYD, k => `<button class="lay" data-a="lay" data-k="${k}" title="Clique: aplicar arranjo · Shift+clique: salvar o arranjo atual">${k}</button>`);
-    const body = { ...Object.fromEntries(fw.map(k => [k, sheet(S.chars[k.slice(2)], true)])), ini: wins.ini.open ? iniWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
+    const body = { ...Object.fromEntries(fw.map(k => [k, sheet(S.chars[k.slice(2)], true)])), ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
     app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${w}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
       <nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(c => c.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB[0];
     const hud = my.map(c => `<div class="hud" data-pv="ficha" style="--c:${esc(c.color)}"><b>${esc(c.name)}</b>${bar('hp', c)}${bar('aura', c)}${bar('san', c)}</div>`).join('');
     const wide = matchMedia('(min-width:1100px)').matches; // no PC tudo fica visível: ficha, cena e chat lado a lado
-    const ficha = `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div></div>${sheets}`;
+    const cts = Object.values(S.contracts).filter(ct => !ct.done).map(ct => `<div class="row inv"><span>Caçar: ${esc(ct.target)}</span><small>${ct.gold} ouro · ${ct.xp} XP</small></div>`).join('');
+    const ficha = `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div>${cts ? '<b>Contratos de caça</b>' + cts : ''}</div>${sheets}`;
     const cena = actor ? (wide ? battle() : '') + command(actor, cur) : (b ? battle() : map()) + (wide ? '' : `<div class="huds">${hud}</div>`);
-    const view = pv === 'ficha' ? ficha : pv === 'chat' ? `<div class="panel">${log}</div>` : cena;
-    app.innerHTML = wide ? `<main class="pc"><aside>${ficha}</aside><section>${cena}</section><aside><div class="panel">${log}</div></aside></main>` : `<main class="pv">${view}</main><nav class="dock">${chips({ cena: b ? 'Batalha' : 'Mesa', ficha: 'Ficha', chat: 'Chat' }, (k, l) => `<button data-pv="${k}" ${on(pv === k)}>${l}</button>`)}</nav>`;
+    const view = pv === 'ficha' ? ficha : pv === 'chat' ? `<div class="panel">${log}</div>` : chaseBar() + cena;
+    app.innerHTML = wide ? `<main class="pc"><aside>${ficha}</aside><section>${chaseBar()}${cena}</section><aside><div class="panel">${log}</div></aside></main>` : `<main class="pv">${view}</main><nav class="dock">${chips({ cena: b ? 'Batalha' : 'Mesa', ficha: 'Ficha', chat: 'Chat' }, (k, l) => `<button data-pv="${k}" ${on(pv === k)}>${l}</button>`)}</nav>`;
     app.insertAdjacentHTML('beforeend', ctxMenu());
-  } else app.innerHTML = `<main>${b ? battle() : map() + party()}</main>`;
+  } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
   app.querySelectorAll('.win-body,.pc>aside').forEach((el, i) => el.scrollTop = scr[i] || 0);
-  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],.hud').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
+  app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],[data-cz],.hud').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   fx();
 }
 
@@ -266,6 +281,8 @@ app.addEventListener('click', e => {
   const nd = e.target.closest('[data-node]');
   if (nd) { selNode[nd.dataset.id] = nd.dataset.node; return render(); }
   const am = e.target.closest('[data-aim]'), sb = e.target.closest('[data-sub]'), pvb = e.target.closest('[data-pv]');
+  const czb = e.target.closest('[data-cz]');
+  if (czb) { cz[czb.dataset.cz] = czb.dataset.v; return render(); }
   if (am) { aim = aim === am.dataset.aim ? null : am.dataset.aim; return render(); }
   if (sb) { sub = sb.dataset.sub || null; return render(); }
   if (pvb) { pv = pvb.dataset.pv; return render(); }
@@ -281,8 +298,15 @@ app.addEventListener('click', e => {
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
   if (d.a === 'fogMode') { fogMode = !fogMode; return render(); }
   if (d.a === 'secret') { secret = !secret; return render(); }
+  if (d.a === 'chaseStart') return send({ t: 'chase', k: 'start', ...cz });
+  if (d.a === 'ctMode') { ctMode = !ctMode; return render(); }
+  if (d.a === 'bSpawn' && ctMode) { // modo contrato: o clique no bestiário escolhe o alvo
+    const b = S.bestiary[d.id], gold = prompt(`Recompensa em ouro por caçar ${b.name}?`, b.goldR * 5);
+    ctMode = false; if (gold === null) return render();
+    return send({ t: 'ctAdd', id: d.id, gold: +gold || 0, xp: b.xpR });
+  }
   if (d.a === 'tier') { tier = { fraco: 'normal', normal: 'elite', elite: 'fraco' }[tier]; return render(); }
-  if (d.a === 'content' && !confirm('Restaurar o conteúdo padrão? Edições nessa coleção serão perdidas' + (d.coll === 'bestiary' ? '.' : ' e os personagens perdem o que tinham dela.'))) return;
+  if (d.a === 'content' && d.coll !== 'scenes' && !confirm('Restaurar o conteúdo padrão? Edições nessa coleção serão perdidas' + (d.coll === 'bestiary' ? '.' : ' e os personagens perdem o que tinham dela.'))) return;
   if (d.a === 'logout') { ['vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); return location.reload(); }
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return alert('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;

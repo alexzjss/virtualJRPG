@@ -28,13 +28,13 @@ export function buildSkills(sk) {
   // raios elementais: [elemento, atributo, tipo, status, [básica, área, forte, suprema, limite], suporte [buff, st, debuff, st, área, st, atributo], proibida?]
   const E = [
     ['kagutsuchi', 'INT', 'dmg', 'burn', ['Centelha', 'Mar de Chamas', 'Lâmina de Kagutsuchi', 'Sol de Kagutsuchi', 'Inferno Rubro'], ['Brasa Interior', 'atkUp', 'Marca Ardente', 'defDn', 'Cinzas Sufocantes', 'silence', 'FOR'], ['Chama Negra', 48, false, 'burn']],
-    ['susanoo', 'INT', 'dmg', 'agiDn', ["Jato d'Água", 'Maré Alta', 'Lança de Susanoo', 'Dilúvio de Susanoo', 'Fúria dos Mares'], ['Correnteza', 'agiUp', 'Afogar', 'agiDn', 'Névoa Fria', 'sleep', 'AGI']],
+    ['susanoo', 'INT', 'dmg', 'agiDn', ["Jato d'Água", 'Maré Alta', 'Lança de Susanoo', 'Dilúvio de Susanoo', 'Fúria dos Mares'], ['Correnteza', 'agiUp', 'Afogar', 'agiDn', 'Névoa Fria', 'frozen', 'AGI']],
     ['atlas', 'FOR', 'dmg', 'defDn', ['Estilhaço', 'Terremoto', 'Punho de Atlas', 'Peso do Mundo', 'Colapso'], ['Pele de Pedra', 'defUp', 'Fenda', 'stun', 'Tremor', 'agiDn', 'CON']],
     ['indra', 'INT', 'dmg', 'para', ['Faísca', 'Tempestade', 'Raio de Indra', 'Julgamento de Indra', 'Vajra'], ['Reflexo Elétrico', 'agiUp', 'Choque', 'para', 'Campo Estático', 'silence', 'DES'], ['Relâmpago Vazio', 44, true, 'stun']],
     ['fuhaku', 'DES', 'dmg', 'bleed', ['Lâmina de Vento', 'Vendaval', 'Corte de Fuhaku', 'Tufão de Fuhaku', 'Mil Lâminas'], ['Vento a Favor', 'agiUp', 'Rajada Cortante', 'bleed', 'Olho do Furacão', 'confuse', 'AGI']],
-    ['amaterasu', 'SAB', 'heal', 'defUp', ['Luz Curativa', 'Aurora', 'Bênção de Amaterasu', 'Alvorada de Amaterasu', 'Sol Nascente'], ['Luz Guardiã', 'defUp', 'Clarão', 'atkDn', 'Julgamento Solar', 'defDn', 'SAB']],
-    ['tsukuyomi', 'INT', 'mental', 'fear', ['Sussurro Sombrio', 'Eclipse', 'Véu de Tsukuyomi', 'Noite Eterna', 'Fim do Sonho'], ['Manto da Noite', 'defUp', 'Pesadelo', 'sleep', 'Lua Negra', 'confuse', 'INT'], ['Olhar do Abismo', 40, false, 'fear']],
-    ['shukketsu', 'INT', 'dmg', 'bleed', ['Sangria', 'Chuva Rubra', 'Pacto de Shukketsu', 'Hemorragia Final', 'Sacrifício'], ['Frenesi', 'atkUp', 'Hemorragia', 'bleed', 'Maré Vermelha', 'atkDn', 'CON'], ['Rito de Sangue', 50, false, 'bleed']],
+    ['amaterasu', 'SAB', 'heal', 'defUp', ['Luz Curativa', 'Aurora', 'Bênção de Amaterasu', 'Alvorada de Amaterasu', 'Sol Nascente'], ['Luz Guardiã', 'defUp', 'Clarão', 'atkDn', 'Julgamento Solar', 'marked', 'SAB']],
+    ['tsukuyomi', 'INT', 'mental', 'fear', ['Sussurro Sombrio', 'Eclipse', 'Véu de Tsukuyomi', 'Noite Eterna', 'Fim do Sonho'], ['Manto da Noite', 'defUp', 'Pesadelo', 'sleep', 'Lua Negra', 'possess', 'INT'], ['Olhar do Abismo', 40, false, 'fear']],
+    ['shukketsu', 'INT', 'dmg', 'bleed', ['Sangria', 'Chuva Rubra', 'Pacto de Shukketsu', 'Hemorragia Final', 'Sacrifício'], ['Frenesi', 'atkUp', 'Hemorragia', 'bleed', 'Maré Vermelha', 'curse', 'CON'], ['Rito de Sangue', 50, false, 'bleed']],
     ['radiacao', 'INT', 'dmg', 'rad', ['Raio Gama', 'Chuva Ácida', 'Fissão de Hiruko', 'Meia-Vida', 'Ponto Crítico'], ['Mutação', 'atkUp', 'Contaminar', 'rad', 'Nuvem Tóxica', 'poison', 'SOR'], ['Fusão do Núcleo', 38, true, 'rad']],
   ];
   E.forEach(([el, attr, kind, st, n, , forb], i) => {
@@ -70,6 +70,8 @@ export function buildItems(it) {
   add('Antídoto', 'cons', 0, { eff: 'cure', price: 15 }); add('Atadura', 'cons', 30, { eff: 'body', price: 12 }); add('Sais Aromáticos', 'cons', 20, { eff: 'rev', price: 60 });
   add('Granada', 'cons', 28, { eff: 'bomb', el: 'fis', price: 35 }); add('Coquetel Incendiário', 'cons', 25, { eff: 'bomb', el: 'kagutsuchi', price: 35 });
   add('Frasco de Ácido', 'cons', 22, { eff: 'bomb', el: 'radiacao', price: 35 }); add('Bomba de Sal Sagrado', 'cons', 24, { eff: 'bomb', el: 'amaterasu', price: 35 });
+  // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)
+  add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + n[el], 'mat', 0, { el, price: 20 }));
   // armas em três níveis por tipo
   [['lamina', 'Sabre de Cavalaria', 'Katana de Caçador', 'Lâmina Consagrada'], ['lanca', 'Baioneta', 'Lança de Caça', 'Alabarda Rúnica'], ['fogo', 'Revólver .38', 'Rifle de Ferrolho', 'Carabina Selada'], ['punho', 'Soqueira', 'Manoplas de Aço', 'Punhos de Talismã']]
     .forEach(([wt, ...names]) => names.forEach((name, i) => add(name, 'arma', [10, 14, 19][i] + (wt === 'fogo') - (wt === 'punho'), { wt, price: [40, 120, 320][i] })));
@@ -115,9 +117,23 @@ export function buildBestiary(make) {
     ['Caçador Rival', '#0f766e', { FOR: 60, DES: 60, AGI: 55 }, [], [], ['Golpe Pesado', 'Tiro Certeiro', 'Passo Rápido', 'Luz Curativa'], { arma: 14, armor: 3, xpR: 30, goldR: 60 }],
   ];
   // um chefe por patrono: usa o raio inteiro do elemento, tem muito HP e entra em fúria com metade da vida
-  const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT'], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR'], ['indra', 'Arconte da Tempestade', 'atlas', 'INT'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES'],
-    ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB'], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT'], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT'], ['radiacao', 'Filho de Hiruko', 'susanoo', 'INT']];
+  const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT', 'torso'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT', 'head'], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR', 'legL'], ['indra', 'Arconte da Tempestade', 'atlas', 'INT', 'armR'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES', 'armL'],
+    ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR'], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head'], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso'], ['radiacao', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
+  const PN = { head: 'cabeça', torso: 'torso', armL: 'braço esquerdo', armR: 'braço direito', legL: 'perna esquerda', legR: 'perna direita' };
   const ray = el => s => s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back);
   return [...B.map(([name, color, attrs, weak, resist, skills, o]) => make(name, color, attrs, weak, resist, skills, o)),
-    ...BOSS.map(([el, name, weak, attr]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
+    ...BOSS.map(([el, name, weak, attr, wp]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
 }
+
+// cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local
+export const SCENES = [
+  { name: 'Beco do Mercado Negro', bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura'],
+    note: 'Encontros: 3 Bandidos + 1 Capanga da Máfia (emboscada); à noite, 2 Diabretes de Cinzas nos telhados. Armeiro vende sem perguntas; a botica é fachada de um Cultista.' },
+  { name: 'Santuário Profanado', bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo'],
+    note: 'Encontros: 2 Yurei + 1 Espectro da Trincheira; chefe opcional: Serafim Caído no altar. A fonte restaura Sanidade uma vez (mestre concede). Teste de horror ao entrar (perda 5).' },
+  { name: 'Estação Central', bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Colete Reforçado'],
+    note: 'Encontros: 2 Soldados Desertores + 1 Autômato Possuído no depósito; Golem de Sucata na locomotiva. Boa cena para iniciar uma perseguição (automóvel contra motocicleta).' },
+  { name: 'Mansão Ashworth', bg: '/maps/mansao.svg', stock: [],
+    note: 'Encontros: Cultistas (3) na capela + Ocultista na biblioteca; Súcubo no salão. Chefe: Condessa Escarlate (ponto fraco: torso). Use névoa de guerra e revele cômodo a cômodo.' },
+];
+export const VEHICLES = { pe: ['A pé', 1, 0], cavalo: ['Cavalo', 3, 10], moto: ['Motocicleta', 5, 0], auto: ['Automóvel', 4, -5], caminhao: ['Caminhão', 3, -15] }; // nome, velocidade, manobra
