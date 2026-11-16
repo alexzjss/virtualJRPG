@@ -21,7 +21,7 @@ const gen = { el: 'kagutsuchi', role: 'bruto', rank: 'comum' }, ROLEN = { bruto:
 // mesma referência do servidor: heróis na cena e poder do grupo (média dos três maiores atributos)
 const partyRef = () => { const pcs = Object.values(S.chars).filter(c => !c.enemy && !c.dead && c.scene === S.scene), top3 = c => A.map(a => c.attrs[a]).sort((x, y) => y - x).slice(0, 3).reduce((a, b) => a + b, 0) / 3; return { n: pcs.length || 4, p: pcs.length ? Math.round(pcs.reduce((a, c) => a + top3(c), 0) / pcs.length) : 58 }; };
 const ent = id => S.chars[id] || S.bestiary?.[id]; // personagem em jogo ou modelo do bestiário
-const WIN = { best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
+const WIN = { sessao: ['Sessão', 440], best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720] };
 const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'best', 'items'] }; // arranjos de janelas
 const view = { z: 1, x: 0, y: 0 }; // zoom e deslocamento do mapa (local de cada tela)
 let ctx = null, pan = null, ruler = null, spaceDown = false, zc = 1, pings = [];
@@ -32,14 +32,24 @@ const ED = {
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Efeito', 'eff', EFF], ['Atr. (acess.)', 'attr', AO], ['Tipo de arma', 'wt', WT], ['Elemento', 'el', { '': '—', ...EL }], ['Preço', 'price']],
 };
 let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
-let wins = { best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
+let wins = { sessao: { x: 360, y: 64, open: true }, best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur;
 const mods = {}, tabs = {}, selNode = {}, open = {};
-const ask = (k, q) => localStorage[k] || (localStorage[k] = prompt(q) || '');
-const name = role === 'player' ? ask('vj_name', 'Seu nome de jogador? (sem espaços)') : '';
-const pass = role === 'player' ? ask('vj_pass_' + name, `Senha de ${name}? (no primeiro acesso, você está criando a senha)`) : '';
-const key = gm ? ask('vj_key', 'Chave do mestre?') : '';
+// login: a página de entrada (GitHub Pages) manda login e senha no fim do link (#vj=…), que nunca vai ao servidor e é apagado da barra
+const ls = (k, v) => { try { if (v === undefined) return localStorage[k] || ''; if (v === null) delete localStorage[k]; else localStorage[k] = v; } catch { return ''; } };
+try { const h = new URLSearchParams(location.hash.slice(1)).get('vj'); if (h) { const o = JSON.parse(decodeURIComponent(escape(atob(h.replace(/-/g, '+').replace(/_/g, '/'))))); ls('vj_name', o.n || ''); ls('vj_pass', o.p || ''); history.replaceState(null, '', location.pathname); } } catch {}
+let name = role === 'gm' ? '' : ls('vj_name'), pass = role === 'gm' ? '' : ls('vj_pass'), key = gm ? ls('vj_key') : '';
+const loginForm = msg => { // gm: só a chave; jogador: login e senha; mesa: conta de jogador ou "mestre" + chave
+  document.body.classList.remove('off');
+  app.innerHTML = `<form class="card login" id="login"><h3>${gm ? 'Chave do mestre' : role === 'table' ? 'Mesa (TV)' : 'Entrar na campanha'}</h3>${msg ? `<p class="msg">${esc(msg)}</p>` : ''}
+    ${gm ? '' : `<label>Login<input name="n" autocomplete="username" required value="${esc(name)}"></label>`}
+    <label>${gm ? 'Chave (aparece na janela do programa e em data/gm-key.txt)' : 'Senha'}<input name="p" type="password" autocomplete="current-password" required></label>
+    <small>${gm ? '' : role === 'table' ? 'Use a conta de um jogador, ou o login <b>mestre</b> com a chave do mestre.' : 'O login e a senha são criados pelo mestre. Esqueceu? Peça a ele uma senha nova.'}</small>
+    <button class="own">Entrar</button></form>`;
+  const f = app.querySelector('#login'); f.querySelector('input:not([value]),input[value=""],input[type=password]')?.focus();
+  f.onsubmit = e => { e.preventDefault(); const d = new FormData(f); if (gm) ls('vj_key', key = d.get('p')); else { ls('vj_name', name = d.get('n').trim()); ls('vj_pass', pass = d.get('p')); } app.textContent = 'Conectando…'; connect(); };
+};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const send = o => ws.readyState === 1 && ws.send(JSON.stringify(o));
@@ -68,9 +78,41 @@ function connect() {
     const m = JSON.parse(e.data);
     if (m.t === 'state') { S = m.s; render(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }
-    if (m.t === 'err') { alert(m.msg); if (m.bad) { ws.onclose = null; ['vj_key', 'vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); location.reload(); } }
+    if (m.t === 'passOk') { ls('vj_pass', pass = m.pass); alert('Senha trocada. Na próxima sessão, digite a nova na página de entrada.'); }
+    if (m.t === 'err') { if (!m.bad) return alert(m.msg); ws.onclose = null; ws.close(); S = null; ls(gm ? 'vj_key' : 'vj_pass', null); loginForm(m.msg); }
   };
   ws.onclose = () => { document.body.classList.add('off'); setTimeout(connect, 1500); };
+}
+
+// ===== janela Sessão (mestre): internet, convite, contas e passo a passo =====
+const sess = { n: '', p: '', ch: '', last: null };
+const heroes = () => Object.values(S.chars).filter(c => !c.enemy);
+const genPass = () => Array.from(crypto.getRandomValues(new Uint32Array(6)), x => 'abcdefghjkmnpqrstuvwxyz23456789'[x % 31]).join('');
+const inviteUrl = () => S.net.code ? S.net.portal + '?c=' + S.net.code : '';
+const inviteText = () => `Mesa aberta! Para entrar na sessão de hoje:\n1. Abra ${inviteUrl()}\n2. Digite seu login e sua senha e clique em Entrar.\n(Se pedir o código da sessão: ${S.net.code})\nO código muda a cada sessão; o login e a senha continuam os mesmos.`;
+const accessText = a => `Seu acesso ao virtualJRPG\nLogin: ${a.n}\nSenha: ${a.p}\nNo dia da sessão eu mando o link de entrada. Você pode trocar a senha depois, no botão Senha, no alto da tela.`;
+const copy = (t, ok) => navigator.clipboard?.writeText(t).then(() => alert(ok), () => prompt('Copie o texto:', t)) ?? prompt('Copie o texto:', t);
+function sessWin() {
+  const n = S.net, st = { ok: 'Aberta', abrindo: 'Abrindo…', baixando: 'Preparando…', erro: 'Com problema', off: 'Desligada' }[n.status] || n.status;
+  const net = `<h4>Internet <span class="net ${esc(n.status)}">${st}</span></h4>
+    ${n.status === 'ok' ? `<div class="invite"><small>Código da sessão</small><b>${esc(n.code)}</b><small>${esc(inviteUrl())}</small></div><div class="row"><button class="own" data-a="copy" data-k="invite">Copiar convite</button></div>`
+      : `<p><small>${esc(n.msg)}</small></p>`}
+    ${n.lan.length ? `<p><small>Mesma rede Wi-Fi (sem internet): ${n.lan.map(u => esc(u) + '/player').join(' · ')}</small></p>` : ''}`;
+  const acc = S.accounts.map(a => { const own = heroes().filter(c => c.owner === a);
+    return `<div class="acct"><b>${esc(a)}</b><span class="chips">${own.map(c => `<span data-a="freeChar" data-id="${c.id}" title="Tirar este personagem da conta">${esc(c.name)} ×</span>`).join('') || '<small>sem personagem</small>'}</span>
+      <span class="row"><button data-a="giveChar" data-k="${esc(a)}">+ Personagem</button><button data-a="userPass" data-k="${esc(a)}">Nova senha</button><button data-a="userDel" data-k="${esc(a)}">Apagar</button></span></div>`; }).join('') || '<p><small>Nenhuma conta ainda. Crie uma para cada jogador.</small></p>';
+  const opts = heroes().map(c => `<option value="${c.id}" ${sess.ch === c.id ? 'selected' : ''}>${esc(c.name)}${c.owner ? ' (de ' + esc(c.owner) + ')' : ''}</option>`).join('');
+  const form = `<div class="row"><input data-sess="n" aria-label="Login do jogador" placeholder="Login (sem espaços)" value="${esc(sess.n)}"><input data-sess="p" aria-label="Senha" placeholder="Senha (vazio = gerar)" value="${esc(sess.p)}"></div>
+    <div class="row"><select data-sess="ch" aria-label="Personagem da conta"><option value="">Sem personagem por enquanto</option>${opts}</select><button class="own" data-a="userAdd">Criar conta</button></div>
+    ${sess.last ? `<div class="invite"><small>Passe só para esse jogador</small><b>${esc(sess.last.n)} · ${esc(sess.last.p)}</b></div><div class="row"><button data-a="copy" data-k="acc">Copiar acesso</button></div>` : ''}`;
+  const guide = `<details><summary>Passo a passo do mestre</summary><ol>
+    <li><b>Antes da 1ª sessão:</b> crie aqui uma conta para cada jogador e escolha o personagem dela. Copie o acesso e mande para cada um em particular.</li>
+    <li><b>No dia:</b> abra o programa e espere "Internet: Aberta" (na 1ª vez ele baixa o cloudflared, leva um minuto).</li>
+    <li>Clique em <b>Copiar convite</b> e cole no grupo. O código muda a cada vez que você abre o programa.</li>
+    <li>Na TV, abra <b>/table</b> e entre com o login <b>mestre</b> e a sua chave.</li>
+    <li>Ao fim, feche a janela do programa: o link para de funcionar e tudo fica salvo na pasta <b>data</b>. Faça cópia dessa pasta de vez em quando.</li>
+    <li>Jogador esqueceu a senha: <b>Nova senha</b>. Quem estiver conectado com a senha antiga é desconectado.</li></ol></details>`;
+  return net + `<h4>Contas dos jogadores</h4>${acc}<h4>Nova conta</h4>${form}${guide}`;
 }
 
 function timeline(n = 8) { return (S.battle.order || []).filter(id => S.chars[id]).slice(0, n); } // fila calculada pelo servidor
@@ -318,21 +360,20 @@ function render() {
     const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && ent(k.slice(2))), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [ent(k.slice(2)).name + (S.chars[k.slice(2)] ? '' : ' · modelo do bestiário'), 1080]])) };
     const rank = Object.keys(ALL).sort((x, y) => (wins[x].z || 0) - (wins[y].z || 0));
     const lays = chips(LAYD, k => `<button class="lay" data-a="lay" data-k="${k}" title="Clique: aplicar arranjo · Shift+clique: salvar o arranjo atual">${k}</button>`);
-    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(ent(k.slice(2)))])), best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
+    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(ent(k.slice(2)))])), sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: sheets || '<small>Crie personagens na janela Cena.</small>', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '' };
     app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : Math.min(w, innerWidth - 24)}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
       ${cropper()}<nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) pg = 'mesa'; // a batalha começou: leva o jogador para a mesa
     wasBattle = b;
-    const free = chars.filter(x => !x.enemy && !x.owner);
-    const page = !c ? `<section class="card"><h3>Escolha seu caçador</h3><p>Assuma um personagem livre ou crie um novo; o mestre define os atributos.</p><div class="icards">${free.map(x => `<div class="icard" style="--e:${esc(x.color)}"><em>${(x.vinc || []).map(e => 'Vínculo: ' + PATRON[e]).join(' · ') || 'Sem Vínculo'}</em><b>${esc(x.name)}</b><small>${esc(x.bio || '')}</small><div class="row"><button class="own" data-a="claim" data-id="${x.id}">Assumir</button></div></div>`).join('')}</div><div class="row"><button data-a="addChar">Criar personagem novo</button></div></section>`
+    const page = !c ? `<section class="card"><h3>Bem-vindo, ${esc(name)}</h3><p>Você entrou na campanha. O mestre ainda não ligou um personagem à sua conta: assim que ele fizer isso, a ficha aparece aqui sozinha.</p></section>`
       : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
       : chaseBar() + (actor ? battle() + command(actor, cur) : b ? battle() : map());
-    app.innerHTML = `<header class="top"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}">${esc(x.name)}<small>${x.hp}/${x.hpMax}</small></button>`).join('')}<button class="ghost" data-a="addChar" title="Novo personagem" aria-label="Novo personagem">+</button></div>
+    app.innerHTML = `<header class="top"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}">${esc(x.name)}<small>${x.hp}/${x.hpMax}</small></button>`).join('')}</div>
       <nav>${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}">${k === 'mesa' && b ? 'Batalha' : l}</button>`)}</nav>
-      <div class="me"><span>${esc(name)}</span><button class="ghost" data-a="chatT" ${on(chatOpen)}>Chat</button><button class="ghost" data-a="logout">Sair</button></div></header>
+      <div class="me"><span>${esc(name)}</span><button class="ghost" data-a="chatT" ${on(chatOpen)}>Chat</button><button class="ghost" data-a="myPass" title="Trocar a sua senha">Senha</button><button class="ghost" data-a="logout">Sair</button></div></header>
       <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg}"><main>${page}</main>${chatOpen ? `<aside class="chatcol"><div class="panel">${log}</div></aside>` : ''}</div>${ctxMenu()}`;
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
   if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
@@ -397,8 +438,9 @@ app.addEventListener('change', e => {
   else if (d.map === 'bg') setBg(v);
   else if (d.map) send({ t: 'map', f: d.map, v });
   else if (d.mid) mods[d.mid] = v;
+  else if (d.sess) sess[d.sess] = v;
 });
-app.addEventListener('input', e => { const k = e.target.dataset.bf; if (!k) return; bf[k] = e.target.value; if (k === 'q') render(); }); // filtros do bestiário
+app.addEventListener('input', e => { if (e.target.dataset.sess) sess[e.target.dataset.sess] = e.target.value; const k = e.target.dataset.bf; if (!k) return; bf[k] = e.target.value; if (k === 'q') render(); }); // filtros do bestiário
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open],[data-aim]')) { e.preventDefault(); e.target.click(); }
 });
@@ -468,12 +510,19 @@ app.addEventListener('click', e => {
   if (d.a === 'ctMode') { ctMode = !ctMode; return render(); }
   if (d.a === 'tier') { tier = { fraco: 'normal', normal: 'elite', elite: 'fraco' }[tier]; return render(); }
   if (d.a === 'content' && d.coll !== 'scenes' && !confirm('Restaurar o conteúdo padrão? Edições nessa coleção serão perdidas' + (d.coll === 'bestiary' ? '.' : ' e os personagens perdem o que tinham dela.'))) return;
-  if (d.a === 'logout') { ['vj_name', 'vj_pass_' + name].forEach(k => delete localStorage[k]); return location.reload(); }
+  if (d.a === 'logout') { ls('vj_pass', null); return location.reload(); }
+  if (d.a === 'myPass') { const p = prompt('Senha nova (pelo menos 4 caracteres):'); if (!p) return; if (prompt('Digite a senha nova de novo:') !== p) return alert('As duas senhas não batem.'); return send({ t: 'userPass', pass: p }); }
+  if (d.a === 'userAdd') { const n = sess.n.trim(), p = sess.p || genPass(); if (!n) return alert('Escreva o login.'); send({ t: 'userAdd', name: n, pass: p, char: sess.ch }); sess.last = { n, p }; sess.n = ''; sess.p = ''; sess.ch = ''; return render(); }
+  if (d.a === 'userPass') { const p = prompt(`Senha nova para ${d.k}:`, genPass()); if (!p) return; send({ t: 'userPass', name: d.k, pass: p }); sess.last = { n: d.k, p }; return render(); }
+  if (d.a === 'userDel') { if (confirm(`Apagar a conta ${d.k}? Os personagens dela ficam sem dono.`)) send({ t: 'userDel', name: d.k }); return; }
+  if (d.a === 'giveChar') { const id = prompt('Qual personagem? Digite o número:\n' + heroes().map((c, i) => `${i + 1}. ${c.name}${c.owner ? ' (de ' + c.owner + ')' : ''}`).join('\n')); const c = heroes()[+id - 1]; if (c) send({ t: 'set', id: c.id, f: 'owner', v: d.k }); return; }
+  if (d.a === 'freeChar') return send({ t: 'set', id: d.id, f: 'owner', v: '' });
+  if (d.a === 'copy') return copy(d.k === 'invite' ? inviteText() : accessText(sess.last), d.k === 'invite' ? 'Convite copiado. Cole no grupo dos jogadores.' : 'Acesso copiado. Mande só para esse jogador.');
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return alert('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
   const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
-  if (d.a === 'addChar' && gm && !d.enemy) m.owner = prompt('Nome do jogador dono?') || '';
+  if (d.a === 'addChar' && gm && !d.enemy) { const o = prompt(`Login do jogador dono? (deixe vazio para escolher depois na janela Sessão)${S.accounts.length ? '\nContas: ' + S.accounts.join(', ') : ''}`); if (o === null) return; m.owner = o.trim(); }
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;
   send(m);
   if (d.a === 'act' || d.a === 'use' || d.a === 'next') { aim = null; sub = null; }
@@ -569,4 +618,4 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => S && render(), 150); });
-if (role) connect();
+if (gm ? key : name && pass) connect(); else loginForm();

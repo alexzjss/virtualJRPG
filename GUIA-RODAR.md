@@ -1,93 +1,77 @@
 # Como rodar o virtualJRPG de graça
 
-O jogo é um servidor Node que fica ligado (WebSocket + estado em arquivo). Por isso **não roda na Vercel**; ela só serve para páginas estáticas e funções curtas.
-O caminho mais simples e realmente gratuito é **rodar no computador do mestre** e abrir um túnel para os jogadores.
+O jogo roda **no computador do mestre**. Lá ficam a campanha, os mapas, as contas e as cópias de segurança.
+Os jogadores não instalam nada: recebem um link, digitam login e senha e jogam pelo navegador (celular ou PC).
+Tudo o que um faz aparece na hora para os outros e para o mestre.
 
-> Planos gratuitos mudam com frequência. Os nomes e limites abaixo são os que eu conheço; confira na página de cada serviço antes de contar com eles.
-
-## Opção 0 (mais fácil): baixar o programa pronto
-
-A cada versão publicada, o GitHub gera um executável que não precisa de Node nem de instalação.
-1. No GitHub do projeto, abra **Releases** e baixe o `.zip` do seu sistema: `windows-x64`, `linux-x64`, `macos-arm64` (Macs com chip M). Macs com processador Intel não têm programa pronto: use a Opção A (com Node).
-2. Extraia e dê dois cliques em `virtualJRPG`. A janela mostra os endereços e a chave do mestre (também guardada em `data/gm-key.txt`).
-3. Para os jogadores de fora da sua rede, abra um túnel (passo 3 da Opção A).
-
-No Windows, se aparecer "PC protegido", clique em **Mais informações → Executar assim mesmo** (o programa não é assinado). No macOS, na primeira vez use botão direito → **Abrir**.
-Para atualizar, troque só o programa e mantenha a pasta `data`.
-
-**Como gerar uma versão (para quem mantém o projeto):** `git tag v0.2.0 && git push origin v0.2.0`. O GitHub Actions roda os testes, compila nas quatro plataformas e publica a Release sozinho. Para gerar localmente: `npm install && node tools/build-exe.mjs` (sai em `dist/`).
-
-## Opção A: no seu PC com Node + túnel gratuito
-
-Serve para uma mesa de amigos durante a sessão. Custa zero, o estado fica no seu disco e não há hibernação.
-
-### 1. Preparar (uma vez)
-1. Instale o **Node.js 20 ou mais novo** (nodejs.org, versão LTS).
-2. Baixe o projeto e instale as dependências:
-   ```
-   git clone https://github.com/alexzjss/virtualJRPG
-   cd virtualJRPG
-   npm install
-   ```
-
-### 2. Ligar o servidor (toda sessão)
 ```
-# Linux / macOS
-GM_KEY=suachavesecreta PORT=3000 npm start
-
-# Windows (PowerShell)
-$env:GM_KEY="suachavesecreta"; $env:PORT=3000; npm start
+Jogador ──link──▶ página de entrada (GitHub Pages, fixa)
+                    │ código da sessão
+                    ▼
+          https://<código>.trycloudflare.com  ◀── túnel gratuito ── programa do mestre (seu PC, pasta data/)
 ```
-- `GM_KEY` é a senha do mestre. **Troque a padrão (`mestre`)**, senão qualquer um que achar o link entra como mestre.
-- Teste em `http://localhost:3000`.
 
-### 3. Abrir para os jogadores (escolha um túnel)
+> O túnel gratuito do Cloudflare (`trycloudflare.com`) não tem conta, nem garantia de funcionamento, e muda de endereço a cada vez. Por isso existe o código da sessão.
 
-**Cloudflare Tunnel (sem conta, mais simples)**
-1. Instale o `cloudflared` (developers.cloudflare.com → Cloudflare Tunnel → Downloads).
-2. Em outro terminal: `cloudflared tunnel --url http://localhost:3000`
-3. Ele imprime um endereço `https://alguma-coisa.trycloudflare.com`. Esse é o link da mesa. Muda a cada vez que você reinicia.
+## Mestre: preparar uma vez
 
-**Alternativas**
-- **ngrok**: conta gratuita, um domínio fixo por conta. `ngrok http 3000`.
-- **Tailscale**: todos instalam o app (gratuito) e entram na mesma rede privada; use o IP do seu PC (`http://100.x.x.x:3000`). Não precisa de HTTPS nem de link público.
-- **Mesma rede Wi-Fi**: use o IP local do PC (`http://192.168.x.x:3000`). Libere a porta 3000 no firewall.
+1. **Baixe o programa.** No GitHub do projeto, abra **Releases** e baixe o `.zip` do seu sistema (`windows-x64`, `linux-x64` ou `macos-arm64`). Extraia numa pasta sua.
+   - Windows: se aparecer "PC protegido", clique em **Mais informações → Executar assim mesmo** (o programa não é assinado).
+   - macOS: na primeira vez, botão direito → **Abrir**. Macs com processador Intel não têm programa pronto: use `npm start` (abaixo).
+2. **Ative a página de entrada** (só quem mantém o repositório, uma vez): no GitHub, **Settings → Pages → Build and deployment → Deploy from a branch**, escolha `main` e a pasta `/docs`, e salve. Em alguns minutos a página fica em `https://alexzjss.github.io/virtualJRPG/`.
+   Se usar outro endereço (um fork, por exemplo), defina a variável `VJ_PORTAL` com ele ao abrir o programa.
+3. **Abra o programa** (dois cliques em `virtualJRPG`). A janela mostra a **chave do mestre** (também em `data/gm-key.txt`). Na primeira vez ele baixa o `cloudflared` (cerca de 30 MB) para a pasta `data/`.
+4. Abra `http://localhost:3000/gm` e entre com a chave.
+5. Na janela **Sessão**, crie **uma conta para cada jogador**: login (sem espaços), senha (vazia = o jogo sorteia uma) e o personagem dela. Clique em **Copiar acesso** e mande **só para aquele jogador**, em particular.
+   - Um jogador pode ter mais de um personagem: **+ Personagem** na linha da conta.
+   - Apagar a conta deixa os personagens dela sem dono, mas não os apaga.
 
-### 4. Quem abre o quê
-| Quem | Endereço | O que faz |
-|---|---|---|
-| Mestre | `…/gm` | pede a chave do mestre na primeira vez |
-| Jogadores | `…/player` | nome e senha (a senha é criada no primeiro acesso) |
-| TV / segundo monitor | `…/table` | só leitura, tela cheia (F11) |
+## Mestre: em cada sessão
 
-Mande aos jogadores o link `…/player`. A conexão usa `wss://` sozinha quando o link é HTTPS.
+1. Abra o programa. Espere a janela **Sessão** mostrar **Internet: Aberta** e o **código da sessão** (ex.: `lago-verde-mesa-norte`). A janela preta do programa também mostra o código.
+2. Clique em **Copiar convite** e cole no grupo. O convite já leva o código no link.
+3. TV ou segundo monitor: `http://localhost:3000/table`, login `mestre` e a sua chave (ou a conta de um jogador).
+4. Ao terminar, **feche a janela do programa**. O link para de funcionar e tudo fica salvo em `data/`.
 
-### 5. Seus dados
-- Tudo fica em `data/` (`state.json`, `uploads/`, `backups/`). A cada início o servidor guarda cópia das 10 últimas em `data/backups/`.
-- Para outro lugar: variável `VJ_DATA=/caminho/dados`.
-- Faça backup da pasta `data/` entre sessões (copie para um pendrive ou nuvem pessoal).
-- Para atualizar o jogo: `git pull && npm install`, reinicie o servidor.
+**Se a internet não abrir**, a janela Sessão mostra o motivo e o programa tenta de novo a cada minuto. Enquanto isso, quem está na mesma rede Wi-Fi entra pelo endereço local que aparece lá (`http://192.168.x.x:3000/player`). Libere a porta 3000 no firewall se for preciso.
 
-## Opção B: servidor ligado 24 horas, de graça (mais trabalho)
+## Jogadores
 
-Útil se o mestre não quiser deixar o PC ligado. Todas têm limites e pegadinhas:
+1. Abra o link que o mestre mandou no grupo.
+2. Digite o login e a senha que o mestre te passou e clique em **Entrar**. Marque "Lembrar" para não digitar de novo.
+3. Para trocar a senha: botão **Senha**, no alto da tela do jogo. Na próxima sessão, use a senha nova na página de entrada.
 
-| Serviço | Como é | Cuidado |
-|---|---|---|
-| **Oracle Cloud "Always Free"** | uma máquina virtual Linux de verdade, sempre ligada | exige cartão para cadastro, criar a conta pode ser burocrático; é a que melhor serve ao jogo |
-| **Render (plano gratuito)** | publica direto do GitHub, dá HTTPS | hiberna sem uso (primeiro acesso demora) e **o disco apaga** quando reinicia: perde campanha e uploads |
-| **Fly.io / Railway / Koyeb** | publicam de GitHub ou Docker | os planos gratuitos mudam; muitos pedem cartão ou só dão crédito de teste |
+A própria página de entrada tem esta ajuda e as soluções para "não conecta".
 
-Se for por esse caminho, o importante é: comando de início `npm start`, porta pela variável `PORT`, `GM_KEY` definida nas variáveis do serviço, e uma **pasta persistente** para `VJ_DATA`. Sem disco persistente, a campanha some a cada reinício; nesse caso exporte o `data/state.json` ao fim da sessão.
+## Seus dados (mestre)
+
+- Tudo fica em `data/`: `state.json` (campanha e contas), `uploads/` (imagens), `backups/` (as 10 últimas cópias, uma por início), `gm-key.txt` e o `cloudflared`.
+- Faça cópia da pasta `data/` de vez em quando (pendrive ou nuvem pessoal).
+- Para atualizar o jogo: troque só o programa e mantenha a pasta `data/`.
+- As contas antigas (criadas pelo próprio jogador no primeiro acesso, na versão anterior) foram apagadas na atualização: recrie-as na janela Sessão.
+
+## Com Node, sem o programa pronto
+
+```
+git clone https://github.com/alexzjss/virtualJRPG
+cd virtualJRPG
+npm install
+GM_KEY=suachavesecreta npm start
+```
+No Windows (PowerShell): `$env:GM_KEY="suachavesecreta"; npm start`. Variáveis: `PORT` (porta, padrão 3000), `VJ_DATA` (pasta dos dados), `VJ_TUNNEL=0` (não abrir o túnel), `VJ_PORTAL` (endereço da página de entrada).
+
+**Gerar uma versão (quem mantém o projeto):** `git tag v0.3.0 && git push origin v0.3.0`. O GitHub Actions testa, compila e publica a Release. Localmente: `node tools/build-exe.mjs` (sai em `dist/`).
 
 ## Problemas comuns
-- **Fica em "Conectando…"**: o túnel caiu ou o link mudou; pegue o novo endereço. Se o servidor não está rodando, nada abre.
-- **Jogadores não conseguem entrar pela rede local**: firewall bloqueando a porta 3000.
-- **Esqueci a senha de um jogador**: apague a entrada em `users` dentro de `data/state.json` (com o servidor parado); ele cria outra no próximo acesso.
-- **Imagens do mapa não aparecem**: o limite de envio é 5 MB por imagem (PNG, JPG, WEBP ou GIF).
-- **Fontes diferentes**: as fontes vêm do Google Fonts; sem internet o visual cai para fontes do sistema.
+
+- **Internet: Com problema** o tempo todo: antivírus ou firewall bloqueando o `cloudflared`, ou rede que bloqueia o Cloudflare. Teste em outra rede; em último caso use a rede local.
+- **Jogador vê "Não achei a mesa"**: o programa está fechado, o túnel ainda está abrindo, ou ele usou o link de uma sessão antiga.
+- **Jogador esqueceu a senha**: **Nova senha** na janela Sessão. Quem estiver conectado com a senha antiga é desconectado.
+- **Imagens do mapa não aparecem**: o limite é 5 MB por imagem (PNG, JPG, WEBP ou GIF).
 
 ## Segurança em poucas linhas
-- Troque `GM_KEY`. Não compartilhe o link `/gm`.
-- Quem tiver o link da mesa consegue tentar entrar. Dê o endereço só a quem vai jogar e desligue o túnel ao fim da sessão.
-- As senhas dos jogadores ficam guardadas com hash (scrypt), mas não há limite de tentativas; por isso não reutilize senhas importantes.
+
+- Só entra quem tem conta: jogador, mesa e mestre pedem login. Não compartilhe a chave do mestre.
+- O login e a senha passam da página de entrada para o jogo depois do `#` do link, que o navegador não envia pela rede; o jogo apaga isso da barra de endereço.
+- As senhas ficam guardadas com hash (scrypt). Não há limite de tentativas: use senhas que não sejam reaproveitadas de outros sites.
+- O envio de imagens (`/upload`) não pede login: quem souber o endereço da sessão consegue mandar imagens até 5 MB para a pasta `data/uploads`.

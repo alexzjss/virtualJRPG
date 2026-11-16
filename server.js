@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
+import { startTunnel } from './tunnel.js';
 import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES } from './content.js';
 
 // __SEA__ só existe no executável gerado por tools/build-exe.mjs: arquivos do jogo vêm embutidos e os dados ficam ao lado do .exe
@@ -12,6 +13,7 @@ const SEA = typeof __SEA__ !== 'undefined', seaMod = SEA ? process.getBuiltinMod
 const dir = SEA ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url));
 const PUB = path.join(dir, 'public'), DATA = process.env.VJ_DATA || path.join(dir, 'data'), UP = path.join(DATA, 'uploads');
 const PORT = process.env.PORT || 3000;
+const PORTAL = (process.env.VJ_PORTAL || 'https://alexzjss.github.io/virtualJRPG/').replace(/\/?$/, '/'); // página fixa onde o jogador digita o código da sessão
 const keyFile = path.join(DATA, 'gm-key.txt');
 const KEY = process.env.GM_KEY || (SEA ? (() => { // no executável a chave do mestre é sorteada na primeira vez e guardada ao lado dos dados
   try { return fs.readFileSync(keyFile, 'utf8').trim(); } catch {}
@@ -75,6 +77,7 @@ S.items ??= buildItems(it);
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
+if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
@@ -93,6 +96,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (req.url === '/api/hi') return res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }).end('{"vj":1}'); // a página de entrada confere se o código leva a uma mesa aberta
   let p; try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return res.writeHead(400).end(); }
   if (p === '/') p = '/index.html';
   if (!path.extname(p)) p += '.html';
@@ -123,9 +127,11 @@ const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name:
   body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: [], resist: [], marks: {}, bon: {} }; };
 const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
 const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
-const view = c => c.role === 'gm' ? { ...S, users: undefined } : { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(),
+let net = { status: 'off', url: '', code: '', msg: 'Túnel desligado.' }; // situação do túnel, só para o mestre (não é salva)
+const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => `http://${i.address}:${PORT}`);
+const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.keys(S.users).sort(), net: { ...net, portal: PORTAL, lan: lan() } } : { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
-const sendState = c => c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
+const sendState = c => c.role && c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
 // recalcula máximos de personagens e modelos antes de enviar o estado
 const prep = () => { Object.values(S.chars).forEach(derive); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
 const push = () => { prep(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
@@ -239,7 +245,7 @@ function strike(a, s, t, aim) {
   return down;
 }
 
-const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll']);
+const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel']);
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
   color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
@@ -311,9 +317,9 @@ const wtype = ch => eq(ch, 'arma')?.wt || 'punho'; // sem arma equipada luta com
 const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, hp: 1, aura: 1, san: 1, x: 1, y: 1 };
 const H = {
   addChar(c, m) {
-    if (c.role !== 'gm' && c.role !== 'player') return;
-    const enemy = c.role === 'gm' && !!m.enemy, id = rid();
-    S.chars[id] = newChar(id, enemy, enemy ? '' : (c.role === 'gm' ? String(m.owner || '').trim().slice(0, 30) : c.name));
+    if (c.role !== 'gm') return; // personagens novos só pelo mestre; ele escolhe o dono
+    const enemy = !!m.enemy, id = rid();
+    S.chars[id] = newChar(id, enemy, enemy ? '' : String(m.owner || '').trim().slice(0, 30));
   },
   undo(c) { // desfaz a última ação do mestre (até 20)
     if (c.role !== 'gm' || !undoStack.length) return;
@@ -373,7 +379,31 @@ const H = {
     if (root && !ch.skills.includes(root)) ch.skills.push(root);
     log(ch.name, `firmou Vínculo com ${VN[m.el]}.`, 'ok');
   },
-  claim(c, m) { const ch = S.chars[m.id]; if (c.role === 'player' && ch && !ch.enemy && !ch.owner) ch.owner = c.name; }, // jogador assume um personagem sem dono
+  // contas: só o mestre cria, troca a senha e apaga; o jogador pode trocar a própria senha
+  userAdd(c, m) {
+    if (c.role !== 'gm') return;
+    const name = String(m.name || '').trim().slice(0, 30), err = msg => c.send(JSON.stringify({ t: 'err', msg }));
+    if (!okName(name)) return err('Login inválido: sem espaços nem @, e não pode ser "mestre".');
+    if (Object.hasOwn(S.users, name)) return err('Já existe uma conta com esse login.');
+    if (String(m.pass || '').length < 4) return err('A senha precisa de pelo menos 4 caracteres.');
+    S.users[name] = hash(m.pass);
+    const ch = S.chars[m.char]; if (ch && !ch.enemy) ch.owner = name;
+    log('Mestre', `criou a conta ${name}${ch && !ch.enemy ? ' para ' + ch.name : ''}.`, '', { to: GM });
+  },
+  userPass(c, m) {
+    const name = c.role === 'gm' ? String(m.name || '') : c.role === 'player' ? c.name : '';
+    if (!name || !Object.hasOwn(S.users, name)) return;
+    if (String(m.pass || '').length < 4) return c.send(JSON.stringify({ t: 'err', msg: 'A senha precisa de pelo menos 4 caracteres.' }));
+    S.users[name] = hash(m.pass);
+    if (c.role === 'gm') kick(name, 'O mestre trocou a sua senha. Entre com a nova.');
+    else { c.send(JSON.stringify({ t: 'passOk', pass: String(m.pass) })); kick(name, 'Sua senha foi trocada em outra janela. Entre com a nova.', c); }
+  },
+  userDel(c, m) {
+    if (c.role !== 'gm' || !Object.hasOwn(S.users, m.name)) return;
+    delete S.users[m.name];
+    for (const ch of Object.values(S.chars)) if (ch.owner === m.name) ch.owner = '';
+    kick(m.name, 'Sua conta foi removida pelo mestre.');
+  },
   aff(c, m) { // cicla normal → fraqueza → resistência
     const ch = getCh(c, m.id);
     if (c.role !== 'gm' || !ch || !EL.includes(m.el)) return;
@@ -667,27 +697,30 @@ const H = {
   },
 };
 
+const okName = n => !!n && !/[@\s]/.test(n) && n.toLowerCase() !== 'mestre';
+const checkUser = (name, pass) => { const u = S.users[name]; return Object.hasOwn(S.users, name) && crypto.timingSafeEqual(Buffer.from(hash(pass, u.split(':')[0])), Buffer.from(u)); };
+const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
 wss.on('connection', c => {
-  c.role = 'table';
+  c.role = null; // sem login não recebe nada
   c.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m !== 'object') return;
     if (m.t === 'hello') {
-      if (m.role === 'gm') { if (m.key !== KEY) return c.send(JSON.stringify({ t: 'err', bad: true, msg: 'Chave do mestre incorreta.' })); c.role = 'gm'; }
-      else if (m.role === 'player') {
-        const name = String(m.name || '').trim().slice(0, 30), u = S.users[name], bad = msg => c.send(JSON.stringify({ t: 'err', bad: true, msg }));
-        if (!name || /[@\s]/.test(name)) return bad('Nome inválido (sem espaços ou @).');
-        if (String(m.pass || '').length < 3) return bad('Senha precisa de pelo menos 3 caracteres.');
-        if (!Object.hasOwn(S.users, name)) { S.users[name] = hash(m.pass); save(); } // primeiro acesso registra a senha
-        else if (!crypto.timingSafeEqual(Buffer.from(hash(m.pass, u.split(':')[0])), Buffer.from(u))) return bad('Senha incorreta para este nome.');
-        c.role = 'player'; c.name = name;
-      }
+      const bad = msg => c.send(JSON.stringify({ t: 'err', bad: true, msg })), name = String(m.name || '').trim().slice(0, 30), pass = String(m.pass || '');
+      // a mesa (TV) entra com a chave do mestre (login "mestre") ou com a conta de um jogador
+      const asGm = m.role === 'gm' || (m.role === 'table' && name.toLowerCase() === 'mestre');
+      if (asGm) { if (String(m.role === 'gm' ? m.key : pass) !== KEY) return bad('Chave do mestre incorreta.'); c.role = m.role === 'gm' ? 'gm' : 'table'; }
+      else if (m.role === 'player' || m.role === 'table') {
+        if (!checkUser(name, pass)) return bad('Login ou senha incorretos. As contas são criadas pelo mestre: confira com ele.');
+        c.role = m.role; c.acct = name; if (m.role === 'player') c.name = name; // a TV não mostra os sussurros do dono da conta
+      } else return;
       return sendState(c);
     }
+    if (!c.role) return;
     if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
       if (c.role === 'table') return;
       const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) });
-      return wss.clients.forEach(o => o.readyState === 1 && o.send(p));
+      return wss.clients.forEach(o => o.role && o.readyState === 1 && o.send(p));
     }
     if (c.role === 'gm' && Object.hasOwn(H, m.t) && !NOUNDO.has(m.t)) { undoStack.push(JSON.stringify({ ...S, log: undefined, users: undefined })); if (undoStack.length > 20) undoStack.shift(); }
     if (Object.hasOwn(H, m.t)) { try { H[m.t](c, m); } catch (e) { console.error(e); } push(); }
@@ -711,7 +744,12 @@ if (isMain) {
     if (SEA) { console.error('Feche esta janela para sair.'); setInterval(() => {}, 1 << 30); } else process.exit(1);
   });
   server.listen(PORT, () => {
-    const ips = Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
-    console.log(`\n  virtualJRPG rodando\n\n  Mestre:     http://localhost:${PORT}/gm   (chave: ${KEY})\n  Jogadores:  http://localhost:${PORT}/player\n  Mesa (TV):  http://localhost:${PORT}/table${ips.length ? `\n\n  Na mesma rede Wi-Fi, os jogadores usam: ${ips.map(ip => `http://${ip}:${PORT}/player`).join('  ou  ')}` : ''}\n\n  Dados salvos em: ${DATA}\n  Para jogar pela internet, use um túnel (veja o guia). Feche esta janela para encerrar.\n`);
+    const ips = lan();
+    console.log(`\n  virtualJRPG rodando\n\n  Mestre:     http://localhost:${PORT}/gm   (chave: ${KEY})\n  Mesa (TV):  http://localhost:${PORT}/table   (login "mestre" + a chave, ou a conta de um jogador)${ips.length ? `\n  Mesma rede Wi-Fi: ${ips.map(u => u + '/player').join('  ou  ')}` : ''}\n\n  Contas dos jogadores: crie na janela "Sessão" do painel do mestre.\n  Dados salvos em: ${DATA}\n  Feche esta janela para encerrar.\n`);
+    if (process.env.VJ_TUNNEL === '0') return console.log('  Túnel desligado (VJ_TUNNEL=0): só a rede local funciona.\n');
+    startTunnel({ port: PORT, dir: DATA, onChange: i => {
+      net = i; wss.clients.forEach(o => o.role === 'gm' && sendState(o));
+      console.log(i.status === 'ok' ? `\n  >>> Internet aberta. CÓDIGO DA SESSÃO: ${i.code}\n      Link para os jogadores: ${PORTAL}?c=${i.code}\n` : '  [túnel] ' + i.msg);
+    } });
   });
 }

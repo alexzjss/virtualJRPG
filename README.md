@@ -1,11 +1,14 @@
 # virtualJRPG
 Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 
-    npm install && npm start        # GM_KEY=suachave PORT=3000 opcionais
+    npm install && npm start        # GM_KEY=suachave PORT=3000 VJ_TUNNEL=0 opcionais
 
-- `/gm` — painel do mestre (chave padrão `mestre`; troque com `GM_KEY`)
-- `/player` — fichas do jogador (nome + senha criada no primeiro acesso)
-- `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura
+- `/gm` — painel do mestre (chave padrão `mestre`; troque com `GM_KEY`). A janela **Sessão** cria as contas e copia o convite.
+- `/player` — fichas do jogador (login e senha criados pelo mestre)
+- `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura; entra com a conta de um jogador ou login `mestre` + chave
+- `docs/index.html` — página fixa de entrada (GitHub Pages): o jogador digita o código da sessão, o login e a senha
+
+Ao iniciar, o servidor abre sozinho um túnel gratuito do Cloudflare (baixa o `cloudflared` na primeira vez) e mostra o **código da sessão**. Veja `GUIA-RODAR.md`.
 
 Chat: texto livre, `/r 2d6+1` para rolar, `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
@@ -33,7 +36,7 @@ Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas j
 ## Vínculos e personagens base
 Cada caçador tem um ou mais **Vínculos** (Kagutsuchi, Susanoo, Atlas, Indra, Fuhaku, Amaterasu, Tsukuyomi, Shukketsu, Hiruko). Ele só aprende o tronco Marcial e as skills dos próprios Vínculos, e resiste ao elemento deles. O mestre concede Vínculos na aba **Mestre** da ficha.
 A árvore (581 nós: 60 por Vínculo em 6 ramos + 41 marciais; veja `REVISAO-ARVORE.md`) fica em `tree.js`; `content.js` só a distribui na grade.
-Campanha nova começa com Shinkai (Indra), Mikhail (Fuhaku) e Thomas (Hiruko), sem dono: o jogador clica em **Assumir**.
+Campanha nova começa com Shinkai (Indra), Mikhail (Fuhaku) e Thomas (Hiruko), sem dono: o mestre liga cada um a uma conta na janela **Sessão**.
 
 ## Mapas
 Na janela **Cena** o mestre cola um link ou envia uma imagem, usa **Recortar área** para escolher o trecho exibido, ajusta **Casas na largura** e o deslocamento da grade para casar com a arte, e pode **Fixar minha vista para todos**.
