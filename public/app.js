@@ -167,7 +167,7 @@ function sheet(c, force) {
       ${gm ? `<div class="row chips">${chips(ST, (k, l) => `<span class="${c.st[k] ? 'weak' : ''}" data-a="st" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div>
       <div class="row">XP ${inp('xp', c.xp)}${c.enemy ? `Recompensa: XP ${inp('xpR', c.xpR)} Ouro ${inp('goldR', c.goldR)}` : ''}</div>
       <div class="row">${btn('horror', 'Horror')}${btn('evolve', 'Evoluir')}${btn('place', c.x == null || c.scene !== S.scene ? 'Pôr no mapa' : 'Tirar do mapa')}${btn('bSave', '→ Bestiário')}${btn('delChar', 'Excluir')}</div>` : ''}`,
-    sk: () => `${grid(c)}${c.skills.filter(k => S.skills[k]).map(k => `<p><b>${esc(S.skills[k].name)}</b> <small>${esc(desc(S.skills[k]))}</small></p>`).join('')}`,
+    sk: () => `<div class="row"><button class="own" data-a="gridFull" data-id="${c.id}">Abrir grade completa</button></div>${grid(c)}${c.skills.filter(k => S.skills[k]).map(k => `<p><b>${esc(S.skills[k].name)}</b> <small>${esc(desc(S.skills[k]))}</small></p>`).join('')}`,
     inv: () => `<div class="row">Ouro: <b>${c.gold}</b></div>${Object.entries(c.inv).filter(([k]) => S.items[k]).map(([k, q]) => { const i = S.items[k], on = c.equip[i.type] === k, x = `data-item="${k}"`;
         return `<div class="row inv"><span>${esc(i.name)} ×${q} <small>${esc(idesc(i))}</small></span>
         ${own ? (i.type === 'cons' ? btn('use', 'Usar', x) : i.type === 'mat' ? '' : btn('equip', on ? 'Desequipar' : 'Equipar', `${x} ${on ? 'class="own"' : ''}`)) + (shop().open ? btn('sell', `Vender ${Math.floor(i.price / 2)}`, x) : '') + btn('drop', '−', x) : ''}</div>`; }).join('') || '<div class="row"><small>vazio</small></div>'}
@@ -181,6 +181,70 @@ function sheet(c, force) {
   return `<div class="sheet" style="--c:${esc(c.color)}">${head}
     <div class="tabs">${chips(TABS, (k, l) => `<span class="${k === tab ? 'on' : ''}" data-tab="${k}" data-id="${c.id}">${l}</span>`)}</div>${body[tab]()}</div>`;
 }
+
+// ===== páginas fora de combate (jogador; o mestre abre a grade em tela cheia pela ficha) =====
+const PAGES = { mesa: 'Mesa', pers: 'Personagem', hab: 'Habilidades', itens: 'Itens', hist: 'Diário' };
+const PATRON = { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', radiacao: 'Hiruko' };
+let pg = 'mesa', selCh = null, chatOpen = true, gridFull = null, wasBattle = false;
+const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
+const figCard = (c, w) => `<div class="unit hero cur static" style="--c:${esc(c.color)};--w:${w}"><div class="figw"><div class="fig">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div></div>`;
+
+// grade de habilidades como constelação: círculo = ativa, losango = passiva; brilho = aprendida, tracejado = disponível
+function skillPage(c) {
+  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 60, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
+  const avail = s => !ownL.length || ownL.some(o => near(o, s)), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
+  let lines = '';
+  for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) { const a = N[i][1], b = N[j][1];
+    if (near(a, b) && (a.el === b.el || a.el === 'fis' || b.el === 'fis')) { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
+  const cen = {}; for (const [, s] of N) { const o = cen[s.el] ||= [0, 0, 0]; o[0] += s.gx; o[1] += s.gy; o[2]++; }
+  const halos = Object.entries(cen).filter(([el]) => el !== 'fis').map(([el, [x, y, n]]) => { const cx = x / n, cy = y / n, dx = cx - 8, dy = cy - 8, d = Math.hypot(dx, dy) || 1, px = (8 + dx / d * 7.6) * U + U / 2, py = (8 + dy / d * 7.6) * U + U / 2;
+    return `<text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]}">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + 46}" style="--e:${ELC[el]}">${PATRON[el]}</text>`; }).join('');
+  const nodes = N.map(([id, s]) => { const [x, y] = P(s), st = own.has(id) ? 'own' : avail(s) ? 'av' : 'lock', pas = s.kind === 'passive', mark = s.back ? '禁' : s.limit ? '極' : pas ? '+' : KANJI[s.el];
+    return `<g class="nd ${st} ${id === sel ? 'sel' : ''} ${c.xp >= s.xp ? '' : 'poor'}" data-node="${id}" data-id="${c.id}" transform="translate(${x} ${y})" style="--e:${ELC[s.el]}"><title>${esc(s.name)} · ${s.xp} XP</title>${pas ? '<rect x="-15" y="-15" width="30" height="30" transform="rotate(45)"/>' : `<circle r="${s.limit || s.back ? 23 : 19}"/>`}<text class="mk" y="7">${mark}</text>${st !== 'lock' || id === sel ? `<text class="lb" y="38">${esc(s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name)}</text>` : ''}</g>`; }).join('');
+  const tag = (l, v) => `<div><small>${l}</small><b>${v}</b></div>`;
+  const why = !ss ? '' : own.has(sel) ? '' : !avail(ss) ? 'Precisa de um nó vizinho já aprendido.' : c.xp < ss.xp ? `Faltam ${ss.xp - c.xp} XP.` : '';
+  const detail = ss ? `<div class="ndcard" style="--e:${ELC[ss.el]}"><small>${PATRON[ss.el]} · ${KIND[ss.kind]}${ss.limit ? ' · Limite' : ''}${ss.back ? ' · Proibida' : ''}</small><h2>${esc(ss.name)}</h2>
+      <div class="tags">${ss.kind === 'passive' ? tag('Efeito', ss.pas === 'res' ? 'Resistência a ' + EL[ss.el] : '+' + ss.power + ' ' + PASL[ss.pas])
+        : tag('Poder', ss.power) + tag('Atributo', ss.attr) + tag('Custo', ss.limit ? 'Limite 100%' : ss.cost + ' ' + RES[ss.res]) + tag('Alvo', ss.area ? 'Área' : 'Único') + ((ss.ct || 100) !== 100 ? tag('Tempo', ss.ct + '%') : '') + (ss.st ? tag('Causa', ST[ss.st]) : '') + (ss.req ? tag('Exige', WT[ss.req]) : '') + (ss.back ? tag('Sequela', ST[ss.back]) : '')}</div>
+      ${own.has(sel) ? '<div class="learned">Aprendida</div>' : `<button class="learn" data-a="learn" data-id="${c.id}" data-skill="${sel}" ${mine(c) && !why ? '' : 'disabled'}>Aprender · ${ss.xp} XP</button>${why ? `<small class="why">${why}</small>` : ''}`}</div>`
+    : '<div class="ndcard empty"><h2>Escolha um nó</h2><small>Clique em um nó da grade para ver o que ele faz. O primeiro pode ser qualquer um; depois, só nós vizinhos dos que você já tem.</small></div>';
+  const mineL = c.skills.filter(k => S.skills[k]).map(k => `<li style="--e:${ELC[S.skills[k].el]}" data-node="${k}" data-id="${c.id}"><b>${esc(S.skills[k].name)}</b><small>${esc(desc(S.skills[k]))}</small></li>`).join('');
+  return `<section class="skp"><div class="skmap"><svg viewBox="0 0 ${17 * U} ${17 * U}" role="group" aria-label="Grade de habilidades">${halos}<g class="ln">${lines}</g>${nodes}</svg></div>
+    <aside class="skside"><div class="xp"><small>XP disponível de ${esc(c.name)}</small><b>${c.xp}</b></div>${detail}
+      <div class="legend"><span><i class="lc"></i>Ativa</span><span><i class="lp"></i>Passiva</span><span><i class="lo"></i>Aprendida</span><span><i class="la"></i>Disponível</span></div>
+      <h3>Aprendidas (${c.skills.length})</h3><ul class="mine">${mineL || '<li class="none"><small>Nenhuma ainda.</small></li>'}</ul></aside></section>`;
+}
+
+function persPage(c) {
+  const eqn = slot => eq(c, slot) ? `<b>${esc(eq(c, slot).name)}</b><small>${esc(idesc(eq(c, slot)))}</small>` : '<b class="none">—</b><small>nada equipado</small>';
+  const res = k => `<div class="resrow">${bar(k, c)}${k === 'limit' ? '' : `<input type="number" aria-label="${L[k]} atual" data-id="${c.id}" data-f="${k}" value="${c[k]}">`}</div>`;
+  const cts = Object.values(S.contracts).filter(ct => !ct.done).map(ct => `<li><b>${esc(ct.target)}</b><small>${ct.gold} ouro · ${ct.xp} XP</small></li>`).join('');
+  return `<section class="pp" style="--c:${esc(c.color)}"><div class="pp-hero">${figCard(c, '200px')}
+      <div class="pp-id"><input class="pname" aria-label="Nome" data-id="${c.id}" data-f="name" value="${esc(c.name)}"><div class="row"><input type="color" aria-label="Cor" data-id="${c.id}" data-f="color" value="${esc(c.color)}"><label class="up">Enviar retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label><span class="pill">XP <b>${c.xp}</b></span><span class="pill">Ouro <b>${c.gold}</b></span></div>
+        ${res('hp')}${res('aura')}${res('san')}${res('limit')}<div class="sts big">${[sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(s => `<i>${s}</i>`).join('') || '<small>Sem condições ativas.</small>'}</div></div></div>
+    <div class="pp-grid"><div class="card"><h3>Atributos <small>clique para rolar d100</small></h3><div class="tiles">${A.map(a => `<button class="tile ${c.marks[a] ? 'mk' : ''}" data-a="roll" data-id="${c.id}" data-attr="${a}"><b>${at(c, a)}</b><span>${a}</span>${at(c, a) !== c.attrs[a] ? `<small>base ${c.attrs[a]}</small>` : ''}</button>`).join('')}</div>
+        <div class="row"><label>Modificador da rolagem <input type="number" class="mod" data-mid="${c.id}" value="${mods[c.id] || 0}"></label><small>▲ dourado = atributo usado com sucesso, pode evoluir no descanso longo.</small></div></div>
+      <div class="card"><h3>Ferimentos</h3>${bodyFig(c)}</div>
+      <div class="card"><h3>Equipamento</h3><div class="slots"><div><em>Arma</em>${eqn('arma')}</div><div><em>Armadura</em>${eqn('armadura')}</div><div><em>Acessório</em>${eqn('acess')}</div></div>
+        <h3>Afinidades</h3><div class="row chips">${[...c.weak.map(k => `<span class="weak">Fraco: ${EL[k]}</span>`), ...c.resist.map(k => `<span class="res">Resiste: ${EL[k]}</span>`), eq(c, 'acess')?.el ? `<span class="res">Resiste: ${EL[eq(c, 'acess').el]}</span>` : ''].join('') || '<small>Nenhuma fraqueza ou resistência.</small>'}</div>
+        ${S.camp.open ? `<h3>Acampamento</h3><div class="row chips">${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div>` : ''}</div>
+      <div class="card"><h3>Contratos de caça</h3><ul class="plain">${cts || '<li><small>Nenhum contrato aberto.</small></li>'}</ul></div></div></section>`;
+}
+
+function itemsPage(c) {
+  const sh = shop(), card = (k, i, foot, q) => `<div class="icard t-${i.type}" style="--e:${ELC[i.el] || 'var(--line)'}"><em>${IT[i.type]}</em><b>${esc(i.name)}${q > 1 ? ` <i>×${q}</i>` : ''}</b><small>${esc(idesc(i))}</small><div class="row">${foot}</div></div>`;
+  const btn = (a, l, k, x = '') => `<button data-a="${a}" data-id="${c.id}" data-item="${k}" ${x}>${l}</button>`;
+  const slot = (s, l) => { const i = eq(c, s); return `<div class="slot ${i ? 'on' : ''}"><em>${l}</em>${i ? `<b>${esc(i.name)}</b><small>${esc(idesc(i))}</small>${btn('equip', 'Tirar', c.equip[s])}` : '<b class="none">Vazio</b><small>equipe um item do inventário</small>'}</div>`; };
+  const inv = Object.entries(c.inv).filter(([k]) => S.items[k]).sort((a, b) => ITO.indexOf(S.items[a[0]].type) - ITO.indexOf(S.items[b[0]].type)).map(([k, q]) => { const i = S.items[k], on = c.equip[i.type] === k;
+    return card(k, i, (i.type === 'cons' ? btn('use', 'Usar', k, i.eff === 'bomb' ? 'disabled title="Só em batalha"' : '') : i.type === 'mat' ? '' : btn('equip', on ? 'Equipado' : 'Equipar', k, on ? 'class="own"' : '')) + (sh.open ? btn('sell', `Vender ${Math.floor(i.price / 2)}`, k) : '') + btn('drop', 'Descartar', k, 'class="ghost"'), q); }).join('');
+  const forge = Object.entries(S.items).filter(([, i]) => i.el && ['arma', 'acess'].includes(i.type)).map(([k, i]) => { const ess = Object.keys(S.items).find(e => S.items[e].type === 'mat' && S.items[e].el === i.el), have = c.inv[ess] || 0, need = i.type === 'arma' ? 3 : 5, cost = Math.round(i.price / 2);
+    return have ? card(k, i, `<small>${have}/${need} essências · ${cost} ouro</small>` + btn('forge', 'Forjar', k, have < need || c.gold < cost ? 'disabled' : '')) : ''; }).join('');
+  return `<section class="ip"><div class="ip-top"><div class="gold"><small>Ouro</small><b>${c.gold}</b></div>${slot('arma', 'Arma')}${slot('armadura', 'Armadura')}${slot('acess', 'Acessório')}</div>
+    <h3>Inventário</h3><div class="icards">${inv || '<p class="none">Inventário vazio.</p>'}</div>
+    ${sh.open ? `<h3>Loja · ${esc(S.scenes[S.scene].name)}</h3><div class="icards">${sh.stock.filter(k => S.items[k]).map(k => card(k, S.items[k], btn('buy', `Comprar · ${S.items[k].price}`, k, c.gold < S.items[k].price ? 'disabled' : ''))).join('') || '<p class="none">Nada à venda.</p>'}</div>` : '<h3>Loja</h3><p class="none">Não há loja aberta nesta cena.</p>'}
+    ${forge ? `<h3>Forja <small>3 essências para arma, 5 para relíquia</small></h3><div class="icards">${forge}</div>` : ''}</section>`;
+}
+const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat'];
 
 // tela do jogador em batalha: barras, figura de corpo e menu de comando
 function command(c, cur) {
@@ -202,7 +266,7 @@ function render() {
   // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
     sel: ae.tagName + Object.entries(ae.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, x => '-' + x.toLowerCase())}="${CSS.escape(v)}"]`).join('') } : null;
-  const scr = [...app.querySelectorAll('.win-body,.pc>aside')].map(el => el.scrollTop);
+  const scr = [...app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main')].map(el => el.scrollTop);
   const b = S.battle.active, sc = S.scenes[S.scene], chars = Object.values(S.chars), on = v => v ? 'class="own"' : '';
   const sheets = chars.filter(mine).map(sheet).join('');
   const log = `${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log" aria-live="polite">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div>`;
@@ -226,18 +290,21 @@ function render() {
     app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : w}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
       <nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
-    const my = chars.filter(mine), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(c => c.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB[0];
-    const hud = my.map(c => `<div class="hud" data-pv="ficha" style="--c:${esc(c.color)}"><b>${esc(c.name)}</b>${bar('hp', c)}${bar('aura', c)}${bar('san', c)}</div>`).join('');
-    const wide = matchMedia('(min-width:1100px)').matches; // no PC tudo fica visível: ficha, cena e chat lado a lado
-    const cts = Object.values(S.contracts).filter(ct => !ct.done).map(ct => `<div class="row inv"><span>Caçar: ${esc(ct.target)}</span><small>${ct.gold} ouro · ${ct.xp} XP</small></div>`).join('');
-    const ficha = `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div>${cts ? '<b>Contratos de caça</b>' + cts : ''}</div>${sheets}`;
-    const cena = actor ? (wide ? battle() : '') + command(actor, cur) : (b ? battle() : map()) + (wide ? '' : `<div class="huds">${hud}</div>`);
-    const view = pv === 'ficha' ? ficha : pv === 'chat' ? `<div class="panel">${log}</div>` : chaseBar() + cena;
-    app.innerHTML = wide ? `<main class="pc"><aside>${ficha}</aside><section>${chaseBar()}${cena}</section><aside><div class="panel">${log}</div></aside></main>` : `<main class="pv">${view}</main><nav class="dock">${chips({ cena: b ? 'Batalha' : 'Mesa', ficha: 'Ficha', chat: 'Chat' }, (k, l) => `<button data-pv="${k}" ${on(pv === k)}>${l}</button>`)}</nav>`;
-    app.insertAdjacentHTML('beforeend', ctxMenu());
+    const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
+    if (b && !wasBattle) pg = 'mesa'; // a batalha começou: leva o jogador para a mesa
+    wasBattle = b;
+    const page = !c && pg !== 'mesa' ? '<section class="card"><h3>Sem personagem</h3><p>Crie um personagem para começar; o mestre define os atributos.</p><button data-a="addChar">Criar personagem</button></section>'
+      : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'itens' ? itemsPage(c)
+      : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
+      : chaseBar() + (actor ? battle() + command(actor, cur) : b ? battle() : map());
+    app.innerHTML = `<header class="top"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}">${esc(x.name)}<small>${x.hp}/${x.hpMax}</small></button>`).join('')}<button class="ghost" data-a="addChar" title="Novo personagem" aria-label="Novo personagem">+</button></div>
+      <nav>${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}">${k === 'mesa' && b ? 'Batalha' : l}</button>`)}</nav>
+      <div class="me"><span>${esc(name)}</span><button class="ghost" data-a="chatT" ${on(chatOpen)}>Chat</button><button class="ghost" data-a="logout">Sair</button></div></header>
+      <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg}"><main>${page}</main>${chatOpen ? `<aside class="chatcol"><div class="panel">${log}</div></aside>` : ''}</div>${ctxMenu()}`;
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
+  if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
-  app.querySelectorAll('.win-body,.pc>aside').forEach((el, i) => el.scrollTop = scr[i] || 0);
+  app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main').forEach((el, i) => el.scrollTop = scr[i] || 0);
   app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],[data-cz],.hud').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   fx();
 }
@@ -316,9 +383,12 @@ app.addEventListener('click', e => {
   if (am) { aim = aim === am.dataset.aim ? null : am.dataset.aim; return render(); }
   if (sb) { sub = sb.dataset.sub || null; return render(); }
   if (pvb) { pv = pvb.dataset.pv; return render(); }
+  const pgb = e.target.closest('[data-pg]'), sl = e.target.closest('[data-sel]');
+  if (pgb) { pg = pgb.dataset.pg; return render(); }
+  if (sl) { selCh = sl.dataset.sel; return render(); }
   if (!d && u) { if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
-  if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.min(innerWidth - 420, 380 + 24 * (zc % 8)), y: 70 + 24 * (zc % 8), open: true, z: ++zc }; else { pv = 'ficha'; open[d.id] = true; } return render(); }
+  if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.min(innerWidth - 420, 380 + 24 * (zc % 8)), y: 70 + 24 * (zc % 8), open: true, z: ++zc }; else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
     if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return alert(`Arranjo "${d.k}" salvo.`); }
@@ -331,6 +401,8 @@ app.addEventListener('click', e => {
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
   if (d.a === 'fogMode') { fogMode = !fogMode; return render(); }
   if (d.a === 'secret') { secret = !secret; return render(); }
+  if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
+  if (d.a === 'gridFull') { gridFull = d.id || null; return render(); }
   if (d.a === 'chaseStart') return send({ t: 'chase', k: 'start', ...cz });
   if (d.a === 'ctMode') { ctMode = !ctMode; return render(); }
   if (d.a === 'bSpawn' && ctMode) { // modo contrato: o clique no bestiário escolhe o alvo
@@ -376,7 +448,7 @@ app.addEventListener('mousedown', e => { if (e.button === 1 && e.target.closest(
 app.addEventListener('contextmenu', e => { const t = e.target.closest('.tok'); if (t) { e.preventDefault(); ctx = { id: t.dataset.id, x: e.clientX, y: e.clientY }; render(); } });
 app.addEventListener('dblclick', e => {
   const t = e.target.closest('.tok'), m = e.target.closest('.map');
-  if (t && mine(S.chars[t.dataset.id])) { if (gm) wins['f_' + t.dataset.id] = { x: Math.min(innerWidth - 420, e.clientX), y: Math.min(innerHeight - 300, e.clientY), open: true, z: ++zc }; else { pv = 'ficha'; open[t.dataset.id] = true; } return render(); }
+  if (t && mine(S.chars[t.dataset.id])) { if (gm) wins['f_' + t.dataset.id] = { x: Math.min(innerWidth - 420, e.clientX), y: Math.min(innerHeight - 300, e.clientY), open: true, z: ++zc }; else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
   if (m && role !== 'table' && !fogMode) send({ t: 'ping', ...cell(e, m) });
 });
 const drawRuler = e => {
@@ -409,7 +481,7 @@ document.addEventListener('keydown', e => {
   if (!S || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();
-    else if (ctx) ctx = null; else if (sub) sub = null; else if (aim) aim = null;
+    else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (sub) sub = null; else if (aim) aim = null;
     else if (gm) { const top = Object.keys(wins).filter(k => wins[k].open).sort((x, y) => (wins[y].z || 0) - (wins[x].z || 0))[0]; if (top) { wins[top].open = false; localStorage.vj_wins = JSON.stringify(wins); } }
     return render();
   }
