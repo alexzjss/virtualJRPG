@@ -162,7 +162,7 @@ function render() {
   // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
     sel: ae.tagName + Object.entries(ae.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, x => '-' + x.toLowerCase())}="${CSS.escape(v)}"]`).join('') } : null;
-  const scr = {}; app.querySelectorAll('.win').forEach(w => scr[w.dataset.win] = w.querySelector('.win-body').scrollTop);
+  const scr = [...app.querySelectorAll('.win-body,.pc>aside')].map(el => el.scrollTop);
   const b = S.battle.active, sc = S.scenes[S.scene], chars = Object.values(S.chars), on = v => v ? 'class="own"' : '';
   const sheets = chars.filter(mine).map(sheet).join('');
   const log = `${role === 'table' ? '' : '<input class="chat" data-chat="1" placeholder="Mensagem · /r 2d6+1 · /w nome texto (Enter)">'}<div class="log" aria-live="polite">${S.log.slice().reverse().map(l => `<p class="${l.kind} ${l.to ? 'priv' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</p>`).join('') || 'Sem rolagens ainda.'}</div>`;
@@ -182,12 +182,14 @@ function render() {
   } else if (role === 'player') {
     const my = chars.filter(mine), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(c => c.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB[0];
     const hud = my.map(c => `<div class="hud" data-pv="ficha" style="--c:${esc(c.color)}"><b>${esc(c.name)}</b>${bar('hp', c)}${bar('aura', c)}${bar('san', c)}</div>`).join('');
-    const view = pv === 'ficha' ? `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div></div>${sheets}`
-      : pv === 'chat' ? `<div class="panel">${log}</div>` : actor ? command(actor, cur) : (b ? battle() : map()) + `<div class="huds">${hud}</div>`;
-    app.innerHTML = `<main class="pv">${view}</main><nav class="dock">${chips({ cena: b ? 'Batalha' : 'Mesa', ficha: 'Ficha', chat: 'Chat' }, (k, l) => `<button data-pv="${k}" ${on(pv === k)}>${l}</button>`)}</nav>`;
+    const wide = matchMedia('(min-width:1100px)').matches; // no PC tudo fica visível: ficha, cena e chat lado a lado
+    const ficha = `<div class="panel"><div class="row"><b>${esc(name)}</b><button data-a="addChar">+ Novo personagem</button><button data-a="logout">Sair</button></div></div>${sheets}`;
+    const cena = actor ? (wide ? battle() : '') + command(actor, cur) : (b ? battle() : map()) + (wide ? '' : `<div class="huds">${hud}</div>`);
+    const view = pv === 'ficha' ? ficha : pv === 'chat' ? `<div class="panel">${log}</div>` : cena;
+    app.innerHTML = wide ? `<main class="pc"><aside>${ficha}</aside><section>${cena}</section><aside><div class="panel">${log}</div></aside></main>` : `<main class="pv">${view}</main><nav class="dock">${chips({ cena: b ? 'Batalha' : 'Mesa', ficha: 'Ficha', chat: 'Chat' }, (k, l) => `<button data-pv="${k}" ${on(pv === k)}>${l}</button>`)}</nav>`;
   } else app.innerHTML = `<main>${b ? battle() : map()}</main>`;
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
-  app.querySelectorAll('.win').forEach(w => w.querySelector('.win-body').scrollTop = scr[w.dataset.win] || 0);
+  app.querySelectorAll('.win-body,.pc>aside').forEach((el, i) => el.scrollTop = scr[i] || 0);
   app.querySelectorAll('span[data-a],[data-tab],[data-node],[data-tgt],[data-aim],.hud').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   fx();
 }
@@ -286,4 +288,5 @@ app.addEventListener('pointermove', e => {
 });
 const drop = e => { if (!drag) return; if (e.type === 'pointerup') send({ t: 'move', id: drag.dataset.id, ...cell(e, drag.parentElement) }); drag = null; if (pending) render(); };
 app.addEventListener('pointerup', drop); app.addEventListener('pointercancel', drop);
+let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => S && render(), 150); });
 if (role) connect();

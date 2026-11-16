@@ -122,3 +122,11 @@ body[data-role=table] .sides{margin-top:6vh;gap:6vw}body[data-role=table] .unit{
 .caption b{font:400 24px Anton,Impact,sans-serif;text-transform:uppercase;margin-right:10px}
 @keyframes cap{0%{opacity:0;translate:0 20px}6%,88%{opacity:1;translate:0}100%{opacity:0}}
 .cmd-top .body svg{width:96px;height:208px}.cmd h2{font-size:34px}.menu{gap:6px}.menu button{min-height:48px}.menu .atk{min-height:52px}
+/* ---- jogador no PC: três colunas ---- */
+.pc{display:grid;grid-template-columns:390px minmax(0,1fr) 330px;gap:16px;align-items:start}
+.pc>aside{max-height:calc(100vh - 24px);top:12px}.pc>section{display:flex;flex-direction:column;gap:12px}
+.pc .log{max-height:calc(100vh - 130px)}.pc .map{max-width:calc((100vh - 40px)*var(--cols)/var(--rows))}
+.pc .cmd{background:#131318ee;padding:14px;box-shadow:6px 6px 0 #000}.pc .cmd-top .body svg{width:120px;height:260px}
+.pc .menu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.pc .menu button,.pc .menu button:nth-child(n){margin-left:0}
+body[data-role=player] h1{font-size:22px;padding:6px 26px 6px 18px}
+.pc .cmd-top .body svg{width:84px;height:182px}.pc .aimrow .body svg{width:52px;height:113px}.pc .cmd h2{font-size:28px}
