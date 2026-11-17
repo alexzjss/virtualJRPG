@@ -6,10 +6,11 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { startTunnel } from './tunnel.js';
-import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES, SUMMONS, BASICS } from './content.js';
+import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES, SUMMONS, BASICS, WEAPONS } from './content.js';
 import './public/rules.js'; // regras compartilhadas com o navegador (globalThis.RULES)
 import './public/oficios.js'; // catálogo de ofícios (perícias), também usado pelo navegador (globalThis.OFI)
-const RU = globalThis.RULES, OF = globalThis.OFI;
+import './public/armas.js'; // armas: modelos, perfil do ataque básico e criador (globalThis.ARMAS)
+const RU = globalThis.RULES, OF = globalThis.OFI, AR = globalThis.ARMAS;
 
 // __SEA__ só existe no executável gerado por tools/build-exe.mjs: arquivos do jogo vêm embutidos e os dados ficam ao lado do .exe
 const SEA = typeof __SEA__ !== 'undefined', seaMod = SEA ? process.getBuiltinModule('node:sea') : null;
@@ -44,7 +45,7 @@ const CTRL = RU.CTRL; // chefes só sofrem controle por 1 turno
 const STK = Object.keys(RU.ST);
 const VN = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko' };
 const STN = RU.ST, RESN = { hp: 'HP', aura: 'Aura', san: 'Sanidade', limit: 'Limite' };
-const ITYPES = ['cons', 'arma', 'armadura', 'acess', 'mat', 'mun'], WT = ['', 'lamina', 'lanca', 'fogo', 'punho'], EFF = ['hp', 'aura', 'san', 'cure', 'body', 'rev', 'bomb', 'comp', 'oil'];
+const ITYPES = ['cons', 'arma', 'armadura', 'acess', 'mat', 'mun'], WT = ['', ...Object.keys(AR.TIPOS)], EFF = ['hp', 'aura', 'san', 'cure', 'body', 'rev', 'bomb', 'comp', 'oil'];
 // partes do corpo: atributos penalizados (−10 cada enquanto crítica), status ao ficar crítica, penalidade para mirar, peso no sorteio
 const BODY = { head: [['INT', 'SAB'], 'stun', 30, 6], torso: [['CON'], 'bleed', 0, 40], armL: [['FOR', 'DES'], 'atkDn', 15, 15], armR: [['FOR', 'DES'], 'atkDn', 15, 15], legL: [['AGI'], 'agiDn', 15, 12], legR: [['AGI'], 'agiDn', 15, 12] };
 const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: 'braço esq.', armR: 'braço dir.', legL: 'perna esq.', legR: 'perna dir.' };
@@ -82,6 +83,13 @@ if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; del
 S.items ??= buildItems(it);
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
+if (S.itemsV !== 2) { // armas com modelo (perfil do ataque e técnicas): as do catálogo antigo ganham os campos novos pelo nome, as que faltam entram no catálogo
+  const cat0 = buildItems(it), byName = Object.fromEntries(Object.values(cat0).map(i => [i.name, i]));
+  for (const i of Object.values(S.items)) if (i.type === 'arma' && !i.tpl && byName[i.name]?.type === 'arma') Object.assign(i, structuredClone(byName[i.name]));
+  const have = new Set(Object.values(S.items).map(i => i.name));
+  for (const w of Object.values(cat0)) if (w.type === 'arma' && !have.has(w.name)) S.items['w' + crypto.randomBytes(4).toString('hex')] = structuredClone(w);
+  S.itemsV = 2;
+}
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
@@ -155,7 +163,7 @@ const reseat = () => {
     T[ch.id] = (others.length ? Math.min(...others) : 0) + delay(ch);
   }
 };
-const usable = () => { for (const ch of Object.values(S.chars)) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries(ch.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
+const usable = () => { for (const ch of Object.values(S.chars)) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries([...ch.skills, ...wSk(ch)].filter(k => SK(k) && SK(k).kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
 let cfgSig = JSON.stringify(S.ofiCfg);
 const push = () => { const sg = JSON.stringify(S.ofiCfg); if (sg !== cfgSig) { cfgSig = sg; OF.apply(S.ofiCfg); } /* desfazer pode trocar o catálogo */ Object.values(S.chars).forEach(breakCheck); prep(); reseat(); pruneReqs(); usable(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
@@ -168,7 +176,12 @@ const okUrl = v => /^(https?:\/\/[^\s'"()<>]+|\/(uploads|maps)\/[\w.-]+)$/.test(
 const can = (c, ch) => ch && (c.role === 'gm' || (c.role === 'player' && ch.owner === c.name));
 const scene = () => S.scenes[S.scene];
 const eq = (ch, slot) => S.items[ch.equip[slot]];
-const at0 = (ch, a) => ch.attrs[a] + (eq(ch, 'acess')?.attr === a ? eq(ch, 'acess').power + (ch.up?.[ch.equip.acess]?.p || 0) : 0);
+const at0 = (ch, a) => ch.attrs[a] + (eq(ch, 'acess')?.attr === a ? eq(ch, 'acess').power + (ch.up?.[ch.equip.acess]?.p || 0) : 0) + (eq(ch, 'arma')?.mod ? AR.kv(eq(ch, 'arma').mod).a[a] || 0 : 0); // arma pode dar atributo enquanto empunhada
+// técnicas da arma: o id 'w:<item>:<n>' aponta para a lista sk do item; só valem com a arma equipada
+const SK = id => { if (typeof id !== 'string' || !id.startsWith('w:')) return S.skills[id]; const [, k, n] = id.split(':'), s = S.items[k]?.sk?.[+n]; return s ? { ...s, wpn: k } : undefined; };
+const wSk = ch => { const k = ch.equip?.arma, l = S.items[k]?.type === 'arma' && S.items[k].sk; return Array.isArray(l) ? l.map((_, n) => `w:${k}:${n}`) : []; };
+const hasSk = (ch, id) => ch.skills.includes(id) || wSk(ch).includes(id);
+const statOf = (a, s) => (s.attr2 ? Math.round((at(a, s.attr) + at(a, s.attr2)) / 2) : at(a, s.attr)) - sanPen(a); // ataque com dois atributos usa a média
 const lvl = (ch, k) => { const d = ch.body[k] || 0; return d >= ch.hpMax * .3 ? 2 : d >= ch.hpMax * .15 ? 1 : 0; }; // 0 ileso, 1 ferido, 2 crítico
 const at = (ch, a) => at0(ch, a) - 10 * PARTS.filter(k => BODY[k][0].includes(a) && lvl(ch, k) === 2).length;
 const healBody = (ch, v) => { while (v > 0) { const k = PARTS.filter(p => ch.body[p] > 0).sort((x, y) => ch.body[y] - ch.body[x])[0]; if (!k) break; const d = Math.min(v, ch.body[k]); ch.body[k] -= d; v -= d; } };
@@ -213,16 +226,18 @@ function normSlots(ch) { // mantém só passivas aprendidas, respeita o limite e
 }
 const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; return s && s.kind === 'passive' && (!slotted(s) || ch.enemy || ch.summon || !Array.isArray(ch.pslots) || ch.pslots.includes(k)); }).map(k => S.skills[k]);
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
-const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!s.req : s.el === sc;
+const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : s.el === sc;
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
   const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
-  const f = ch.form && ch.st?.form && S.skills[ch.form]; if (f?.form) add(f.form.m);
+  const f = ch.form && ch.st?.form && SK(ch.form); if (f?.form) add(f.form.m);
   if (vows(ch).includes('tempo')) m.hit += 15;
   const D = S.battle?.dom; if (D) add(ch.enemy === D.side ? D.ally : D.foe); // Expansão de Domínio aberta
   const af = ch.afl && (ch.afl.t === 'v' ? RU.VIR : RU.AFL)[ch.afl.k]; if (af) add(af[2]); // Aflição ou Virtude
   const wu = ch.up?.[ch.equip?.arma]; // assinatura, runas e arma viva
   if (wu) { if (wu.sig != null) add(OF.SIG[wu.sig]?.m || {}); for (const rn of wu.g || []) add(OF.RUNAS[rn]?.mod || {}); if (wu.living && stageOf(wu.kills) >= 3 && s?.basic) m.crit += 10; }
+  const wp = eq(ch, 'arma'); // traços da arma empunhada: bônus fixos sempre; acerto e crítico só no ataque básico; sem o atributo pedido, −20 de acerto nos golpes com ela
+  if (wp?.type === 'arma') { const P = AR.prof(wp); add(P.mod.m); if (s?.basic) { m.hit += P.hit; m.crit += P.crit; } if ((s?.basic || s?.req || s?.wpn) && AR.short(wp, x => at0(ch, x)).length) m.hit -= 20; }
   if (S.meal && S.battle?.active && !ch.enemy) add(S.meal.m); // refeição do acampamento
   if (ch.sharp && s?.basic) m.atkP += 3; // arma afiada
   if (S.battle?.active && !ch.enemy && ch.id in S.battle.ticks) for (const o of battlers()) { // laços: aliados queridos por perto fortalecem
@@ -242,7 +257,7 @@ function vowMult(a, s, t) {
     case 'chama': m *= a.hp <= a.hpMax * .4 ? 1.6 : .85; break;
     case 'silencio': m *= s.area ? 1 : 1.35; break;
     case 'cacador': m *= t.enemy && t.cat !== 'humano' ? 1.4 : .5; break;
-    case 'arma': m *= s.basic || s.req ? 1.35 : 1; break;
+    case 'arma': m *= s.basic || s.req || s.wpn ? 1.35 : 1; break;
     case 'tempo': m *= 1.25; break;
   }
   return m;
@@ -251,8 +266,9 @@ const breakVow = (ch, v, why) => { (ch.bt ??= {}).broken ??= {}; if (ch.bt.broke
 const compOf = ch => Object.keys(ch.inv || {}).find(k => S.items[k]?.eff === 'comp' && ch.inv[k] > 0);
 // a skill como este personagem a usa: amplificações (versões Discente/Verdadeiro), afinidade de Aura e custos de votos
 function effSkill(a, id) {
-  const s0 = S.skills[id]; if (!s0) return null;
+  const s0 = SK(id); if (!s0) return null;
   const s = { ...s0, id, pay: { ...(s0.pay || {}) }, fx: [...(s0.fx || [])] };
+  if (s.wpn) { const w = S.items[s.wpn]; if (s.power && ['dmg', 'mental', 'heal'].includes(s.kind)) s.power += wpPow(a); if (s.el === 'fis' && w?.el) s.el = w.el; } // técnica da arma: soma a têmpera e herda o elemento
   for (const p of passOf(a)) if (p.amp === s0.name && p.up) { const u = p.up; s.power += u.p || 0; s.cost += u.c || 0; if (u.san) s.pay.san = (s.pay.san || 0) + u.san; if (u.area) s.area = true; if (u.hits) s.hits = u.hits; if (u.fx) s.fx.push(...u.fx); s.amped = (s.amped || 0) + 1; }
   const e = RU.nenEff(a, s0); if (e !== 1) s.power = Math.round(s.power * e); s.eff = e;
   const vs = vows(a);
@@ -263,7 +279,10 @@ function effSkill(a, id) {
 }
 const stageOf = k => [10, 25, 50].filter(v => (k || 0) >= v).length;
 const wpPow = a => { const u = a.up?.[a.equip?.arma]; return u ? (u.p || 0) + (u.living ? stageOf(u.kills) : 0) : 0; };
-const basicOf = a => { const wp = eq(a, 'arma'); return { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: (wp?.power ?? a.arma) + wpPow(a) + modsOf(a, { basic: true }).atkP, cost: 0, res: 'aura', basic: true, ct: 100, fx: [], pay: {} }; };
+// ataque básico: vem da arma empunhada (atributo, tempo, golpes, área, condições e efeitos do perfil); sem arma, punhos com FOR e o poder base
+const basicOf = a => { const wp = eq(a, 'arma'), P = AR.prof(wp);
+  return { name: P.atkN || 'Ataque', kind: P.mental ? 'mental' : 'dmg', attr: P.wa, ...(P.wa2 ? { attr2: P.wa2 } : {}), el: wp?.el || 'fis', power: (wp?.power ?? a.arma) + wpPow(a) + modsOf(a, { basic: true }).atkP, cost: 0, res: 'aura', basic: true,
+    ct: P.ct, ...(P.hits > 1 ? { hits: P.hits } : {}), area: P.area, fx: AR.basicFx(wp), pay: {} }; };
 const battlers = () => Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead);
 const skipping = o => o.st.stun || o.st.frozen || o.st.sleep || o.chg;
 // técnica em dupla (1 nome) ou em trio (2 nomes): aliados de pé e distintos, que conhecem a skill par e podem pagar por ela
@@ -285,6 +304,8 @@ function partners(a, s) {
 // motivo para não poder usar agora ('' = pode)
 function cantUse(a, s) {
   if (!s || s.kind === 'passive') return 'Passiva';
+  if (s.wpn && a.equip?.arma !== s.wpn) return 'Arma não equipada';
+  if (s.uses && (a.bt?.wu?.[s.id] || 0) >= s.uses) return 'Esgotada nesta batalha';
   if (s.req && s.req !== wtype(a)) return 'Exige ' + s.req;
   if (!s.basic && (a.st.silence || a.st.fury)) return a.st.silence ? 'Silenciado' : 'Em fúria: só ataca';
   if (s.limit && a.limit < 100) return 'Limite incompleto';
@@ -296,7 +317,7 @@ function cantUse(a, s) {
   if (s.dom && (!S.battle.active || a.aura < Math.ceil(a.auraMax / 2))) return S.battle.active ? 'Exige metade da Aura' : 'Só em batalha';
   const vs = vows(a);
   if (vs.includes('silencio') && s.area) return 'Voto do Silêncio';
-  if (vs.includes('arma') && !s.basic && !s.req && s.kind !== 'form') return 'Voto da Arma Única';
+  if (vs.includes('arma') && !s.basic && !s.req && !s.wpn && s.kind !== 'form') return 'Voto da Arma Única';
   return '';
 }
 const applySt = (t, k, n = 3) => {
@@ -312,7 +333,7 @@ function expire(ch, k) { // condições com efeito ao acabar
   if (k === 'guarded') delete ch.guardBy;
 }
 function endForm(ch, colateral) {
-  const f = ch.form && S.skills[ch.form]; delete ch.form; delete ch.st.form;
+  const f = ch.form && SK(ch.form); delete ch.form; delete ch.st.form;
   if (!f) return;
   let txt = '';
   if (colateral) for (const e of f.form?.end || []) txt += fx1(ch, f, ch, e, { stat: at(ch, f.attr) });
@@ -330,7 +351,7 @@ function livingKill(src, t) { // arma viva: cada abate conta; a cada estágio a 
   const was = stageOf(u.kills); u.kills = (u.kills || 0) + 1;
   if (stageOf(u.kills) > was) log(src.name, `${S.items[src.equip.arma]?.name} desperta: estágio ${stageOf(u.kills)}${stageOf(u.kills) === 3 ? ' (ignora armadura e acerta críticos com mais facilidade)' : ''}!`, 'ok');
 }
-function interrupt(t) { if (!t.chg) return; const s = S.skills[t.chg.s]; delete t.chg; delete t.st.charge; log(t.name, `perde a concentração${s ? ' de ' + s.name : ''}!`, 'bad'); }
+function interrupt(t) { if (!t.chg) return; const s = SK(t.chg.s); delete t.chg; delete t.st.charge; log(t.name, `perde a concentração${s ? ' de ' + s.name : ''}!`, 'bad'); }
 // ---------- sistemas de batalha: Quebra, Cadeia, Ataque Total, Domínio, clima, reações ----------
 const sideOf = ch => ch.enemy ? 'e' : 'h', TEN = [1, 1.5, 2, 3];
 const climaOf = () => RU.CLIMA[S.battle.wx?.k] || null;
@@ -493,7 +514,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
     n.aura = Math.min(n.auraMax, n.aura + Math.max(1, Math.round(n.auraMax / 10)));
     if (n.st.regen) { const v = Math.max(1, Math.round(n.hpMax / 20 / (n.boss ? 3 : 1))); /* como o dano contínuo; chefes têm HP inflado e agem duas vezes */ n.hp = Math.min(n.hpMax, n.hp + v); healBody(n, v); log(n.name, `regenera ${v} HP.`, 'ok', { fx: { id: n.id, heal: v } }); }
     if (n.st.dread) { const v = Math.max(1, Math.round(n.sanMax / 12)); n.san = Math.max(0, n.san - v); log(n.name, `é corroído pelo pavor: −${v} de Sanidade.`, 'bad'); }
-    const f = n.form && S.skills[n.form];
+    const f = n.form && SK(n.form);
     if (f?.form?.dr && n.st.form) { // transformação drena a cada turno; sem recurso, ela acaba
       const dr = f.form.dr, short = Object.entries(dr).find(([r, v]) => r === 'hp' ? n.hp <= Math.ceil(n.hpMax * v / 100) : n[r] < v);
       if (short) endForm(n, true); else for (const [r, v] of Object.entries(dr)) { if (r === 'hp') n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * v / 100)); else n[r] -= v; }
@@ -509,7 +530,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
     const skip = n.st.broken ? 'quebrado' : n.st.stun ? 'atordoado' : n.st.frozen ? 'congelado' : n.st.sleep ? 'dormindo' : n.st.para && d100() <= 50 ? 'paralisado' : '';
     if (!skip) {
       if (n.chg) { // concentração: espera os turnos e solta sozinha
-        if (--n.chg.n > 0) { log(n.name, `continua concentrando ${S.skills[n.chg.s]?.name || ''}…`, ''); tickSt(n); bump(n.id, delay(n)); continue; }
+        if (--n.chg.n > 0) { log(n.name, `continua concentrando ${SK(n.chg.s)?.name || ''}…`, ''); tickSt(n); bump(n.id, delay(n)); continue; }
         const c = n.chg; delete n.chg; delete n.st.charge;
         let t = S.chars[c.t]; if (!t || t.dead || !(t.id in S.battle.ticks) || (t.hp <= 0 && t.enemy !== n.enemy)) t = pick(battlers().filter(o => o.enemy !== n.enemy && o.hp > 0));
         if (t && doAct(n, { skill: c.s, target: t.id, aim: c.aim, release: true })) return;
@@ -533,14 +554,14 @@ function redirect(a, t) { // provocar, guarda-costas e furtividade mudam o alvo 
 }
 function ammoFor(a, s) { // munição equipada: dá o elemento por N tiros, só em armas de fogo
   const id = a.equip?.mun, am = S.items[id];
-  if (!am || am.type !== 'mun' || wtype(a) !== 'fogo' || !(s.basic || s.req === 'fogo') || s.kind === 'mental') return null;
+  if (!am || am.type !== 'mun' || wtype(a) !== 'fogo' || !(s.basic || s.req === 'fogo' || s.wpn) || s.kind === 'mental') return null;
   a.shots ??= {};
   if (!(a.shots[id] > 0)) { if (!(a.inv[id] > 0)) { delete a.equip.mun; return null; } if (--a.inv[id] <= 0) delete a.inv[id]; a.shots[id] = am.shots + OF.hook(a, 'tiros'); log(a.name, `abre um pacote de ${am.name} (${a.shots[id]} tiros).`, ''); }
   a.shots[id]--; return am;
 }
 function strike(a, s, t, aim, bonus = 0, o = {}) {
   const am = ammoFor(a, s); if (am) s = { ...s, el: am.el };
-  const ma = modsOf(a, s), stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${STN[s.st]}]` : '';
+  const ma = modsOf(a, s), stat = statOf(a, s), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal' || s.kind === 'util') {
     const fallen = t.hp <= 0; let txt = '';
     if (s.kind === 'heal') {
@@ -566,7 +587,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
   const crit = r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
-  a.bt ??= {}; const wu = (s.basic || s.req) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
+  a.bt ??= {}; const wu = (s.basic || s.req || s.wpn) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
   if (olho) a.bt.olho = 1;
   const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
@@ -574,7 +595,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv / (s.hits || 1)) + (o.plus || 0) - armor) * mult)); // multi-golpe divide o bônus do atributo; a armadura conta em cada golpe
-  a.marks[s.attr] = true;
+  a.marks[s.attr] = true; if (s.attr2) a.marks[s.attr2] = true;
   let extra = '', part = '';
   const was = t.hp > 0;
   if (mental) t.san = Math.max(0, t.san - d);
@@ -607,19 +628,20 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
 }
 // ---------- ação de combate (jogador aprovado, mestre, IA, concentração liberada) ----------
 function doAct(a, m, bonus = 0) {
-  const s = m.skill === 'atk' ? basicOf(a) : a.skills.includes(m.skill) && effSkill(a, m.skill);
+  const s = m.skill === 'atk' ? basicOf(a) : hasSk(a, m.skill) && effSkill(a, m.skill);
   if (!s || (!m.release && cantUse(a, s))) return false;
   let t0 = s.tg === 'self' || s.kind === 'form' ? a : S.chars[m.target];
   if (!t0 || !(t0.id in S.battle.ticks)) return false;
   if (!m.release) {
     a[s.res] -= s.cost;
     if (s.limit) a.limit = 0;
+    if (s.uses) { a.bt ??= {}; a.bt.wu ??= {}; a.bt.wu[m.skill] = (a.bt.wu[m.skill] || 0) + 1; } // golpe com usos por batalha
     for (const [r, v] of Object.entries(s.pay || {})) { if (r === 'hp') a.hp = Math.max(1, a.hp - Math.ceil(a.hpMax * v / 100)); else a[r] = Math.max(0, a[r] - v); }
     if (s.useComp) { const k = compOf(a); if (k && --a.inv[k] <= 0) delete a.inv[k]; }
     if (s.dom) { openDomain(a, s); endTurn(a.id, s.ct); return true; }
     if (s.chg) { a.chg = { s: m.skill, t: t0.id, aim: m.aim, n: s.chg }; a.st.charge = 99; log(a.name, `começa a concentrar ${s.name}…`, 'ok'); endTurn(a.id, 100); return true; }
   }
-  const stat = at(a, s.attr) - sanPen(a);
+  const stat = statOf(a, s);
   if (s.kind === 'form') {
     if (a.form) endForm(a, false);
     a.form = m.skill; a.st.form = s.form.dur + 1;
@@ -672,7 +694,7 @@ function summonOf(a, s) { // invocação: aliado temporário que age sozinho, co
 // IA opcional por modelo do bestiário (campo `ia`, desligado por padrão): { dom: 1 } abre a Expansão de Domínio uma vez por combate;
 // { defend: p } defende com a vida baixa; { focus: p } concentra Tensão com a vida alta; p = chance por turno. Devolve true se gastou o turno.
 function iaExtra(a, usable) {
-  const ia = a.ia, dk = ia.dom && !a.domUsed && usable.find(k => S.skills[k].dom), D = S.battle.dom;
+  const ia = a.ia, dk = ia.dom && !a.domUsed && usable.find(k => SK(k)?.dom), D = S.battle.dom;
   if (dk && !(D && D.side === a.enemy) && (D ? D.side !== a.enemy : a.rage || a.hp < a.hpMax * .75) && Math.random() < .6 && doAct(a, { skill: dk, target: a.id })) { a.domUsed = 1; return true; } // contra um Domínio rival abre já, para o Choque
   if (a.icd > 0) { a.icd--; return false; }
   if (ia.defend && a.hp < a.hpMax * .4 && !a.st.defUp && Math.random() < ia.defend) { a.icd = 3; doDefend(a); return true; }
@@ -684,9 +706,9 @@ function aiAct(a) {
   const all = battlers(), alive = all.filter(o => o.hp > 0), foesAll = alive.filter(o => o.enemy !== a.enemy), mates = alive.filter(o => o.enemy === a.enemy);
   if (!foesAll.length) return endTurn(a.id);
   const foes = foesAll.filter(o => !o.st.stealth || a.st.focus).length ? foesAll.filter(o => !o.st.stealth || a.st.focus) : foesAll;
-  const K = k => S.skills[k], has = (k, t) => K(k).fx?.some(f => f.t === t), pw = k => K(k).power * (K(k).hits || 1) * (K(k).area ? 1.5 : 1);
+  const K = SK, has = (k, t) => K(k).fx?.some(f => f.t === t), pw = k => K(k).power * (K(k).hits || 1) * (K(k).area ? 1.5 : 1);
   const strong = l => { const o = [...l].sort((x, y) => pw(y) - pw(x)); return Math.random() < .6 ? pick(o.slice(0, 3)) : pick(o); }; // repertório grande: prefere os golpes mais fortes
-  const usable = a.skills.filter(k => K(k) && K(k).kind !== 'passive' && !((K(k).trio && !(R.iaExtra && a.ia?.trio)) || K(k).dom && !(R.iaExtra && a.ia?.dom)) && !cantUse(a, effSkill(a, k))); // Domínio e trio só com `ia` explícito
+  const usable = [...a.skills, ...wSk(a)].filter(k => K(k) && K(k).kind !== 'passive' && !((K(k).trio && !(R.iaExtra && a.ia?.trio)) || K(k).dom && !(R.iaExtra && a.ia?.dom)) && !cantUse(a, effSkill(a, k))); // Domínio e trio só com `ia` explícito
   const lim = usable.find(k => K(k).limit); // Limite carregado tem prioridade
   const hurt0 = [...mates].sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0], fallen = all.filter(o => o.enemy === a.enemy && o.hp <= 0 && !o.dead);
   const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => (K(k).kind === 'heal' && !K(k).power || K(k).kind === 'util') && !K(k).summon && !K(k).dom && !has(k, 'revive'));
@@ -1239,7 +1261,7 @@ const H = {
   },
   forge(c, m) { // forja com essências do elemento: arma = 3, relíquia = 5, mais metade do preço em ouro
     const ch = S.chars[m.id], i = S.items[m.item];
-    if (!can(c, ch) || S.battle.active || !i?.el || !['arma', 'acess'].includes(i.type)) return;
+    if (!can(c, ch) || S.battle.active || !i?.el || !['arma', 'acess'].includes(i.type) || (i.type === 'arma' && i.cat && i.cat !== 'elemental')) return; // lendárias e malditas não saem da forja
     const ess = Object.keys(S.items).find(k => S.items[k].type === 'mat' && S.items[k].el === i.el), need = i.type === 'arma' ? OF.hook(ch, 'essencia') || 3 : 5, cost = Math.round(i.price / 2);
     if (!ess || !(ch.inv[ess] >= need) || ch.gold < cost) return;
     ch.gold -= cost; if ((ch.inv[ess] -= need) <= 0) delete ch.inv[ess];
@@ -1449,6 +1471,14 @@ const H = {
     if (c.role !== 'gm' || !S.items[m.item] || S.items[m.item].type !== 'mat') return;
     const g = scene().gather ??= []; scene().gather = m.on === false ? g.filter(k => k !== m.item) : g.includes(m.item) ? g : [...g, m.item];
   },
+  wpnSave(c, m) { // criador de armas do mestre: cria uma arma nova ou regrava uma existente (m.id), a partir de um rascunho
+    if (c.role !== 'gm' || !m.w || typeof m.w !== 'object') return;
+    const { w, errs } = AR.clean(m.w), id = m.id && S.items[m.id]?.type === 'arma' ? m.id : rid();
+    S.items[id] = { ...it(w.name, 'arma', w.power), ...w };
+    if (S.battle.active) usable();
+    log('Mestre', `${m.id === id ? 'atualizou' : 'criou'} a arma ${w.name}.${errs.length ? ' Corrigido: ' + errs.join(' · ') : ''}`, errs.length ? 'bad' : 'ok', { to: GM });
+    tell0(c, { kind: errs.length ? 'no' : 'ok', text: errs.length ? errs.join(' · ') : `${w.name} salva.`, id });
+  },
   edSet(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(SCH, m.coll) || !Object.hasOwn(SCH[m.coll], m.f) || !Object.hasOwn(S[m.coll], m.id)) return;
     const o = S[m.coll][m.id], r = SCH[m.coll][m.f], v = m.v;
@@ -1479,7 +1509,7 @@ const gateOf = m => m.t === 'use' && S.battle.active && m.id in S.battle.ticks ?
 const reqText = m => { // frase curta que o mestre lê na fila
   const ch = S.chars[m.id], i = S.items[m.item], tg = S.chars[m.target], sg = v => (v > 0 ? '+' : '') + v;
   if (m.t === 'roll') return `rolar ${m.attr}${int(m.mod, -100, 100) ? ' ' + sg(int(m.mod, -100, 100)) : ''}`;
-  if (m.t === 'act') return `${m.skill === 'atk' ? 'Ataque' : S.skills[m.skill]?.name || '?'} → ${tg?.name || '?'}${PARTS.includes(m.aim) ? ` (mira: ${PL[m.aim]})` : ''}`;
+  if (m.t === 'act') return `${m.skill === 'atk' ? 'Ataque' : SK(m.skill)?.name || '?'} → ${tg?.name || '?'}${PARTS.includes(m.aim) ? ` (mira: ${PL[m.aim]})` : ''}`;
   if (m.t === 'learn') return `aprender ${S.skills[m.skill]?.name || '?'} (${S.skills[m.skill]?.xp ?? '?'} XP)`;
   if (m.t === 'campAct') return `acampamento: ${m.k}`;
   if (m.t === 'ofiUse') { const n = nodeOf(ch, m.node); return `ofício: ${n?.n || '?'}${tg ? ' → ' + tg.name : ''}${i ? ' · ' + i.name : ''}`; }
@@ -1493,6 +1523,7 @@ const reqText = m => { // frase curta que o mestre lê na fila
   return `${V[m.t]} ${i?.name || '?'}${m.t === 'use' && tg && tg !== ch ? ' em ' + tg.name : ''}`;
 };
 const pruneReqs = () => { for (const [id, r] of Object.entries(S.reqs)) { const ch = S.chars[r.m.id]; if (!ch || ch.owner !== r.by || (r.cat === 'act' && !(S.battle.active && current() === ch.id))) delete S.reqs[id]; } };
+const tell0 = (c, o) => c.readyState === 1 && c.send(JSON.stringify({ t: 'note', ...o })); // aviso só para quem mandou
 const tell = (name, o) => wss.clients.forEach(x => x.role === 'player' && x.name === name && x.readyState === 1 && x.send(JSON.stringify({ t: 'note', ...o })));
 const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
 wss.on('connection', c => {
@@ -1527,7 +1558,7 @@ wss.on('connection', c => {
 });
 prep();
 export { genFoe, partyRef, fitBoss, spawn };
-export { H, S, R, current, derive, modsOf, slotMax, server, push }; // server e push: o teste de interface (tools/ui-smoke.js) sobe o jogo no mesmo processo
+export { H, S, R, current, derive, modsOf, slotMax, server, push, basicOf }; // server e push: o teste de interface (tools/ui-smoke.js) sobe o jogo no mesmo processo
 export { view, order, handle };
 const isMain = SEA || process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {

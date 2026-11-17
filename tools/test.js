@@ -2,7 +2,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
-const { H, S, current, derive, view, handle, modsOf, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
+const { H, S, current, derive, view, handle, modsOf, basicOf, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 const { TREE } = await import('../tree.js');
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
@@ -49,7 +49,7 @@ test('economia: loja por cena, contrato pago na vitória, forja com essências',
   const bid = Object.keys(S.bestiary).find(k => S.bestiary[k].name === 'Kappa'); H.ctAdd(gm, { id: bid, gold: 100, xp: 7 }); H.bSpawn(gm, { id: bid, tier: 'elite' });
   const foe = Object.values(S.chars).find(c => c.enemy); derive(foe); H.battle(gm, { on: true }); foe.hp = 0; h.gold = 0; h.xp = 0; H.battle(gm, { on: false, win: true });
   assert.ok(h.gold >= 100); assert.ok(h.xp >= 7); assert.equal(Object.values(S.contracts)[0].done, true);
-  const ess = it('Essência de Kagutsuchi'); h.inv[ess] = 3; h.gold = 125; H.forge(ana, { id: h.id, item: it('Sabre Flamejante') }); assert.equal(h.inv[it('Sabre Flamejante')], 1); assert.equal(h.inv[ess], undefined); assert.equal(h.gold, 0);
+  const ess = it('Essência de Kagutsuchi'); h.inv[ess] = 3; h.gold = Math.round(S.items[it('Sabre Flamejante')].price / 2); // metade do preço H.forge(ana, { id: h.id, item: it('Sabre Flamejante') }); assert.equal(h.inv[it('Sabre Flamejante')], 1); assert.equal(h.inv[ess], undefined); assert.equal(h.gold, 0);
 });
 test('cenas de exemplo com loja própria e perseguição que termina', () => {
   reset(); assert.ok(Object.values(S.scenes).some(s => s.name === 'Estação Central' && s.shop.stock.length && s.bg === '/maps/estacao.svg'));
@@ -536,4 +536,60 @@ test('IA: o trio de inimigos só usa a técnica com os três de pé', () => {
   reset(); const h2 = mk(ana, {}); for (const n of ['Oni de Brasa', 'Tengu do Vendaval']) H.bSpawn(gm, { id: bst(n) });
   const [p, q] = Object.values(S.chars).filter(c => c.enemy); [p, q].forEach(c => { derive(c); c.hp = c.hpMax; c.aura = c.auraMax; }); H.battle(gm, { on: true }); turn(p); const ap = p.aura;
   fixR(.3, () => H.act(gm, { id: p.id, skill: p.skills.find(k => S.skills[k].trio), target: h2.id })); assert.equal(p.aura, ap, 'sem o terceiro');
+});
+
+// ---------- armas: perfil do ataque básico, técnicas da arma e criador ----------
+const AR = globalThis.ARMAS, itm2 = n => Object.keys(S.items).find(k => S.items[k].name === n);
+const duelW = () => { delete S.meal; S.bonds = {}; return duel(); }; // sem refeição nem laços de testes anteriores
+const arm = (a, n) => { const k = itm2(n); a.inv[k] = 1; a.equip.arma = k; return k; };
+test('armas: o ataque básico vem da arma (atributo, tempo, golpes, área, condição, perfuração); sem arma, punhos com FOR', () => {
+  let [a, e] = duelW(); let b = basicOf(a); assert.deepEqual([b.attr, b.ct, b.area, b.hits, b.fx.length, b.power], ['FOR', 100, false, undefined, 0, a.arma]); // como era antes
+  arm(a, 'Rifle de Ferrolho'); b = basicOf(a); assert.equal(b.attr, 'DES'); assert.equal(b.ct, 125); assert.ok(b.fx.some(f => f.t === 'pierce' && f.p === 30));
+  assert.equal(modsOf(a, { basic: true }).hit - modsOf(a, { kind: 'dmg' }).hit, 15, 'acerto do rifle só no ataque básico'); assert.equal(modsOf(a, { basic: true }).crit - modsOf(a, { kind: 'dmg' }).crit, 5);
+  arm(a, 'Katana de Caçador'); b = basicOf(a); assert.equal(b.attr2, 'DES'); // média de FOR e DES
+  a.attrs.FOR = 90; a.attrs.DES = 10; e.armor = 0; const hp = e.hp = e.hpMax = 999; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id }));
+  assert.equal(hp - e.hp, b.power + Math.floor(50 / 10)); // stat = (90 + 10) / 2 = 50
+  [a, e] = duelW(); const e2 = mk(gm, { enemy: true }); derive(e2); e2.hp = e2.hpMax; S.battle.ticks[e2.id] = 900; arm(a, 'Escopeta de Cano Serrado'); assert.equal(basicOf(a).area, true);
+  const h1 = e.hp, h2 = e2.hp; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.hp < h1 && e2.hp < h2, 'escopeta acerta todos');
+  [a, e] = duelW(); arm(a, 'Pistolas Gêmeas'); const n0 = S.log.length; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.equal(S.log.slice(n0).filter(l => /^Ataque → /.test(l.text)).length, 2, 'dois tiros');
+  [a, e] = duelW(); arm(a, 'Garras de Ferro'); assert.ok(basicOf(a).fx.some(f => f.t === 'st' && f.k === 'bleed' && f.ch === 20)); turn(a); fixR(.1, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.st.bleed > 0, 'sangramento por chance');
+  [a, e] = duelW(); arm(a, 'Sino de Exorcismo'); assert.equal(basicOf(a).kind, 'mental'); assert.equal(basicOf(a).attr, 'CAR'); const san = e.san; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.san < san, 'o sino fere a Sanidade');
+});
+test('armas: bônus empunhada, requisito de atributo e custo da arma maldita', () => {
+  let [a, e] = duelW(); arm(a, 'Manoplas de Aço'); assert.equal(modsOf(a).def, 5);
+  arm(a, 'Faixas de Monge'); assert.equal(modsOf(a).agi, 5); assert.equal(basicOf(a).attr, 'AGI');
+  arm(a, 'Marreta de Ferroviário'); a.attrs.FOR = 60; const ok = modsOf(a, { basic: true }).hit; a.attrs.FOR = 30; assert.equal(modsOf(a, { basic: true }).hit, ok - 20, 'sem FOR 50: −20 de acerto');
+  const other = modsOf(a, { kind: 'dmg' }).hit; a.attrs.FOR = 60; assert.equal(modsOf(a, { kind: 'dmg' }).hit, other, 'skill que não é da arma não sofre a penalidade');
+  assert.equal(modsOf(a, { wpn: 'x', kind: 'dmg' }).hit, other); a.attrs.FOR = 30; assert.equal(modsOf(a, { wpn: 'x', kind: 'dmg' }).hit, other - 20, 'técnica da arma sofre');
+  [a, e] = duelW(); arm(a, 'Grimório do Sem-Nome'); const san = a.san; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.equal(a.san, san - 2, 'maldita cobra Sanidade a cada ataque');
+  [a, e] = duelW(); const w = itm2('Sabre de Cavalaria'); derive(a); const hp0 = a.hpMax; S.items[w].mod = 'CON 10'; arm(a, 'Sabre de Cavalaria'); derive(a); assert.equal(a.hpMax, hp0 + 20, 'CON 10 empunhada: +20 de HP máximo'); S.items[w].mod = '';
+});
+test('armas: técnicas próprias só com a arma equipada, herdam elemento e têmpera, e respeitam usos por batalha', () => {
+  let [a, e] = duelW(); const k = arm(a, 'Revólver .38'), id = `w:${k}:0`; assert.equal(S.items[k].sk[0].name, 'Leque do Pistoleiro');
+  turn(a); let aura = a.aura; fixR(.3, () => H.act(gm, { id: a.id, skill: id, target: e.id })); assert.ok(a.aura < aura, 'técnica da arma usada'); assert.ok(S.log.some(l => /Leque do Pistoleiro/.test(l.text)));
+  delete a.equip.arma; turn(a); aura = a.aura; fixR(.3, () => H.act(gm, { id: a.id, skill: id, target: e.id })); assert.equal(a.aura, aura, 'sem a arma, recusado');
+  [a, e] = duelW(); const fk = arm(a, 'Sabre Flamejante'); turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: `w:${fk}:0`, target: e.id })); assert.equal(S.log.filter(l => l.fx?.s === 'Corte Cruzado').at(-1).fx.el, 'kagutsuchi', 'técnica física herda o elemento da arma');
+  a.up = { [fk]: { p: 6 } }; const pw = basicOf(a).power; assert.equal(pw, S.items[fk].power + 6);
+  [a, e] = duelW(); const lk = arm(a, 'Aurora do Último Dia'), ult = `w:${lk}:2`; assert.equal(S.items[lk].sk[2].uses, 1); e.hp = e.hpMax = 9999;
+  turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: ult, target: e.id })); assert.equal(a.bt.wu[ult], 1);
+  turn(a); aura = a.aura; fixR(.3, () => H.act(gm, { id: a.id, skill: ult, target: e.id })); assert.equal(a.aura, aura, 'golpe supremo: 1 uso por batalha');
+  H.battle(gm, { on: false }); H.battle(gm, { on: true }); a.aura = a.auraMax; turn(a); aura = a.aura; fixR(.3, () => H.act(gm, { id: a.id, skill: ult, target: e.id })); assert.ok(a.aura < aura, 'nova batalha, novo uso');
+  // inimigo com arma equipada também usa as técnicas dela (IA)
+  [a, e] = duelW(); const ek = itm2('Machado de Lenhador'); e.inv[ek] = 1; e.equip.arma = ek; handle(gm, { t: 'autoSet', k: 'roll', v: S.auto.roll }); // handle → push recalcula ch.cant
+  assert.equal(e.cant[`w:${ek}:0`], '', 'a técnica do machado entra no repertório do inimigo');
+});
+test('armas: modelos geram armas válidas e dentro da régua; o criador do mestre limpa o rascunho', () => {
+  for (const id of Object.keys(AR.MOD)) for (const cat of Object.keys(AR.CATS)) for (const lvl of [0, 3]) {
+    const w = AR.make(id, { lvl, cat, el: cat === 'elemental' ? 'indra' : '' }); assert.ok(w.sk.length >= 1 && w.sk.every(s => s.name && s.kind), id + cat);
+    const r = AR.rel(w); assert.ok(r >= 75 && r <= 200, `${id}/${cat}/${lvl}: ${r}%`);
+  }
+  for (const id of Object.keys(AR.MOD)) { const r = AR.rel(AR.make(id, { lvl: 1 })); assert.ok(r >= 88 && r <= 125, `${id} básico: ${r}%`); } // básicas perto do sabre simples
+  reset(); const n = Object.keys(S.items).length;
+  H.wpnSave(ana, { w: { name: 'Hack' } }); assert.equal(Object.keys(S.items).length, n, 'jogador não cria arma');
+  const d = { ...AR.make('machado', { cat: 'especial' }), name: 'Machado do Teste', fx: 'efeito-falso 2', mod: 'def 5; xyz 3', hit: 999, sk: [{ name: 'Golpe Novo', kind: 'dmg', power: 20, cost: 5, fxs: 'st bleed 3 50%' }, { name: 'Quebrado', kind: 'dmg', fxs: 'nada 1' }] };
+  H.wpnSave(gm, { w: d }); const k = itm2('Machado do Teste'), w = S.items[k];
+  assert.equal(w.fx, ''); assert.equal(w.mod, 'def 5'); assert.equal(w.hit, 50); assert.equal(w.sk.length, 2); assert.equal(w.sk[0].fx[0].k, 'bleed'); assert.equal(w.sk[1].fx, undefined); assert.equal(w.tpl, 'machado');
+  assert.ok(S.log.at(-1).to === '@gm' && /Corrigido/.test(S.log.at(-1).text), 'erros avisados só ao mestre');
+  H.wpnSave(gm, { id: k, w: { ...w, power: 33 } }); assert.equal(S.items[k].power, 33); assert.equal(Object.keys(S.items).length, n + 1, 'regravar não cria outra');
+  const h = mk(ana, {}), lend = itm2('Aurora do Último Dia'), ess = itm2('Essência de Amaterasu'); h.inv[ess] = 9; h.gold = 99999; H.forge(ana, { id: h.id, item: lend }); assert.equal(h.inv[lend], undefined, 'lendária não sai da forja');
 });

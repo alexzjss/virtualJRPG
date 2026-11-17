@@ -1,6 +1,9 @@
 // Conteúdo padrão da campanha: fantasia mística com demônios e caçadores, tecnologia dos anos 1910-1920.
 // buildSkills → grade compartilhada; buildItems → catálogo; buildBestiary → modelos de inimigos.
 import { TREE } from './tree.js';
+import './public/rules.js'; // parseFx e parseForm são compartilhados com o navegador (globalThis.RULES)
+import './public/armas.js'; // modelos de arma (globalThis.ARMAS)
+export const { parseFx, parseForm } = globalThis.RULES;
 const EL9 = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko'];
 const PATRON = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko' };
 
@@ -8,11 +11,6 @@ const PATRON = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', i
 // fx: 'st burn 3 60%; drain hp 30; shield 12 self' → lista de efeitos. Alvo opcional: self | ally | foes | tgt (padrão: o alvo da skill).
 // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
 // mod / bon: 'atk 10; hit 5' e 'INT 4; sanMax -5' → modificadores e bônus das passivas.
-const TO = new Set(['self', 'ally', 'foes', 'tgt']);
-const ARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'],
-  push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
-const DEF = { st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 } };
-const TXT = new Set(['k', 'r']);
 // dom: 'dur 3; ally atk 20; ally hit 10; foe def -20; foe agi -15; tick burn' → Expansão de Domínio
 export function parseDom(str, where = '') {
   const d = { dur: 3, ally: {}, foe: {}, tick: '' };
@@ -24,33 +22,7 @@ export function parseDom(str, where = '') {
   }
   return d;
 }
-export function parseFx(str, where = '') {
-  if (!str) return undefined;
-  return String(str).split(';').map(x => x.trim()).filter(Boolean).map(item => {
-    const w = item.split(/\s+/), t = w.shift(), keys = ARGS[t];
-    if (!keys) throw new Error(`efeito desconhecido "${item}" em ${where}`);
-    const o = { t, ...DEF[t] }, pos = w.filter(x => !TO.has(x) && !x.endsWith('%'));
-    keys.forEach((k, i) => { if (pos[i] == null) return; o[k] = TXT.has(k) ? pos[i] : +pos[i]; if (!TXT.has(k) && Number.isNaN(o[k])) throw new Error(`número inválido em "${item}" (${where})`); });
-    if (keys.some(k => o[k] == null)) throw new Error(`faltam argumentos em "${item}" (${where})`);
-    const ch = w.find(x => x.endsWith('%')), to = w.find(x => TO.has(x));
-    if (t === 'st') o.ch = ch ? parseInt(ch) : 100;
-    if (to) o.to = to;
-    return o;
-  });
-}
 const kv = (str, where) => Object.fromEntries(String(str).split(';').map(x => x.trim()).filter(Boolean).map(x => { const [k, v] = x.split(/\s+/); if (Number.isNaN(+v)) throw new Error(`valor inválido "${x}" em ${where}`); return [k, +v]; }));
-export function parseForm(str, where = '') {
-  const f = { dur: 3, m: {}, dr: {}, end: [] };
-  for (const item of String(str).split(';').map(x => x.trim()).filter(Boolean)) {
-    const [k, ...r] = item.split(/\s+/);
-    if (k === 'end') f.end.push(...parseFx(r.join(' '), where));
-    else if (k === 'dr') f.dr[r[0]] = +r[1];
-    else if (k === 'dur') f.dur = +r[0];
-    else if (['atk', 'def', 'agi', 'hit', 'crit', 'atkP', 'heal'].includes(k)) f.m[k] = +r[0];
-    else throw new Error(`campo de forma desconhecido "${item}" em ${where}`);
-  }
-  return f;
-}
 // converte um nó dos dados para os campos que o servidor usa
 export function expand(o) {
   const { fx, fm, mod, bon, up, dom, trio, ...rest } = o, w = o.n;
@@ -123,6 +95,33 @@ export function buildSkills(sk) {
   return G;
 }
 
+// catálogo de armas: [nome, modelo, nível (0 Comum · 1 Refinada · 2 Obra-prima · 3 Mítica), categoria, elemento, campos que sobrescrevem]
+// Os 12 nomes das armas antigas e as 9 elementais continuam iguais (lojas, fichas salvas e testes os procuram pelo nome).
+export const WEAPONS = [
+  // as três linhas de loja antigas, agora com modelo
+  ['Sabre de Cavalaria', 'sabre', 0, 'basica'], ['Katana de Caçador', 'katana', 1, 'basica'], ['Lâmina Consagrada', 'katana', 2, 'especial', '', { fx: 'vs demon 1.2', d: 'Katana benzida num templo: corta mais fundo o que é demônio.' }],
+  ['Baioneta', 'baioneta', 0, 'basica'], ['Lança de Caça', 'lanca', 1, 'basica'], ['Alabarda Rúnica', 'alabarda', 2, 'especial'],
+  ['Revólver .38', 'revolver', 0, 'basica'], ['Rifle de Ferrolho', 'rifle', 1, 'basica'], ['Carabina Selada', 'rifle', 2, 'especial', '', { fx: 'vs demon 1.2', d: 'Cano gravado com selos: as balas ferem o que é profano.' }],
+  ['Soqueira', 'soqueira', 0, 'basica'], ['Manoplas de Aço', 'manoplas', 1, 'basica'], ['Punhos de Talismã', 'faixas', 2, 'especial', '', { d: 'Faixas escritas com talismãs: o punho fica leve e certeiro.' }],
+  // armas novas de loja: uma por modelo que faltava
+  ['Adaga de Trincheira', 'adaga', 0, 'basica'], ['Florete de Duelo', 'florete', 0, 'basica'], ['Foice de Ceifador', 'foice', 1, 'especial'],
+  ['Arpão de Baleeiro', 'arpao', 0, 'basica'], ['Pistolas Gêmeas', 'pistolas', 0, 'basica'], ['Escopeta de Cano Serrado', 'escopeta', 0, 'basica'], ['Submetralhadora de Tambor', 'metralhadora', 1, 'basica'], ['Pistola Sinalizadora', 'sinalizador', 0, 'basica'],
+  ['Garras de Ferro', 'garras', 0, 'basica'], ['Faixas de Monge', 'faixas', 0, 'basica'],
+  ['Marreta de Ferroviário', 'marreta', 0, 'basica'], ['Machado de Lenhador', 'machado', 0, 'basica'], ['Montante de Guerra', 'montante', 1, 'basica'], ['Âncora de Corrente', 'ancora', 1, 'especial'],
+  ['Grimório Gasto', 'grimorio', 0, 'basica'], ['Cajado de Peregrino', 'cajado', 0, 'basica'], ['Sino de Exorcismo', 'sino', 0, 'basica'], ['Leque de Ofudas', 'leque', 0, 'basica'],
+  // elementais (forjadas com 3 essências): o ataque básico e as técnicas físicas passam a ter o elemento
+  ['Sabre Flamejante', 'sabre', 1, 'elemental', 'kagutsuchi'], ['Arpão da Maré', 'arpao', 1, 'elemental', 'susanoo'], ['Manoplas de Atlas', 'manoplas', 1, 'elemental', 'atlas'], ['Rifle Tesla', 'rifle', 1, 'elemental', 'indra'],
+  ['Leque de Lâminas', 'adaga', 1, 'elemental', 'fuhaku'], ['Lança Solar', 'lanca', 1, 'elemental', 'amaterasu'], ['Adaga Lunar', 'adaga', 1, 'elemental', 'tsukuyomi'], ['Bisturi Rubro', 'florete', 1, 'elemental', 'shukketsu'], ['Pistola de Rádio', 'revolver', 1, 'elemental', 'hiruko'],
+  ['Martelo de Atlas', 'marreta', 1, 'elemental', 'atlas'], ['Grimório de Tsukuyomi', 'grimorio', 1, 'elemental', 'tsukuyomi'],
+  // lendárias e malditas: não estão à venda; o mestre entrega como tesouro ou recompensa de chefe
+  ['Aurora do Último Dia', 'katana', 3, 'lendaria', 'amaterasu', { d: 'A katana de um caçador que nunca voltou. Brilha antes do amanhecer.' }],
+  ['Marreta do Juízo', 'marreta', 3, 'lendaria', 'atlas', { d: 'Forjada no fundo de uma mina: cada golpe soa como um sino de igreja.' }],
+  ['Rifle do Caçador Fantasma', 'rifle', 3, 'lendaria', 'tsukuyomi', { d: 'Ninguém vê quem atira. Só se ouve o ferrolho.' }],
+  ['Sino do Abade Cego', 'sino', 3, 'lendaria', 'amaterasu', { d: 'O sino de um mosteiro queimado. Os demônios ainda lembram o som.' }],
+  ['Garras da Condessa', 'garras', 2, 'maldita', 'shukketsu', { d: 'Unhas de prata da Condessa Escarlate. Têm sede, e não só do inimigo.' }],
+  ['Grimório do Sem-Nome', 'grimorio', 2, 'maldita', 'oculto', { d: 'As páginas se reescrevem sozinhas à noite. Ler custa caro.' }],
+];
+
 export function buildItems(it) {
   const L = [], add = (...a) => L.push(it(...a)), n = PATRON;
   // consumíveis
@@ -145,12 +144,8 @@ export function buildItems(it) {
   add('Ofuda de Selo', 'cons', 32, { eff: 'bomb', el: 'amaterasu', price: 32 }); add('Ofuda de Retorno', 'cons', 35, { eff: 'rev', price: 60 }); add('Isca', 'mat', 0, { tag: 'carne', price: 5 });
   // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)
   add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + n[el], 'mat', 0, { el, price: 20 }));
-  // armas em três níveis por tipo
-  [['lamina', 'Sabre de Cavalaria', 'Katana de Caçador', 'Lâmina Consagrada'], ['lanca', 'Baioneta', 'Lança de Caça', 'Alabarda Rúnica'], ['fogo', 'Revólver .38', 'Rifle de Ferrolho', 'Carabina Selada'], ['punho', 'Soqueira', 'Manoplas de Aço', 'Punhos de Talismã']]
-    .forEach(([wt, ...names]) => names.forEach((name, i) => add(name, 'arma', [10, 14, 19][i] + (wt === 'fogo') - (wt === 'punho'), { wt, price: [40, 120, 320][i] })));
-  // armas elementais: o ataque básico passa a ter o elemento
-  [['kagutsuchi', 'Sabre Flamejante', 'lamina'], ['susanoo', 'Arpão da Maré', 'lanca'], ['atlas', 'Manoplas de Atlas', 'punho'], ['indra', 'Rifle Tesla', 'fogo'], ['fuhaku', 'Leque de Lâminas', 'lamina'],
-    ['amaterasu', 'Lança Solar', 'lanca'], ['tsukuyomi', 'Adaga Lunar', 'lamina'], ['shukketsu', 'Bisturi Rubro', 'lamina'], ['hiruko', 'Pistola de Rádio', 'fogo']].forEach(([el, name, wt]) => add(name, 'arma', 15, { wt, el, price: 250 }));
+  // armas: todas saem dos modelos de public/armas.js (tipo, traços do ataque básico e técnicas próprias); veja WEAPONS abaixo
+  for (const [name, tpl, lvl, cat, el, o] of WEAPONS) add(name, 'arma', 0, globalThis.ARMAS.make(tpl, { name, lvl, cat, el: el || '', ...o }));
   // armaduras
   [['Casaco de Couro', 2, 40], ['Colete Reforçado', 4, 120], ['Sobretudo Selado', 5, 260], ['Couraça de Trincheira', 6, 300]].forEach(([name, p, price]) => add(name, 'armadura', p, { price }));
   // acessórios: amuletos (+10 no atributo) e relíquias dos patronos (+8 no atributo e resistência ao elemento)
@@ -235,11 +230,11 @@ export function buildBestiary(make) {
 // ingredientes básicos que toda loja de cena pode vender (os raros, como Carne de Demônio e Essências, só por colheita, caça ou forja)
 export const BASICS = ['Erva Medicinal', 'Raiz Amarga', 'Ervas de Cozinha', 'Carne de Caça', 'Sal Sagrado', 'Pólvora', 'Sucata de Ferro', 'Papel de Arroz', 'Frasco Vazio', 'Óleo de Lamparina'];
 export const SCENES = [
-  { name: 'Beco do Mercado Negro', gather: ['Sucata de Ferro', 'Frasco Vazio', 'Pólvora', 'Papel de Arroz', 'Carne de Caça'], bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
+  { name: 'Beco do Mercado Negro', gather: ['Sucata de Ferro', 'Frasco Vazio', 'Pólvora', 'Papel de Arroz', 'Carne de Caça'], bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Adaga de Trincheira', 'Escopeta de Cano Serrado', 'Machado de Lenhador', 'Pistola Sinalizadora', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
     note: 'Encontros: 3 Bandidos + 1 Capanga da Máfia (emboscada); à noite, 2 Diabretes de Cinzas nos telhados. Armeiro vende sem perguntas; a botica é fachada de um Cultista.' },
-  { name: 'Santuário Profanado', gather: ['Sal Sagrado', 'Papel de Arroz', 'Cogumelo Pálido', 'Erva Medicinal', 'Raiz Amarga'], bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo', 'Componente Ritualístico', 'Munição de Sal', ...BASICS],
+  { name: 'Santuário Profanado', gather: ['Sal Sagrado', 'Papel de Arroz', 'Cogumelo Pálido', 'Erva Medicinal', 'Raiz Amarga'], bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo', 'Cajado de Peregrino', 'Sino de Exorcismo', 'Leque de Ofudas', 'Grimório Gasto', 'Componente Ritualístico', 'Munição de Sal', ...BASICS],
     note: 'Encontros: 2 Yurei + 1 Espectro da Trincheira; chefe opcional: Serafim Caído no altar. A fonte restaura Sanidade uma vez (mestre concede). Teste de horror ao entrar (perda 5).' },
-  { name: 'Estação Central', gather: ['Sucata de Ferro', 'Pólvora', 'Óleo de Lamparina', 'Frasco Vazio'], bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Colete Reforçado', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
+  { name: 'Estação Central', gather: ['Sucata de Ferro', 'Pólvora', 'Óleo de Lamparina', 'Frasco Vazio'], bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Marreta de Ferroviário', 'Pistolas Gêmeas', 'Florete de Duelo', 'Garras de Ferro', 'Arpão de Baleeiro', 'Faixas de Monge', 'Colete Reforçado', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
     note: 'Encontros: 2 Soldados Desertores + 1 Autômato Possuído no depósito; Golem de Sucata na locomotiva. Boa cena para iniciar uma perseguição (automóvel contra motocicleta).' },
   { name: 'Mansão Ashworth', gather: ['Erva Medicinal', 'Ervas de Cozinha', 'Cogumelo Pálido', 'Papel de Arroz', 'Óleo de Lamparina', 'Carne de Caça', 'Couro Curtido'], bg: '/maps/mansao.svg', stock: [],
     note: 'Encontros: Cultistas (3) na capela + Ocultista na biblioteca; Súcubo no salão. Chefe: Condessa Escarlate (ponto fraco: torso). Use névoa de guerra e revele cômodo a cômodo.' },

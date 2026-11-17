@@ -5,10 +5,10 @@ const EL = { fis: 'Físico', kagutsuchi: 'Kagutsuchi·Fogo', susanoo: 'Susanoo·
 const ELC = { fis: '#ffffff', kagutsuchi: '#ff5a1f', susanoo: '#2e8bff', atlas: '#b9853c', indra: '#ffe600', fuhaku: '#7dffb0', amaterasu: '#fff3a0', tsukuyomi: '#8a4dff', shukketsu: '#c10020', hiruko: '#9dff00', aura: '#40e0d0', oculto: '#ff2bd6' };
 const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passiva', form: 'Transformação', util: 'Suporte' }, PASL = { hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx', res: 'Resistência', ...AO }, RES = { aura: 'Aura', san: 'Sanidade' };
 const ST = RULES.ST, STD = RULES.STD; // nomes das condições vêm das regras compartilhadas com o servidor
-const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material', mun: 'Munição' }, WT = { '': '—', lamina: 'Lâmina', lanca: 'Lança', fogo: 'Arma de fogo', punho: 'Punhos' };
+const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material', mun: 'Munição' }, WT = { '': '—', ...Object.fromEntries(Object.entries(ARMAS.TIPOS).map(([k, t]) => [k, t.n])) }, CATN = Object.fromEntries(Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]));
 const EFF = { hp: 'HP', aura: 'Aura', san: 'Sanidade', cure: 'Cura condições', body: 'Trata ferimentos', rev: 'Reanima caído', bomb: 'Bomba' };
 const idesc = i => i.type === 'mun' ? `${i.shots} tiros${i.el ? ' · ' + EL[i.el] : ''}${i.salt ? ' · purifica' : ''}` : i.type === 'cons' ? (['hp', 'aura', 'san'].includes(i.eff) ? `+${i.power} ${EFF[i.eff]}` : EFF[i.eff] + (i.eff === 'bomb' ? ` ${i.power} ${EL[i.el] || EL.fis}` : i.power ? ' ' + i.power : ''))
-  : i.type === 'arma' ? `${WT[i.wt] || 'Arma'} ${i.power}${i.el ? ' · ' + EL[i.el] : ''}` : i.type === 'acess' ? `${i.attr} +${i.power}${i.el ? ' · resiste ' + EL[i.el] : ''}` : i.type === 'mat' ? 'Material' + (i.el ? ' · ' + EL[i.el] : '') : `Armadura ${i.power}`;
+  : i.type === 'arma' ? `${WT[i.wt] || 'Arma'}${i.cat && i.cat !== 'basica' ? ' ' + (CATN[i.cat] || '').toLowerCase() : ''} · poder ${i.power}${i.el ? ' · ' + EL[i.el] : ''}` : i.type === 'acess' ? `${i.attr} +${i.power}${i.el ? ' · resiste ' + EL[i.el] : ''}` : i.type === 'mat' ? 'Material' + (i.el ? ' · ' + EL[i.el] : '') : `Armadura ${i.power}`;
 const shop = () => S.scenes[S.scene].shop; // cada cena tem a sua loja
 let ctMode = false;
 let tier = 'normal';
@@ -21,8 +21,8 @@ const gen = { el: 'kagutsuchi', role: 'bruto', rank: 'comum' }, ROLEN = { bruto:
 // mesma referência do servidor: heróis na cena e poder do grupo (média dos três maiores atributos)
 const partyRef = () => { const pcs = Object.values(S.chars).filter(c => !c.enemy && !c.dead && c.scene === S.scene), top3 = c => A.map(a => c.attrs[a]).sort((x, y) => y - x).slice(0, 3).reduce((a, b) => a + b, 0) / 3; return { n: pcs.length || 4, p: pcs.length ? Math.round(pcs.reduce((a, c) => a + top3(c), 0) / pcs.length) : 58 }; };
 const ent = id => S.chars[id] || S.bestiary?.[id]; // personagem em jogo ou modelo do bestiário
-const WIN = { sessao: ['Sessão', 440], best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720], ofcat: ['Catálogo de ofícios', 780] };
-const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'best', 'items'] }; // arranjos de janelas
+const WIN = { sessao: ['Sessão', 440], best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720], ofcat: ['Catálogo de ofícios', 780], armas: ['Forja de armas', 1120] };
+const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'best', 'items'], Armas: ['armas'] }; // arranjos de janelas
 const view = { z: 1, x: 0, y: 0 }; // zoom e deslocamento do mapa (local de cada tela)
 let ctx = null, pan = null, ruler = null, spaceDown = false, zc = 1, pings = [];
 const CAMPL = { vigiar: 'Vigiar (AGI↑)', cozinhar: 'Cozinhar (grupo ATQ↑)', conversar: 'Conversar (+5 Sanidade)', treinar: 'Treinar (+5 XP)', meditar: 'Meditar (+30 Limite)' };
@@ -32,7 +32,7 @@ const ED = {
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Efeito', 'eff', EFF], ['Atr. (acess.)', 'attr', AO], ['Tipo de arma', 'wt', WT], ['Elemento', 'el', { '': '—', ...EL }], ['Preço', 'price']],
 };
 let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
-let wins = { sessao: { x: 360, y: 64, open: true }, best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false }, ofcat: { x: 120, y: 90, open: false } };
+let wins = { sessao: { x: 360, y: 64, open: true }, best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false }, ofcat: { x: 120, y: 90, open: false }, armas: { x: 70, y: 60, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur;
 const mods = {}, tabs = {}, selNode = {}, open = {};
@@ -57,7 +57,14 @@ const send = o => ws.readyState === 1 && ws.send(JSON.stringify(o));
 const mine = c => gm || (role === 'player' && c.owner === name);
 const eq = (c, slot) => S.items[c.equip[slot]];
 const lvl = (c, k) => { const d = c.body[k] || 0; return d >= c.hpMax * .3 ? 2 : d >= c.hpMax * .15 ? 1 : 0; };
-const at = (c, a) => c.attrs[a] + (eq(c, 'acess')?.attr === a ? eq(c, 'acess').power : 0) - 10 * PARTS.filter(k => BODY[k].includes(a) && lvl(c, k) === 2).length;
+const at = (c, a) => c.attrs[a] + (eq(c, 'acess')?.attr === a ? eq(c, 'acess').power : 0) + (eq(c, 'arma')?.mod ? ARMAS.kv(eq(c, 'arma').mod).a[a] || 0 : 0) - 10 * PARTS.filter(k => BODY[k].includes(a) && lvl(c, k) === 2).length;
+// técnicas da arma: 'w:<item>:<n>' (mesmo esquema do servidor)
+const SK = id => { if (typeof id !== 'string' || !id.startsWith('w:')) return S.skills[id]; const [, k, n] = id.split(':'), s = S.items[k]?.sk?.[+n]; return s ? { ...s, wpn: k } : undefined; };
+const wSk = c => { const k = c.equip?.arma, l = S.items[k]?.type === 'arma' && S.items[k].sk; return Array.isArray(l) ? l.map((_, n) => `w:${k}:${n}`) : []; };
+// resumo de uma arma: traços do ataque básico e técnicas (cartões, ficha e menu de batalha)
+const wpnLine = (i, c) => { const P = ARMAS.prof(i), base = i ? i.power : c?.arma ?? 8, falta = c && i ? ARMAS.short(i, a => at(c, a)) : [];
+  return `${P.atkN || 'Ataque'} · poder ${base}${i?.el ? ' · ' + EL[i.el] : ''} · ${ARMAS.traits(i).join(' · ')}${falta.length ? ` · falta ${falta.map(([a, v]) => a + ' ' + v).join(', ')} (−20% de acerto)` : ''}`; };
+const wpnInfo = (i, c) => i?.type !== 'arma' ? '' : `<div class="wpinfo"><small class="wtr">${esc(wpnLine(i, c))}</small>${(i.sk || []).map(s => `<small class="wsk" title="${esc(desc(s))}"><b>${esc(s.name)}</b> ${esc(KIND[s.kind])} · ${s.power ? 'poder ' + s.power + ' · ' : ''}${s.cost} ${RES[s.res]}${s.uses ? ` · ${s.uses}×/batalha` : ''}${s.d ? ' — ' + esc(s.d) : ''}</small>`).join('')}${i.d ? `<small class="wd">${esc(i.d)}</small>` : ''}</div>`;
 // figura de corpo: mode 'aim' deixa mirar numa parte; 'gm' deixa o mestre ferir/curar a parte
 function bodyFig(c, mode) {
   const hurt = PARTS.filter(k => lvl(c, k)).map(k => `${PL[k]}: ${LV[lvl(c, k)]}`);
@@ -144,7 +151,7 @@ function connect() {
     const m = JSON.parse(e.data);
     if (m.t === 'state') { S = m.s; syncOfi(); render(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }
-    if (m.t === 'note') { toast(m.text, m.kind, m.why); if (m.kind === 'no') navigator.vibrate?.(120); }
+    if (m.t === 'note') { if (m.id && gm && wf.d) wf.id = m.id; /* arma salva na Forja: continua editando ela */ toast(m.text, m.kind, m.why); if (m.kind === 'no') navigator.vibrate?.(120); }
     if (m.t === 'passOk') { ls('vj_pass', pass = m.pass); alert('Senha trocada. Na próxima sessão, digite a nova na página de entrada.'); }
     if (m.t === 'err') { if (!m.bad) return alert(m.msg); ws.onclose = null; ws.close(); S = null; ls(gm ? 'vj_key' : 'vj_pass', null); loginForm(m.msg); }
   };
@@ -209,8 +216,8 @@ function battle() {
   const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
   const side = e => { const l = inB.filter(c => !!c.enemy === e), n = l.length, cols = n > 4 ? Math.ceil(n / 2) : Math.max(1, n), w = Math.min(14.5, 43 / cols - 1.3);
     return `<div class="side ${e ? 'foes' : 'heroes'} ${n > 4 ? 'two' : ''}" style="--w:${w.toFixed(2)}cqw">${l.map(c => unit(c, cur)).join('')}</div>`; };
-  const acts = c => `<div class="row"><b>${esc(c.name)}:</b>${gm && c.enemy ? '<button class="own" data-a="ai">IA decide</button>' : ''}<button data-a="act" data-id="${c.id}" data-skill="atk">Ataque</button>${c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => { const s = S.skills[k];
-      return `<button data-a="act" data-id="${c.id}" data-skill="${k}" title="${esc(c.cant?.[k] || desc(s))}" ${blocked(c, s, k) ? 'disabled' : ''}>${esc(s.name)}</button>`; }).join('')}
+  const acts = c => `<div class="row"><b>${esc(c.name)}:</b>${gm && c.enemy ? '<button class="own" data-a="ai">IA decide</button>' : ''}<button data-a="act" data-id="${c.id}" data-skill="atk" title="${esc(wpnLine(eq(c, 'arma'), c))}">${esc(ARMAS.prof(eq(c, 'arma')).atkN || 'Ataque')}</button>${[...wSk(c), ...c.skills].filter(k => SK(k) && SK(k).kind !== 'passive').map(k => { const s = SK(k);
+      return `<button data-a="act" data-id="${c.id}" data-skill="${k}" class="${s.wpn ? 'wpn' : ''}" title="${esc(c.cant?.[k] || desc(s))}" ${blocked(c, s, k) ? 'disabled' : ''}>${s.wpn ? '⚔ ' : ''}${esc(s.name)}</button>`; }).join('')}
       ${Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons').map(([k, q]) => `<button class="item" data-a="use" data-id="${c.id}" data-item="${k}">${esc(S.items[k].name)} ×${q}</button>`).join('')}
       <button data-a="next">Passar</button></div>${aimBox()}`;
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
@@ -395,6 +402,71 @@ const oc = { tab: 'rec', per: '', rec: '', d: null, nn: { n: '', d: '', t: 1, po
 const ocMods = { atk: 'dano', def: 'defesa', agi: 'velocidade', hit: 'acerto', crit: 'crítico' };
 const ocDraft = r => ({ id: r.id, n: r.n, per: r.per, t: r.t, out: r.out || '', mats: Object.entries(r.mats), dc: r.dc, qty: r.qty, meal: r.meal ? { ...r.meal } : null, off: !!r.off, custom: !!r.custom });
 const ocCusto = d => d.mats.reduce((a, [n, q]) => a + q * (Object.values(S.items).find(i => i.name === n)?.price || 0), 0);
+// ----- Forja de armas (mestre): modelos, ajuste fino do ataque básico, técnicas próprias e orçamento -----
+const wf = { tpl: 'sabre', lvl: 0, cat: 'basica', el: '', id: '', d: null };
+const SKD = s => ({ name: s.name, kind: s.kind, attr: s.attr || '', el: s.el || 'fis', power: s.power || 0, cost: s.cost || 0, res: s.res || 'aura', ct: s.ct || 100, hits: s.hits || 1, area: !!s.area, tg: s.tg || '', uses: s.uses || 0,
+  fxs: s.fxs ?? RULES.fxSrc(s.fx), fms: s.fms ?? RULES.formSrc(s.form), d: s.d || '', payHp: s.pay?.hp || 0 }); // técnica → rascunho editável
+const wDraft = w => ({ ...structuredClone(w), sk: (w.sk || []).map(SKD) });
+const wfNew = () => { wf.d = wDraft(ARMAS.make(wf.tpl, { lvl: wf.lvl, cat: wf.cat, el: wf.el })); wf.id = ''; };
+function armasWin() {
+  if (!wf.d) wfNew();
+  const D = wf.d; let w, errs; try { ({ w, errs } = ARMAS.clean(D)); } catch (e) { w = { ...D, sk: [] }; errs = [e.message]; }
+  const sel = (f, v, opts, lab = '') => `<select data-wf="${f}" ${lab ? `aria-label="${esc(lab)}"` : ''}>${opts.map(([k, l]) => `<option value="${esc(k)}" ${String(k) === String(v ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const num = (f, v, mn, mx) => `<input type="number" class="sm" data-wf="${f}" min="${mn}" max="${mx}" value="${v ?? 0}">`;
+  const txt = (f, v, ph = '', cls = 'w', mx = 160) => `<input class="${cls}" data-wf="${f}" maxlength="${mx}" value="${esc(v ?? '')}" placeholder="${esc(ph)}">`;
+  const chk = (f, v, l) => `<label class="wchk"><input type="checkbox" data-wf="${f}" ${v ? 'checked' : ''}> ${l}</label>`;
+  const AT = ARMAS.ATTRS.map(a => [a, a]), ELO = [['', '— físico'], ...Object.entries(EL).filter(([k]) => k !== 'fis')], STO = [['', '— nenhuma'], ...Object.entries(ST)], M0 = ARMAS.MOD[wf.tpl], T0 = ARMAS.TIPOS[D.wt];
+  const gal = Object.entries(ARMAS.TIPOS).map(([t, T]) => `<div class="wgal"><em title="${esc(T.d)}">${esc(T.n)}</em>${Object.values(ARMAS.MOD).filter(m => m.wt === t).map(m => `<button class="${wf.tpl === m.id ? 'on' : ''}" data-a="wfTpl" data-k="${m.id}" title="${esc(m.d)}">${esc(m.n)}</button>`).join('')}</div>`).join('');
+  const r = ARMAS.rel(w), [lo, hi] = ARMAS.FAIXA[w.cat] || [90, 120], cls = r < lo ? 'low' : r > hi ? 'high' : 'ok';
+  const skRow = (x, n) => `<div class="wskr"><div class="row">${txt(`sk.${n}.name`, x.name, 'Nome', '', 40)}${sel(`sk.${n}.kind`, x.kind, [['dmg', 'Dano'], ['mental', 'Dano mental'], ['heal', 'Cura'], ['util', 'Suporte'], ['form', 'Transformação']], 'Tipo')}${sel(`sk.${n}.attr`, x.attr, [['', 'atributo da arma'], ...AT], 'Atributo')}${sel(`sk.${n}.el`, x.el, [['fis', 'Físico (herda o da arma)'], ...ELO.slice(1)], 'Elemento')}<button class="ghost" data-a="wfSkDel" data-k="${n}" aria-label="Tirar técnica">×</button></div>
+    <div class="row"><label>Poder ${num(`sk.${n}.power`, x.power, 0, 99)}</label><label>Custo ${num(`sk.${n}.cost`, x.cost, 0, 99)}</label>${sel(`sk.${n}.res`, x.res, [['aura', 'Aura'], ['san', 'Sanidade']], 'Recurso')}<label>Tempo % ${num(`sk.${n}.ct`, x.ct, 40, 200)}</label><label>Golpes ${num(`sk.${n}.hits`, x.hits, 1, 8)}</label><label>Usos/batalha ${num(`sk.${n}.uses`, x.uses, 0, 9)}</label><label>% HP ${num(`sk.${n}.payHp`, x.payHp, 0, 30)}</label>${chk(`sk.${n}.area`, x.area, 'área')}${chk(`sk.${n}.tg`, x.tg === 'self', 'em si')}</div>
+    <div class="row"><label class="g">Efeitos ${txt(`sk.${n}.fxs`, x.fxs, 'st bleed 3 50%; pierce 50; exec 30 1.5')}</label>${x.kind === 'form' ? `<label class="g">Forma ${txt(`sk.${n}.fms`, x.fms, 'dur 3; hit 15; crit 10')}</label>` : ''}</div><div class="row"><label class="g">Descrição ${txt(`sk.${n}.d`, x.d, 'O que a técnica faz, na voz do mundo', 'w', 200)}</label></div></div>`;
+  const q = (bf.wsq || '').trim().toLowerCase(), found = q.length >= 2 ? Object.entries(S.skills).filter(([, s]) => ['dmg', 'mental', 'heal', 'util', 'form'].includes(s.kind) && !s.dom && !s.trio && !s.duo && !s.summon && s.name.toLowerCase().includes(q)).slice(0, 12) : [];
+  const wq = (bf.wq || '').trim().toLowerCase(), list = Object.entries(S.items).filter(([, i]) => i.type === 'arma' && (!wq || i.name.toLowerCase().includes(wq) || (WT[i.wt] || '').toLowerCase().includes(wq))).sort((a, b) => (a[1].wt || '').localeCompare(b[1].wt || '') || a[1].power - b[1].power);
+  return `<div class="wforge"><div class="wf-ed">
+    <h4>1. Modelo <small>clique para começar uma arma nova a partir dele</small></h4><div class="wgals">${gal}</div>
+    <div class="row"><label>Nível ${sel('_lvl', wf.lvl, ARMAS.NIVEIS.map((n, i) => [i, `${n.n} (+${n.p} de poder)`]))}</label><label>Categoria ${sel('_cat', wf.cat, Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]))}</label><label>Elemento ${sel('_el', wf.el, ELO)}</label><button class="ghost" data-a="wfApply" title="Refaz o rascunho com o modelo, o nível, a categoria e o elemento escolhidos">Refazer do modelo</button></div>
+    <small class="hint">${esc(M0 ? M0.n + ': ' + M0.d : '')} ${esc(ARMAS.CATS[wf.cat][1])}</small>
+    <h4>2. Arma ${wf.id ? `<small>editando <b>${esc(S.items[wf.id]?.name || '')}</b></small>` : '<small>rascunho novo</small>'}</h4>
+    <div class="row"><label class="g">Nome ${txt('name', D.name, 'Nome da arma', 'w', 40)}</label><label>Tipo ${sel('wt', D.wt, Object.entries(ARMAS.TIPOS).map(([k, t]) => [k, t.n]))}</label><label>Categoria ${sel('cat', D.cat, Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]))}</label></div>
+    <div class="row"><label>Poder ${num('power', D.power, 0, 99)}</label><label>Preço ${num('price', D.price, 0, 99999)}</label><label>Elemento ${sel('el', D.el, ELO)}</label><label>Nível ${sel('lvl', D.lvl, ARMAS.NIVEIS.map((n, i) => [i, n.n]))}</label></div>
+    <h4>3. Ataque básico <small>${esc(T0?.d || '')}</small></h4>
+    <div class="row"><label>Nome ${txt('atkN', D.atkN, 'Ataque', '', 30)}</label><label>Atributo ${sel('wa', D.wa, [['', `do tipo (${T0?.wa || 'FOR'})`], ...AT])}</label><label>2º atributo ${sel('wa2', D.wa2, [['', '— nenhum'], ...AT])}</label></div>
+    <div class="row"><label>Acerto ${num('hit', D.hit, -50, 50)}</label><label>Crítico ${num('crit', D.crit, 0, 50)}</label><label>Tempo % ${num('ct', D.ct || 100, 40, 200)}</label><label>Golpes ${num('hits', D.hits || 1, 1, 6)}</label><label>Perfura % ${num('pierce', D.pierce, 0, 100)}</label>${chk('area', D.area, 'em área')}${chk('mental', D.mental, 'fere a Sanidade')}</div>
+    <div class="row"><label>Condição ${sel('st', D.st, STO)}</label><label>Chance % ${num('stc', D.st ? D.stc ?? 100 : 0, 0, 100)}</label><label>Turnos ${num('stn', D.stn || 3, 1, 6)}</label></div>
+    <div class="row"><label class="g">Efeitos ${txt('fx', D.fx, 'exec 30 1.5; vs bleed 1.3; push 20; drain hp 20; st marked 2 30%')}</label></div>
+    <div class="row"><label class="g">Bônus empunhada ${txt('mod', D.mod, 'def 5; agi -5; FOR 3', 'w', 80)}</label><label>Requisito ${txt('rq', D.rq, 'FOR 50', '', 40)}</label></div>
+    <div class="row"><label class="g">Descrição ${txt('d', D.d, 'De onde veio, como é', 'w', 200)}</label></div>
+    <h4>4. Técnicas da arma <small>${D.sk.length}/4 · só existem com ela equipada; elemento Físico herda o da arma e a têmpera soma no poder</small></h4>
+    ${D.sk.map(skRow).join('') || '<small>Nenhuma técnica: a arma só melhora o ataque básico.</small>'}
+    <div class="row"><button class="ghost" data-a="wfSkAdd" ${D.sk.length >= 4 ? 'disabled' : ''}>+ Técnica nova</button><input class="bq" data-bf="wsq" placeholder="Copiar da árvore: digite o nome…" aria-label="Copiar técnica da árvore" value="${esc(bf.wsq || '')}"></div>
+    ${found.length ? `<div class="row chips">${found.map(([k, s]) => `<span data-a="wfSkCopy" data-id="${k}" title="${esc(desc(s))}">+ ${esc(s.name)}</span>`).join('')}</div>` : ''}
+    <div class="row wsave">${wf.id ? '<button class="own" data-a="wfSave">Salvar alterações</button><button data-a="wfSaveNew">Salvar como arma nova</button>' : '<button class="own" data-a="wfSaveNew">Criar arma</button>'}<button class="ghost" data-a="wfApply">Descartar e voltar ao modelo</button></div>
+  </div><div class="wf-side">
+    <div class="wprev"><em>Prévia</em><b>${esc(w.name)}</b><small>${esc(idesc(w))}</small><small class="wtr">${esc(wpnLine(w))}</small>
+      <div class="wbar ${cls}"><i style="width:${Math.min(100, r / 1.8)}%"></i><span>Orçamento do ataque: <b>${r}%</b> do sabre simples do mesmo nível · faixa ${esc(CATN[w.cat] || '')}: ${lo}–${hi}%</span></div>
+      ${w.sk.map(x => `<small class="wsk"><b>${esc(x.name)}</b> ${esc(desc(x))}</small>`).join('')}${errs.length ? `<p class="warn">${errs.map(esc).join('<br>')}</p>` : ''}</div>
+    <h4>Armas da campanha <small>${list.length}</small></h4><input class="bq" data-bf="wq" placeholder="Buscar por nome ou tipo…" aria-label="Buscar arma" value="${esc(bf.wq || '')}">
+    <div class="orows">${list.map(([k, i]) => `<button class="orow ${wf.id === k ? 'on' : ''}" data-a="wfEdit" data-id="${k}"><b>${esc(i.name)}</b><small>${esc(WT[i.wt] || '—')} · ${esc(CATN[i.cat] || 'sem modelo')} · poder ${i.power} · ${ARMAS.rel(i)}%${(i.sk || []).length ? ` · ${i.sk.length} técnica(s)` : ''}</small></button>`).join('')}</div>
+  </div></div>`;
+}
+function wfChange(f, v) {
+  if (['_lvl', '_cat', '_el'].includes(f)) { wf[f.slice(1)] = f === '_lvl' ? +v : v; if (!wf.id) wfNew(); return render(); }
+  const m = f.match(/^sk\.(\d+)\.(\w+)$/);
+  if (m) { const x = wf.d.sk[+m[1]]; if (x) x[m[2]] = m[2] === 'tg' ? (v ? 'self' : '') : v; return render(); }
+  wf.d[f] = v; return render();
+}
+function wfClick(d) {
+  if (d.a === 'wfTpl') { wf.tpl = d.k; wfNew(); }
+  else if (d.a === 'wfApply') wfNew();
+  else if (d.a === 'wfEdit') { const i = S.items[d.id]; if (!i) return; wf.id = d.id; wf.d = wDraft(i); if (ARMAS.MOD[i.tpl]) wf.tpl = i.tpl; }
+  else if (d.a === 'wfSkAdd') { if (wf.d.sk.length < 4) wf.d.sk.push(SKD({ name: 'Técnica nova', kind: 'dmg', power: 12, cost: 4 })); }
+  else if (d.a === 'wfSkDel') wf.d.sk.splice(+d.k, 1);
+  else if (d.a === 'wfSkCopy') { const s = S.skills[d.id]; if (s && wf.d.sk.length < 4) { wf.d.sk.push(SKD({ ...s, attr: s.attr })); bf.wsq = ''; } }
+  else if (d.a === 'wfSave') return send({ t: 'wpnSave', id: wf.id, w: wf.d });
+  else if (d.a === 'wfSaveNew') return send({ t: 'wpnSave', w: wf.d });
+  return render();
+}
 function ofcatWin() {
   const O = OFI, tab = (k, l) => `<button class="${oc.tab === k ? 'on' : ''}" data-a="ocTab" data-k="${k}" aria-pressed="${oc.tab === k}">${l}</button>`;
   const changed = Object.keys(S.ofiCfg || {}).length;
@@ -560,7 +632,7 @@ function skillPage(c) {
 }
 
 function persPage(c) {
-  const eqn = slot => eq(c, slot) ? `<b>${esc(eq(c, slot).name)}</b><small>${esc(idesc(eq(c, slot)))}</small>${upInfo(c, c.equip[slot], eq(c, slot))}` : '<b class="none">Vazio</b><small>equipe na página Itens</small>';
+  const eqn = slot => eq(c, slot) ? `<b>${esc(eq(c, slot).name)}</b><small>${esc(idesc(eq(c, slot)))}</small>${wpnInfo(eq(c, slot), c)}${upInfo(c, c.equip[slot], eq(c, slot))}` : slot === 'arma' ? `<b class="none">Punhos</b><small>${esc(wpnLine(null, c))} · equipe uma arma na página Itens</small>` : '<b class="none">Vazio</b><small>equipe na página Itens</small>';
   const res = k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${edv(c, k, c[k])}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`;
   const cts = Object.values(S.contracts).filter(ct => !ct.done).map(ct => `<li><b>${esc(ct.target)}</b><small>${ct.gold} ouro · ${ct.xp} XP</small></li>`).join('');
   const sts = [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(x => `<i>${x}</i>`).join('');
@@ -604,13 +676,13 @@ function munSlot(c, btn) {
   return `<div class="slot on"><em>Munição</em><b>${esc(i.name)}</b><small>${pente} tiro(s) no pente${pac ? ` · ${pac} pacote(s) de ${per}` : ' · sem pacotes de reserva'}${i.el ? ` · ${EL[i.el]}` : ''}</small>${fogo ? '' : '<small class="warn">A arma equipada não é de fogo: a munição não é usada.</small>'}${btn('equip', 'Tirar', k, 'class="ghost"')}</div>`;
 }
 function itemsPage(c) {
-  const sh = shop(), card = (k, i, foot, q) => `<div class="icard t-${i.type}" style="--e:${ELC[i.el] || 'var(--line)'}"><em>${IT[i.type]}</em><b>${esc(i.name)}${q > 1 ? ` <i>×${q}</i>` : ''}</b><small>${esc(idesc(i))}</small>${upInfo(c, k, i)}<div class="row">${foot}</div></div>`;
+  const sh = shop(), card = (k, i, foot, q) => `<div class="icard t-${i.type}" style="--e:${ELC[i.el] || 'var(--line)'}"><em>${IT[i.type]}${i.type === 'arma' && i.cat ? ` · ${CATN[i.cat]}` : ''}</em><b>${esc(i.name)}${q > 1 ? ` <i>×${q}</i>` : ''}</b><small>${esc(idesc(i))}</small>${wpnInfo(i, c)}${upInfo(c, k, i)}<div class="row">${foot}</div></div>`;
   const btn = (a, l, k, x = '') => `<button data-a="${a}" data-id="${c.id}" data-item="${k}" ${x}>${l}</button>`;
-  const slot = (s, l) => { const i = eq(c, s); return `<div class="slot ${i ? 'on' : ''}"><em>${l}</em>${i ? `<b>${esc(i.name)}</b><small>${esc(idesc(i))}</small>${upInfo(c, c.equip[s], i)}${btn('equip', 'Tirar', c.equip[s], 'class="ghost"')}` : '<b class="none">Vazio</b><small>equipe um item do inventário</small>'}</div>`; };
+  const slot = (s, l) => { const i = eq(c, s); return `<div class="slot ${i ? 'on' : ''}"><em>${l}</em>${i ? `<b>${esc(i.name)}</b><small>${esc(idesc(i))}</small>${s === 'arma' ? `<small class="wtr">${esc(wpnLine(i, c))}</small>` : ''}${upInfo(c, c.equip[s], i)}${btn('equip', 'Tirar', c.equip[s], 'class="ghost"')}` : '<b class="none">Vazio</b><small>equipe um item do inventário</small>'}</div>`; };
   const invL = Object.entries(c.inv).filter(([k]) => S.items[k]).sort((a, b) => ITO.indexOf(S.items[a[0]].type) - ITO.indexOf(S.items[b[0]].type));
   const inv = invL.map(([k, q]) => { const i = S.items[k], on = c.equip[i.type] === k;
     return card(k, i, (i.type === 'cons' ? btn('use', 'Usar', k, i.eff === 'bomb' ? 'disabled title="Só em batalha"' : 'class="own"') : i.type === 'mat' ? '' : btn('equip', on ? 'Equipado' : 'Equipar', k, on ? 'class="own"' : '')) + (sh.open ? btn('sell', `Vender · ${Math.floor(i.price / 2)}`, k) : '') + btn('drop', 'Descartar', k, 'class="ghost"'), q); }).join('');
-  const forge = Object.entries(S.items).filter(([, i]) => i.el && ['arma', 'acess'].includes(i.type)).map(([k, i]) => { const ess = Object.keys(S.items).find(e => S.items[e].type === 'mat' && S.items[e].el === i.el), have = c.inv[ess] || 0, need = i.type === 'arma' ? 3 : 5, cost = Math.round(i.price / 2);
+  const forge = Object.entries(S.items).filter(([, i]) => i.el && ['arma', 'acess'].includes(i.type) && !(i.type === 'arma' && i.cat && i.cat !== 'elemental')).map(([k, i]) => { const ess = Object.keys(S.items).find(e => S.items[e].type === 'mat' && S.items[e].el === i.el), have = c.inv[ess] || 0, need = i.type === 'arma' ? 3 : 5, cost = Math.round(i.price / 2);
     return have ? card(k, i, `<small>${have}/${need} essências · ${cost} ouro</small>` + btn('forge', 'Forjar', k, have < need || c.gold < cost ? 'disabled' : '')) : ''; }).join('');
   const stock = sh.open ? sh.stock.filter(k => S.items[k]) : [], T = { inv: `Inventário <i>${invL.reduce((n, [, q]) => n + q, 0)}</i>`, loja: `Loja${sh.open ? ` <i>${stock.length}</i>` : ''}`, forja: 'Forja' }, tab = T[itab] ? itab : 'inv';
   const gq = (bf.giveq || '').trim().toLowerCase(), giveL = Object.entries(S.items).filter(([, i]) => !gq || i.name.toLowerCase().includes(gq)).sort((a, b) => a[1].name.localeCompare(b[1].name)).slice(0, gq ? 30 : 12);
@@ -632,16 +704,18 @@ const fieldBar = () => { const B = S.battle, wx = RULES.CLIMA[B.wx?.k], ch = B.c
 const blockWhy = (c, s, k) => k && c.cant?.[k] ? c.cant[k] : c.st.silence ? 'Silenciado' : c.st.fury ? 'Em fúria: só ataca' : s.limit && c.limit < 100 ? 'Limite incompleto' : c[s.res] < s.cost ? `Falta ${RES[s.res]}` : s.req && s.req !== wtype(c) ? `Exige ${WT[s.req]}` : '';
 function command(c, cur) {
   const my = cur === c, inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead).sort((x, y) => y.enemy - x.enemy), t = inB.find(o => o.id === tgt), [rqId, rq] = myReq() || [], wait = rq && rq.ch === c.id;
-  const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
-  if ((pick.k === 'sk' && !sks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { k: 'atk', id: 'atk' };
-  const tab = sub === 'sk' || sub === 'it' ? sub : 'atk', s = pick.k === 'sk' ? S.skills[pick.id] : null, it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma');
+  const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
+  if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { k: 'atk', id: 'atk' };
+  const tab = ['sk', 'it', 'wp'].includes(sub) ? sub : 'atk', s = pick.k === 'sk' ? SK(pick.id) : null, it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma');
   const label = it ? it.name : s ? s.name : 'Ataque', canAim = !it && !(s && (s.area || ['heal', 'util', 'form'].includes(s.kind) || selfSk(s))) && t;
   const why = !my ? 'Aguarde a sua vez' : !t && !selfSk(s) ? 'Escolha um alvo' : s && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
   const tg = o => `<button class="tg ${o.enemy ? 'foe' : 'ally'} ${o.id === tgt ? 'on' : ''} ${o.hp > 0 ? '' : 'ko'}" data-tgt="${o.id}" style="--c:${esc(o.enemy ? '#e4002b' : o.color)}" aria-pressed="${o.id === tgt}"><b>${esc(o.name)}</b>${bar('hp', o, true)}<small>${o.hp > 0 ? (o.enemy ? Math.round(100 * o.hp / (o.hpMax || 1)) + '%' : `${o.hp}/${o.hpMax}`) : 'caído'}</small></button>`;
   const opt = (k, id, name, meta, d, off) => `<button class="opt ${pick.k === k && pick.id === id ? 'on' : ''}" data-a="pick" data-k="${k}" data-v="${id}" ${off ? 'disabled' : ''} aria-pressed="${pick.k === k && pick.id === id}"><b>${esc(name)}</b><i>${meta}</i><small>${esc(off || d)}</small></button>`;
-  const list = tab === 'sk' ? sks.map(k => { const x = S.skills[k]; return opt('sk', k, x.name, x.limit ? 'Limite' : `${x.cost} ${RES[x.res]}${x.pay ? ' +' : ''}`, desc(x), blocked(c, x, k) ? blockWhy(c, x, k) : ''); }).join('') || '<p class="none">Nenhuma skill ativa ainda. Aprenda na página Habilidades.</p>'
+  const skOpt = k => { const x = SK(k); return opt('sk', k, x.name, x.limit ? 'Limite' : `${x.cost} ${RES[x.res]}${x.pay ? ' +' : ''}${x.uses ? ` · ${x.uses}×` : ''}`, desc(x), blocked(c, x, k) ? blockWhy(c, x, k) : ''); };
+  const list = tab === 'sk' ? sks.map(skOpt).join('') || '<p class="none">Nenhuma skill ativa ainda. Aprenda na página Habilidades.</p>'
+    : tab === 'wp' ? wsks.map(skOpt).join('') || `<p class="none">${wp ? 'Esta arma não tem técnicas próprias.' : 'Sem arma equipada: equipe uma na página Itens para usar as técnicas dela.'}</p>`
     : tab === 'it' ? cons.map(([k, q]) => opt('it', k, S.items[k].name, '×' + q, idesc(S.items[k]))).join('') || '<p class="none">Nenhum consumível no inventário.</p>'
-    : opt('atk', 'atk', 'Ataque', 'sem custo', `${wp ? wp.name : 'Punhos'} · poder ${wp?.power ?? c.arma} · ${wp?.wt === 'fogo' ? 'DES' : 'FOR'}`);
+    : opt('atk', 'atk', ARMAS.prof(wp).atkN || 'Ataque', 'sem custo', `${wp ? wp.name : 'Punhos'} · ${wpnLine(wp, c)}`);
   const tl = timeline(6).slice(1).map(id => `<i class="${S.chars[id].enemy ? 'foe' : ''}">${esc(S.chars[id].name)}</i>`).join('');
   const allies = inB.filter(o => !o.enemy && o.id !== c.id && o.hp > 0), downAll = inB.filter(o => o.enemy && o.hp > 0).length > 0 && inB.filter(o => o.enemy && o.hp > 0).every(o => o.st.down || o.st.broken);
   const rhythm = `<div class="rhythm"><button class="ghost" data-a="defend" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)">Defender${c.brv > 0 ? ' ' + c.brv : ''}</button><button class="ghost" data-a="focus" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3">Concentrar${c.ten ? ' ×' + [1, 1.5, 2, 3][c.ten] : ''}</button><button class="ghost ${braveOn ? 'on' : ''} ${c.brv < 0 ? 'debt' : ''}" data-a="braveT" ${c.brv > -2 ? '' : 'disabled'} aria-pressed="${braveOn}" title="Gasta 1 ponto de Coragem para agir de novo; sem pontos, fica devendo tempo (dívida: o próximo turno demora mais)">Coragem ${c.brv || 0}</button><select data-a="passSel" aria-label="Passar a vez depois de acertar uma fraqueza"><option value="">Passar a vez: ninguém</option>${allies.map(o => `<option value="${o.id}" ${passTo === o.id ? 'selected' : ''}>Passar a vez: ${esc(o.name)}</option>`).join('')}</select><button class="ghost allout" data-a="allOut" data-id="${c.id}" ${my && !wait && downAll ? '' : 'disabled'} title="Todo inimigo Derrubado ou Quebrado: o grupo inteiro ataca">Ataque Total</button></div>`;
@@ -649,7 +723,7 @@ function command(c, cur) {
     <div class="cmd-g"><div class="cmd-me"><h2>${esc(c.name)}</h2>${['hp', 'aura', 'san', 'limit'].map(k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${c[k]}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`).join('')}
         <div class="sts">${c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(x => `<i>${x}</i>`).join('') || '<small>Sem condições.</small>' : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}</div></div>
       <div class="cmd-step"><h4><i>1</i>Alvo</h4><div class="tgs">${inB.map(tg).join('')}</div></div>
-      <div class="cmd-step"><h4><i>2</i>Ação</h4><div class="seg" role="tablist">${[['atk', 'Atacar'], ['sk', `Skills <i>${sks.length}</i>`], ['it', `Itens <i>${cons.length}</i>`]].map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-sub="${k}">${l}</button>`).join('')}</div><div class="alist">${list}</div>
+      <div class="cmd-step"><h4><i>2</i>Ação</h4><div class="seg" role="tablist">${[['atk', 'Atacar'], ['wp', `Arma <i>${wsks.length}</i>`], ['sk', `Skills <i>${sks.length}</i>`], ['it', `Itens <i>${cons.length}</i>`]].map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-sub="${k}">${l}</button>`).join('')}</div><div class="alist">${list}</div>
         ${canAim ? `<button class="ghost aimb ${aim ? 'on' : ''}" data-a="aimT" aria-expanded="${aimOpen}">${aim ? `Mira: ${PL[aim]} (−${AIMP[aim]}%)` : 'Mirar numa parte do corpo'}</button>${aimOpen ? aimBox() : ''}` : ''}</div></div>
     ${fieldBar()}${rhythm}
     <div class="cmd-go ${wait ? 'wait' : ''}"><div class="sum"><small>${wait ? 'Aguardando o mestre' : 'Sua ação'}</small><b>${wait ? esc(rq.text) : `${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim && aim ? ` · ${PL[aim]}` : ''}`}</b></div>
@@ -698,7 +772,7 @@ function render() {
     const fw = Object.keys(wins).filter(k => k.startsWith('f_') && wins[k].open && ent(k.slice(2))), ALL = { ...WIN, ...Object.fromEntries(fw.map(k => [k, [ent(k.slice(2)).name + (S.chars[k.slice(2)] ? '' : ' · modelo do bestiário'), 1080]])) };
     const rank = Object.keys(ALL).sort((x, y) => (wins[x].z || 0) - (wins[y].z || 0));
     const lays = chips(LAYD, k => `<button class="lay" data-a="lay" data-k="${k}" title="Clique: aplicar arranjo · Shift+clique: salvar o arranjo atual">${k}</button>`);
-    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(ent(k.slice(2)))])), sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '' };
+    const body = { ...Object.fromEntries(fw.map(k => [k, gmSheet(ent(k.slice(2)))])), sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, batalha: b ? battle() : '<small>Nenhuma batalha em andamento.</small>', fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
     app.innerHTML = `<main>${map()}</main>${chips(ALL, (id, [title, w]) => wins[id].open ? `<section class="win" data-win="${id}" style="left:${wins[id].x}px;top:${wins[id].y}px;width:${id === 'batalha' ? Math.max(640, innerWidth - 780) : Math.min(w, innerWidth - 24)}px;z-index:${20 + rank.indexOf(id)}"><header data-drag="${id}"><span>${esc(title)}</span><button data-a="winX" data-id="${id}" aria-label="Fechar ${esc(title)}">×</button></header><div class="win-body">${body[id]}</div></section>` : '')}
       ${reqStrip()}${cropper()}<nav class="dock">${chips(WIN, (id, [title]) => `<button data-a="winT" data-id="${id}" ${on(wins[id].open)}>${title}</button>`)}<i></i>${lays}</nav>${ctxMenu()}`;
   } else if (role === 'player') {
@@ -804,6 +878,7 @@ app.addEventListener('change', e => {
   if (d.ou) { const [nd, f] = d.ou.split(':'); (oUi[nd] ||= {})[f] = v; return; }
   if (d.nota) return send({ t: 'ofiNota', id: d.id, e: d.nota, txt: v });
   if (d.oc) return ocChange(el, v);
+  if (d.wf) return wfChange(d.wf, v);
   if (d.a === 'planLoad') { const b = lsGet('vj.builds', [])[+v]; if (b) lsSet('vj.plan.' + d.id, b.nodes); return render(); }
   if (d.a === 'campWith') { campWith[d.id] = v; const pr = myReq()?.[1]; if (S.camp.acts[d.id] === 'conversar' || (pr?.t === 'campAct' && pr.m.k === 'conversar' && pr.m.id === d.id)) send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); } // com o pedido ainda na fila, reenvia: o novo substitui o anterior e leva a escolha
   if (d.up) {
@@ -819,7 +894,7 @@ app.addEventListener('change', e => {
   else if (d.sess) sess[d.sess] = v;
   else if (d.qa) qa[d.qa] = v;
 });
-app.addEventListener('input', e => { const ds = e.target.dataset; if (ds.rqtxt && reqUi[ds.rqtxt]) reqUi[ds.rqtxt].txt = e.target.value; if (ds.sess) sess[ds.sess] = e.target.value; if (ds.qa) qa[ds.qa] = e.target.type === 'number' ? +e.target.value : e.target.value; const k = ds.bf; if (!k) return; bf[k] = e.target.value; if (k === 'q' || k === 'giveq' || k === 'skq') render(); }); // filtros e buscas
+app.addEventListener('input', e => { const ds = e.target.dataset; if (ds.rqtxt && reqUi[ds.rqtxt]) reqUi[ds.rqtxt].txt = e.target.value; if (ds.sess) sess[ds.sess] = e.target.value; if (ds.qa) qa[ds.qa] = e.target.type === 'number' ? +e.target.value : e.target.value; const k = ds.bf; if (!k) return; bf[k] = e.target.value; if (['q', 'giveq', 'skq', 'wq', 'wsq'].includes(k)) render(); }); // filtros e buscas
 app.addEventListener('toggle', e => { const k = e.target.dataset?.oper; if (k) oOpen[k] = e.target.open; }, true); // lembra as perícias abertas e fechadas
 app.addEventListener('keydown', e => { const el = e.target; if (!el.dataset?.edin) return; if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.stopPropagation(); el.value = ''; el.blur(); } }, true);
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
@@ -848,7 +923,7 @@ app.addEventListener('click', e => {
   const czb = e.target.closest('[data-cz]');
   if (czb) { cz[czb.dataset.cz] = czb.dataset.v; return render(); }
   if (am) { aim = aim === am.dataset.aim ? null : am.dataset.aim; return render(); }
-  if (sb) { sub = sb.dataset.sub || null; if (sub !== 'sk' && sub !== 'it') pick = { k: 'atk', id: 'atk' }; return render(); }
+  if (sb) { sub = sb.dataset.sub || null; if (!['sk', 'it', 'wp'].includes(sub)) pick = { k: 'atk', id: 'atk' }; return render(); }
   if (pvb) { pv = pvb.dataset.pv; return render(); }
   const ftb = e.target.closest('[data-ftab]');
   if (ftb) { ftab[ftb.dataset.id] = ftb.dataset.ftab; return render(); }
@@ -865,7 +940,7 @@ app.addEventListener('click', e => {
     if (saved[d.k]) wins = { ...wins, ...structuredClone(saved[d.k]) };
     else { for (const k in wins) wins[k].open = LAYD[d.k].includes(k);
       const W = innerWidth, H = innerHeight, at = (k, x, y) => Object.assign(wins[k], { x, y });
-      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); at('best', 360, 56); }
+      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); at('best', 360, 56); at('armas', 16, 56); }
     localStorage.vj_wins = JSON.stringify(wins); return render();
   }
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
@@ -889,13 +964,14 @@ app.addEventListener('click', e => {
   if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
   if (d.a === 'ofiUse') { const u = oUi[d.node] || {}; return send({ t: 'ofiUse', id: d.id, node: d.node, item: u.item, rune: u.rune, el2: u.el2, sig: u.sig, nm: u.nm, target: u.target, part: u.part }); }
   if (d.a?.startsWith('oc') && gm) return ocClick(d);
+  if (d.a?.startsWith('wf') && gm) return wfClick(d);
   if (d.a === 'ofiNota') return send({ t: 'ofiNota', id: d.id, e: d.k, del: true });
   if (d.a === 'skF') { bf.skf = bf.skf === d.v ? '' : d.v; return render(); }
   if (d.a === 'planT') { const k = 'vj.plan.' + d.id, p = lsGet(k, []); lsSet(k, p.includes(d.name) ? p.filter(n => n !== d.name) : [...p, d.name]); return render(); }
   if (d.a === 'planClear') { lsSet('vj.plan.' + d.id, []); return render(); }
   if (d.a === 'planSave') { const n = prompt('Nome da build?'); if (!n) return; lsSet('vj.builds', [...lsGet('vj.builds', []).filter(b => b.name !== n), { name: n.slice(0, 40), nodes: lsGet('vj.plan.' + d.id, []) }].slice(-12)); return render(); }
   if (d.a === 'braveT') { braveOn = !braveOn; return render(); }
-  if (d.a === 'go') { if (pick.k === 'sk' && selfSk(S.skills[pick.id])) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.'); send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }); aim = null; aimOpen = false; braveOn = false; passTo = ''; return; }
+  if (d.a === 'go') { if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.'); send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }); aim = null; aimOpen = false; braveOn = false; passTo = ''; return; }
   if (d.a === 'rollAsk') { rollDlg = { id: d.id, attr: d.attr }; return render(); }
   if (d.a === 'rollX') { rollDlg = null; return render(); }
   if (d.a === 'rollMod') { mods[rollDlg.id] = +d.v; return render(); }

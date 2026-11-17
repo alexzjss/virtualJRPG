@@ -187,12 +187,45 @@ try {
     await shot(pg, 'ataque-total');
   });
 
+  await section('armas: aba Arma do jogador e ataque básico pela arma', async () => {
+    for (const f of [bossCh, minion]) { delete f.st.down; delete f.st.broken; } push();
+    check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia');
+    check(/DES/.test(await txt(bia, '.alist .opt')), 'Atacar: o ataque do revólver deveria mostrar DES');
+    await click(bia, '.cmd [data-sub=wp]', 'aba Arma');
+    await until(async () => /Leque do Pistoleiro/i.test(await txt(bia, '.alist')), 'técnica do Revólver .38 na aba Arma'); // o CSS põe em maiúsculas
+    await click(bia, '.alist .opt[data-a=pick]', 'técnica da arma'); await tgBtn(bia, minion.id).click();
+    await shot(bia, 'arma');
+    const n = S.seq; await click(bia, '.cmd-go .go', 'Agir com a técnica da arma');
+    await until(() => S.log.slice(-6).some(l => /Leque do Pistoleiro/.test(l.text)), 'técnica da arma executada');
+  });
+
   go({ t: 'battle', on: false });
   S.auto.act = false; push();
   const onPage = async (p, sel) => { // abre as páginas do jogador até achar o elemento
     for (const pg of ['mesa', 'pers', 'hab', 'ofi', 'itens', 'hist']) { if (await p.locator(sel).count()) return true; await p.click(`[data-pg=${pg}]`).catch(() => {}); await sleep(120); }
     return (await p.locator(sel).count()) > 0;
   };
+
+  await section('Forja de armas do mestre', async () => {
+    await click(gmP, '.dock [data-a=winT][data-id=armas]', 'botão Forja de armas');
+    await until(() => vis(gmP, '.wforge'), 'janela da Forja de armas');
+    const tap = sel => gmP.locator(sel).first().dispatchEvent('click'); // a janela pode nascer embaixo de outras: o clique vai direto no botão
+    await tap('.wforge [data-a=wfTpl][data-k=machado]');
+    await until(async () => /Machado/.test(await txt(gmP, '.wprev')), 'prévia do machado');
+    await gmP.selectOption('.wforge select[data-wf=_cat]', 'especial');
+    await until(async () => (await gmP.locator('.wforge .wskr').count()) === 2, 'categoria especial: duas técnicas');
+    await gmP.fill('.wforge input[data-wf=name]', 'Machado de Teste'); await gmP.locator('.wforge input[data-wf=name]').press('Tab');
+    await gmP.fill('.wforge input[data-wf=fx]', 'efeito-que-nao-existe 3'); await gmP.locator('.wforge input[data-wf=fx]').press('Tab');
+    await until(async () => /desconhecido/i.test(await txt(gmP, '.wprev .warn')), 'efeito inválido avisado na prévia');
+    await gmP.fill('.wforge input[data-wf=fx]', 'vs bleed 1.3'); await gmP.locator('.wforge input[data-wf=fx]').press('Tab');
+    await until(async () => !(await vis(gmP, '.wprev .warn')), 'aviso some com o efeito válido');
+    await shot(gmP, 'forja-armas');
+    await tap('.wforge [data-a=wfSaveNew]');
+    const made = await until(() => Object.values(S.items).find(i => i.name === 'Machado de Teste'), 'arma criada no catálogo');
+    check(made && made.tpl === 'machado' && made.cat === 'especial' && made.sk.length === 2 && made.fx === 'vs bleed 1.3', 'arma criada com modelo, categoria, técnicas e efeito');
+    await until(async () => /editando/i.test(await txt(gmP, '.wforge')), 'depois de criar, a Forja continua editando a arma');
+    await tap('.win[data-win=armas] [data-a=winX]');
+  });
 
   await section('pedido de rolagem: aprovação com Vantagem e Desvantagem', async () => {
     for (const adv of ['adv', 'dis']) {

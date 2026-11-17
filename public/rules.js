@@ -103,6 +103,43 @@
     if (ch.xp < xpCost(ch, s)) return `Faltam ${xpCost(ch, s) - ch.xp} XP.`;
     return '';
   }
+  // ----- notação compacta dos efeitos (a mesma de tree.js e arvore/*.js; também usada nas armas) -----
+  // fx: 'st burn 3 60%; drain hp 30; shield 12 self' → lista de efeitos. Alvo opcional: self | ally | foes | tgt (padrão: o alvo da skill).
+  // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
+  const FXTO = new Set(['self', 'ally', 'foes', 'tgt']);
+  const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'],
+    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
+  const FXDEF = { st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 } };
+  const FXTXT = new Set(['k', 'r']);
+  function parseFx(str, where = '') {
+    if (!str) return undefined;
+    return String(str).split(';').map(x => x.trim()).filter(Boolean).map(item => {
+      const w = item.split(/\s+/), t = w.shift(), keys = FXARGS[t];
+      if (!keys) throw new Error(`efeito desconhecido "${item}" em ${where}`);
+      const o = { t, ...FXDEF[t] }, pos = w.filter(x => !FXTO.has(x) && !x.endsWith('%'));
+      keys.forEach((k, i) => { if (pos[i] == null) return; o[k] = FXTXT.has(k) ? pos[i] : +pos[i]; if (!FXTXT.has(k) && Number.isNaN(o[k])) throw new Error(`número inválido em "${item}" (${where})`); });
+      if (keys.some(k => o[k] == null)) throw new Error(`faltam argumentos em "${item}" (${where})`);
+      const ch = w.find(x => x.endsWith('%')), to = w.find(x => FXTO.has(x));
+      if (t === 'st') { o.ch = ch ? parseInt(ch) : 100; if (!ST[o.k]) throw new Error(`condição desconhecida "${o.k}" em ${where}`); }
+      if (to) o.to = to;
+      return o;
+    });
+  }
+  function parseForm(str, where = '') {
+    const f = { dur: 3, m: {}, dr: {}, end: [] };
+    for (const item of String(str).split(';').map(x => x.trim()).filter(Boolean)) {
+      const [k, ...r] = item.split(/\s+/);
+      if (k === 'end') f.end.push(...parseFx(r.join(' '), where));
+      else if (k === 'dr') f.dr[r[0]] = +r[1];
+      else if (k === 'dur') f.dur = +r[0];
+      else if (['atk', 'def', 'agi', 'hit', 'crit', 'atkP', 'heal'].includes(k)) f.m[k] = +r[0];
+      else throw new Error(`campo de forma desconhecido "${item}" em ${where}`);
+    }
+    return f;
+  }
+  // caminho inverso: efeitos lidos → texto na notação (o criador de armas copia técnicas da árvore assim)
+  const fxSrc = l => (l || []).map(f => [f.t, ...FXARGS[f.t].map(k => f[k]), ...(f.t === 'st' && f.ch != null && f.ch < 100 ? [f.ch + '%'] : []), ...(f.to ? [f.to] : [])].join(' ')).join('; ');
+  const formSrc = f => !f ? '' : [`dur ${f.dur}`, ...Object.entries(f.m || {}).map(([k, v]) => `${k} ${v}`), ...Object.entries(f.dr || {}).map(([k, v]) => `dr ${k} ${v}`), ...(f.end || []).map(e => 'end ' + fxSrc([e]))].join('; ');
   // ----- descrição mecânica gerada dos campos da skill -----
   const TO = { self: 'em si', ally: 'nos aliados', foes: 'nos inimigos', tgt: '' };
   const pct = v => (v > 0 ? '+' : '') + v + '%';
@@ -147,6 +184,8 @@
   // linhas extras da descrição (o resto — poder, custo, elemento — a interface já mostra)
   function extra(s, sk) {
     const o = [];
+    if (s.wpn) o.push('técnica da arma equipada');
+    if (s.uses) o.push(`${s.uses} uso${s.uses > 1 ? 's' : ''} por batalha`);
     if (s.hits > 1) o.push(`${s.hits} golpes`);
     if (s.chg) o.push(`concentra ${s.chg} turno${s.chg > 1 ? 's' : ''} antes de soltar`);
     if (s.tg === 'self') o.push('em si mesmo');
@@ -167,5 +206,5 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

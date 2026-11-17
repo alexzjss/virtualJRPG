@@ -664,3 +664,28 @@ body[data-role=table] .stage>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;bottom:1.2v
   .stage .unit .duo small,.stage .unit .lim small{display:none}
   .cmd-go{padding:8px 10px;gap:8px}.cmd-go .sum b{font-size:17px}.cmd-go .go{font-size:16px;white-space:nowrap;min-height:44px}.cmd-go .go:disabled{font-size:14px}
 }
+
+/* armas: traços do ataque básico e técnicas próprias (cartões, ficha, menu) e a Forja de armas do mestre */
+.wpinfo{display:grid;gap:2px;margin-top:4px}
+.wtr{display:block;color:var(--paper);opacity:.85;font-size:12px}
+.wsk{display:block;font-size:12px;border-left:2px solid var(--gold);padding-left:6px}.wsk b{color:var(--gold)}
+.wd{display:block;font-style:italic;font-size:12px}
+button.wpn{border-bottom-color:var(--gold)}
+.wforge{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:14px;align-items:start}
+@media(max-width:900px){.wforge{grid-template-columns:1fr}}
+.wforge h4{margin:12px 0 4px;font:600 14px var(--cond);letter-spacing:.6px;text-transform:uppercase}.wforge h4 small{text-transform:none;letter-spacing:0;font:500 12px var(--body)}
+.wforge .row{align-items:flex-end;gap:6px 10px;margin:4px 0}
+.wforge label{display:flex;flex-direction:column;gap:2px;font-size:.8rem;color:var(--dim)}.wforge label.g{flex:1 1 240px}.wforge label.g input{width:100%}
+.wforge label.wchk{flex-direction:row;align-items:center;gap:5px;white-space:nowrap;align-self:center;padding-bottom:6px}
+.wforge input.sm{width:64px}.wforge input.w{min-width:min(100%,260px)}
+.wgals{display:grid;gap:4px}
+.wgal{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.wgal em{font:600 12px var(--cond);text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-style:normal;min-width:96px}
+.wgal button{min-height:28px;padding:3px 9px;font-size:12px}.wgal button.on{background:var(--gold);color:var(--ink)}
+.wskr{border:1px solid var(--line);background:var(--ink2);padding:6px 8px;margin:6px 0}
+.wsave{margin-top:12px!important}
+.wf-side{position:sticky;top:0;display:grid;gap:6px}
+.wprev{border:1px solid var(--gold);background:var(--ink2);padding:10px;display:grid;gap:4px}.wprev em{font:600 11px var(--cond);text-transform:uppercase;color:var(--gold);font-style:normal}
+.wprev .warn{color:var(--bad);margin:4px 0 0}
+.wbar{position:relative;background:var(--ink);border:1px solid var(--line);min-height:24px;margin:4px 0}.wbar i{position:absolute;inset:0 auto 0 0;background:#3ddc8455}.wbar.low i{background:#35b9ff55}.wbar.high i{background:#ff546877}
+.wbar span{position:relative;display:block;padding:3px 7px;font-size:12px}
+.wf-side .orows{grid-template-columns:1fr;max-height:420px;overflow:auto}
