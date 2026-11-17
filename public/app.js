@@ -260,7 +260,7 @@ function bestWin() {
 function iniWin() {
   const T = S.battle.ticks, ids = Object.keys(T).filter(k => S.chars[k]).sort((a, b) => T[a] - T[b] || a.localeCompare(b)), b = (k, id, l, t) => `<button data-a="ini" data-k="${k}" data-id="${id}" aria-label="${t}" title="${t}">${l}</button>`;
   if (!S.battle.active) return '<small>Nenhuma batalha em andamento.</small>';
-  return ids.map((id, i) => `<div class="row inv"><span>${i + 1}. ${esc(S.chars[id].name)} <small>${S.chars[id].hp > 0 ? 'tempo ' + T[id] : 'caído'}</small></span>${b('up', id, '▲', 'Adiantar')}${b('down', id, '▼', 'Atrasar')}${b('out', id, '×', 'Tirar da batalha')}</div>`).join('')
+  return ids.map((id, i) => `<div class="row inv"><span>${i + 1}. ${esc(S.chars[id].name)} <small>${S.chars[id].hp > 0 ? '' : 'caído · '}tempo <input type="number" class="tin" min="0" aria-label="Tempo de ${esc(S.chars[id].name)}" data-ini="${id}" value="${T[id]}"></small></span>${b('up', id, '▲', 'Adiantar')}${b('down', id, '▼', 'Atrasar')}${b('out', id, '×', 'Tirar da batalha')}</div>`).join('')
     + `<div class="row chips">Incluir: ${Object.values(S.chars).filter(c => !(c.id in T) && c.x != null && c.scene === S.scene && c.hp > 0).map(c => `<span data-a="ini" data-k="in" data-id="${c.id}">+ ${esc(c.name)}</span>`).join('') || '<small>todos já estão na fila</small>'}</div>`;
 }
 
@@ -369,7 +369,7 @@ function persPage(c) {
     return gm ? `<div class="tile gmt ${c.marks[a] ? 'mk' : ''}">${edv(c, 'attrs.' + a, c.attrs[a], 'tv')}<button data-a="roll" data-id="${c.id}" data-attr="${a}" title="Rolar ${ATN[a]}${v !== c.attrs[a] ? ` (vale ${v} com equipamento e ferimentos)` : ''}">${a}</button></div>`
       : `<button class="tile ${c.marks[a] ? 'mk' : ''}" data-a="rollAsk" data-id="${c.id}" data-attr="${a}" aria-label="Rolar ${ATN[a]}, ${v}%"><b>${v}</b><span>${a}</span><em>${ATN[a]}</em>${base}</button>`; };
   return `<section class="pp" style="--c:${esc(c.color)}"><div class="pp-hero">${figCard(c, '170px')}
-      <div class="pp-id"><input class="pname" aria-label="Nome" data-id="${c.id}" data-f="name" value="${esc(c.name)}"><div class="row pills">${(c.vinc || []).map(e => `<span class="pill vp" style="--e:${ELC[e]}">Vínculo <b>${PATRON[e]}</b></span>`).join('')}<span class="pill">XP <b>${edv(c, 'xp', c.xp)}</b></span><span class="pill">Ouro <b>${edv(c, 'gold', c.gold)}</b></span>
+      <div class="pp-id"><input class="pname" aria-label="Nome" data-id="${c.id}" data-f="name" value="${esc(c.name)}"><div class="row pills">${gm ? Object.keys(PATRON).filter(e => e !== 'fis').map(e => `<span class="pill vp ${(c.vinc || []).includes(e) ? '' : 'off'}" style="--e:${ELC[e]};${(c.vinc || []).includes(e) ? '' : 'opacity:.4'}" role="button" tabindex="0" data-a="vinc" data-id="${c.id}" data-el="${e}" title="Clique para ${(c.vinc || []).includes(e) ? 'remover' : 'conceder'} o Vínculo">Vínculo <b>${PATRON[e]}</b></span>`).join('') : (c.vinc || []).map(e => `<span class="pill vp" style="--e:${ELC[e]}">Vínculo <b>${PATRON[e]}</b></span>`).join('')}<span class="pill">XP <b>${edv(c, 'xp', c.xp)}</b></span><span class="pill">Ouro <b>${edv(c, 'gold', c.gold)}</b></span>
           <input type="color" aria-label="Cor do personagem" data-id="${c.id}" data-f="color" value="${esc(c.color)}"><label class="up">Trocar retrato<input type="file" accept="image/*" data-up="img" data-id="${c.id}"></label></div>
         <div class="resg">${res('hp')}${res('aura')}${res('san')}${res('limit')}</div><div class="sts big">${sts || '<small>Sem condições ativas.</small>'}</div></div></div>
     <div class="pp-grid"><div class="card wide"><h3>Atributos <small>${gm ? 'clique no número para editar, na sigla para rolar' : `toque para rolar o d100${gated('roll') ? ' (o mestre aprova)' : ''}`}</small></h3><div class="tiles">${A.map(tile).join('')}</div>
@@ -575,6 +575,7 @@ app.addEventListener('change', e => {
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
       .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => alert('Falha no upload (PNG/JPG/WEBP/GIF até 5 MB).'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
+  else if (d.ini) send({ t: 'ini', k: 'set', id: d.ini, v });
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
   else if (d.map === 'bg') setBg(v);
   else if (d.map) send({ t: 'map', f: d.map, v });

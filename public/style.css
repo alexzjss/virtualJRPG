@@ -577,3 +577,4 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
   .pl.pg-mesa .cmd{gap:10px;padding:12px 14px}.pl.pg-mesa .alist{max-height:150px}.pl.pg-mesa .tgs{max-height:190px;overflow:auto}
 }
 @media(max-width:999px){.pl.pg-mesa .stage{min-height:0}.pl.pg-mesa .stage .field{padding-top:1cqw}.pl.pg-mesa main{gap:8px}}
+.tin{width:64px}
