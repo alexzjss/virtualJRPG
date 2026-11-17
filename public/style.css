@@ -630,3 +630,37 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
 .onode-ed .nr1{display:flex;gap:8px;align-items:center}.onode-ed .nr2{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}.onode-ed .nr2 label{display:flex;gap:5px;align-items:center;font-size:.8rem;color:var(--dim)}.onode-ed .w{flex:1 1 auto;width:100%;min-width:0}.onode-ed .gr{color:var(--gold);width:1.2em;flex:none}
 .oced input[type=checkbox],.onode-ed input[type=checkbox]{flex:none}
 .oced label.chk{white-space:nowrap;flex-direction:row}.oced .row>.chk{align-self:center}
+/* faixa de clima, Cadeia e Domínio dentro do palco (mestre e mesa); o jogador a vê no painel de comandos */
+.stage>.fbar{position:absolute;left:1cqw;right:1cqw;bottom:.4rem;margin:0;z-index:3;pointer-events:none;text-shadow:0 1px 3px #000}
+.stage>.fbar span{background:rgba(0,0,0,.55)}
+
+/* celular: 7 abas na barra de baixo (6 páginas + Chat), alvos de toque de 40px, fim da página livre da barra e do botão Agir */
+@media(max-width:999px){
+  .top .tnav{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .top .tnav button{font-size:10.5px;letter-spacing:.2px;padding:6px 0}.top .tnav button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body:not([data-role=table]) .banner,body:not([data-role=table]) .banner.me{top:64px;bottom:auto;font-size:20px;padding:4px 24px 4px 44px}
+}
+@media(max-width:600px){#app button,#app select,#app .tog{min-height:40px}#app .tnav button{min-height:58px}}
+
+/* Tensão (brilho que cresce por nível), Dívida de Coragem (pulso vermelho), Cadeia cheia e Domínio aberto */
+.unit.ten1 .figw,.unit.ten2 .figw,.unit.ten3 .figw{animation:tenGlow var(--tp,1.3s) ease-in-out infinite alternate}
+.unit.ten1{--tp:1.3s;--tg:.7cqw;--tc:#ffd24a}.unit.ten2{--tp:.8s;--tg:1.2cqw;--tc:#ff9f1c}.unit.ten3{--tp:.4s;--tg:1.8cqw;--tc:#fff1a8}
+@keyframes tenGlow{from{filter:drop-shadow(.5cqw .6cqw 0 #000) drop-shadow(0 0 calc(var(--tg) * .4) var(--tc))}to{filter:drop-shadow(.5cqw .6cqw 0 #000) drop-shadow(0 0 var(--tg) var(--tc)) drop-shadow(0 0 calc(var(--tg) * 2) var(--tc))}}
+.unit.ten1 .rit,.unit.ten2 .rit,.unit.ten3 .rit{color:var(--tc);font-weight:700}
+.unit.debt .figw{animation:debtPulse 1s ease-in-out infinite alternate}
+@keyframes debtPulse{from{filter:drop-shadow(.5cqw .6cqw 0 #000) saturate(.8)}to{filter:drop-shadow(.5cqw .6cqw 0 #000) drop-shadow(0 0 1.1cqw #e4002b) saturate(.6) brightness(.85)}}
+.unit.debt .rit{color:#ff5a5a;font-weight:700;animation:pulse .6s infinite alternate}
+.rhythm button.debt{color:#ff7a7a;border-color:#e4002b;animation:pulse .7s infinite alternate}
+.fbar .chain.full{color:#ffd24a;font-weight:700;animation:chainFull .45s ease-in-out infinite alternate}
+@keyframes chainFull{from{box-shadow:0 0 0 0 #ffd24a00}to{box-shadow:0 0 .9rem 2px #ffd24a99}}
+.fbar .dom{animation:domChip 1.2s ease-in-out infinite alternate}
+@keyframes domChip{from{box-shadow:0 0 0 0 #ff7a5900}to{box-shadow:0 0 .8rem 2px #ff7a5999}}
+.stage .domfx{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 38%,#5b21b6aa 100%);mix-blend-mode:screen;animation:domBreath 2.2s ease-in-out infinite alternate}
+@keyframes domBreath{from{opacity:.45}to{opacity:1}}
+body[data-role=table] .stage>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;bottom:1.2vw}
+.unit .brk{font-size:max(10px,1.5cqw);line-height:1.15}
+/* celular: cartões do palco só com barras (os números ficam no painel de comandos) e barra "Sua ação" mais baixa */
+@media(max-width:600px){
+  .stage .unit .duo small,.stage .unit .lim small{display:none}
+  .cmd-go{padding:8px 10px;gap:8px}.cmd-go .sum b{font-size:17px}.cmd-go .go{font-size:16px;white-space:nowrap;min-height:44px}.cmd-go .go:disabled{font-size:14px}
+}

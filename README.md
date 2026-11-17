@@ -45,7 +45,7 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 `VJ_RULES='{"enemyAttr":45}' node tools/sim.js` testa uma variação sem editar o código.
 
 ## Testes e segurança dos dados
-- `npm test` roda os testes de regras e permissões; `npm run sim` roda o simulador de balanceamento.
+- `npm test` roda os testes de regras e permissões; `npm run sim` roda o simulador de balanceamento; `npm run ui` abre o jogo no Chromium (Playwright) com mestre, jogadores e mesa e confere batalha, pedidos, acampamento, Ofícios e celular.
 - A cada início o servidor copia `data/state.json` para `data/backups/` (guarda as 10 últimas).
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
 

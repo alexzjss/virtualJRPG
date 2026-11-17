@@ -131,7 +131,7 @@ const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { fs.mkdirSyn
 const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, note: undefined, gmNote: undefined }]));
 // cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
 // jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
-const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, hp: Math.ceil(ch.hp * k), hpMax: 100,
+const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, brk: ch.brk, hp: Math.ceil(ch.hp * k), hpMax: 100,
   body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: ch.known >= 1 ? ch.weak : [], resist: ch.known >= 2 ? ch.resist : [], weakPart: ch.known >= 3 ? ch.weakPart : undefined, known: ch.known || 0, marks: {}, bon: {} }; };
 const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
 const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
@@ -1527,7 +1527,7 @@ wss.on('connection', c => {
 });
 prep();
 export { genFoe, partyRef, fitBoss, spawn };
-export { H, S, R, current, derive, modsOf, slotMax };
+export { H, S, R, current, derive, modsOf, slotMax, server, push }; // server e push: o teste de interface (tools/ui-smoke.js) sobe o jogo no mesmo processo
 export { view, order, handle };
 const isMain = SEA || process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
