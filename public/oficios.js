@@ -342,5 +342,5 @@
     for (const [per, L] of Object.entries(cfg.nodeNew || {})) if (P[per]) L.forEach(o => { const { chk, ...x } = o, i = P[per].nodes.length; P[per].nodes.push({ po: [0, 2, 4, 7][o.t] ?? 2, ...x, t: o.t, ...(chk ? { act: 'checar', g: o.g || 0 } : {}), id: per + '.' + i, custom: true }); });
     for (const [id, o] of Object.entries(cfg.rec || {})) REC[id] = REC[id] && !o.custom ? { ...REC[id], ...o } : { dc: 0, qty: 1, mats: {}, ...o, id };
   };
-  g.OFI = { PER: P, REC, RUNAS, SIG, ELST, GRAU, BONUS, apply, recipes, learned, grau, rollBonus, hook, temp, slots, esp, whyNot, order: Object.keys(P) };
+  g.OFI = { PER: P, REC, RUNAS, SIG, ELST, GRAU, BONUS, apply, recipes, base: SNAP, learned, grau, rollBonus, hook, temp, slots, esp, whyNot, order: Object.keys(P) };
 })(globalThis);
