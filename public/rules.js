@@ -235,6 +235,32 @@
       if (left <= par) return canParry ? 'par' : esq > 0 ? 'esq' : 'late';
       return esq > 0 && left <= par + esq ? 'esq' : 'cedo';
     },
+    // janelas do Golpe no tempo (ms): o Perfeito de técnica com Black Flash fica mais fácil quanto maior o bf
+    tempoWin(s, mods = {}) { return { cw: (s.cw || 160) + (mods.cw || 0), cp: (s.bf ? 30 + 8 * (s.bf + (mods.bf || 0)) : s.cp || 60) + (mods.cp || 0) }; },
+    // a nota que o navegador mandou, limitada pelo que a técnica permite; sem comando na técnica a nota não vale nada
+    clampCmd(s, cmd, mods = {}) {
+      const z = { g: '', n: 0, acc: 0 };
+      if (!s?.cmd || s.cmd === 'choque' || !cmd || typeof cmd !== 'object') return z;
+      const cnt = { martelar: (s.mx || 0) + (mods.mx || 0), seq: s.seq?.length || 0, ritmo: s.nt || 0 }[s.cmd] ?? 0;
+      let g = cmd.g === 'bom' || cmd.g === 'perf' ? cmd.g : '';
+      const n = Math.max(0, Math.min(cnt, Math.floor(+cmd.n) || 0)); let acc = +cmd.acc; acc = !Number.isFinite(acc) ? 0 : s.cmd === 'segurar' && acc < 0 ? -1 : Math.max(0, Math.min(1, acc));
+      if (g === 'perf' && cnt && n < cnt) g = 'bom'; // nos comandos de contagem o Perfeito pede a nota cheia
+      return { g, n, acc };
+    },
+    // o que a nota vale (spec §5.3): multiplicador, golpes extras, golpe final, efeito extra (pf), Black Flash, crítico, Quebra, estouro, turnos, cura
+    cmdEffect(s, c) {
+      const e = { g: c?.g || '', mult: 1, extra: 0, extraMult: 1, fin: 0, pf: false, bf: false, crit: false, brk: 0, estouro: false, turns: 0, healMult: 1, noSan: false };
+      if (!s?.cmd || !c) return e;
+      const bom = c.g === 'bom', perf = c.g === 'perf', dmg = s.kind === 'dmg' || s.kind === 'mental';
+      if (s.cmd === 'tempo') { if (bom) e.mult = 1.2; if (perf) { e.mult = 1.4; e.pf = true; e.bf = s.bf > 0; } }
+      else if (s.cmd === 'martelar') { e.extra = c.n; e.pf = perf; }
+      else if (s.cmd === 'segurar') { if (c.acc < 0) e.estouro = true; else if (bom) e.mult = 1.3; else if (perf) { e.mult = 1.6; e.pf = true; } }
+      else if (s.cmd === 'seq') { if (!(s.hits > 1)) { e.extra = c.n; e.extraMult = .5; } if (perf) { e.fin = s.fin || Math.round(s.power * 1.5); e.pf = true; } }
+      else if (s.cmd === 'ritmo') { e.pf = perf; if (dmg) e.mult = 1 + .1 * c.n; else { e.turns = c.n; if (s.kind === 'heal' && s.power > 0) e.healMult = 1 + .1 * c.n; } }
+      else if (s.cmd === 'mira') { if (bom || perf) { e.crit = true; e.brk = 2; } e.pf = perf; }
+      else if (s.cmd === 'runa') { if (dmg) { if (bom) e.mult = 1.2; if (perf) { e.mult = 1.4; e.pf = true; } } else { if (bom || perf) { e.turns = 1; e.healMult = 1.2; } e.noSan = perf; } }
+      return e;
+    },
   };
   g.RULES = { CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

@@ -960,8 +960,10 @@ test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo'
 test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e clones', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h);
   h.skills = [sk('Tempestade Negra')]; H.battle(gm, { on: true }); assert.ok(S.skills[sk('Tempestade Negra')].bf === 10);
-  let bf = false; for (let i = 0; i < 200 && !bf; i++) { S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; H.act(ana, { id: h.id, skill: sk('Tempestade Negra'), target: e.id }); bf = S.log.some(l => /BLACK FLASH/.test(l.text || '')); }
-  assert.ok(bf, 'Black Flash sai na faixa do d100'); assert.ok(h.aura > 0, 'devolve Aura');
+  const kT = sk('Tempestade Negra'); S.skills[kT].cmd = 'tempo';
+  for (let i = 0; i < 6; i++) { S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; fixR(.3, () => H.act(ana, { id: h.id, skill: kT, target: e.id })); assert.ok(!S.log.some(l => /BLACK FLASH/.test(l.text || '')), 'sem Perfeito não há Black Flash'); }
+  S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; fixR(.3, () => H.act(ana, { id: h.id, skill: kT, target: e.id, cmd: { g: 'perf', n: 0, acc: 1 } })); const bf = S.log.some(l => /BLACK FLASH/.test(l.text || '')); delete S.skills[kT].cmd;
+  assert.ok(bf, 'Black Flash sai no Perfeito'); assert.ok(h.aura > 0, 'devolve Aura');
   reset(); const m = mk(ana, {}), f = mk(gm, { enemy: true }); m.skills = [sk('Marca Rubra')]; m.pslots = [...m.skills]; derive(m); const hp0 = m.hpMax, san0 = m.sanMax;
   H.battle(gm, { on: true }); m.hp = m.hpMax; f.attrs.FOR = 95; S.battle.ticks[f.id] = -1;
   for (let i = 0; i < 50 && !m.st.mark; i++) { if (m.hp > m.hpMax * .35) m.hp = Math.ceil(m.hpMax * .35); S.battle.ticks[f.id] = -1; H.act(gm, { id: f.id, skill: 'atk', target: m.id }); m.hp = Math.max(m.hp, 1); }
@@ -1064,4 +1066,55 @@ test('chefe: golpe anunciado pode sair Perfeito (20%): batida 20% mais curta e d
   assert.equal(run(0).C.perf, true); assert.equal(run(0).C.beats[0], 880); assert.equal(run(.5).C.perf, false); assert.equal(run(.5).C.beats[0], 1100);
   const a = run(.5, false).loss, b = run(.5, true).loss; assert.ok(a > 0 && Math.abs(b / a - 1.25) < .1, `×1,25 (${a} → ${b})`);
   const nb = (() => { const { e } = dfx([]); e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); return S.battle.cmd.perf; })(); assert.equal(nb, false, 'só chefe tem Perfeito');
+});
+
+// ---- comandos de ataque: a nota do navegador vira dano, golpes e efeitos ----
+const withCmd = (name, f, fn) => { const k = sk(name), sv = Object.fromEntries(Object.keys(f).map(x => [x, S.skills[k][x]])); Object.assign(S.skills[k], f); try { return fn(k); } finally { Object.assign(S.skills[k], sv); for (const x in f) if (sv[x] === undefined) delete S.skills[k][x]; } };
+const duelC = () => { reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; derive(h); derive(e); e.armor = 0; h.aura = h.auraMax = 99; e.hpMax = e.hp = 99999; H.battle(gm, { on: true }); return { h, e }; };
+const hitsOf = (name) => S.log.filter(l => (l.text || '').startsWith(name + ' →') || (l.text || '').startsWith(name + ' (final) →')).length;
+const lossC = (f, cmd) => withCmd('Tiro Certeiro', f, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, cmd ? { cmd } : {}); return 99999 - e.hp; });
+test('cmd: clamp limita a nota absurda; sem cmd ou sem comando vira neutro', () => {
+  const C = RU.CMD, z = { g: '', n: 0, acc: 0 };
+  assert.deepEqual(C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'perf', n: 999, acc: 9 }, { mx: 1 }), { g: 'perf', n: 5, acc: 1 });
+  assert.deepEqual(C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'perf', n: 2, acc: 1 }, {}), { g: 'bom', n: 2, acc: 1 }, 'Perfeito exige a barra cheia');
+  assert.deepEqual(C.clampCmd({}, { g: 'perf', n: 9, acc: 1 }, {}), z); assert.deepEqual(C.clampCmd({ cmd: 'tempo' }, { g: 'x', n: -3, acc: -5 }, {}), z);
+  assert.deepEqual(C.clampCmd({ cmd: 'tempo' }, null, {}), z); assert.equal(C.clampCmd({ cmd: 'segurar' }, { g: '', acc: -1 }, {}).acc, -1, 'estouro');
+  assert.equal(C.clampCmd({ cmd: 'seq', seq: '↑→↓' }, { g: 'perf', n: 99 }, {}).n, 3);
+});
+test('cmd: tempo Perfeito ×1,4, Bom ×1,2 e sem nota = normal', () => {
+  const base = lossC({ cmd: 'tempo' }), bom = lossC({ cmd: 'tempo' }, { g: 'bom' }), perf = lossC({ cmd: 'tempo' }, { g: 'perf' }), nada = lossC({ cmd: 'tempo' }, { g: '', n: 0, acc: 0 });
+  assert.equal(nada, base); assert.ok(Math.abs(bom / base - 1.2) < .08, `bom ${bom}/${base}`); assert.ok(Math.abs(perf / base - 1.4) < .08, `perf ${perf}/${base}`);
+});
+test('cmd: janela do tempo cresce com bf (30 + 8·bf ms) e com as passivas', () => {
+  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 0, cw: 0, cp: 0 }).cp, 54); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 7 }, { bf: 0, cw: 0, cp: 0 }).cp, 86);
+  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 2, cw: 0, cp: 10 }).cp, 80); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo' }, { bf: 0, cw: 40, cp: 15 }).cw, 200);
+});
+test('cmd: martelar soma golpes extras acima dos hits', () => {
+  withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 4, hits: 2 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: 'bom', n: 3, acc: .7 } }); assert.equal(hitsOf('Tiro Certeiro'), 5); });
+  withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 4, hits: 2 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e); assert.equal(hitsOf('Tiro Certeiro'), 2, 'sem martelar = os hits normais'); });
+});
+test('cmd: sequência nova soma golpe por seta; nó antigo nunca fica abaixo dos hits e só a perfeita dá o golpe final', () => {
+  withCmd('Tiro Certeiro', { cmd: 'seq', seq: '↑→↓', fin: 20 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: 'bom', n: 2, acc: 1 } }); assert.equal(hitsOf('Tiro Certeiro'), 3, '1 + 2 setas'); });
+  withCmd('Tiro Certeiro', { cmd: 'seq', seq: '↑→↓', hits: 3 }, () => {
+    let r = duelC(); use(r.h, 'Tiro Certeiro', r.e, { cmd: { g: 'bom', n: 1, acc: 1 } }); assert.equal(hitsOf('Tiro Certeiro'), 3, 'errar setas não tira golpes');
+    r = duelC(); use(r.h, 'Tiro Certeiro', r.e, { cmd: { g: 'perf', n: 3, acc: 1 } }); assert.equal(hitsOf('Tiro Certeiro'), 4, '3 golpes + golpe final'); });
+});
+test('cmd: segurar estourado sai normal e deixa o herói Exposto; mira acerta = crítico e −2 na Quebra', () => {
+  withCmd('Tiro Certeiro', { cmd: 'segurar' }, () => { const base = lossC({ cmd: 'segurar' }); const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: '', n: 0, acc: -1 } }); assert.ok(h.st.exposed > 0); assert.equal(99999 - e.hp, base); });
+  withCmd('Tiro Certeiro', { cmd: 'mira' }, () => { const b0 = lossC({ cmd: 'mira' }); const r = duelC(); r.e.rank = 'elite'; r.e.brk = { cur: 5, max: 5 }; use(r.h, 'Tiro Certeiro', r.e, { cmd: { g: 'bom', n: 0, acc: 1 } });
+    assert.ok(99999 - r.e.hp > b0 * 1.8, 'crítico ×2'); assert.equal(r.e.brk.cur, 3, 'tirou 2 pontos da Quebra'); });
+});
+test('cmd: ritual com runa Perfeita não cobra Sanidade; nota num golpe sem comando é ignorada; fora do turno nada acontece', () => {
+  const rit = Object.keys(S.skills).find(k => S.skills[k].circ && S.skills[k].pay?.san && S.skills[k].kind !== 'passive'); assert.ok(rit, 'existe ritual com custo de Sanidade');
+  withCmd(S.skills[rit].name, { cmd: 'runa', rn: 'circulo' }, () => {
+    const san = cmd => { const { h, e } = duelC(); h.san = 50; h.skills.push(rit); const s0 = h.san; turn(h); fixR(.3, () => H.act(gm, { id: h.id, skill: rit, target: e.id, ...(cmd ? { cmd } : {}) })); return s0 - h.san; };
+    assert.ok(san() > 0, 'sem nota cobra'); assert.equal(san({ g: 'perf', n: 0, acc: 1 }), 0, 'Perfeito não cobra'); });
+  assert.equal(lossC({}), lossC({}, { g: 'perf', n: 9, acc: 1 }), 'sem cmd na técnica a nota não vale');
+  const { h, e } = duelC(); use(h, 'Tiro Certeiro', e); turn(e); const hp = e.hp; fixR(.3, () => H.act(gm, { id: h.id, skill: sk('Tiro Certeiro'), target: e.id })); assert.equal(e.hp, hp, 'fora do turno nada acontece');
+});
+test('cmd: ritmo — cada nota soma +10% na cura em grupo e +1 turno nos buffs; todas as notas dão o Perfeito', () => {
+  const heal = n => withCmd('Luz Curativa', { cmd: 'ritmo', nt: 6 }, () => { reset(); const h = mk(ana, {}), f = mk(bia, {}); h.attrs.AGI = 99; derive(h); derive(f); h.aura = 99; f.hp = 1; H.battle(gm, { on: true });
+    use(h, 'Luz Curativa', f, n == null ? {} : { cmd: { g: n === 6 ? 'perf' : 'bom', n, acc: 1 } }); return f.hp - 1; });
+  const base = heal(null), quatro = heal(4); assert.ok(base > 0); assert.ok(quatro / base > 1.3 && quatro / base < 1.5, `${quatro}/${base}`); assert.ok(heal(6) > quatro);
+  const gm1 = RU.CMD.cmdEffect({ cmd: 'ritmo', kind: 'heal', power: 0, nt: 6 }, { g: 'bom', n: 3 }); assert.equal(gm1.turns, 3); assert.equal(gm1.healMult, 1);
 });
