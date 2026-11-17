@@ -48,12 +48,12 @@ const BBG = ['rubro', 'noite', 'floresta', 'brasa', 'gelo', 'vazio', 'santuario'
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR']); // campos numéricos que só o mestre altera
 const EXTRA = { vinc: [], body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
-const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', rq: null, ...o });
-const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
+const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', rq: null, pierce: 0, ...o });
+const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, pierce: 0, reqFor: 0, grant: null, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
 const SCH = {
-  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', ...ATTRS], req: WT, back: ['', ...STK], ex: 't', d: 't' },
-  items: { name: 's', type: ITYPES, eff: EFF, attr: ATTRS, wt: WT, el: ['', ...EL], power: 'n', price: 'n' },
+  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', ...ATTRS], req: WT, pierce: 'n', back: ['', ...STK], ex: 't', d: 't' },
+  items: { name: 's', type: ITYPES, eff: EFF, attr: ATTRS, wt: WT, el: ['', ...EL], power: 'n', price: 'n', pierce: 'n', reqFor: 'n' },
 };
 // ---------- estado ----------
 let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] }, fresh = true;
@@ -75,13 +75,30 @@ if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; del
   S.skills ??= built; S.skillsSig = sig;
 }
 S.items ??= buildItems(it);
+export function migrateItems() { // catálogo v2: só Florete e Perfuradora; as chaves mudam, então tudo é remapeado pelo nome
+  if (S.itemsV === 2) return;
+  const old = S.items, fresh = buildItems(it), byName = n => Object.keys(fresh).find(k => fresh[k].name === n), flo = byName('Florete'), map = {};
+  for (const [k, i] of Object.entries(old)) {
+    if (i.type === 'arma') { map[k] = byName(i.name) || flo; continue; } // arma que não existe mais vira Florete
+    const nk = byName(i.name) || 'x' + k; map[k] = nk; fresh[nk] = { ...i }; // mantém edições do mestre e itens criados por ele
+  }
+  S.items = fresh;
+  const tr = k => map[k] ?? (fresh[k] ? k : null);
+  for (const ch of Object.values(S.chars)) {
+    const inv = {}; for (const [k, n] of Object.entries(ch.inv || {})) { const nk = tr(k); if (nk) inv[nk] = (inv[nk] || 0) + n; } ch.inv = inv;
+    for (const sl of Object.keys(ch.equip || {})) { const nk = tr(ch.equip[sl]); if (nk) ch.equip[sl] = nk; else delete ch.equip[sl]; }
+  }
+  for (const sc of Object.values(S.scenes)) if (sc.shop) sc.shop.stock = [...new Set(sc.shop.stock.map(tr).filter(k => k && fresh[k].type !== 'arma'))];
+  S.itemsV = 2;
+}
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
-for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
+for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; i.pierce ??= 0; i.reqFor ??= 0; i.grant ??= null; }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
+if (fresh) S.itemsV = 2; else migrateItems();
 for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
 
 // ---------- http ----------
@@ -241,7 +258,7 @@ function strike(a, s, t, aim, bonus = 0) {
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
   const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
   const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1);
-  const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv) - (mental ? 0 : t.armor + (eq(t, 'armadura')?.power || 0))) * mult));
+  const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv) - (mental ? 0 : Math.round((t.armor + (eq(t, 'armadura')?.power || 0)) * (1 - Math.min(1, Math.max(0, s.pierce || 0)))))) * mult));
   a.marks[s.attr] = true;
   let extra = '';
   let part = '';
@@ -286,9 +303,9 @@ const spot = k => { const sc = scene(), C = Math.ceil(sc.cols), Rw = Math.ceil(s
 if (fresh) loadBestiary();
 if (fresh) { // personagens base, sem dono: o mestre atribui ou o jogador assume
   const item = n => Object.keys(S.items).find(k => S.items[k].name === n);
-  [['Shinkai', 'indra', '#f5c518', { AGI: 65, DES: 60, FOR: 50, CON: 40, INT: 50, SAB: 35 }, 'Katana de Caçador', 'Veloz e ofensivo: age muitas vezes e pune com lâmina e raio.', [3, 5]],
-    ['Mikhail', 'fuhaku', '#3ddc97', { AGI: 60, INT: 60, DES: 55, CAR: 50, FOR: 35, SAB: 45 }, 'Revólver .38', 'Ágil e estrategista: controla o campo e a ordem dos turnos.', [2, 6]],
-    ['Thomas', 'radiacao', '#8fd400', { FOR: 65, CON: 65, AGI: 30, SAB: 45, INT: 45, CAR: 35 }, 'Manoplas de Aço', 'Pesado e ofensivo: aguenta o castigo e devolve em dobro.', [3, 7]]]
+  [['Shinkai', 'indra', '#f5c518', { AGI: 65, DES: 60, FOR: 50, CON: 40, INT: 50, SAB: 35 }, 'Florete', 'Veloz e ofensivo: age muitas vezes e pune com lâmina e raio.', [3, 5]],
+    ['Mikhail', 'fuhaku', '#3ddc97', { AGI: 60, INT: 60, DES: 55, CAR: 50, FOR: 35, SAB: 45 }, 'Florete', 'Ágil e estrategista: controla o campo e a ordem dos turnos.', [2, 6]],
+    ['Thomas', 'radiacao', '#8fd400', { FOR: 65, CON: 65, AGI: 30, SAB: 45, INT: 45, CAR: 35 }, 'Florete', 'Pesado e ofensivo: aguenta o castigo e devolve em dobro.', [3, 7]]]
     .forEach(([name, el, color, attrs, weapon, bio, [x, y]]) => {
       const id = rid(), ch = S.chars[id] = { ...newChar(id, false, ''), name, color, bio, xp: 30, x, y, vinc: [el] };
       Object.assign(ch.attrs, attrs);
@@ -519,8 +536,8 @@ const H = {
     if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || !t0 || !(t0.id in S.battle.ticks)) return;
     const basic = m.skill === 'atk';
     const wp = eq(a, 'arma');
-    const s = basic ? { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: wp?.power ?? a.arma, cost: 0, res: 'aura' } : a.skills.includes(m.skill) && S.skills[m.skill];
-    if (!s || s.kind === 'passive' || (s.req && s.req !== wtype(a)) || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
+    const s = basic ? { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: wp?.power ?? a.arma, pierce: wp?.pierce || 0, cost: 0, res: 'aura' } : m.skill === 'wpn' ? wp?.grant : a.skills.includes(m.skill) && S.skills[m.skill];
+    if (!s || s.kind === 'passive' || (s.req && s.req !== wtype(a)) || (s.reqFor && at0(a, 'FOR') < s.reqFor) || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
     a[s.res] -= s.cost;
     if (s.limit) a.limit = 0;
     const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
@@ -555,6 +572,7 @@ const H = {
   equip(c, m) {
     const ch = getCh(c, m.id), i = S.items[m.item];
     if (!can(c, ch) || !i || i.type === 'cons' || !(ch.inv[m.item] > 0)) return;
+    if (ch.equip[i.type] !== m.item && i.reqFor && at0(ch, 'FOR') < i.reqFor) return; // exige FOR mínima para equipar
     if (ch.equip[i.type] === m.item) delete ch.equip[i.type]; else ch.equip[i.type] = m.item;
   },
   use(c, m) {
@@ -722,7 +740,7 @@ const H = {
   content(c, m) { // restaura o conteúdo padrão de uma coleção (skills aprendidas e itens dos personagens são limpos se a coleção mudar)
     if (c.role !== 'gm') return;
     if (m.coll === 'skills') { S.skills = buildSkills(sk); Object.values(S.chars).forEach(ch => ch.skills = []); }
-    else if (m.coll === 'items') { S.items = buildItems(it); Object.values(S.chars).forEach(ch => { ch.inv = {}; ch.equip = {}; }); Object.values(S.scenes).forEach(sc => sc.shop.stock = []); }
+    else if (m.coll === 'items') { S.items = buildItems(it); S.itemsV = 2; Object.values(S.chars).forEach(ch => { ch.inv = {}; ch.equip = {}; }); Object.values(S.scenes).forEach(sc => sc.shop.stock = []); }
     else if (m.coll === 'bestiary') loadBestiary();
     else if (m.coll === 'scenes') loadScenes();
     else return;
