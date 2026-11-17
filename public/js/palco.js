@@ -10,7 +10,7 @@ const mainEl = c => c.el || c.resist?.find(e => e !== 'fis') || 'fis';
 const bodyMini = c => `<svg class="mini" viewBox="0 0 120 260" aria-hidden="true">${PARTS.map(k => `<${SHAPE[k][0]} ${SHAPE[k][1]} class="l${lvl(c, k)}"/>`).join('')}</svg>`;
 function unit(c, cur) {
   const foe = !!c.enemy, el = mainEl(c), low = c.hp > 0 && c.hp <= c.hpMax * .25;
-  const sts = c.hp > 0 ? stChips(c) : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
+  const sts = c.hp > 0 ? stIcons(c) : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
   const vb = !foe && c.vinc?.[0] ? `<em class="vb" style="--e:${ELC[c.vinc[0]]}" title="Vínculo: ${PATRON[c.vinc[0]]}">${KANJI[c.vinc[0]]}</em>` : '';
   const fig = `<div class="figw">${vb}<div class="fig" style="--e:${ELC[el]}">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${foe ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div>`;
   const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
@@ -19,6 +19,12 @@ function unit(c, cur) {
   const brk = c.brk && c.hp > 0 ? `<div class="brk" title="Barra de Quebra: fraquezas e pontos fracos a esvaziam">Quebra ${'◆'.repeat(c.brk.cur)}${'◇'.repeat(c.brk.max - c.brk.cur)}</div>` : '', rit = !foe && (c.brv || c.ten) ? `<div class="rit">${c.brv ? `Coragem ${c.brv}` : ''}${c.brv && c.ten ? ' · ' : ''}${c.ten ? `Tensão ×${[1, 1.5, 2, 3][c.ten]}` : ''}</div>` : '';
   return `<div class="unit ${foe ? 'foe' : 'hero'} ${c.ten ? 'ten' + c.ten : ''} ${(c.brv || 0) < 0 ? 'debt' : ''} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${brk}${rit}${stats}</div></div>`;
 }
+// condições no palco: ícone (kanji) que pulsa quando a condição age; o nome completo fica na dica
+const STK = { possess: '憑', curse: '呪', frozen: '氷', marked: '印', down: '倒', burn: '炎', bleed: '血', poison: '毒', rad: '核', stun: '眩', sleep: '眠', para: '痺', silence: '黙', atkUp: '攻', atkDn: '攻', defUp: '守', defDn: '守', agiUp: '速', agiDn: '速', fear: '恐', fury: '怒', confuse: '乱',
+  shield: '盾', wet: '濡', oil: '油', broken: '砕', regen: '癒', taunt: '挑', guarded: '護', counter: '返', reflect: '鏡', evade: '避', stealth: '隠', focus: '集', exposed: '露', exaus: '疲', seal: '封', blind: '盲', root: '根', charge: '溜', form: '変', endure: '耐', dread: '畏' };
+const STGOOD = new Set(['atkUp', 'defUp', 'agiUp', 'shield', 'regen', 'taunt', 'guarded', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'charge', 'form', 'endure']);
+const stIcons = c => [sanSt(c) && `<i class="sti bad" title="${esc(sanSt(c))}: sanidade baixa pesa em todas as rolagens">狂</i>`, ...Object.entries(c.st).map(([k, n]) => { const nm = k === 'shield' && c.shield ? ST[k] + ' ' + c.shield : (ST[k] || k) + (n < 90 ? ' · ' + n : '');
+  return `<i class="sti ${STGOOD.has(k) ? 'good' : /Dn$/.test(k) ? 'bad dn' : /Up$/.test(k) ? '' : 'bad'} ${/Up$/.test(k) ? 'up' : ''}" data-st="${esc(k)}" title="${esc(nm + (STD[k] ? ': ' + STD[k] : ''))}" aria-label="${esc(nm)}">${STK[k] || esc((ST[k] || k).slice(0, 1))}${n < 90 ? `<sub>${n}</sub>` : ''}</i>`; })].filter(Boolean).join('');
 const BBG = { rubro: 'Rubro', noite: 'Noite', floresta: 'Floresta', brasa: 'Brasa', gelo: 'Gelo', vazio: 'Vazio', santuario: 'Santuário', tempestade: 'Tempestade' }; // fundos prontos da batalha
 function battle() {
   const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
@@ -30,7 +36,7 @@ function battle() {
       <button data-a="next">Passar</button></div>${aimBox()}`;
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
   const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
-  return `<section class="stage battle heat-${heat} ${S.battle.dom ? 'dom-on' : ''} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
+  return `<section class="stage battle heat-${heat} ${S.battle.dom ? 'dom-on' : ''} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)};--e:${ELC[mainEl(S.chars[id])]}">${i ? '' : '<small>Agora</small>'}<i class="tlp">${S.chars[id].img ? `<img src="${esc(S.chars[id].img)}" alt="">` : S.chars[id].enemy ? KANJI[mainEl(S.chars[id])] : esc(S.chars[id].name.slice(0, 1).toUpperCase())}</i>${esc(S.chars[id].name)}</span>`).join('')}</div>
     ${S.battle.dom ? '<i class="domfx" aria-hidden="true"></i>' : ''}<div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${S.battle.end === 'won' ? ' · inimigos derrotados' : heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}${gm && cur ? acts(cur) : ''}</section>`;
 }
 
