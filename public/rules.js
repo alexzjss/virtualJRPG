@@ -225,7 +225,23 @@
     return o.join(' · ');
   }
   // ----- comandos de ação (Aparar, Esquiva e minigames de ataque): regras puras usadas pelo servidor e pela tela -----
+  const resample = (pts, n) => { // n pontos igualmente espaçados ao longo do traço
+    const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const tot = L[L.length - 1] || 1e-6, out = []; let j = 1;
+    for (let k = 0; k < n; k++) { const d = tot * k / (n - 1); while (j < pts.length - 1 && L[j] < d) j++; const seg = L[j] - L[j - 1] || 1e-6, f = Math.min(1, Math.max(0, (d - L[j - 1]) / seg)); out.push([pts[j - 1][0] + (pts[j][0] - pts[j - 1][0]) * f, pts[j - 1][1] + (pts[j][1] - pts[j - 1][1]) * f]); }
+    return out;
+  };
+  const poly = (v, close) => close ? [...v, v[0]] : v, ang = (i, n, r, off = -Math.PI / 2) => [.5 + r * Math.cos(off + 2 * Math.PI * i / n), .5 + r * Math.sin(off + 2 * Math.PI * i / n)];
+  const RUNE_T = {
+    circulo: { closed: true, pts: Array.from({ length: 65 }, (_, i) => ang(i, 64, .4)) },
+    triangulo: { closed: true, pts: poly([ang(0, 3, .45), ang(1, 3, .45), ang(2, 3, .45)], true) },
+    estrela: { closed: true, pts: poly([0, 2, 4, 1, 3].map(i => ang(i, 5, .45)), true) },
+    raio: { closed: false, pts: [[.6, .05], [.3, .45], [.65, .5], [.35, .95]] },
+    espiral: { closed: false, pts: Array.from({ length: 80 }, (_, i) => { const t = i / 79, a = t * 3 * Math.PI, r = .05 + .4 * t; return [.5 + r * Math.cos(a), .5 + r * Math.sin(a)]; }) },
+    onda: { closed: false, pts: Array.from({ length: 60 }, (_, i) => [i / 59, .5 + .25 * Math.sin(i / 59 * 3 * Math.PI)]) },
+  };
   const CMD = {
+    RUNE_T,
     KINDS: ['tempo', 'martelar', 'segurar', 'seq', 'ritmo', 'mira', 'runa', 'choque'],
     RUNES: ['circulo', 'triangulo', 'raio', 'espiral', 'estrela', 'onda'],
     DEF: { beat: 1100, esq: 450, grace: 200, gap: 700 },
@@ -237,6 +253,18 @@
     },
     // janelas do Golpe no tempo (ms): o Perfeito de técnica com Black Flash fica mais fácil quanto maior o bf
     tempoWin(s, mods = {}) { return { cw: (s.cw || 160) + (mods.cw || 0), cp: (s.bf ? 30 + 8 * (s.bf + (mods.bf || 0)) : s.cp || 60) + (mods.cp || 0) }; },
+    // reconhecedor de runa: reamostra o traço em 32 pontos, normaliza escala e centro e compara com o modelo (testando giros de ±30° e,
+    // nos símbolos fechados, qualquer ponto de partida e as duas direções). Devolve 0..100
+    runeScore(points, rune) {
+      const T = CMD.RUNE_T[rune]; if (!T || !Array.isArray(points) || points.length < 4) return 0;
+      const norm = pts => { const r = resample(pts, 32), cx = r.reduce((a, p) => a + p[0], 0) / 32, cy = r.reduce((a, p) => a + p[1], 0) / 32, q = r.map(p => [p[0] - cx, p[1] - cy]);
+        const w = Math.max(...q.map(p => Math.abs(p[0]))) * 2, h = Math.max(...q.map(p => Math.abs(p[1]))) * 2, k = Math.max(w, h, 1e-6); return q.map(p => [p[0] / k, p[1] / k]); };
+      const tpl = norm(T.pts), me = norm(points); let best = Infinity;
+      for (const dir of [1, -1]) { const m0 = dir === 1 ? me : [...me].reverse();
+        for (let deg = -30; deg <= 30; deg += 10) { const a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), m = m0.map(p => [p[0] * c - p[1] * sn, p[0] * sn + p[1] * c]);
+          for (let sh = 0; sh < (T.closed ? 32 : 1); sh++) { let d = 0; for (let i = 0; i < 32; i++) { const q = m[(i + sh) % 32], t = tpl[i]; d += Math.hypot(q[0] - t[0], q[1] - t[1]); } d /= 32; if (d < best) best = d; } } }
+      return Math.max(0, Math.min(100, Math.round(100 * (1 - best / .35))));
+    },
     // a nota que o navegador mandou, limitada pelo que a técnica permite; sem comando na técnica a nota não vale nada
     clampCmd(s, cmd, mods = {}) {
       const z = { g: '', n: 0, acc: 0 };

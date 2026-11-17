@@ -9,7 +9,7 @@ for (const [el, t] of Object.entries(TREE)) t.branches.forEach((br, bi) => br.fo
 }));
 const byName = new Map(nodes.map(n => [n.n, n]));
 const bad = (n, m) => out.push(`${n.id} · ${n.n} [${n.k}${n.tg ? '/' + n.tg : ''}]: ${m}`);
-const RES = new Set(['hp', 'aura', 'san', 'limit']), MODK = new Set(['atk', 'def', 'agi', 'hit', 'crit', 'atkP', 'heal', 'bf']);
+const RES = new Set(['hp', 'aura', 'san', 'limit']), MODK = new Set(['atk', 'def', 'agi', 'hit', 'crit', 'atkP', 'heal', 'bf', 'cw', 'cp', 'mx', 'cz', 'ma', 'esq', 'par', 'chq', 'rit', 'ctr', 'rn']);
 const EL = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko'];
 const SC = new Set(['atk', 'mental', 'heal', 'area', 'req', 'form', 'circ', 'fis', 'aura', 'oculto', ...EL]);
 const BON = new Set(['hpMax', 'auraMax', 'sanMax', 'FOR', 'CON', 'DES', 'AGI', 'INT', 'SAB', 'CAR', 'SOR']);

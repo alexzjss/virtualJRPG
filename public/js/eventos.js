@@ -102,7 +102,10 @@ app.addEventListener('click', e => {
   if (d.a === 'planSave') { const n = prompt('Nome da build?'); if (!n) return; lsSet('vj.builds', [...lsGet('vj.builds', []).filter(b => b.name !== n), { name: n.slice(0, 40), nodes: lsGet('vj.plan.' + d.id, []) }].slice(-12)); return render(); }
   if (d.a === 'braveT') { braveOn = !braveOn; return render(); }
   if (d.a === 'go') { if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
-    { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }); aim = null; aimOpen = false; braveOn = false; passTo = ''; return; }
+    { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } const msg = pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = '';
+    const who = S.chars[d.id], s1 = msg.t === 'act' ? SK(msg.skill) : null;
+    if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
+    send(msg); return; }
   if (d.a === 'rollAsk') { rollDlg = { id: d.id, attr: d.attr }; return render(); }
   if (d.a === 'rollX') { rollDlg = null; return render(); }
   if (d.a === 'rollMod') { mods[rollDlg.id] = +d.v; return render(); }
