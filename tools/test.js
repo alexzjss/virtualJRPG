@@ -327,8 +327,10 @@ test('batalha: alvo caído não gasta o turno; placar aponta o destaque na vitó
   H.battle(gm, { on: true }); e.hp = 0;
   H.act(ana, { id: h.id, skill: 'atk', target: e.id }); assert.equal(current(), h.id); assert.equal(S.battle.n, 0); // nada aconteceu
   for (let i = 0; i < 60 && e2.hp > 0; i++) { if (current() !== h.id) H.next(gm); else H.act(ana, { id: h.id, skill: 'atk', target: e2.id }); }
-  assert.equal(e2.hp, 0); assert.ok(S.battle.n > 0); assert.ok(S.battle.stats[h.id].dmg > 0);
-  H.battle(gm, { win: true }); assert.match(S.log.find(l => /^Vitória!/.test(l.text)).text, new RegExp(`Destaque: ${h.name} \\(\\d+ de dano`));
+  assert.equal(e2.hp, 0); assert.ok(S.battle.n > 0); assert.ok(S.battle.stats[h.id].dmg > 0); assert.equal(S.battle.stats[h.id].ko, 1); // derrubou um inimigo
+  H.battle(gm, { win: true }); const v = S.log.find(l => /^Vitória!/.test(l.text)); assert.match(v.text, new RegExp(`Destaque: ${h.name} \\(\\d+ de dano`));
+  // a tela de resultado recebe XP, ouro, espólios e o placar de cada herói
+  assert.equal(v.res.mvp, h.id); const st = v.res.st.find(s => s.id === h.id); assert.ok(st.dmg > 0); assert.equal(st.ko, 1); assert.ok(Number.isFinite(v.res.xp) && Number.isFinite(v.res.gold) && Array.isArray(v.res.drops));
 });
 test('chat: /r soma vários dados e números; expressão ruim não vira rolagem', async () => {
   const { rollExpr } = await import('../src/rules.js');
