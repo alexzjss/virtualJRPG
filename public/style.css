@@ -928,3 +928,57 @@ button.wpn{border-bottom-color:var(--gold)}
 .cmd.p5 .cmd-h .fbar{margin:0 0 0 auto}.cmd.p5{gap:10px}.cmd.p5 .cmd-go{padding:6px 10px}
 .cmd.p5 .tg{flex:0 1 118px}.p5t{align-items:flex-start}.p5t>small{padding-top:8px}
 @media(min-width:1000px){.pl.pg-mesa .stage{height:clamp(240px,calc(100vh - 520px),560px)}}
+
+/* ================= MESTRE: painéis fixos (docas com abas) + centro com palco e mapa ================= */
+.gms{display:grid;grid-template-columns:var(--wl) minmax(0,1fr) var(--wr);height:100vh;overflow:hidden;background:#050506}
+.gside{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--ink2);z-index:30}
+.gside.L{border-right:1px solid var(--line)}.gside.R{border-left:1px solid var(--line)}
+.gdock{position:relative;flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--ink2)}
+.gdock+.gdock{border-top:3px solid var(--ink)}
+.gdock.empty{flex:0 0 0;overflow:hidden;display:grid;place-items:center;border:0;transition:flex-basis .15s}
+.gdock.empty small{color:var(--dim);font:600 12px var(--cond);letter-spacing:1px;text-transform:uppercase}
+.gdragging .gdock.empty{flex:0 0 70px;border:2px dashed var(--line);margin:4px}
+.gdock.over{outline:2px solid var(--gold);outline-offset:-2px}
+.gtabs{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;background:var(--ink);border-bottom:2px solid var(--red);flex:none}
+.gtabs::-webkit-scrollbar{display:none}
+.gtab{flex:none;display:flex;align-items:center;gap:6px;min-height:34px;padding:4px 12px;background:none;border:0;border-right:1px solid #ffffff10;font:600 13px var(--cond);letter-spacing:.8px;text-transform:uppercase;color:var(--dim);white-space:nowrap;cursor:pointer}
+.gtab:hover{color:#fff;background:var(--ink3)}
+.gtab.on{color:#fff;background:var(--red);box-shadow:inset 0 -3px 0 var(--gold)}
+.gtab.sheet{color:var(--gold)}.gtab.sheet.on{color:#fff}
+.gtab i{font-style:normal;font-size:15px;line-height:1;padding:0 2px;opacity:.7}.gtab i:hover{opacity:1;color:var(--gold)}
+.gtab[draggable=true]{cursor:grab}.gtab[draggable=true]:active{cursor:grabbing}
+.gwide{margin-left:auto;flex:none;min-height:34px;padding:0 10px;background:none;border:0;border-left:1px solid #ffffff10;color:var(--dim);font-size:15px}.gwide:hover{color:#fff;background:var(--ink3)}
+.win-body.gbody{flex:1;min-height:0;max-height:none;overflow:auto;padding:12px}
+/* aba larga (bestiário, editores, forja, fichas): abre por cima do centro sem mexer no mapa */
+.gside.L .gdock.wide{position:absolute;left:0;top:42px;bottom:0;width:min(1100px,calc(100vw - var(--gwr) - 24px));z-index:40;box-shadow:24px 0 60px #000c,6px 0 0 #000}
+.gside.R .gdock.wide{position:absolute;right:0;top:42px;bottom:0;width:min(1100px,calc(100vw - var(--gwl) - 24px));z-index:40;box-shadow:-24px 0 60px #000c,-6px 0 0 #000}
+.gbody[data-win^=f_]{padding:0;gap:0;overflow:hidden}
+.gres{position:absolute;top:0;bottom:0;width:7px;cursor:col-resize;z-index:45}.gside.L .gres{right:-4px}.gside.R .gres{left:-4px}
+.gres:hover,.gresizing .gres{background:linear-gradient(90deg,transparent 2px,var(--red) 2px,var(--red) 5px,transparent 5px)}
+.gresizing,.gresizing *{user-select:none!important;cursor:col-resize}
+/* centro */
+.gcenter{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;padding-top:42px;background:var(--ink)}
+.gmap{flex:1;min-height:0;position:relative}
+.gcenter.split .gstage{flex:0 0 calc(var(--sp)*100%);min-height:0;display:flex;flex-direction:column;overflow:hidden;background:var(--ink)}
+.gstage>.stage{flex:1;min-height:0}
+.gstage .field{flex:1;min-height:0;align-items:flex-end}
+.gsplit{flex:none;height:7px;cursor:row-resize;background:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;z-index:5}
+.gsplit::after{content:"";position:absolute;left:50%;top:2px;width:40px;height:2px;translate:-50% 0;background:var(--dim);box-shadow:0 0 0 0 transparent}
+.gsplit:hover,.gresizing .gsplit{background:var(--red)}
+body[data-role=gm] .gmap .mapwrap{height:100%;container-type:size}
+body[data-role=gm] .gmap .map{max-width:calc((100cqh - 20px)*var(--cols)/var(--rows))}
+body[data-role=gm] .maptools{bottom:10px}
+body[data-role=gm] .sndbox{bottom:8px;right:calc(var(--gwr,0px) + 8px)}
+body[data-role=gm] .reqs{left:calc(var(--gwl,0px) + (100vw - var(--gwl,0px) - var(--gwr,0px))/2);width:min(760px,calc(100vw - var(--gwl,0px) - var(--gwr,0px) - 24px))}
+body[data-role=gm] h1{right:var(--gwr,0px)}
+/* barra de ações sob o palco: a mesma lista inclinada do jogador, deitada */
+.gcmd{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:7px 12px 8px;background:linear-gradient(90deg,#1a0006,var(--ink) 40%);border-top:3px solid var(--c,var(--red));max-height:40%;overflow:auto}
+.gcmd.foe{background:linear-gradient(90deg,#3a0010,#12000a 45%,var(--ink))}
+.gcmd-n{font:400 20px/1 var(--disp);letter-spacing:1px;text-transform:uppercase;color:var(--c,#fff);margin-right:8px;text-shadow:2px 2px 0 #000}
+.gcmd .p5i{width:auto;flex:none;min-height:32px;font-size:15px;padding:3px 12px 3px 8px;gap:7px}
+.gcmd .p5i:hover:not(:disabled),.gcmd .p5i:focus-visible{transform:skewX(-12deg) translateY(-2px)}
+.gcmd .p5i.on{transform:skewX(-12deg);box-shadow:3px 3px 0 #000}
+.gcmd .p5i.item{border-left-color:var(--gold)}.gcmd .p5i.wpn{border-left-color:#17508f}
+.gcmd .p5i span{overflow:visible}
+.gstage .aim,.gstage .aimbox{flex:none}
+@media(max-width:1400px){.gtab{padding:4px 9px;font-size:12px}.gcmd .p5i{font-size:14px}}

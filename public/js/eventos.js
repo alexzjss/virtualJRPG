@@ -61,7 +61,7 @@ app.addEventListener('click', e => {
   if (sl) { selCh = sl.dataset.sel; return render(); }
   if (!d && u) { if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
-  if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200 + 24 * (zc % 8))), y: 50 + 20 * (zc % 6), open: true, z: ++zc }; else { pg = 'pers'; selCh = d.id; } return render(); }
+  if (d.a === 'openSheet') { if (gm) gOpen('f_' + d.id); else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
     if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return toast(`Arranjo "${d.k}" salvo.`, 'ok'); }
@@ -214,7 +214,7 @@ app.addEventListener('mousedown', e => { if (e.button === 1 && e.target.closest(
 app.addEventListener('contextmenu', e => { const t = e.target.closest('.tok'); if (t) { e.preventDefault(); ctx = { id: t.dataset.id, x: e.clientX, y: e.clientY }; render(); } });
 app.addEventListener('dblclick', e => {
   const t = e.target.closest('.tok'), m = e.target.closest('.map');
-  if (t && mine(S.chars[t.dataset.id])) { if (gm) wins['f_' + t.dataset.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200)), y: 50, open: true, z: ++zc }; else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
+  if (t && mine(S.chars[t.dataset.id])) { if (gm) gOpen('f_' + t.dataset.id); else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
   if (m && role !== 'table' && !fogMode) send({ t: 'ping', ...cell(e, m) });
 });
 const drawRuler = e => {
@@ -248,7 +248,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();
     else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (aim) aim = null;
-    else if (gm) { const top = Object.keys(wins).filter(k => wins[k].open).sort((x, y) => (wins[y].z || 0) - (wins[x].z || 0))[0]; if (top) { wins[top].open = false; localStorage.vj_wins = JSON.stringify(wins); } }
+    else if (gm) { const f = DOCKS.map(d => dock.act[d]).find(k => k && isWide(k)); if (f) { if (f.startsWith('f_')) gClose(f); else { dock.nar[f] = 1; saveDock(); } } } // fecha a ficha aberta ou encolhe a aba larga
     return render();
   }
   if (e.target.matches('input,textarea,select')) return;
