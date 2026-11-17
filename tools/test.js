@@ -1118,3 +1118,29 @@ test('cmd: ritmo — cada nota soma +10% na cura em grupo e +1 turno nos buffs; 
   const base = heal(null), quatro = heal(4); assert.ok(base > 0); assert.ok(quatro / base > 1.3 && quatro / base < 1.5, `${quatro}/${base}`); assert.ok(heal(6) > quatro);
   const gm1 = RU.CMD.cmdEffect({ cmd: 'ritmo', kind: 'heal', power: 0, nt: 6 }, { g: 'bom', n: 3 }); assert.equal(gm1.turns, 3); assert.equal(gm1.healMult, 1);
 });
+
+// ---- Choque de poderes: cabo de guerra contra golpe anunciado de alvo único ----
+const chqFx = (area = false) => { // herói com técnica de Choque (Tiro Certeiro marcado) contra um inimigo com golpe anunciado
+  const { hs: [h], e } = dfx([]); h.skills = [sk('Tiro Certeiro')]; h.aura = 50; h.attrs.AGI = 1; S.skills[sk('Tiro Certeiro')].cmd = 'choque';
+  e.skills = [sk(area ? 'Terremoto' : 'Golpe Pesado')]; e.telK = [...e.skills]; e.hpMax = e.hp = 99999; fixR(0, () => H.ai(gm)); return { h, e, C: S.battle.cmd };
+};
+const noChq = () => { delete S.skills[sk('Tiro Certeiro')].cmd; };
+test('choque: só em golpe anunciado de alvo único e para quem tem a técnica', () => {
+  try {
+    const { h, C } = chqFx(); assert.deepEqual(C.chqOk, [h.id]);
+    const a = chqFx(true); assert.ok(!a.C.chqOk?.length, 'em área não há Choque');
+    const { hs: [h2], e } = dfx([]); h2.skills = []; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); assert.ok(!S.battle.cmd.chqOk?.length, 'sem a técnica não há Choque');
+    const { hs: [h3] } = dfx(['Aparar']); h3.skills.push(sk('Tiro Certeiro')); H.ai(gm); assert.ok(!S.battle.cmd.chqOk?.length, 'golpe não anunciado não tem Choque');
+  } finally { noChq(); }
+});
+test('choque: vencer anula o golpe, devolve ×1,3 e expõe; perder leva ×1,3; apertos acima de 20/s são cortados', () => {
+  try {
+    const win = chqFx(); const hp = win.h.hp, aura = win.h.aura; H.chq(ana, { id: win.h.id, skill: sk('Tiro Certeiro') }); const C = S.battle.cmd;
+    assert.equal(win.h.aura, aura - S.skills[sk('Tiro Certeiro')].cost, 'paga a técnica'); assert.ok(C.chq.meta >= 10 && C.chq.meta <= 40);
+    H.chq(ana, { id: win.h.id, n: 999 }); assert.ok(C.chq.n <= 3, `cortado a 20/s (${C.chq.n})`); C.chq.last -= 3000; H.chq(ana, { id: win.h.id, n: 60 }); assert.ok(C.chq.n >= C.chq.meta);
+    fixR(.3, () => H.cmdSkip(gm)); assert.equal(win.h.hp, hp, 'golpe anulado'); assert.ok(win.e.hp < 99999, 'a técnica de Choque acerta'); assert.ok(win.e.st.exposed > 0); assert.ok(S.log.some(l => /CHOQUE/.test(l.text || '')));
+    const base = (() => { const { hs: [h], e } = dfx([]); h.skills = []; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); const x = h.hp; fixR(.3, () => H.cmdSkip(gm)); return x - h.hp; })();
+    const lose = chqFx(); const hp2 = lose.h.hp; H.chq(ana, { id: lose.h.id, skill: sk('Tiro Certeiro') }); fixR(.3, () => H.cmdSkip(gm)); const perda = hp2 - lose.h.hp; assert.ok(base > 0 && Math.abs(perda / base - 1.3) < .12, `×1,3 (${perda}/${base})`);
+    const once = chqFx(); H.chq(ana, { id: once.h.id, skill: sk('Tiro Certeiro') }); const a1 = once.h.aura; H.chq(ana, { id: once.h.id, skill: sk('Tiro Certeiro') }); assert.equal(once.h.aura, a1, 'iniciar de novo não cobra');
+  } finally { noChq(); }
+});

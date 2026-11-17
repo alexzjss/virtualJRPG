@@ -382,7 +382,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
       const dr = f.form.dr, short = Object.entries(dr).find(([r, v]) => r === 'hp' ? n.hp <= Math.ceil(n.hpMax * v / 100) : n[r] < v);
       if (short) endForm(n, true); else for (const [r, v] of Object.entries(dr)) { if (r === 'hp') n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * v / 100)); else n[r] -= v; }
     }
-    n.rxT = 0; n.parT = 0; // reação e aparar disponíveis de novo
+    n.rxT = 0; n.parT = 0; n.chqT = 0; // reação e aparar disponíveis de novo
     const dz = n.stk?.doenca || 0; if (dz >= 3) { const v = Math.max(1, Math.ceil(n.hpMax * .015 * (dz - 2))); n.hp = Math.max(1, n.hp - v); log(n.name, `a Doença (estágio ${dz}) consome ${v} HP.`, 'bad', { fx: { id: n.id, dmg: v } }); }
     if (vows(n).includes('tempo')) n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * .04));
     const dots = DOT.filter(k => n.st[k]).length;
@@ -425,7 +425,7 @@ function ammoFor(a, s) { // munição equipada: balas (armas de fogo) ou flechas
   a.shots[id]--; return am;
 }
 function strike(a, s, t, aim, bonus = 0, o = {}) {
-  if (o.beat != null && S.battle.cmd?.perf && S.battle.cmd.foe === a.id) o = { ...o, mult: (o.mult || 1) * 1.25 }; // golpe anunciado Perfeito de chefe
+  { const CW = S.battle.cmd, mw = CW && o.beat != null && CW.foe === a.id ? (CW.perf ? 1.25 : 1) * (CW.xmult || 1) : 1; if (mw !== 1) o = { ...o, mult: (o.mult || 1) * mw }; } // Perfeito de chefe ×1,25; Choque perdido ×1,3
   const am = ammoFor(a, s); if (am) { const pi = Math.max(am.pierce || 0, s.fx?.find(f => f.t === 'pierce')?.p || 0); s = { ...s, el: am.el || s.el, fx: [...(s.fx || []).filter(f => f.t !== 'pierce'), ...(pi ? [{ t: 'pierce', p: pi }] : []), ...(am.st ? [{ t: 'st', k: am.st, n: am.stn || 2, ch: am.stc ?? 100 }] : [])] }; }
   const ma = modsOf(a, s), stat = statOf(a, s), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal' || s.kind === 'util') {
@@ -523,7 +523,23 @@ function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devol
   const tel = telOf(a, plan.skill), ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (tel || (parryable(a, s, t, {}, false) && canPar(t))));
   if (!ts.length) return null;
   const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, beats = Array.from({ length: hits }, (_, i) => beat + i * D.gap);
-  return { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, perf, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, perf, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  if (tel && !s.area && ts.length === 1 && chqSkill(ts[0])) C.chqOk = [ts[0].id]; // Choque de poderes: só golpe anunciado de alvo único
+  return C;
+}
+const chqSkill = h => (h.chqT || h.enemy || skipping(h)) ? '' : (h.skills || []).find(k => SK(k)?.cmd === 'choque' && !cantUse(h, effSkill(h, k))) || '';
+function chqMeta(a, plan, hero, key) { // meta de apertos: força do golpe do inimigo contra a da técnica (spec §4.5)
+  const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), pw = (s.power || 1) * (s.hits || 1), mine = SK(key).power || 1;
+  const m = Math.max(10, Math.min(40, Math.round(18 * pw / mine))) * (a.boss ? 1.2 : 1) * Math.max(.25, 1 - modsOf(hero, null).chq / 100);
+  return Math.max(5, Math.round(m));
+}
+function chqResolve(a, plan, C) { // o cabo de guerra fechou: quem apertou mais decide o golpe
+  const hero = S.chars[C.chq.id], key = C.chq.skill, won = C.chq.n >= C.chq.meta;
+  if (!hero || hero.hp <= 0) return aiRun(a, plan);
+  if (won) {
+    log(hero.name, `CHOQUE! ${hero.name} vence o duelo de poderes e devolve o golpe de ${a.name}!`, 'ok', { fx: { id: hero.id, a: a.id, s: SK(key).name, el: SK(key).el, chq: 1 } });
+    strike(hero, effSkill(hero, key), a, null, 0, { mult: 1.3 }); applySt(a, 'exposed', 2); endTurn(a.id, 100);
+  } else { log(hero.name, `CHOQUE perdido: o golpe de ${a.name} passa por cima!`, 'bad', { fx: { id: hero.id, chq: 1 } }); C.xmult = 1.3; aiRun(a, plan); }
 }
 function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'bad' (golpe sai +50%) ou ''
   const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
@@ -784,4 +800,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { iaExtra, defWindow, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
