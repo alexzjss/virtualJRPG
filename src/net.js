@@ -1,15 +1,17 @@
 import { spawn as runCmd } from 'child_process';
 import http from 'http';
+import { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
+import zlib from 'zlib';
 import { WebSocketServer } from 'ws';
 import { startTunnel } from '../tunnel.js';
-import { SEA, seaMod, dir, PUB, DATA, UP, PORT, PORTAL, KEY, VEND, IMG, MIME, AUD } from './config.js';
+import { SEA, seaMod, dir, PUB, DATA, UP, PORT, PORTAL, KEY, VEND, IMG, MIME, AUD, GM } from './config.js';
 import { ATTRS, PARTS, PL } from './consts.js';
 import { S, save, log } from './state.js';
-import { UPMAX, dirSize, magic, ipOf, blocked, penalize, clean, flood, checkUser } from './auth.js';
+import { UPMAX, dirSize, magic, ipOf, blocked, penalize, clean, flood, same, checkUser } from './auth.js';
 import { rid, int, can, scene, at, current, order, prep, reseat } from './rules.js';
 import { undoStack, NOUNDO, H } from './handlers.js';
 
@@ -18,50 +20,79 @@ const hooks = { api: null, store: () => ({ camps: [], backups: [] }) }; // preen
 // abre o painel do mestre no navegador já com a chave (ela vai depois do #, que nunca sai do computador)
 const openGm = () => { const url = `http://localhost:${PORT}/gm#k=${encodeURIComponent(KEY)}`, [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   try { runCmd(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true }).on('error', () => {}).unref(); } catch {} };
+// cabeçalhos de segurança: nada de adivinhar tipo, nada de abrir a mesa dentro de outro site, e o endereço (com o código da sessão) não vaza para links externos
+const SEC = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'SAMEORIGIN', 'Cross-Origin-Resource-Policy': 'same-origin' };
+// as páginas só executam scripts do próprio servidor: mesmo que um nome ou texto malicioso escape da limpeza, não vira código
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: http: https:; media-src 'self' blob: http: https:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'";
+const TEXT = new Set(['.html', '.js', '.css', '.svg']), zcache = new Map(); // texto vai comprimido (o three.js cai de 1,2 MB para ~300 KB); guarda o resultado por arquivo e versão
+const gz = (key, tag, buf) => { const c = zcache.get(key); if (c && c.tag === tag) return c.gz; const g = zlib.gzipSync(buf, { level: 7 }); zcache.set(key, { tag, gz: g }); return g; };
+// envia um arquivo ou recurso embutido: ETag (o navegador só baixa de novo o que mudou), gzip para texto e pedaços (Range) para áudio
+function deliver(req, res, key, ext, tag, size, read, stream) {
+  const up = key.startsWith('/uploads/'), head = { ...SEC, 'Content-Type': MIME[ext] || 'application/octet-stream', ETag: tag, 'Cache-Control': up ? 'public, max-age=31536000, immutable' : 'no-cache', ...(ext === '.html' ? { 'Content-Security-Policy': CSP } : {}) };
+  if (req.headers['if-none-match'] === tag) return res.writeHead(304, head).end();
+  const body = req.method !== 'HEAD';
+  if (TEXT.has(ext)) return read((e, d) => {
+    if (e) return res.writeHead(404, SEC).end('404');
+    const z = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && d.length > 1024, out = z ? gz(key, tag, d) : d;
+    res.writeHead(200, { ...head, Vary: 'Accept-Encoding', 'Content-Length': out.length, ...(z ? { 'Content-Encoding': 'gzip' } : {}) }).end(body ? out : undefined);
+  });
+  head['Accept-Ranges'] = 'bytes';
+  const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || ''); // pedaços do arquivo: o navegador precisa disso para pular dentro de uma música
+  let a = 0, b = size - 1, code = 200;
+  if (rg && (rg[1] || rg[2])) {
+    a = rg[1] ? +rg[1] : Math.max(0, size - +rg[2]); b = rg[1] && rg[2] ? Math.min(+rg[2], size - 1) : size - 1;
+    if (a > b || a >= size) return res.writeHead(416, { ...SEC, 'Content-Range': `bytes */${size}` }).end();
+    code = 206; head['Content-Range'] = `bytes ${a}-${b}/${size}`;
+  }
+  res.writeHead(code, { ...head, 'Content-Length': size ? b - a + 1 : 0 });
+  if (!body || !size) return res.end();
+  stream(a, b).on('error', () => res.destroy()).pipe(res);
+}
 const server = http.createServer((req, res) => {
   try { if (hooks.api?.(req, res)) return; } catch { return res.writeHead(400).end(); }
   if (req.method === 'POST' && req.url === '/upload') {
     const ext = IMG[req.headers['content-type']] || AUD[req.headers['content-type']], big = Object.values(AUD).includes(ext), chunks = [], hd = k => { try { return decodeURIComponent(req.headers[k] || ''); } catch { return ''; } }; let n = 0;
     const kIp = 'up:' + ipOf(req);
     if (blocked(kIp)) return res.writeHead(429).end();
-    const ok = hd('x-vj-key') ? hd('x-vj-key') === KEY : !!hd('x-vj-user') && checkUser(hd('x-vj-user'), hd('x-vj-pass')); // só quem tem a chave do mestre ou uma conta envia imagens
+    const isGm = !!hd('x-vj-key') && same(hd('x-vj-key'), KEY), ok = hd('x-vj-key') ? isGm : !!hd('x-vj-user') && checkUser(hd('x-vj-user'), hd('x-vj-pass')); // só quem tem a chave do mestre ou uma conta envia imagens
     if (!ok) { penalize(kIp); return res.writeHead(401).end(); }
-    if (!ext || (big && hd('x-vj-key') !== KEY)) return res.writeHead(415).end(); // áudio (trilha) só o mestre envia
+    if (!ext || (big && !isGm)) return res.writeHead(415).end(); // áudio (trilha) só o mestre envia
     if (dirSize(UP) > UPMAX) return res.writeHead(507).end();
     req.on('data', d => { if ((n += d.length) > (big ? 40e6 : 5e6)) { res.writeHead(413).end(); req.destroy(); } else chunks.push(d); });
     req.on('end', () => {
       if (res.writableEnded) return;
       const buf = Buffer.concat(chunks); if (!magic(buf, ext)) return res.writeHead(415).end();
       const name = crypto.randomBytes(8).toString('hex') + ext;
-      fs.mkdirSync(UP, { recursive: true }); fs.writeFileSync(path.join(UP, name), buf);
-      res.writeHead(200).end('/uploads/' + name);
+      try { fs.mkdirSync(UP, { recursive: true }); fs.writeFileSync(path.join(UP, name), buf); } catch (e) { console.error('Falha ao gravar o envio:', e.message); return res.writeHead(507).end(); }
+      res.writeHead(200, SEC).end('/uploads/' + name);
     });
+    req.on('error', () => {});
     return;
   }
-  if (req.url === '/api/hi') return res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }).end('{"vj":1}'); // a página de entrada confere se o código leva a uma mesa aberta
+  if (req.method !== 'GET' && req.method !== 'HEAD') return res.writeHead(405, { ...SEC, Allow: 'GET, HEAD' }).end();
+  if (req.url === '/api/hi') return res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }).end('{"vj":1}'); // a página de entrada confere se o código leva a uma mesa aberta
   let p; try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { return res.writeHead(400).end(); }
   if (p === '/') p = '/index.html';
   if (!path.extname(p)) p += '.html';
-  const done = (d, ext) => res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes' }).end(d);
-  if (SEA && !p.startsWith('/uploads/')) { // arquivos embutidos no executável
+  const key = p; // endereço pedido: chave do cache de compressão
+  if (SEA && !p.startsWith('/uploads/')) { // arquivos embutidos no executável (não mudam enquanto o programa roda)
     let a = null; try { if (!p.includes('..')) a = seaMod.getAsset(p.startsWith('/vendor/') ? p.slice(1) : 'public' + p); } catch {}
-    return a ? done(Buffer.from(a), path.extname(p)) : res.writeHead(404).end('404');
+    if (!a) return res.writeHead(404, SEC).end('404');
+    const buf = Buffer.from(a);
+    return deliver(req, res, key, path.extname(p), `"sea-${BOOT}-${buf.length.toString(36)}"`, buf.length, cb => cb(null, buf), (x, y) => Readable.from([buf.subarray(x, y + 1)]));
   }
   let root = p.startsWith('/uploads/') ? DATA : PUB;
   if (p.startsWith('/vendor/')) { root = VEND; p = p.slice(7); }
   const f = path.join(root, path.normalize(p));
-  if (!f.startsWith(root + path.sep)) return res.writeHead(403).end();
-  fs.readFile(f, (e, d) => {
-    if (e) return res.writeHead(404).end('404');
-    const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || ''); // pedaços do arquivo: o navegador precisa disso para pular dentro de uma música
-    if (rg && (rg[1] || rg[2])) {
-      const a = rg[1] ? +rg[1] : Math.max(0, d.length - +rg[2]), b = rg[1] && rg[2] ? Math.min(+rg[2], d.length - 1) : d.length - 1;
-      if (a > b || a >= d.length) return res.writeHead(416, { 'Content-Range': `bytes */${d.length}` }).end();
-      return res.writeHead(206, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Content-Range': `bytes ${a}-${b}/${d.length}`, 'Accept-Ranges': 'bytes', 'X-Content-Type-Options': 'nosniff' }).end(d.subarray(a, b + 1));
-    }
-    done(d, path.extname(f));
+  if (!f.startsWith(root + path.sep)) return res.writeHead(403, SEC).end();
+  fs.stat(f, (e, st) => {
+    if (e || !st.isFile()) return res.writeHead(404, SEC).end('404');
+    deliver(req, res, key, path.extname(f), `"${st.size.toString(36)}-${Math.round(st.mtimeMs).toString(36)}"`, st.size, cb => fs.readFile(f, cb), (x, y) => fs.createReadStream(f, { start: x, end: y }));
   });
 });
+const BOOT = Date.now().toString(36);
+server.on('clientError', (e, sock) => { if (sock.writable) sock.end('HTTP/1.1 400 Bad Request\r\n\r\n'); else sock.destroy(); });
+server.headersTimeout = 20e3; server.requestTimeout = 600e3; // conexões que nunca terminam de pedir não ficam presas
 const wss = new WebSocketServer({ server, maxPayload: 65536, perMessageDeflate: { threshold: 1024, concurrencyLimit: 4 } }); // o estado tem ~200 KB de JSON repetitivo: comprimido pesa bem menos pelo túnel
 wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('error')
 
@@ -77,11 +108,33 @@ const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && 
 const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.keys(S.users).sort(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
    { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
-const sendState = c => c.role && c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
-const push = () => { prep(); reseat(); pruneReqs(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+// As definições de skills e itens são ~85% do estado e quase nunca mudam: vão numa mensagem à parte ("defs"), só para quem ainda
+// não tem a versão atual. O resto ("state") segue a cada mudança, bem mais leve pelo túnel.
+let defs = { v: 0, json: '' }, defsDirty = true;
+const curDefs = () => { if (defsDirty) { defsDirty = false; const json = JSON.stringify({ skills: S.skills, items: S.items }); if (json !== defs.json) defs = { v: defs.v + 1, json }; } return defs; };
+const sendState = c => {
+  if (!c.role || c.readyState !== 1) return;
+  const d = curDefs();
+  if (c.defsV !== d.v) { c.defsV = d.v; c.send(`{"t":"defs","v":${d.v},"d":${d.json}}`); }
+  c.send(JSON.stringify({ t: 'state', dv: d.v, s: { ...view(c), skills: undefined, items: undefined } }));
+};
+// avisos automáticos de fim de combate, só para o mestre (ele decide quando declarar a vitória)
+const battleWatch = () => {
+  const B = S.battle; if (!B.active) return;
+  const all = Object.keys(B.ticks).map(k => S.chars[k]).filter(Boolean), foes = all.filter(o => o.enemy), pcs = all.filter(o => !o.enemy);
+  const end = foes.length && foes.every(o => o.hp <= 0) ? 'won' : pcs.length && pcs.every(o => o.hp <= 0) ? 'lost' : '';
+  if (end && B.end !== end) log('Sistema', end === 'won' ? 'Todos os inimigos caíram. Clique em "Vitória" para distribuir as recompensas.' : 'Todos os heróis estão caídos.', end === 'won' ? 'ok' : 'bad', { to: GM });
+  B.end = end;
+};
+const push = () => {
+  try { prep(); reseat(); pruneReqs(); battleWatch(); S.battle.order = S.battle.active ? order() : []; } catch (e) { console.error('Falha ao preparar o estado:', e); }
+  defsDirty = true;
+  wss.clients.forEach(c => { try { sendState(c); } catch (e) { console.error('Falha ao enviar o estado:', e.message); } });
+  save();
+};
 // executa uma mensagem de cliente; pedidos de jogador que exigem aprovação entram na fila em vez de acontecer
 function handle(c, m) {
-  if (!Object.hasOwn(H, m.t)) return;
+  if (typeof m.t !== 'string' || !Object.hasOwn(H, m.t)) return;
   if (c.role === 'gm' && !NOUNDO.has(m.t)) { undoStack.push(JSON.stringify({ ...S, log: undefined, users: undefined })); if (undoStack.length > 20) undoStack.shift(); }
   const cat = c.role === 'player' && !c.ctl ? gateOf(m) : null;
   if (cat && !S.auto[cat]) { // vira um pedido (um por jogador: o novo substitui o anterior)
@@ -109,12 +162,22 @@ const reqText = m => { // frase curta que o mestre lê na fila
 const pruneReqs = () => { for (const [id, r] of Object.entries(S.reqs)) { const ch = S.chars[r.m.id]; if (!ch || ch.owner !== r.by || (r.cat === 'act' && !(S.battle.active && current() === ch.id))) delete S.reqs[id]; } };
 const tell = (name, o) => wss.clients.forEach(x => x.role === 'player' && x.name === name && x.readyState === 1 && x.send(JSON.stringify({ t: 'note', ...o })));
 const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
+// conexões paradas: quem não responde ao ping em 30 s (aba fechada, celular sem sinal, túnel caído) ou não faz login em 30 s é encerrado
+const beat = setInterval(() => { const now = Date.now(); wss.clients.forEach(c => { if (!c.alive || (!c.role && now - c.t0 > 30e3)) return c.terminate(); c.alive = false; try { c.ping(); } catch {} }); }, 30e3); beat.unref();
+const MAXIP = 40; // conexões simultâneas de um mesmo endereço
 wss.on('connection', (c, req) => {
-  c.ip = ipOf(req);
+  c.ip = ipOf(req); c.alive = true; c.t0 = Date.now();
   c.role = null; // sem login não recebe nada
-  c.on('message', raw => {
+  c.on('pong', () => { c.alive = true; });
+  c.on('error', () => {});
+  let n = 0; wss.clients.forEach(o => { if (o.ip === c.ip) n++; });
+  if (n > MAXIP) return c.close(1013, 'muitas conexões');
+  c.on('message', raw => { try { onMsg(c, raw); } catch (e) { console.error('Erro ao tratar mensagem:', e); } });
+});
+function onMsg(c, raw) {
+  {
     let m; try { m = JSON.parse(raw); } catch { return; }
-    if (!m || typeof m !== 'object') return;
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return;
     if (m.t === 'hello') {
       const bad = msg => c.send(JSON.stringify({ t: 'err', bad: true, msg })), name = String(m.name || '').trim().slice(0, 30), pass = String(m.pass || '');
       // a mesa (TV) entra com a chave do mestre (login "mestre") ou com a conta de um jogador
@@ -122,19 +185,21 @@ wss.on('connection', (c, req) => {
       if (blocked(kIp) || (name && blocked(kAcc))) return bad('Muitas tentativas erradas. Aguarde alguns minutos e tente de novo.');
       const miss = msg => { penalize(kIp); if (name) penalize(kAcc); return bad(msg); };
       if (m.role === 'player' && m.as) { // o mestre confere a tela de um jogador: mesma visão, sem poder agir
-        if (String(m.key) !== KEY) return miss('Chave do mestre incorreta.');
+        if (!same(m.key, KEY)) return miss('Chave do mestre incorreta.');
         c.role = 'player'; c.name = String(m.as).slice(0, 30); if (m.ctl) c.ctl = c.appr = true; else c.peek = true; // ctl: o mestre joga por esse jogador, sem fila de pedidos
         return sendState(c);
       }
       const asGm = m.role === 'gm' || (m.role === 'table' && name.toLowerCase() === 'mestre');
-      if (asGm) { if (String(m.role === 'gm' ? m.key : pass) !== KEY) return miss('Chave do mestre incorreta.'); c.role = m.role === 'gm' ? 'gm' : 'table'; }
+      if (asGm) { if (!same(m.role === 'gm' ? m.key : pass, KEY)) return miss('Chave do mestre incorreta.'); c.role = m.role === 'gm' ? 'gm' : 'table'; }
       else if (m.role === 'player' || m.role === 'table') {
         if (!checkUser(name, pass)) return miss('Login ou senha incorretos. As contas são criadas pelo mestre: confira com ele.');
         c.role = m.role; c.acct = name; if (m.role === 'player') c.name = name; // a TV não mostra os sussurros do dono da conta
       } else return;
       clean(kAcc); // acertou: zera o contador da conta (o do IP continua)
+      c.defsV = -1; // login novo sempre recebe as definições
       return sendState(c);
     }
+    if (m.t === 'sync') { if (c.role) { c.defsV = -1; sendState(c); } return; } // o cliente pede tudo de novo (perdeu as definições)
     if (!c.role || c.peek) return;
     if (c.role !== 'gm' && (flood(c, 'all', 80) || (m.t === 'chat' && flood(c, 'chat', 10)) || (m.t === 'ping' && flood(c, 'ping', 12)))) return;
     if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
@@ -143,8 +208,8 @@ wss.on('connection', (c, req) => {
       return wss.clients.forEach(o => o.role && o.readyState === 1 && o.send(p));
     }
     handle(c, m);
-  });
-});
+  }
+}
 function start() {
   server.on('error', e => { // no executável a janela fecha sozinha; segura até o usuário ler a mensagem
     console.error(e.code === 'EADDRINUSE' ? `\nA porta ${PORT} já está em uso (o jogo já está aberto?). Use outra: defina PORT=3001.` : '\nErro: ' + e.message);

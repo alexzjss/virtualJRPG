@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { buildSkills, buildItems, ITEMS_V, RENAME } from '../content.js';
 import { DATA, FILE } from './config.js';
-import { EXTRA, sk, it } from './consts.js';
+import { EXTRA, ATTRS, EL, sk, it } from './consts.js';
 
 // ---------- estado ----------
 let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] }, fresh = true;
@@ -65,16 +65,79 @@ if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no pr
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 if (isNew) S.itemsV = ITEMS_V; else migrateItems();
+fixShape();
 for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
+for (const [id, ch] of Object.entries(S.chars)) fixChar(ch, id, true);
+for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, ...b, enemy: true }); fixChar(b, id, false); }
+}
+// ---------- saneamento: um arquivo editado à mão, antigo ou importado nunca deixa o estado num formato que derrube o servidor ----------
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const fin = (v, d = 0) => v !== null && v !== '' && typeof v !== 'boolean' && Number.isFinite(+v) ? +v : d;
+function preFix() { // antes das migrações: coleções que não são objetos de objetos são descartadas (as que têm padrão são recriadas)
+  for (const k of ['chars', 'scenes', 'bestiary', 'skills', 'items', 'encounters', 'contracts']) {
+    if (S[k] === undefined) continue;
+    if (!isObj(S[k])) { delete S[k]; continue; }
+    for (const [id, v] of Object.entries(S[k])) if (!isObj(v)) delete S[k][id];
+  }
+  if (!isObj(S.chars)) S.chars = {};
+  if (isObj(S.scenes) && !Object.keys(S.scenes).length) delete S.scenes;
+  if (!Array.isArray(S.log)) S.log = [];
+  S.log = S.log.filter(isObj).slice(-150); S.seq = Math.max(0, Math.round(fin(S.seq)));
+  if (S.scenes && !Object.hasOwn(S.scenes, S.scene)) S.scene = Object.keys(S.scenes)[0];
+}
+function fixShape() {
+  for (const k of ['reqs', 'users']) if (!isObj(S[k])) S[k] = {};
+  if (!isObj(S.battle)) S.battle = { active: false, ticks: {} };
+  if (!isObj(S.battle.ticks)) S.battle.ticks = {};
+  for (const [id, t] of Object.entries(S.battle.ticks)) if (!Number.isFinite(t) || !S.chars[id]) delete S.battle.ticks[id];
+  S.battle.active = !!S.battle.active;
+  if (!isObj(S.camp)) S.camp = { open: false, acts: {} };
+  if (!isObj(S.camp.acts)) S.camp.acts = {};
+  for (const sc of Object.values(S.scenes)) {
+    const base = newScene('?');
+    sc.name = String(sc.name ?? '?').slice(0, 30) || '?';
+    sc.cols = Math.min(80, Math.max(4, fin(sc.cols, 20))); sc.ar = Math.min(6, Math.max(.2, fin(sc.ar, sc.cols / Math.max(1, fin(sc.rows, 12))))); sc.rows = Math.max(1, fin(sc.rows, Math.round(sc.cols / sc.ar * 1000) / 1000));
+    sc.ox = Math.min(.95, Math.max(0, fin(sc.ox))); sc.oy = Math.min(.95, Math.max(0, fin(sc.oy)));
+    if (!isObj(sc.crop) || !['x', 'y', 'w', 'h'].every(k => Number.isFinite(sc.crop[k]))) sc.crop = base.crop;
+    if (!isObj(sc.seen)) sc.seen = {};
+    if (!isObj(sc.shop)) sc.shop = base.shop;
+    if (!Array.isArray(sc.shop.stock)) sc.shop.stock = [];
+    sc.shop.open = !!sc.shop.open;
+    if (sc.cam !== null && !isObj(sc.cam)) sc.cam = null;
+    for (const k of ['bg', 'bbg']) if (typeof sc[k] !== 'string') sc[k] = '';
+    sc.fogOn = !!sc.fogOn;
+  }
+  if (S.chase && !(isObj(S.chase) && isObj(S.chase.a) && isObj(S.chase.b))) S.chase = null;
+}
+function fixChar(ch, id, live) {
+  const arr = (k, ok) => { ch[k] = Array.isArray(ch[k]) ? [...new Set(ch[k].filter(ok))] : []; }, obj = k => { if (!isObj(ch[k])) ch[k] = {}; }, str = v => typeof v === 'string';
+  ch.id = id; ch.enemy = !!ch.enemy; ch.name = String(ch.name ?? '?').slice(0, 30) || '?'; ch.owner = ch.enemy ? '' : String(ch.owner ?? '').slice(0, 30);
+  if (!/^#[0-9a-f]{6}$/i.test(ch.color)) ch.color = ch.enemy ? '#e60012' : '#00b7ff';
+  if (!str(ch.img)) ch.img = '';
+  const at = isObj(ch.attrs) ? ch.attrs : {}; ch.attrs = Object.fromEntries(ATTRS.map(a => [a, Math.min(100, Math.max(1, Math.round(fin(at[a], ch.enemy ? 50 : 40))))]));
+  arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str);
+  ['st', 'inv', 'equip', 'marks', 'body', 'bon'].forEach(obj);
+  for (const k of ['hpMax', 'auraMax', 'sanMax']) ch.bon[k] = Math.round(fin(ch.bon[k]));
+  for (const [k, n] of Object.entries(ch.inv)) { if (fin(n) > 0) ch.inv[k] = Math.round(fin(n)); else delete ch.inv[k]; }
+  for (const [k, n] of Object.entries(ch.st)) if (!Number.isFinite(n)) delete ch.st[k];
+  for (const [k, n] of Object.entries(ch.body)) ch.body[k] = Math.max(0, fin(n));
+  for (const [k, v] of Object.entries(ch.equip)) if (!str(v)) delete ch.equip[k];
+  for (const k of ['hp', 'aura', 'san', 'xp', 'gold', 'xpR', 'goldR', 'arma', 'armor']) ch[k] = Math.max(0, Math.round(fin(ch[k])));
+  ch.limit = Math.min(100, Math.max(0, Math.round(fin(ch.limit))));
+  for (const k of ['x', 'y']) ch[k] = ch[k] == null ? null : Math.max(0, Math.round(fin(ch[k])));
+  for (const k of ['bio', 'gmNote']) ch[k] = String(ch[k] ?? '').slice(0, 3000);
+  if (live && !Object.hasOwn(S.scenes, ch.scene)) ch.scene = S.scene;
 }
 // aplica todas as migrações ao estado atual (ao abrir, ao trocar de campanha, ao restaurar um backup)
-const migrate = isNew => { migrateA(); migrateB(isNew); };
+const migrate = isNew => { preFix(); migrateA(); migrateB(isNew); };
 migrate(fresh);
 let saveT = null;
 const flush = () => { if (!saveT) return; clearTimeout(saveT); saveT = null; try { writeState(); } catch (e) { console.error('Falha ao salvar:', e.message); } };
 const save = () => { clearTimeout(saveT); saveT = setTimeout(flush, 300); };
 process.on('exit', flush); // não perde o que ainda esperava para ser gravado ao fechar
-const log = (who, text, kind = '', x = {}) => { if (!x.to) diary.push({ t: Date.now(), who, text, kind }), diary.length > 3000 && diary.shift(); S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
+// Ctrl+C, fechar a janela do console (SIGHUP no Windows) ou encerrar o processo: grava antes de sair. Sem isto o Node sai sem passar pelo 'exit'.
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { flush(); process.exit(0); });
+const log = (who, text, kind = '', x = {}) => { if (!x.to) diary.push({ t: Date.now(), who, text, kind }), diary.length > 3000 && diary.shift(); S.log.push({ n: ++S.seq, ts: Date.now(), who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 // ---------- diário, backups e troca de campanha ----------
 const slug = n => String(n || 'campanha').normalize('NFD').replace(/[^\w -]/g, '').trim().replace(/\s+/g, '-').toLowerCase().slice(0, 40) || 'campanha';
 // diário: tudo o que é público no histórico vai para um arquivo por campanha, sem o limite de 150 linhas do chat
@@ -92,12 +155,21 @@ function backup(tag = 'auto') {
 function backupOnStart() { if (!fresh) backup('inicio'); }
 const BLANK = () => ({ chars: {}, battle: { active: false, ticks: {} }, log: [] });
 // troca o conteúdo do estado sem trocar o objeto (os outros módulos guardam a referência); as contas dos jogadores são mantidas
-function adopt(o, isNew = false) {
-  if (!o || typeof o !== 'object' || Array.isArray(o) || (!isNew && (typeof o.chars !== 'object' || !o.chars))) throw new Error('Arquivo de campanha inválido.');
-  flushDiary(); const users = S.users, accV = S.accV;
-  for (const k of Object.keys(S)) delete S[k];
-  Object.assign(S, structuredClone(o), { accV }); S.log ??= []; S.battle ??= { active: false, ticks: {} };
-  migrate(isNew); S.users = { ...S.users, ...users };
+// Se o conteúdo novo não puder ser aberto, o estado anterior volta inteiro (o que estava em uso nunca fica pela metade).
+// after: passos que o chamador ainda precisa dar sobre o estado novo (sementes, valores padrão, conferência) dentro da mesma garantia.
+function adopt(o, isNew = false, after = () => {}) {
+  if (!isObj(o) || (!isNew && !isObj(o.chars))) throw new Error('Arquivo de campanha inválido.');
+  flushDiary(); const prev = { ...S }, users = S.users, accV = S.accV;
+  try {
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, structuredClone(o), { accV }); S.log ??= []; S.battle ??= { active: false, ticks: {} };
+    migrate(isNew); S.users = { ...S.users, ...users };
+    after();
+  } catch (e) {
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, prev);
+    throw new Error('Não foi possível abrir esta campanha (' + (e.message || e) + '). Nada foi alterado.');
+  }
 }
 
-export { S, fresh, BK, writeState, newScene, migrateItems, saveT, flush, save, log, backupOnStart, migrate, adopt, backup, slug, diaryFile, flushDiary, BLANK };
+export { S, fresh, BK, writeState, newScene, migrateItems, saveT, flush, save, log, backupOnStart, migrate, adopt, backup, slug, diaryFile, flushDiary, BLANK, isObj, fin };

@@ -5,6 +5,10 @@ const EL = { fis: 'Físico', kagutsuchi: 'Kagutsuchi·Fogo', susanoo: 'Susanoo·
 const ELC = { fis: '#ffffff', kagutsuchi: '#ff5a1f', susanoo: '#2e8bff', atlas: '#b9853c', indra: '#ffe600', fuhaku: '#7dffb0', amaterasu: '#fff3a0', tsukuyomi: '#8a4dff', shukketsu: '#c10020', radiacao: '#9dff00' };
 const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passiva' }, PASL = { hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx', res: 'Resistência', ...AO }, RES = { aura: 'Aura', san: 'Sanidade' };
 const ST = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
+const STD = { possess: 'Ataca os próprios aliados', curse: 'Cura recebida pela metade e −10% de acerto', frozen: 'Perde o turno e sofre +25% de dano; quebra ao ser atingido', marked: '+20% de chance de ser atingido', down: 'Derrubado: sofre +25% de dano',
+  burn: 'Dano contínuo a cada turno', bleed: 'Dano contínuo a cada turno', poison: 'Dano contínuo a cada turno', rad: 'Dano contínuo a cada turno', stun: 'Perde o turno', sleep: 'Perde o turno até sofrer dano', para: '50% de chance de perder o turno',
+  silence: 'Não usa skills, só o ataque', atkUp: '+25% de dano causado', atkDn: '−25% de dano causado', defUp: '−25% de dano sofrido', defDn: '+25% de dano sofrido', agiUp: 'Age 25% mais rápido', agiDn: 'Age 25% mais devagar',
+  fear: '−20% de acerto', fury: '+25% de dano, mas só usa o ataque', confuse: 'Acerta um alvo ao acaso' };
 const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material' }, WT = { '': '—', lamina: 'Lâmina', lanca: 'Lança', fogo: 'Arma de fogo', punho: 'Punhos' };
 const EFF = { hp: 'HP', aura: 'Aura', san: 'Sanidade', cure: 'Cura condições', body: 'Trata ferimentos', rev: 'Reanima caído', bomb: 'Bomba' };
 const idesc = i => i.type === 'cons' ? (['hp', 'aura', 'san'].includes(i.eff) ? `+${i.power} ${EFF[i.eff]}` : EFF[i.eff] + (i.eff === 'bomb' ? ` ${i.power} ${EL[i.el] || EL.fis}` : i.power ? ' ' + i.power : ''))
@@ -32,7 +36,7 @@ const ED = {
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Efeito', 'eff', EFF], ['Atr. (acess.)', 'attr', AO], ['Tipo de arma', 'wt', WT], ['Elemento', 'el', { '': '—', ...EL }], ['Preço', 'price'], ['Perfuração (0-1)', 'pierce'], ['FOR mín.', 'reqFor']],
 };
 let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
-let wins = { sessao: { x: 360, y: 64, open: true }, best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: true }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
+let wins = { sessao: { x: 360, y: 64, open: true }, best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: false }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
 let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur;
 const mods = {}, tabs = {}, selNode = {}, open = {};
@@ -66,6 +70,7 @@ function bodyFig(c, mode) {
 const aimBox = () => { const t = S.chars[tgt]; return t && t.id in S.battle.ticks ? `<div class="aimrow">${bodyFig(t, 'aim')}<div>Mira em <b>${esc(t.name)}</b>: <b>${aim ? `${PL[aim]} (−${AIMP[aim]}% de acerto)` : 'sem mira'}</b><br><small>Toque numa parte do corpo para mirar; parte crítica causa penalidade e status.</small></div></div>` : ''; };
 const delay = c => Math.round(1000 / Math.max(1, at(c, 'AGI') * (c.st.agiUp ? 1.25 : 1) * (c.st.agiDn ? .75 : 1)));
 const sanSt = c => { const p = c.san / (c.sanMax || 1); return p <= 0 ? 'Colapso: ataca aliados' : p <= .25 ? 'Surto −20' : p <= .5 ? 'Abalado −10' : ''; };
+const stChips = c => [sanSt(c) && `<i title="Sanidade baixa pesa em todas as rolagens; em 0, o personagem ataca os aliados">${sanSt(c)}</i>`, ...Object.entries(c.st).map(([k, n]) => `<i title="${STD[k] || ''}">${ST[k] || esc(k)}${n < 90 ? ' ' + n : ''}</i>`)].filter(Boolean).join('');
 const stList = c => [sanSt(c), ...Object.entries(c.st).map(([k, n]) => `${ST[k]} ${n}`)].filter(Boolean).join(' · ');
 const desc = s => s.kind === 'passive' ? `Passiva · ${s.pas === 'res' ? 'Resistência a ' + EL[s.el] : '+' + s.power + ' ' + PASL[s.pas]}` : `${KIND[s.kind]}${s.area ? ' em área' : ''}${(s.ct || 100) !== 100 ? ` · tempo ${s.ct}%` : ''} · ${EL[s.el]} · ${s.attr} · poder ${s.power} · ${s.limit ? 'Limite 100%' : s.cost + ' ' + RES[s.res]}${s.st ? ' · causa ' + ST[s.st] : ''}${s.pierce ? ' · perfura ' + Math.round(s.pierce * 100) + '%' : ''}${s.reqFor ? ' · exige FOR ' + s.reqFor : ''}${s.req ? ' · exige ' + WT[s.req] : ''}${s.back ? ' · sequela: ' + ST[s.back] : ''}`;
 const wtype = c => eq(c, 'arma')?.wt || 'punho', skOf = (c, k) => k === 'wpn' ? eq(c, 'arma')?.grant : S.skills[k], blocked = (c, s) => (s.reqFor && c.attrs.FOR < s.reqFor) || c[s.res] < s.cost || (s.limit && c.limit < 100) || c.st.silence || c.st.fury || (s.req && s.req !== wtype(c));
@@ -104,18 +109,21 @@ const edv = (c, f, v, cls = '') => !gm ? `<span class="${cls}">${v}</span>` : ed
 const commitEd = el => { const cur = +el.dataset.cur, raw = el.value.trim().replace(',', '.'), v = /^[+-]\d+$/.test(raw) ? cur + +raw : +raw; editing = null; if (raw !== '' && Number.isFinite(v) && v !== cur) send({ t: 'set', id: el.dataset.id, f: el.dataset.edin, v: Math.max(0, Math.round(v)) }); render(); };
 let actx; const beep = () => { try { actx ||= new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime; o.type = 'triangle'; o.frequency.setValueAtTime(660, t); o.frequency.setValueAtTime(880, t + .09); g.gain.setValueAtTime(.12, t); g.gain.exponentialRampToValueAtTime(.001, t + .3); o.connect(g).connect(actx.destination); o.start(); o.stop(t + .32); } catch {} };
 
+// skills e itens chegam à parte ("defs") e só quando mudam; cada estado diz de qual versão delas depende
+let DEFS = { skills: {}, items: {} }, DEFV = -1, retry = 0;
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
-  ws.onopen = () => document.body.classList.remove('off') || send({ t: 'hello', role, name, pass, key, as: asWho || undefined, ctl: ctl || undefined });
+  ws.onopen = () => { retry = 0; document.body.classList.remove('off'); send({ t: 'hello', role, name, pass, key, as: asWho || undefined, ctl: ctl || undefined }); };
   ws.onmessage = e => {
-    const m = JSON.parse(e.data);
-    if (m.t === 'state') { S = m.s; render(); }
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === 'defs') { DEFS = m.d; DEFV = m.v; return; }
+    if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; render(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }
     if (m.t === 'sfx') playSfx(m.k);
     if (m.t === 'note') { toast(m.text, m.kind, m.why); if (m.kind === 'no') navigator.vibrate?.(120); }
-    if (m.t === 'passOk') { ls('vj_pass', pass = m.pass); alert('Senha trocada. Na próxima sessão, digite a nova na página de entrada.'); }
-    if (m.t === 'err') { if (!m.bad) return alert(m.msg); ws.onclose = null; ws.close(); S = null; ls(gm ? 'vj_key' : 'vj_pass', null); loginForm(m.msg); }
+    if (m.t === 'passOk') { ls('vj_pass', pass = m.pass); toast('Senha trocada.', 'ok', 'Na próxima sessão, entre com a nova.'); }
+    if (m.t === 'err') { if (!m.bad) return toast(m.msg, 'no'); ws.onclose = null; ws.close(); S = null; ls(gm ? 'vj_key' : 'vj_pass', null); loginForm(m.msg); }
   };
-  ws.onclose = () => { document.body.classList.add('off'); setTimeout(connect, 1500); };
+  ws.onclose = () => { document.body.classList.add('off'); setTimeout(connect, Math.min(8000, 1000 * 1.5 ** retry++)); }; // tenta de novo, espaçando até 8 s
 }
 

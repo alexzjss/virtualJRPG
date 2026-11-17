@@ -5,7 +5,7 @@ const genPass = () => Array.from(crypto.getRandomValues(new Uint32Array(6)), x =
 const inviteUrl = () => !S.net.code ? '' : S.net.portal ? S.net.portal + '?c=' + S.net.code : S.net.url + '/player'; // sem página de entrada configurada, o convite é o link direto do túnel
 const inviteText = () => `Mesa aberta! Para entrar na sessão de hoje:\n1. Abra ${inviteUrl()}\n2. Digite seu login e sua senha e clique em Entrar.\n${S.net.portal ? `(Se pedir o código da sessão: ${S.net.code})\nO código` : 'O link'} muda a cada sessão; o login e a senha continuam os mesmos.`;
 const accessText = a => `Seu acesso ao virtualJRPG\nLogin: ${a.n}\nSenha: ${a.p}\nNo dia da sessão eu mando o link de entrada. Você pode trocar a senha depois, no botão Senha, no alto da tela.`;
-const copy = (t, ok) => navigator.clipboard?.writeText(t).then(() => alert(ok), () => prompt('Copie o texto:', t)) ?? prompt('Copie o texto:', t);
+const copy = (t, ok) => navigator.clipboard?.writeText(t).then(() => toast(ok, 'ok'), () => prompt('Copie o texto:', t)) ?? prompt('Copie o texto:', t);
 function sessWin() {
   const n = S.net, st = { ok: 'Aberta', abrindo: 'Abrindo…', baixando: 'Preparando…', erro: 'Com problema', off: 'Desligada' }[n.status] || n.status;
   const net = `<h4>Internet <span class="net ${esc(n.status)}">${st}</span></h4>

@@ -17,4 +17,5 @@ if (fresh) { seed(); fix(); }
 prep();
 export { genFoe, partyRef, fitBoss, spawn, H, S, R, current, derive, view, order, handle, migrateItems, importPack };
 if (process.argv.includes('--offline')) process.env.VJ_TUNNEL = '0'; // npm run offline: sem túnel
-if (SEA || process.argv[1] === fileURLToPath(import.meta.url)) { backupOnStart(); autoBackup(); start(); }
+export const boot = () => { backupOnStart(); autoBackup(); start(); };
+if (SEA || process.argv[1] === fileURLToPath(import.meta.url)) boot();

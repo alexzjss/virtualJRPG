@@ -4,7 +4,7 @@ app.addEventListener('change', e => {
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type, ...(key ? { 'X-VJ-Key': encodeURIComponent(key) } : { 'X-VJ-User': encodeURIComponent(name), 'X-VJ-Pass': encodeURIComponent(pass) }) }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
-      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => alert('Falha no envio da imagem (PNG, JPG, WEBP ou GIF até 5 MB).'));
+      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : d.up === 'hand' ? (hand.img = u, render()) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => toast('Falha no envio da imagem.', 'no', 'Aceita PNG, JPG, WEBP ou GIF de até 5 MB.'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
   else if (d.ini) send({ t: 'ini', k: 'set', id: d.ini, v });
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
@@ -55,7 +55,7 @@ app.addEventListener('click', e => {
   if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200 + 24 * (zc % 8))), y: 50 + 20 * (zc % 6), open: true, z: ++zc }; else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
-    if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return alert(`Arranjo "${d.k}" salvo.`); }
+    if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return toast(`Arranjo "${d.k}" salvo.`, 'ok'); }
     if (saved[d.k]) wins = { ...wins, ...structuredClone(saved[d.k]) };
     else { for (const k in wins) wins[k].open = LAYD[d.k].includes(k);
       const W = innerWidth, H = innerHeight, at = (k, x, y) => Object.assign(wins[k], { x, y });
@@ -81,7 +81,8 @@ app.addEventListener('click', e => {
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
   if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
-  if (d.a === 'go') { if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.'); send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim }); aim = null; aimOpen = false; return; }
+  if (d.a === 'go') { if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
+    { const s0 = pick.k === 'sk' ? skOf(S.chars[d.id], pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim }); aim = null; aimOpen = false; return; }
   if (d.a === 'rollAsk') { rollDlg = { id: d.id, attr: d.attr }; return render(); }
   if (d.a === 'rollX') { rollDlg = null; return render(); }
   if (d.a === 'rollMod') { mods[rollDlg.id] = +d.v; return render(); }
@@ -114,14 +115,15 @@ app.addEventListener('click', e => {
   if (d.a === 'tier') { tier = { fraco: 'normal', normal: 'elite', elite: 'fraco' }[tier]; return render(); }
   if (d.a === 'content' && d.coll !== 'scenes' && !confirm('Restaurar o conteúdo padrão? Edições nessa coleção serão perdidas' + (d.coll === 'bestiary' ? '.' : ' e os personagens perdem o que tinham dela.'))) return;
   if (d.a === 'logout') { ls('vj_pass', null); return location.reload(); }
-  if (d.a === 'myPass') { const p = prompt('Senha nova (pelo menos 4 caracteres):'); if (!p) return; if (prompt('Digite a senha nova de novo:') !== p) return alert('As duas senhas não batem.'); return send({ t: 'userPass', pass: p }); }
-  if (d.a === 'userAdd') { const n = sess.n.trim(), p = sess.p || genPass(); if (!n) return alert('Escreva o login.'); send({ t: 'userAdd', name: n, pass: p, char: sess.ch }); sess.last = { n, p }; sess.n = ''; sess.p = ''; sess.ch = ''; return render(); }
+  if (d.a === 'myPass') { const p = prompt('Senha nova (pelo menos 4 caracteres):'); if (!p) return; if (prompt('Digite a senha nova de novo:') !== p) return toast('As duas senhas não batem.', 'no'); return send({ t: 'userPass', pass: p }); }
+  if (d.a === 'userAdd') { const n = sess.n.trim(), p = sess.p || genPass(); if (!n) return toast('Escreva o login.', 'no'); send({ t: 'userAdd', name: n, pass: p, char: sess.ch }); sess.last = { n, p }; sess.n = ''; sess.p = ''; sess.ch = ''; return render(); }
   if (d.a === 'userPass') { const p = prompt(`Senha nova para ${d.k}:`, genPass()); if (!p) return; send({ t: 'userPass', name: d.k, pass: p }); sess.last = { n: d.k, p }; return render(); }
   if (d.a === 'userDel') { if (confirm(`Apagar a conta ${d.k}? Os personagens dela ficam sem dono.`)) send({ t: 'userDel', name: d.k }); return; }
   if (d.a === 'giveChar') { const id = prompt('Qual personagem? Digite o número:\n' + heroes().map((c, i) => `${i + 1}. ${c.name}${c.owner ? ' (de ' + c.owner + ')' : ''}`).join('\n')); const c = heroes()[+id - 1]; if (c) send({ t: 'set', id: c.id, f: 'owner', v: d.k }); return; }
   if (d.a === 'freeChar') return send({ t: 'set', id: d.id, f: 'owner', v: '' });
   if (d.a === 'copy') return copy(d.k === 'invite' ? inviteText() : accessText(sess.last), d.k === 'invite' ? 'Convite copiado. Cole no grupo dos jogadores.' : 'Acesso copiado. Mande só para esse jogador.');
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return toast('Escolha um alvo clicando em uma unidade.');
+  if (d.a === 'act') { const s0 = S.skills[d.skill]; if (S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); }
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
   const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
@@ -169,7 +171,7 @@ app.addEventListener('pointerdown', e => {
   pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const sk = zone.classList.contains('skmap'), o = sk ? gv : view;
   if (pts.size === 2) { const [a, b] = [...pts.values()], r = (sk ? zone : mapEl().parentElement).getBoundingClientRect(); pinch = { sk, d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: o.z, x: o.x, y: o.y, px: (a.x + b.x) / 2 - r.left, py: (a.y + b.y) / 2 - r.top }; skd = null; tpan = null; drag = null; }
-  else if (!sk && !e.target.closest('.tok.mine') && !fogMode) tpan = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+  else if (!sk && !e.target.closest('.tok.mine') && !fogMode && !mapTool && !e.target.closest('.maptools')) tpan = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
 });
 app.addEventListener('pointermove', e => {
   if (!pts.has(e.pointerId)) return;
@@ -199,12 +201,12 @@ app.addEventListener('dblclick', e => {
 const drawRuler = e => {
   const m = mapEl(), b = cell(e, m), a = ruler.a, sc = S.scenes[S.scene], n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
   m.querySelector('.rul')?.remove();
-  m.insertAdjacentHTML('beforeend', `<div class="rul"><svg viewBox="0 0 ${sc.cols} ${sc.rows}" preserveAspectRatio="none"><line x1="${a.x + sc.ox + .5}" y1="${a.y + sc.oy + .5}" x2="${b.x + sc.ox + .5}" y2="${b.y + sc.oy + .5}" vector-effect="non-scaling-stroke"/>${e.shiftKey ? `<rect x="${a.x + sc.ox - n}" y="${a.y + sc.oy - n}" width="${2 * n + 1}" height="${2 * n + 1}" vector-effect="non-scaling-stroke"/>` : ''}</svg><b style="--x:${b.x + sc.ox};--y:${b.y + sc.oy}">${e.shiftKey ? 'raio ' : ''}${dist(n, sc)}</b></div>`);
+  m.insertAdjacentHTML('beforeend', `<div class="rul"><svg viewBox="0 0 ${sc.cols} ${sc.rows}" preserveAspectRatio="none"><line x1="${a.x + sc.ox + .5}" y1="${a.y + sc.oy + .5}" x2="${b.x + sc.ox + .5}" y2="${b.y + sc.oy + .5}" vector-effect="non-scaling-stroke"/>${e.shiftKey || mapTool === 'area' ? `<rect x="${a.x + sc.ox - n}" y="${a.y + sc.oy - n}" width="${2 * n + 1}" height="${2 * n + 1}" vector-effect="non-scaling-stroke"/>` : ''}</svg><b style="--x:${b.x + sc.ox};--y:${b.y + sc.oy}">${e.shiftKey || mapTool === 'area' ? 'raio ' : ''}${dist(n, sc)}</b></div>`);
 };
 app.addEventListener('pointerdown', e => {
   const wrap = e.target.closest('.mapwrap');
   if (wrap && (e.button === 1 || (e.button === 0 && spaceDown))) { pan = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }; wrap.setPointerCapture(e.pointerId); return; }
-  if (wrap && e.altKey && e.button === 0) { ruler = { a: cell(e, mapEl()) }; wrap.setPointerCapture(e.pointerId); return drawRuler(e); }
+  if (wrap && (e.altKey || mapTool === 'ruler' || mapTool === 'area') && e.button === 0 && !e.target.closest('.maptools')) { ruler = { a: cell(e, mapEl()) }; wrap.setPointerCapture(e.pointerId); return drawRuler(e); }
   if (e.button !== 0) return;
   if (gm && fogMode && S.scenes[S.scene].fogOn) { lastFog = ''; return paint(e); }
   const t = e.target.closest('.tok.mine');

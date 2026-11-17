@@ -2,12 +2,12 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA, KEY, GM } from './config.js';
-import { R, SCH, NEW, ATTRS, EL, PARTS, ITYPES, TIER } from './consts.js';
+import { R, SCH, NEW, ATTRS, EL, PARTS, ITYPES, TIER, STK, BBG } from './consts.js';
 import { S, BK, adopt, backup, slug, diaryFile, flushDiary, log, BLANK } from './state.js';
-import { rid, int, okUrl, newChar } from './rules.js';
+import { rid, int, okUrl, newChar, prep } from './rules.js';
 import { seed } from './seed.js';
 import { H, undoStack, NOUNDO } from './handlers.js';
-import { ipOf, blocked, penalize } from './auth.js';
+import { ipOf, blocked, penalize, same } from './auth.js';
 import { push, hooks } from './net.js';
 import { fixMedia } from './media.js';
 
@@ -31,8 +31,34 @@ function saveSlot() { // guarda a campanha atual em data/campanhas/<nome>.json
   const f = path.join(CAMPS, slug(S.title) + '.json'), tmp = f + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(S)); fs.renameSync(tmp, f); touch();
 }
-function swap(o, isNew = false) { // troca a campanha em uso, sempre com uma cópia de segurança antes
-  backup('antes-de-trocar'); adopt(o, isNew); if (isNew) seed(); fix(); undoStack.length = 0; touch();
+function swap(o, isNew = false) { // troca a campanha em uso, sempre com uma cópia de segurança antes; se a nova não abrir, a atual continua intacta
+  backup('antes-de-trocar'); adopt(o, isNew, () => { if (isNew) seed(); fix(); prep(); }); undoStack.length = 0; touch();
+}
+// campanha vinda de um arquivo de fora: só passam chaves simples, definições no esquema e um histórico limpo
+const okKey = k => /^[\w-]{1,32}$/.test(k), KINDS_LOG = ['', 'ok', 'bad', 'chat'];
+function cleanCampaign(o) {
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  for (const k of ['chars', 'scenes', 'bestiary', 'skills', 'items', 'encounters', 'contracts', 'tracks']) if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) o[k] = Object.fromEntries(Object.entries(o[k]).filter(([id, v]) => okKey(id) && v && typeof v === 'object'));
+  for (const coll of ['skills', 'items']) if (o[coll]) for (const [id, d] of Object.entries(o[coll])) o[coll][id] = cleanDef(coll, d);
+  for (const ch of [...Object.values(o.chars || {}), ...Object.values(o.bestiary || {})]) {
+    if (!okUrl(ch.img)) ch.img = '';
+    ch.cat = ['demonio', 'humano', 'chefe'].includes(ch.cat) ? ch.cat : undefined; ch.tpl = ch.tpl == null ? undefined : str(ch.tpl, 40);
+    if (ch.st && typeof ch.st === 'object') ch.st = Object.fromEntries(Object.entries(ch.st).filter(([k]) => STK.includes(k)));
+    if (!PARTS.includes(ch.weakPart)) delete ch.weakPart;
+  }
+  for (const sc of Object.values(o.scenes || {})) {
+    for (const k of ['bg', 'music']) if (!okUrl(sc[k])) sc[k] = '';
+    if (!BBG.includes(sc.bbg) && !okUrl(sc.bbg)) sc.bbg = '';
+    sc.note = str(sc.note, 3000);
+    sc.pins = sc.pins && typeof sc.pins === 'object' ? Object.fromEntries(Object.entries(sc.pins).filter(([id, p]) => okKey(id) && p && typeof p === 'object').map(([id, p]) => [id, { x: int(p.x, 0, 99), y: int(p.y, 0, 99), text: str(p.text, 60), gm: !!p.gm }])) : {};
+  }
+  for (const [id, t] of Object.entries(o.tracks || {})) { if (okUrl(t.url)) o.tracks[id] = { name: str(t.name, 40), url: t.url }; else delete o.tracks[id]; }
+  if (o.audio && typeof o.audio === 'object') { if (!okUrl(o.audio.url)) { o.audio.url = ''; o.audio.on = false; } } else delete o.audio;
+  o.log = (Array.isArray(o.log) ? o.log : []).filter(e => e && typeof e === 'object').slice(-150).map(e => ({ n: int(e.n, 0, 1e9), who: str(e.who, 40), text: str(e.text, 600), kind: KINDS_LOG.includes(e.kind) ? e.kind : '',
+    ...(Number.isFinite(e.d) ? { d: int(e.d, 0, 100) } : {}), ...(typeof e.to === 'string' ? { to: str(e.to, 30) } : {}), ...(typeof e.from === 'string' ? { from: str(e.from, 30) } : {}) }));
+  o.title = str(o.title || 'Campanha', 40); o.reqs = {}; o.handout = null; delete o.users; delete o.vj;
+  if (o.chase) o.chase = null;
+  return o;
 }
 
 // ---------- pacote de conteúdo: skills, itens, bestiário e encontros num arquivo, para levar de uma campanha a outra ----------
@@ -127,7 +153,7 @@ export function api(req, res) {
   const kIp = 'api:' + ipOf(req), end = (code, body = '') => (res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end(body), true);
   if (blocked(kIp)) return end(429);
   let k = ''; try { k = decodeURIComponent(req.headers['x-vj-key'] || ''); } catch {}
-  if (k !== KEY) { penalize(kIp); return end(401); }
+  if (!same(k, KEY)) { penalize(kIp); return end(401); }
   const json = o => (res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }).end(JSON.stringify(o)), true);
   if (req.method === 'GET' && p === '/api/export') return what === 'conteudo' ? json(exportPack()) : json({ ...S, users: undefined, reqs: {}, vj: 'campanha' }); // as senhas não saem no arquivo
   if (req.method === 'GET' && p === '/api/diario') return end(200, diaryText());
@@ -139,7 +165,7 @@ export function api(req, res) {
       try {
         const o = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (what === 'conteudo') importPack(o);
-        else { if (o?.vj !== 'campanha') throw new Error('Este arquivo não é uma campanha exportada do virtualJRPG.'); delete o.vj; delete o.users; saveSlot(); swap(o); log('Mestre', `importou a campanha "${S.title}".`, '', { to: GM }); }
+        else { if (o?.vj !== 'campanha') throw new Error('Este arquivo não é uma campanha exportada do virtualJRPG.'); saveSlot(); swap(cleanCampaign(o)); log('Mestre', `importou a campanha "${S.title}".`, '', { to: GM }); }
         push(); end(200, 'ok');
       } catch (e) { end(400, e.message || 'Arquivo inválido.'); }
     });

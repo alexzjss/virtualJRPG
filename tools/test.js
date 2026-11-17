@@ -260,3 +260,36 @@ test('mapa e som: névoa inteira, pincel, marcadores só do mestre, escala e tri
   const k = Object.keys(S.items)[0]; H.edSet(gm, { coll: 'items', id: k, f: 'pierce', v: .35 }); assert.equal(S.items[k].pierce, .35);
   H.sceneAdd(gm, {}); assert.ok(S.scenes[S.scene].pins);
 });
+test('batalha: alvo caído não gasta o turno; placar aponta o destaque na vitória', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), e2 = mk(gm, { enemy: true }); h.attrs.AGI = 95; h.attrs.FOR = 95; e.attrs.AGI = e2.attrs.AGI = 1;
+  H.battle(gm, { on: true }); e.hp = 0;
+  H.act(ana, { id: h.id, skill: 'atk', target: e.id }); assert.equal(current(), h.id); assert.equal(S.battle.n, 0); // nada aconteceu
+  for (let i = 0; i < 60 && e2.hp > 0; i++) { if (current() !== h.id) H.next(gm); else H.act(ana, { id: h.id, skill: 'atk', target: e2.id }); }
+  assert.equal(e2.hp, 0); assert.ok(S.battle.n > 0); assert.ok(S.battle.stats[h.id].dmg > 0);
+  H.battle(gm, { win: true }); assert.match(S.log.find(l => /^Vitória!/.test(l.text)).text, new RegExp(`Destaque: ${h.name} \\(\\d+ de dano`));
+});
+test('chat: /r soma vários dados e números; expressão ruim não vira rolagem', async () => {
+  const { rollExpr } = await import('../src/rules.js');
+  for (let i = 0; i < 50; i++) { const r = rollExpr('2d6 + 1d4 + 3'); assert.equal(r.text, '2d6+1d4+3'); assert.ok(r.total >= 6 && r.total <= 19); }
+  assert.equal(rollExpr('d20-1').text, '1d20-1'); assert.equal(rollExpr('3'), null); assert.equal(rollExpr('2d6+'), null); assert.equal(rollExpr('1d6;alert(1)'), null);
+  const n = S.log.length; H.chat(gm, { text: '/r 3d6+2' }); assert.match(S.log.at(-1).text, /^rolou 3d6\+2: \[\d, \d, \d\] = \d+$/);
+  H.chat(gm, { text: '/r banana' }); assert.equal(S.log.length, n + 1);
+});
+test('mostrar a todos: só o mestre abre e recolhe; link ruim é descartado', () => {
+  H.handout(ana, { text: 'oi' }); assert.equal(S.handout, null);
+  H.handout(gm, { text: ' Carta ', img: 'javascript:alert(1)' }); assert.deepEqual({ ...S.handout, n: 0 }, { img: '', text: 'Carta', n: 0 });
+  H.handout(gm, { img: '/uploads/a.png' }); assert.equal(view(ana).handout.img, '/uploads/a.png');
+  H.handout(gm, {}); assert.equal(S.handout, null);
+});
+test('campanha malformada: nada muda no estado em uso; campos estranhos são saneados', () => {
+  reset(); const h = mk(ana, {}); h.name = 'Fica'; S.title = 'Firme'; H.campSave(gm, {});
+  const errs = [], g = { role: 'gm', send: s => errs.push(JSON.parse(s).msg) }, dir = path.join(process.env.VJ_DATA, 'campanhas');
+  fs.writeFileSync(path.join(dir, 'ruim.json'), JSON.stringify({ chars: { a: { name: 'X' } }, scenes: { s: { shop: { stock: 5 } } }, scene: 's', itemsV: 1, items: { i0: { name: 'Florete', type: 'arma' } } }));
+  H.campLoad(g, { id: 'ruim' }); // a migração do catálogo tropeça na loja sem lista: a troca é desfeita
+  assert.equal(S.title, 'Firme'); assert.ok(Object.values(S.chars).some(c => c.name === 'Fica')); assert.match(errs[0], /Nada foi alterado/);
+  fs.writeFileSync(path.join(dir, 'torta.json'), JSON.stringify({ title: 'Torta', chars: { a: { name: 7, attrs: { FOR: 'abc', CON: 500 }, weak: 'fogo', skills: [1, 'g0'], inv: { i0: -3, i1: '2' }, hp: null, color: 'red', x: 'q' }, b: null }, log: 'x', battle: { active: 1, ticks: { zz: 5 } }, scene: 'nao-existe' }));
+  H.campLoad(g, { id: 'torta' }); assert.equal(S.title, 'Torta');
+  const a = S.chars.a; assert.equal(a.name, '7'); assert.equal(a.attrs.FOR, 40); assert.equal(a.attrs.CON, 100); assert.deepEqual(a.weak, []); assert.deepEqual(a.skills, ['g0']); assert.deepEqual(a.inv, { i1: 2 });
+  assert.match(a.color, /^#/); assert.equal(a.x, 0); assert.ok(a.hpMax > 0 && a.hp <= a.hpMax); assert.ok(!S.chars.b); assert.deepEqual(S.battle.ticks, {}); assert.ok(S.scenes[S.scene]); assert.ok(Array.isArray(S.log));
+  H.campLoad(g, { id: 'firme' }); assert.equal(S.title, 'Firme');
+});

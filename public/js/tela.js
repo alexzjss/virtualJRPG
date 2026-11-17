@@ -1,3 +1,4 @@
+let gmWasB = false;
 function render() {
   const ae = document.activeElement;
   if (drag || wdrag || cdrag || ae?.matches?.('#app select')) { pending = true; return; }
@@ -15,8 +16,10 @@ function render() {
     if (reqIn) { lastReqN = newest[1].n; if (!mute) beep(); }
   }
   if (gm) {
+    if (b && !gmWasB) { wins.batalha.open = true; wins.batalha.z = ++zc; } // a batalha começou: a janela dela vem para a frente
+    gmWasB = b;
     const cena = `<div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
-      <div class="row">${b ? '<button data-a="battle" data-win="1" class="own">Vitória</button><button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
+      <div class="row">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
       <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button></div>
       <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span><span data-a="content" data-coll="scenes">+ cenas de exemplo</span></div>
       <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"></div>

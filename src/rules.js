@@ -62,8 +62,10 @@ function hurt(t, d) { // dano em HP: enche Limite, acorda, avisa queda
   Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && o !== t && o.enemy === t.enemy).forEach(o => addLimit(o, 25));
   return ` ${t.name} caiu!`;
 }
+const tally = (ch, k, v) => { if (!S.battle.active) return; const st = (S.battle.stats ??= {})[ch.id] ??= { dmg: 0, heal: 0, crit: 0 }; st[k] += v; };
 function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
   const a = S.chars[id];
+  S.battle.n = (S.battle.n || 0) + 1; // ações já feitas nesta batalha
   tickSt(a); S.battle.ticks[id] += Math.round(delay(a) * (ct || 100) / 100);
   for (let i = 0; i < 30; i++) { // início do turno do próximo: regen de Aura, dano contínuo, perda de turno
     const n = S.chars[current()];
@@ -92,7 +94,7 @@ function strike(a, s, t, aim, bonus = 0) {
   const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal') {
     const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1)));
-    t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v);
+    const before = t.hp; t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v); tally(a, 'heal', t.hp - before);
     if (s.st) applySt(t, s.st);
     log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok', { fx: { id: t.id, heal: v, a: a.id, s: s.name, el: s.el } });
     return false;
@@ -107,7 +109,7 @@ function strike(a, s, t, aim, bonus = 0) {
   const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
   const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1);
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv) - (mental ? 0 : Math.round((t.armor + (eq(t, 'armadura')?.power || 0)) * (1 - Math.min(1, Math.max(0, s.pierce || 0)))))) * mult));
-  a.marks[s.attr] = true;
+  a.marks[s.attr] = true; tally(a, 'dmg', mental ? Math.min(d, t.san) : Math.min(d, t.hp)); if (crit) tally(a, 'crit', 1);
   let extra = '';
   let part = '';
   if (mental) t.san = Math.max(0, t.san - d);
@@ -182,4 +184,20 @@ function spawn(tpl, tier = 'normal', x = 0, y = 0) { // cria um inimigo a partir
 }
 const wtype = ch => eq(ch, 'arma')?.wt || 'punho'; // sem arma equipada luta com os punhos
 
-export { pick, d100, rid, int, okUrl, can, scene, eq, at0, lvl, at, healBody, BASE, derive, evolveCh, sanPen, delay, nextOf, current, order, onMap, applySt, tickSt, addLimit, prep, reseat, hurt, endTurn, strike, newChar, makeFoe, loadScenes, loadBestiary, passive, getCh, spot, partyRef, genFoe, fitBoss, spawn, wtype };
+// /r do chat: soma de dados e números, como 2d6+1d4+3 ou d20-1 (até 8 termos e 40 dados)
+function rollExpr(expr) {
+  const src = String(expr).replace(/\s+/g, '');
+  if (!/^[+-]?(\d{0,2}d\d{1,3}|\d{1,4})([+-](\d{0,2}d\d{1,3}|\d{1,4})){0,7}$/i.test(src) || !/d/i.test(src)) return null;
+  let total = 0, dice = 0; const parts = [], shown = [];
+  for (const [, sg, n, f, k] of src.matchAll(/([+-]?)(?:(\d{0,2})d(\d{1,3})|(\d{1,4}))/gi)) {
+    const neg = sg === '-' ? -1 : 1;
+    if (f !== undefined) {
+      const q = int(n || 1, 1, 20), faces = int(f, 2, 100), rs = Array.from({ length: q }, () => 1 + Math.floor(Math.random() * faces));
+      if ((dice += q) > 40) return null;
+      total += neg * rs.reduce((a, x) => a + x, 0); parts.push(`${shown.length ? (neg < 0 ? '-' : '+') : neg < 0 ? '-' : ''}${q}d${faces}`); shown.push(`${neg < 0 ? '−' : ''}[${rs.join(', ')}]`);
+    } else { total += neg * +k; parts.push(`${neg < 0 ? '-' : shown.length || parts.length ? '+' : ''}${+k}`); }
+  }
+  return { text: parts.join(''), shown: shown.join(' '), total };
+}
+
+export { rollExpr, tally, pick, d100, rid, int, okUrl, can, scene, eq, at0, lvl, at, healBody, BASE, derive, evolveCh, sanPen, delay, nextOf, current, order, onMap, applySt, tickSt, addLimit, prep, reseat, hurt, endTurn, strike, newChar, makeFoe, loadScenes, loadBestiary, passive, getCh, spot, partyRef, genFoe, fitBoss, spawn, wtype };

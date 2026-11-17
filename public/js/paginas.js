@@ -15,8 +15,9 @@ function skillPage(c) {
   const mineV = s => c.enemy || s.el === 'fis' || (c.vinc || []).includes(s.el), exTaken = s => s.ex && ownL.some(o => o.ex === s.ex && o !== s);
   const avail = s => mineV(s) && !exTaken(s) && (!ownL.length || ownL.some(o => near(o, s))), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
   let lines = '';
-  for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) { const a = N[i][1], b = N[j][1];
-    if (near(a, b) && (a.el === b.el || a.el === 'fis' || b.el === 'fis')) { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''} ${mineV(a) && mineV(b) ? '' : 'out'}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
+  const cells = new Map(); N.forEach(([, s], i) => { const k = s.gx + ',' + s.gy; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i); });
+  for (let p = 0; p < N.length; p++) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [1, -1]]) for (const q of cells.get((N[p][1].gx + dx) + ',' + (N[p][1].gy + dy)) || []) { if (!dx && !dy && q <= p) continue; const i = Math.min(p, q), j = Math.max(p, q), a = N[i][1], b = N[j][1];
+    if (a.el === b.el || a.el === 'fis' || b.el === 'fis') { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''} ${mineV(a) && mineV(b) ? '' : 'out'}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
   const cen = {}; for (const [, s] of N) { const o = cen[s.el] ||= [0, 0, 0]; o[0] += s.gx; o[1] += s.gy; o[2]++; }
   const halos = Object.entries(cen).filter(([el]) => el !== 'fis').map(([el, [x, y, n]]) => { const dx = x / n - mid, dy = y / n - mid, d = Math.hypot(dx, dy) || 1, px = (mid + dx / d * G * .46) * U + U / 2, py = (mid + dy / d * G * .46) * U + U / 2, mineS = (c.vinc || []).includes(el);
     return `<g class="${mineS ? 'vmine' : 'vout'}"><text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]};font-size:${G * 12}px">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + G * 4}" style="--e:${ELC[el]};font-size:${G * 1.9}px">${PATRON[el]}${mineS ? ' · seu Vínculo' : ''}</text></g>`; }).join('');
@@ -48,7 +49,7 @@ function persPage(c) {
   const eqn = slot => eq(c, slot) ? `<b>${esc(eq(c, slot).name)}</b><small>${esc(idesc(eq(c, slot)))}</small>` : '<b class="none">Vazio</b><small>equipe na página Itens</small>';
   const res = k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${edv(c, k, c[k])}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`;
   const cts = Object.values(S.contracts).filter(ct => !ct.done).map(ct => `<li><b>${esc(ct.target)}</b><small>${ct.gold} ouro · ${ct.xp} XP</small></li>`).join('');
-  const sts = [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(x => `<i>${x}</i>`).join('');
+  const sts = stChips(c);
   const tile = a => { const v = at(c, a), base = v !== c.attrs[a] ? `<small>base ${c.attrs[a]}</small>` : '';
     return gm ? `<div class="tile gmt ${c.marks[a] ? 'mk' : ''}">${edv(c, 'attrs.' + a, c.attrs[a], 'tv')}<button data-a="roll" data-id="${c.id}" data-attr="${a}" title="Rolar ${ATN[a]}${v !== c.attrs[a] ? ` (vale ${v} com equipamento e ferimentos)` : ''}">${a}</button></div>`
       : `<button class="tile ${c.marks[a] ? 'mk' : ''}" data-a="rollAsk" data-id="${c.id}" data-attr="${a}" aria-label="Rolar ${ATN[a]}, ${v}%"><b>${v}</b><span>${a}</span><em>${ATN[a]}</em>${base}</button>`; };
@@ -91,7 +92,9 @@ const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat'];
 let pick = { k: 'atk', id: 'atk' }, aimOpen = false;
 const blockWhy = (c, s) => c.st.silence ? 'Silenciado' : c.st.fury ? 'Em fúria: só ataca' : s.limit && c.limit < 100 ? 'Limite incompleto' : c[s.res] < s.cost ? `Falta ${RES[s.res]}` : s.req && s.req !== wtype(c) ? `Exige ${WT[s.req]}` : s.reqFor && c.attrs.FOR < s.reqFor ? `Exige FOR ${s.reqFor}` : '';
 function command(c, cur) {
-  const my = cur === c, inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead).sort((x, y) => y.enemy - x.enemy), t = inB.find(o => o.id === tgt), [rqId, rq] = myReq() || [], wait = rq && rq.ch === c.id;
+  const my = cur === c, inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead).sort((x, y) => y.enemy - x.enemy);
+  if (my) { const t0 = inB.find(o => o.id === tgt); if (!t0 || (t0.enemy && t0.hp <= 0)) { const f = inB.find(o => o.enemy !== c.enemy && o.hp > 0); if (f) { tgt = f.id; aim = null; } } } // na sua vez, já vem mirado no primeiro inimigo de pé
+  const t = inB.find(o => o.id === tgt), [rqId, rq] = myReq() || [], wait = rq && rq.ch === c.id;
   const sks = [...(eq(c, 'arma')?.grant ? ['wpn'] : []), ...c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive')], cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
   if ((pick.k === 'sk' && !sks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { k: 'atk', id: 'atk' };
   const tab = sub === 'sk' || sub === 'it' ? sub : 'atk', s = pick.k === 'sk' ? skOf(c, pick.id) : null, it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma');
@@ -105,7 +108,7 @@ function command(c, cur) {
   const tl = timeline(6).slice(1).map(id => `<i class="${S.chars[id].enemy ? 'foe' : ''}">${esc(S.chars[id].name)}</i>`).join('');
   return `<section class="cmd ${my ? 'mine' : ''}" style="--c:${esc(c.color)}"><div class="cmd-h"><div class="turn ${my ? 'me' : ''}">${my ? 'Seu turno' : 'Turno de ' + esc(cur?.name || '—')}</div><div class="nextup"><small>Depois:</small>${tl}</div></div>
     <div class="cmd-g"><div class="cmd-me"><h2>${esc(c.name)}</h2>${['hp', 'aura', 'san', 'limit'].map(k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${c[k]}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`).join('')}
-        <div class="sts">${c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(x => `<i>${x}</i>`).join('') || '<small>Sem condições.</small>' : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}</div></div>
+        <div class="sts">${c.hp > 0 ? stChips(c) || '<small>Sem condições.</small>' : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}</div></div>
       <div class="cmd-step"><h4><i>1</i>Alvo</h4><div class="tgs">${inB.map(tg).join('')}</div></div>
       <div class="cmd-step"><h4><i>2</i>Ação</h4><div class="seg" role="tablist">${[['atk', 'Atacar'], ['sk', `Skills <i>${sks.length}</i>`], ['it', `Itens <i>${cons.length}</i>`]].map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-sub="${k}">${l}</button>`).join('')}</div><div class="alist">${list}</div>
         ${canAim ? `<button class="ghost aimb ${aim ? 'on' : ''}" data-a="aimT" aria-expanded="${aimOpen}">${aim ? `Mira: ${PL[aim]} (−${AIMP[aim]}%)` : 'Mirar numa parte do corpo'}</button>${aimOpen ? aimBox() : ''}` : ''}</div></div>

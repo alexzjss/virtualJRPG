@@ -4,7 +4,7 @@ import { GM } from './config.js';
 import { R, ATTRS, EL, STK, VN, STN, PARTS, BBG, CAMP, GMF, sk, it, NEW, SCH, TIER, ROLES, NUM } from './consts.js';
 import { S, newScene, log } from './state.js';
 import { hash, okName } from './auth.js';
-import { pick, d100, rid, int, okUrl, can, scene, eq, at0, lvl, at, healBody, BASE, evolveCh, sanPen, delay, current, onMap, applySt, addLimit, hurt, endTurn, strike, newChar, loadScenes, loadBestiary, passive, getCh, spot, partyRef, genFoe, fitBoss, spawn, wtype } from './rules.js';
+import { pick, d100, rid, int, okUrl, can, scene, eq, at0, lvl, at, healBody, BASE, evolveCh, sanPen, delay, current, onMap, applySt, addLimit, hurt, endTurn, strike, newChar, loadScenes, loadBestiary, passive, getCh, spot, partyRef, genFoe, fitBoss, spawn, wtype, rollExpr } from './rules.js';
 import { tell, kick, start } from './net.js';
 
 const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet']);
@@ -148,13 +148,15 @@ const H = {
         const el = d.resist.find(e => e !== 'fis') || '', k = Object.keys(S.items).find(i => S.items[i].type === 'mat' && S.items[i].el === el);
         if (k && Math.random() < .6) { const p = pick(pcs); p.inv[k] = (p.inv[k] || 0) + 1; drops.push(`${S.items[k].name} → ${p.name}`); }
       }
-      log('Mestre', `Vitória! +${xp} XP e +${gold} de ouro para cada herói.${drops.length ? ' Espólios: ' + drops.join(', ') : ''}`, 'ok');
+      const best = pcs.map(p => [p, S.battle.stats?.[p.id]]).filter(([, st]) => st?.dmg > 0).sort((x, y) => y[1].dmg - x[1].dmg)[0]; // quem mais causou dano
+      const mvp = best ? ` Destaque: ${best[0].name} (${best[1].dmg} de dano${best[1].crit ? `, ${best[1].crit} crítico${best[1].crit > 1 ? 's' : ''}` : ''}).` : '';
+      log('Mestre', `Vitória! +${xp} XP e +${gold} de ouro para cada herói.${drops.length ? ' Espólios: ' + drops.join(', ') + '.' : ''}${mvp}`, 'ok');
       for (const ct of Object.values(S.contracts)) if (!ct.done && dead.some(d => (d.tpl || d.name) === ct.target)) { // contratos de caça cumpridos
         ct.done = true; pcs.forEach(p => { p.gold += Math.floor(ct.gold / pcs.length); p.xp += ct.xp; });
         log('Mestre', `Contrato cumprido: ${ct.target}! +${Math.floor(ct.gold / pcs.length)} de ouro e +${ct.xp} XP para cada herói.`, 'ok');
       }
     }
-    S.battle = { active: !!m.on, ticks: {} };
+    S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {} };
     if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => S.battle.ticks[ch.id] = delay(ch));
     log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
   },
@@ -192,6 +194,7 @@ const H = {
     const wp = eq(a, 'arma');
     const s = basic ? { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: wp?.power ?? a.arma, pierce: wp?.pierce || 0, cost: 0, res: 'aura' } : m.skill === 'wpn' ? wp?.grant : a.skills.includes(m.skill) && S.skills[m.skill];
     if (!s || s.kind === 'passive' || (s.req && s.req !== wtype(a)) || (s.reqFor && at0(a, 'FOR') < s.reqFor) || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
+    if (s.kind !== 'heal' && !s.area && t0.hp <= 0) return; // não se gasta o turno golpeando quem já caiu
     a[s.res] -= s.cost;
     if (s.limit) a.limit = 0;
     const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
@@ -401,16 +404,16 @@ const H = {
     log('Mestre', `restaurou o conteúdo padrão (${m.coll}).`);
   },
   bDel(c, m) { if (c.role === 'gm') delete S.bestiary[m.id]; },
-  // ----- chat: texto livre, /r XdY+Z, /w nome mensagem -----
+  // ----- chat: texto livre, /r 2d6+1d4+3, /w nome mensagem -----
   chat(c, m) {
     if (c.role === 'table') return;
     const who = c.role === 'gm' ? 'Mestre' : c.name, me = c.role === 'gm' ? GM : c.name, text = String(m.text || '').trim().slice(0, 300), priv = c.role === 'gm' && m.secret ? { to: GM } : {};
     let mm;
     if (!text) return;
-    if ((mm = text.match(/^\/r\s+(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i))) {
-      const n = int(mm[1] || 1, 1, 20), f = int(mm[2], 2, 100), b = int((mm[3] || '0').replace(/\s/g, ''), -999, 999), rs = Array.from({ length: n }, () => 1 + Math.floor(Math.random() * f));
-      log(who, `rolou ${n}d${f}${b ? (b > 0 ? '+' : '') + b : ''}: [${rs.join(', ')}] = ${rs.reduce((a, x) => a + x, b)}`, 'ok', priv);
-    } else if ((mm = text.match(/^\/w\s+(\S+)\s+(.+)/i))) log(who, `(sussurro → ${mm[1]}) ${mm[2]}`, 'chat', { to: /^mestre$/i.test(mm[1]) ? GM : mm[1], from: me });
+    const dice = (mm = text.match(/^\/r(?:oll)?\s+(.+)$/i)) && rollExpr(mm[1]);
+    if (dice) log(who, `rolou ${dice.text}: ${dice.shown} = ${dice.total}`, 'ok', priv);
+    else if (mm) c.send?.(JSON.stringify({ t: 'note', kind: 'no', text: 'Rolagem não entendida.', why: 'Exemplos: /r 2d6+1 · /r d20 · /r 2d6+1d4+3' }));
+    else if ((mm = text.match(/^\/w\s+(\S+)\s+(.+)/i))) log(who, `(sussurro → ${mm[1]}) ${mm[2]}`, 'chat', { to: /^mestre$/i.test(mm[1]) ? GM : mm[1], from: me });
     else log(who, text, 'chat');
   },
   // ----- editores do mestre (skills / itens) -----

@@ -10,7 +10,7 @@ const mainEl = c => c.el || c.resist?.find(e => e !== 'fis') || 'fis';
 const bodyMini = c => `<svg class="mini" viewBox="0 0 120 260" aria-hidden="true">${PARTS.map(k => `<${SHAPE[k][0]} ${SHAPE[k][1]} class="l${lvl(c, k)}"/>`).join('')}</svg>`;
 function unit(c, cur) {
   const foe = !!c.enemy, el = mainEl(c), low = c.hp > 0 && c.hp <= c.hpMax * .25;
-  const sts = c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + (n < 90 ? ' ' + n : ''))].filter(Boolean).map(s => `<i>${s}</i>`).join('') : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
+  const sts = c.hp > 0 ? stChips(c) : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
   const vb = !foe && c.vinc?.[0] ? `<em class="vb" style="--e:${ELC[c.vinc[0]]}" title="Vínculo: ${PATRON[c.vinc[0]]}">${KANJI[c.vinc[0]]}</em>` : '';
   const fig = `<div class="figw">${vb}<div class="fig" style="--e:${ELC[el]}">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${foe ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div>`;
   const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
@@ -29,8 +29,8 @@ function battle() {
       <button data-a="next">Passar</button></div>${aimBox()}`;
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
   const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
-  return `<section class="stage battle heat-${heat} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
+  return `<section class="stage battle heat-${heat} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
+    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${S.battle.end === 'won' ? ' · inimigos derrotados' : heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {

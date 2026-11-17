@@ -20,6 +20,8 @@ const clean = k => fails.delete(k);
 const flood = (c, kind, max) => { const now = Date.now(), w = (c.win ??= {})[kind]; if (!w || now - w.t > 10e3) { c.win[kind] = { t: now, n: 1 }; return false; } return ++w.n > max; };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const okName = n => !!n && !/[@\s]/.test(n) && n.toLowerCase() !== 'mestre';
-const checkUser = (name, pass) => { const u = S.users[name]; return Object.hasOwn(S.users, name) && crypto.timingSafeEqual(Buffer.from(hash(pass, u.split(':')[0])), Buffer.from(u)); };
+// comparação em tempo constante (não revela, pelo tempo de resposta, quantos caracteres estavam certos)
+const same = (a, b) => { const x = Buffer.from(String(a ?? '')), y = Buffer.from(String(b ?? '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+const checkUser = (name, pass) => { const u = Object.hasOwn(S.users, name) ? S.users[name] : null; return typeof u === 'string' && u.includes(':') && same(hash(pass, u.split(':')[0]), u); };
 
-export { UPMAX, dirSize, MAGIC, magic, fails, FAIL_MAX, FAIL_WIN, ipOf, blocked, penalize, clean, flood, hash, okName, checkUser };
+export { UPMAX, dirSize, MAGIC, magic, fails, FAIL_MAX, FAIL_WIN, ipOf, blocked, penalize, clean, flood, hash, okName, same, checkUser };

@@ -12,7 +12,7 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 
 Ao iniciar, o servidor abre sozinho um túnel gratuito do Cloudflare (baixa o `cloudflared` na primeira vez) e mostra o **código da sessão**. Veja `GUIA-RODAR.md`.
 
-Chat: texto livre, `/r 2d6+1` para rolar, `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
+Chat: texto livre, `/r 2d6+1` para rolar (aceita somas como `/r 2d6+1d4+3` e `/r d20-1`), `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
 
 ## Uso pessoal, direto do seu computador
@@ -34,9 +34,21 @@ Janela **Campanha** do mestre:
 - Régua: Alt+arrastar; com Shift mede área. Marcador: Ctrl+clique no mapa (Ctrl+Shift+clique cria um que só o mestre vê).
 - Janela **Som**: trilha por link ou arquivo enviado (MP3, OGG, WAV, M4A até 40 MB), lista de faixas, trilha própria por cena, ambiências e efeitos prontos (sintetizados, sem arquivos). Todos ouvem em sincronia; cada pessoa ajusta ou silencia o próprio volume no canto da tela. Golpes, críticos, erros e curas também têm som.
 
+## Mostrar a todos
+Na janela **Cena**, "Mostrar a todos" abre um texto e/ou uma imagem (carta, retrato, pista) na tela de cada jogador e na mesa. O jogador fecha quando quiser e pode rever; "Recolher" tira de todas as telas.
+
+## Interface
+- Perguntas e confirmações aparecem em janelas do próprio jogo (nada de caixas do navegador); exclusões pedem confirmação.
+- Barra de ferramentas no mapa: zoom, enquadrar, régua, área, sinal e, para o mestre, marcador e névoa. Funciona no toque.
+- **Ctrl+K** (mestre): busca rápida de janelas, cenas, fichas, ações, sons e inimigos. Tecla **?**: lista de atalhos.
+- Histórico com filtro (tudo, conversa, rolagens) e hora de cada linha ao passar o mouse.
+- O jogador é avisado quando chega a vez dele (aviso, som, vibração e título da aba); o mestre vê na aba quantos pedidos esperam.
+- Mudança de cena mostra o nome da cena em destaque para jogadores e mesa.
+- Mestre: duplo clique no título recolhe a janela; arrastar uma imagem para a tela troca o mapa (ou o retrato, se soltar sobre uma ficha) e um áudio vira trilha.
+
 ## Organização do código
 - `server.js` é só a entrada. `src/config.js` (caminhos, chave), `consts.js` (tabelas de regras), `state.js` (estado, migrações, gravação), `rules.js` (combate, inimigos, fila), `handlers.js` (ações dos clientes), `net.js` (HTTP e WebSocket), `auth.js`, `seed.js`, `campaign.js` (campanhas, cópias, diário, pacotes) e `media.js` (som e extras do mapa).
-- `public/js/`: `nucleo.js` (constantes, login, conexão), `sessao.js`, `palco.js` (batalha e mapa), `mestre.js` (janelas do mestre), `paginas.js` (telas do jogador), `tela.js` (desenho e efeitos), `extras.js` (Campanha, Som, marcadores) e `eventos.js`. São scripts comuns carregados nessa ordem.
+- `public/js/`: `nucleo.js` (constantes, login, conexão), `sessao.js`, `palco.js` (batalha e mapa), `mestre.js` (janelas do mestre), `paginas.js` (telas do jogador), `tela.js` (desenho e efeitos), `extras.js` (Campanha, Som, marcadores), `ux.js` (diálogos, ferramentas do mapa, busca rápida, ajuda) e `eventos.js`. São scripts comuns carregados nessa ordem.
 
 ## Pedidos e aprovação do mestre
 Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, itens fora de combate (usar, equipar, comprar, vender, forjar, descartar) e ações de acampamento do jogador viram **pedidos**. Mover o token e passar a vez não pedem aprovação.
@@ -54,6 +66,9 @@ Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, it
 - Na janela **Cena**, "Fundo da batalha" escolhe um tema pronto (Rubro, Noite, Floresta, Brasa, Gelo, Vazio, Santuário, Tempestade), o mapa da cena ou uma imagem própria (link ou envio). Vale por cena.
 - O palco muda com o estado do combate: grupo ferido deixa o fundo mais vermelho e rápido ("tensão"); grupo no limite, herói caído ou chefe de pé vira "perigo".
 - Cada ação mostra os dados num painel (o que era preciso tirar e o veredito) e só então o palco aproxima em quem age e nos alvos, com o golpe, o número e o carimbo de crítico ou fraqueza.
+- Na vez do jogador, o primeiro inimigo de pé já vem escolhido como alvo. Ninguém gasta o turno golpeando quem já caiu.
+- Quando o último inimigo cai, o mestre recebe um aviso e o botão **Vitória** pisca. A mensagem de vitória aponta o destaque da batalha (quem causou mais dano e quantos críticos).
+- Passe o mouse sobre uma condição (Queimadura, Medo, ATQ↑…) para ver o que ela faz.
 - **Assumir** (janelas Fichas e Sessão) abre a tela de um jogador para o mestre jogar por ele, sem fila de pedidos. Personagens sem dono o mestre controla pela janela Batalha e pela ficha.
 
 ## Atalhos no PC
@@ -64,13 +79,23 @@ Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, it
 - Mestre: Shift+clique em Exploração/Batalha/Preparo salva o arranjo de janelas atual
 
 ## Balanceamento
-Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula batalhas 4x4 com as regras reais;
+Os números ficam em `R` no topo de `src/consts.js`. `node tools/sim.js 500` simula batalhas 4x4 com as regras reais;
 `VJ_RULES='{"enemyAttr":45}' node tools/sim.js` testa uma variação sem editar o código.
 
 ## Testes e segurança dos dados
 - `npm test` roda os testes de regras e permissões; `npm run sim` roda o simulador de balanceamento.
-- A cada início o servidor copia `data/state.json` para `data/backups/` (guarda as 10 últimas).
+- `npm run dev` sobe uma cópia de desenvolvimento em `http://localhost:3210/gm` (chave `dev`), com dados separados em `data-dev/`, sem túnel: dá para testar à vontade sem tocar na campanha de verdade.
+- A cada início o servidor copia `data/state.json` para `data/backups/` (guarda as 30 últimas, somando as automáticas e as manuais).
+- Fechar a janela do programa ou apertar Ctrl+C grava o que ainda estava pendente antes de sair.
+- Abrir, importar ou restaurar uma campanha é tudo-ou-nada: se o arquivo não puder ser aberto, a campanha em uso continua exatamente como estava e o mestre vê o motivo. Um arquivo editado à mão, com campos faltando ou de tipo errado, é consertado ao abrir.
+- Campanha importada de fora é limpa antes de entrar: só passam chaves simples, skills e itens no formato do editor, links válidos e um histórico sem marcação.
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
+
+## Rede e segurança
+- O estado enviado a cada mudança ficou ~85% menor: as definições de skills e itens (a maior parte) só vão quando mudam. Páginas, scripts e o three.js vão comprimidos e o navegador só baixa de novo o que mudou.
+- As páginas só executam scripts do próprio servidor (Content-Security-Policy), não abrem dentro de outros sites e não vazam o endereço da sessão para links externos.
+- Chave do mestre e senhas são comparadas em tempo constante. Conexões que não fazem login em 30 s, ou que param de responder, são encerradas.
+- Uma mensagem malformada ou um erro numa ação não derruba o servidor: o erro vai para o console e a mesa continua.
 
 ## Conteúdo padrão
 `content.js` gera a grade de skills (128 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.

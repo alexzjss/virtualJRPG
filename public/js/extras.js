@@ -7,7 +7,7 @@ if (gm) { const k = new URLSearchParams(location.hash.slice(1)).get('k'); if (k)
 // ===== arquivos: exportar, importar e diário (só o mestre, com a chave) =====
 const apiH = () => ({ 'X-VJ-Key': encodeURIComponent(key) });
 const fname = s => String(s || 'campanha').normalize('NFD').replace(/[^\w -]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'campanha';
-const download = (url, file) => fetch(url, { headers: apiH() }).then(r => r.ok ? r.blob() : Promise.reject()).then(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }).catch(() => alert('Não consegui baixar o arquivo.'));
+const download = (url, file) => fetch(url, { headers: apiH() }).then(r => r.ok ? r.blob() : Promise.reject()).then(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }).catch(() => toast('Não consegui baixar o arquivo.', 'no'));
 const bkLabel = f => { const m = /^state-(\d{4})-(\d\d)-(\d\d)T(\d\d)-(\d\d)-\d\d-\d+Z-?(.*)\.json$/.exec(f); if (!m) return f;
   return new Date(Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5])).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + (m[6] ? ' · ' + m[6].replace(/-/g, ' ') : ''); };
 
@@ -38,9 +38,16 @@ const xWins = () => ({ camp: wins.camp.open ? campWin() : '', som: wins.som.open
 
 // ===== mapa: linhas extras da janela Cena e marcadores =====
 let fogR = 1;
-const xCena = sc => `<div class="row">${sc.fogOn ? `<button data-a="fogAll" data-v="1">Revelar tudo</button><button data-a="fogAll" data-v="">Esconder tudo</button><label>Pincel <select data-x="fogR">${[0, 1, 2, 3].map(r => `<option value="${r}" ${r === fogR ? 'selected' : ''}>${2 * r + 1}×${2 * r + 1}</option>`).join('')}</select></label>` : ''}</div>
+const hand = { text: '', img: '' }; let handSeen = 0;
+const xCena = sc => `<h4>Mostrar a todos</h4><div class="row"><input data-hand="text" placeholder="Texto: carta, pista, legenda…" aria-label="Texto para mostrar a todos" value="${esc(hand.text)}"></div>
+  <div class="row"><input data-hand="img" placeholder="Link de uma imagem (opcional)" aria-label="Imagem para mostrar a todos" value="${esc(hand.img)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="hand"></label></div>
+  <div class="row"><button class="own" data-x="handGo" title="Abre a imagem e o texto na tela de cada jogador e na mesa">Mostrar</button>${S.handout ? '<button data-x="handOff">Recolher</button><small>Aberto nas telas dos jogadores.</small>' : ''}</div>
+  <h4>Névoa e grade</h4><div class="row">${sc.fogOn ? `<button data-a="fogAll" data-v="1">Revelar tudo</button><button data-a="fogAll" data-v="">Esconder tudo</button><label>Pincel <select data-x="fogR">${[0, 1, 2, 3].map(r => `<option value="${r}" ${r === fogR ? 'selected' : ''}>${2 * r + 1}×${2 * r + 1}</option>`).join('')}</select></label>` : ''}</div>
   <div class="row"><button data-a="map" data-f="grid" data-v="${sc.grid === false ? 1 : ''}" class="${sc.grid === false ? '' : 'own'}">Grade visível</button><label>Metros por casa <input type="number" min="0" max="1000" step="0.5" data-map="unit" value="${+sc.unit || 0}"></label></div>
   <small>Régua: Alt+arrastar (segure Shift para medir área). Marcador: Ctrl+clique no mapa (Ctrl+Shift+clique: só você vê).</small>`;
+const handoutHtml = () => { const h = S.handout; if (!h || gm) return '';
+  if (role === 'player' && handSeen === h.n) return '<button class="handchip" data-x="handShow">Ver o que o mestre mostrou</button>';
+  return `<div class="handout" role="dialog" aria-label="O mestre mostra"><figure><small>O mestre mostra</small>${h.img ? `<img src="${esc(h.img)}" alt="">` : ''}${h.text ? `<figcaption>${esc(h.text)}</figcaption>` : ''}${role === 'player' ? '<button class="own" data-x="handX">Fechar</button>' : ''}</figure></div>`; };
 const xPins = m => Object.entries(m.pins || {}).map(([id, p]) => `<i class="pin ${p.gm ? 'gmo' : ''}" style="--x:${+p.x + m.ox};--y:${+p.y + m.oy}" ${gm ? `data-x="pinDel" data-id="${id}" title="Clique para apagar"` : ''}><b>${esc(p.text)}</b></i>`).join('');
 const dist = (n, sc) => `${n} ${n === 1 ? 'casa' : 'casas'}${sc.unit ? ` · ${Math.round(n * sc.unit * 10) / 10} m` : ''}`;
 
@@ -121,7 +128,11 @@ sndBox.addEventListener('click', e => { const k = e.target.dataset.s; if (k === 
 sndBox.addEventListener('input', e => { if (e.target.type === 'range') { snd.vol = +e.target.value; ls('vj_vol', String(snd.vol)); if (S) syncAudio(); } });
 addEventListener('pointerdown', unlock, true);
 drawSnd();
-{ const render0 = render; render = function () { render0(); try { syncAudio(); sfxFromLog(); } catch (e) { console.error(e); } }; }
+{ const render0 = render; render = function () { render0();
+  app.querySelectorAll(':scope > .handout, :scope > .handchip').forEach(el => el.remove()); // um redesenho adiado não pode empilhar cópias
+  app.insertAdjacentHTML('beforeend', handoutHtml());
+  try { syncAudio(); sfxFromLog(); } catch (e) { console.error(e); } }; }
+document.addEventListener('input', e => { const k = e.target.dataset?.hand; if (k) hand[k] = e.target.value; });
 
 // ===== cliques e campos próprios destes extras =====
 document.addEventListener('change', e => {
@@ -132,15 +143,15 @@ document.addEventListener('change', e => {
   else if (x === 'fogR') { fogR = +el.value; el.blur(); }
   else if (x === 'audUp') { const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type, ...apiH() }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
-      .then(u => { send({ t: 'trackAdd', v: u, k: f.name.replace(/\.\w+$/, '') }); send({ t: 'audio', f: 'url', v: u }); }).catch(() => alert('Falha no envio (MP3, OGG, WAV ou M4A até 40 MB).')); }
+      .then(u => { send({ t: 'trackAdd', v: u, k: f.name.replace(/\.\w+$/, '') }); send({ t: 'audio', f: 'url', v: u }); }).catch(() => toast('Falha no envio do áudio.', 'no', 'Aceita MP3, OGG, WAV ou M4A de até 40 MB.')); }
   else if (x === 'import') { const f = el.files[0], k = el.dataset.k; el.value = '';
-    if (!f || (k === 'campanha' && !confirm('Abrir a campanha deste arquivo? A atual é guardada antes e continua na lista.'))) return;
-    f.text().then(t => fetch('/api/import?what=' + k, { method: 'POST', headers: apiH(), body: t })).then(async r => { if (!r.ok) throw new Error(await r.text()); alert(k === 'campanha' ? 'Campanha importada.' : 'Pacote importado.'); })
-      .catch(err => alert('Não foi possível importar. ' + (err.message || ''))); }
+    if (!f) return;
+    (k === 'campanha' ? dialog({ title: 'Importar campanha', text: `Abrir a campanha de "${f.name}"? A atual é guardada antes e continua na lista.`, ok: 'Importar' }) : Promise.resolve(true)).then(yes => yes ? f.text() : Promise.reject(new Error('cancelado'))).then(t => fetch('/api/import?what=' + k, { method: 'POST', headers: apiH(), body: t })).then(async r => { if (!r.ok) throw new Error(await r.text()); alert(k === 'campanha' ? 'Campanha importada.' : 'Pacote importado.'); })
+      .catch(err => { if (err.message !== 'cancelado') toast('Não foi possível importar', 'no', err.message || ''); }); }
 });
 document.addEventListener('click', e => {
   if (gm && e.ctrlKey && S && !fogMode) { const mp = e.target.closest('.map'); // marcador novo
-    if (mp && !e.target.closest('.tok,.pin')) { const v = prompt(e.shiftKey ? 'Texto do marcador (só você vê):' : 'Texto do marcador (todos veem):'); if (v?.trim()) send({ t: 'pinAdd', ...cell(e, mp), v: v.trim(), k: e.shiftKey ? 1 : '' }); return; } }
+    if (mp && !e.target.closest('.tok,.pin')) { addPin(cell(e, mp), e.shiftKey); return; } }
   const el = e.target.closest('[data-x]'), d = el?.dataset; if (!d || el.matches('input,select')) return;
   const ask = (q, def = '') => { const v = prompt(q, def); return v === null ? null : v.trim(); };
   if (d.x === 'campNew') { const v = ask('Nome da nova campanha? (a atual é guardada antes)', 'Nova campanha'); if (v) send({ t: 'campNew', v }); }
@@ -149,7 +160,11 @@ document.addEventListener('click', e => {
   else if (d.x === 'bkRestore') { if (confirm('Voltar para esta cópia? O estado atual vira outra cópia antes, então dá para voltar atrás.')) send({ t: 'bkRestore', id: d.id }); }
   else if (d.x === 'sessMark') { const v = ask('Título desta sessão?', 'Sessão de ' + new Date().toLocaleDateString('pt-BR')); if (v) send({ t: 'sessMark', v }); }
   else if (d.x === 'export') download('/api/export?what=' + d.k, `${fname(S.title)}-${d.k}.json`);
-  else if (d.x === 'diario') { if (d.k) download('/api/diario', `diario-${fname(S.title)}.txt`); else { const w = open('', '_blank'); fetch('/api/diario', { headers: apiH() }).then(r => r.ok ? r.text() : Promise.reject()).then(t => { if (w) { w.document.title = 'Diário'; const pre = w.document.createElement('pre'); pre.style.cssText = 'white-space:pre-wrap;font:15px/1.5 Georgia,serif;max-width:820px;margin:24px auto;padding:0 16px'; pre.textContent = t; w.document.body.append(pre); } }).catch(() => { w?.close(); alert('Não consegui abrir o diário.'); }); } }
+  else if (d.x === 'diario') { if (d.k) download('/api/diario', `diario-${fname(S.title)}.txt`); else { const w = window.open('', '_blank'); /* "open" sozinho é a tabela de painéis abertos (nucleo.js), não a função do navegador */ fetch('/api/diario', { headers: apiH() }).then(r => r.ok ? r.text() : Promise.reject()).then(t => { if (w) { w.document.title = 'Diário'; const pre = w.document.createElement('pre'); pre.style.cssText = 'white-space:pre-wrap;font:15px/1.5 Georgia,serif;max-width:820px;margin:24px auto;padding:0 16px'; pre.textContent = t; w.document.body.append(pre); } }).catch(() => { w?.close(); alert('Não consegui abrir o diário.'); }); } }
   else if (d.x === 'trackAdd') { const v = ask('Nome da faixa?', 'Faixa'); if (v) send({ t: 'trackAdd', v: S.audio.url, k: v }); }
+  else if (d.x === 'handGo') { if (!hand.text.trim() && !hand.img.trim()) return toast('Escreva um texto ou escolha uma imagem.', 'no'); send({ t: 'handout', text: hand.text, img: hand.img.trim() }); }
+  else if (d.x === 'handOff') send({ t: 'handout' });
+  else if (d.x === 'handX') { handSeen = S.handout?.n || 0; render(); }
+  else if (d.x === 'handShow') { handSeen = 0; render(); }
   else if (d.x === 'pinDel') { if (!e.ctrlKey && confirm('Apagar este marcador?')) send({ t: 'pinDel', id: d.id }); }
 });
