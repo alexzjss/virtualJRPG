@@ -244,7 +244,7 @@ function openDomain(a, s) { // Expansão de Domínio: gasta toda a Aura; dois Do
     const ow = S.chars[old.by]; if (ow) applySt(ow, 'exaus', 3);
   }
   B.dom = { by: a.id, side: a.enemy, name: s.name, ttl: s.dom.dur, ally: s.dom.ally, foe: s.dom.foe, tick: s.dom.tick, pow: stat(a) };
-  log(a.name, `abre o Domínio ${s.name}!`, 'ok', { fx: { id: a.id, a: a.id, s: s.name, el: s.el, heal: 0 } });
+  log(a.name, `abre o Domínio ${s.name}!`, 'ok', { fx: { id: a.id, a: a.id, s: s.name, el: s.el, heal: 0, dom: 1 } });
 }
 function closeDomain(why) { const D = S.battle.dom; if (!D) return; delete S.battle.dom; const o = S.chars[D.by]; if (o && !o.dead) applySt(o, 'exaus', 3); log(o?.name || 'Domínio', `${D.name} se desfaz${why ? ' (' + why + ')' : ''}; o usuário fica Exausto.`, 'bad'); }
 // reação elemental do golpe com as condições do alvo
@@ -342,11 +342,11 @@ function hurt(t, d, src) { // dano em HP: escudo, tenacidade, Limite, acorda, qu
   if (!t.enemy) { t.dying = 3; t.fell = true; }
   interrupt(t); if (t.form) endForm(t, false);
   Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && o !== t && o.enemy === t.enemy).forEach(o => { addLimit(o, 25); trig(o, 'ally', t); });
-  if (src && src !== t) { trig(src, 'kill', t); livingKill(src, t); }
+  if (src && src !== t) { trig(src, 'kill', t); livingKill(src, t); tally(src, 'ko', 1); }
   return note + ` ${t.name} caiu!`;
 }
 const bump = (id, v) => { if (id in S.battle.ticks) S.battle.ticks[id] += v; }; // empurra na fila só quem ainda está nela (invocação morta sai)
-const tally = (ch, k, v) => { if (!S.battle.active) return; const st = (S.battle.stats ??= {})[ch.id] ??= { dmg: 0, heal: 0, crit: 0 }; st[k] += v; };
+const tally = (ch, k, v) => { if (!S.battle.active) return; const st = (S.battle.stats ??= {})[ch.id] ??= { dmg: 0, heal: 0, crit: 0, ko: 0 }; st[k] = (st[k] || 0) + v; };
 function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
   const a = S.chars[id];
   S.battle.n = (S.battle.n || 0) + 1; // ações já feitas nesta batalha
@@ -426,16 +426,16 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     }
     if (s.st) applySt(t, s.st);
     txt += hitFx(a, s, t, { d: 0, stat, fallen });
-    log(a.name, `${s.name} → ${t.name}${txt ? ': ' + txt.trim() : ''}${stTxt}`, 'ok', { fx: { id: t.id, heal: s.kind === 'heal' ? 1 : 0, a: a.id, s: s.name, el: s.el } });
+    log(a.name, `${s.name} → ${t.name}${txt ? ': ' + txt.trim() : ''}${stTxt}`, 'ok', { fx: { id: t.id, heal: s.kind === 'heal' ? 1 : 0, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } });
     if (s.kind === 'heal' && t !== a) trig(a, 'heal', t);
     return false;
   }
   const sure = s.fx?.some(f => f.t === 'sure');
-  if (t.st.evade && !s.area && !sure && !o.counter) { delete t.st.evade; log(a.name, `${s.name} → ${t.name}: esquivou!`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } }); return false; }
+  if (t.st.evade && !s.area && !sure && !o.counter) { delete t.st.evade; log(a.name, `${s.name} → ${t.name}: esquivou!`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } }); return false; }
   const chance = sure ? 95 : int(stat + R.hit - (t.st.root ? 0 : Math.floor(at(t, 'AGI') / 2)) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) - (a.st.blind ? 25 : 0) - (a.st.exaus ? 15 : 0) + (a.st.focus ? 15 : 0) + (a.st.stealth ? 25 : 0) + ma.hit + (climaOf()?.[1].hit || 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
   if (r > chance) {
     if (r >= 96) addLimit(a, 20);
-    log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } });
+    log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } });
     trig(a, 'miss', t);
     return false;
   }
@@ -475,7 +475,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
   extra += hitFx(a, s, t, { d, stat, blk });
   if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
-  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w } });
+  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}) } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
   if (w) a.bt.wkNow = true;
   if (crit) trig(a, 'crit', t);

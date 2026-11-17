@@ -118,7 +118,7 @@ function syncAudio() { // acompanha o que o mestre pôs para tocar; quem entra d
 function sfxFromLog() { // golpes, críticos, erros e curas do histórico viram som (só os novos)
   if (snd.seen < 0) { snd.seen = S.seq; return; }
   const fresh = S.log.filter(l => l.n > snd.seen && l.fx).slice(-3); snd.seen = S.seq;
-  for (const l of fresh) setTimeout(() => playSfx(l.fx.miss ? 'miss' : l.fx.heal ? 'heal' : l.fx.crit ? 'crit' : 'hit'), l.d ? 950 : 0);
+  void fresh; // o som de cada golpe toca no impacto, junto da animação (coreo.js)
 }
 // controle de volume de cada pessoa, fora da área redesenhada
 const sndBox = document.createElement('div'); sndBox.className = 'sndbox'; document.body.append(sndBox);

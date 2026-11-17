@@ -221,7 +221,7 @@ try {
   };
 
   await section('Forja de armas do mestre', async () => {
-    await click(gmP, '.dock [data-a=winT][data-id=armas]', 'botão Forja de armas');
+    await click(gmP, '.gtab[data-g=tab][data-id=armas]', 'aba Forja de armas');
     await until(() => vis(gmP, '.wforge'), 'janela da Forja de armas');
     const tap = sel => gmP.locator(sel).first().dispatchEvent('click'); // a janela pode nascer embaixo de outras: o clique vai direto no botão
     await tap('.wforge [data-a=wfTpl][data-k=machado]');
@@ -264,7 +264,7 @@ try {
     await tap('.wforge [data-a=wfImpGo]');
     const imp = await until(() => Object.values(S.items).find(i => i.name === 'Lâmina Importada'), 'arma importada ao confirmar');
     check(imp && imp.hit === 50 && imp.fx === '', 'importação corrige o que veio fora dos limites');
-    await tap('.win[data-win=armas] [data-a=winX]');
+    await tap('.gdock.wide [data-g=wide][data-id=armas]'); // encolhe a aba larga de volta para a doca
   });
 
   await section('pedido de rolagem: aprovação com Vantagem e Desvantagem', async () => {
