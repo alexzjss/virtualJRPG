@@ -213,14 +213,21 @@ export function buildBestiary(make) {
     ['Caçador Rival', '#0f766e', { FOR: 60, DES: 60, AGI: 55 }, [], [], ['Golpe Pesado', 'Tiro Certeiro', 'Passo Rápido', 'Luz Curativa'], { arma: 14, armor: 3, xpR: 30, goldR: 60 }],
   ];
   // um chefe por patrono: usa o raio inteiro do elemento, tem muito HP e entra em fúria com metade da vida
-  const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT', 'torso'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT', 'head'], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR', 'legL', { hp: .7 }], ['indra', 'Arconte da Tempestade', 'atlas', 'INT', 'armR'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES', 'armL'],
-    ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR', { arma: -4, hp: .6, nosup: 1 }], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head', { hp: .7 }], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso'], ['hiruko', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
+  const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT', 'torso'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT', 'head', { hp: 1.4 }], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR', 'legL', { hp: .7 }], ['indra', 'Arconte da Tempestade', 'atlas', 'INT', 'armR'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES', 'armL'],
+    ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR', { arma: -4, hp: .6, nosup: 1 }], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head', { hp: .7 }], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso', { hp: 1.2 }], ['hiruko', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
   const PN = { head: 'cabeça', torso: 'torso', armL: 'braço esquerdo', armR: 'braço direito', legL: 'perna esquerda', legR: 'perna direita' };
   // chefes não usam dupla, ritual, Despertar nem invocação; dos ramos novos (7-9) só levam ataques e transformações (sem as que aumentam cura), senão o suporte deixa a luta sem fim
   const solo = s => !s.duo && !s.trio && !s.dom && !s.v2 && !s.circ && !s.aw && !s.summon && !s.form?.m?.heal && (+String(s.br).split('-')[1] < 6 || ['dmg', 'mental', 'form'].includes(s.kind));
   const ray = el => s => solo(s) && (s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back));
+  // IA opcional dos chefes (campo `ia`; ausente = só ataques e transformações): dom = abre a Expansão de Domínio 1× por combate (precisa de metade da Aura);
+  // defend / focus = chance por turno de Defender (vida < 40%) e de Concentrar Tensão (vida > 50%). Medido em tools/sim.js; ver DECISOES-SISTEMAS.md.
+  const BIA = { susanoo: { dom: 1, focus: .15 }, amaterasu: { defend: .2 }, hiruko: { dom: 1 }, shukketsu: { dom: 1, focus: .15 } };
+  // trio de elites (campo `ia.trio`): só funciona com os três no campo, cada um com a sua parte da Tempestade Ígnea
+  const TRIO = [['Oni de Brasa', '#d9480f', 'kagutsuchi', { FOR: 60, CON: 55, AGI: 45 }, ['Centelha', 'Marca Ardente']], ['Tengu do Vendaval', '#3b6ea8', 'fuhaku', { AGI: 65, DES: 60 }, ['Lâmina de Vento', 'Vendaval']], ['Raijū', '#e0b400', 'indra', { AGI: 65, INT: 55 }, ['Faísca', 'Choque']]];
+  const tn = el => `Tempestade Ígnea: ${{ kagutsuchi: 'Kagutsuchi', fuhaku: 'Fuhaku', indra: 'Indra' }[el]}`;
   return [...B.map(([name, color, attrs, weak, resist, skills, o], i) => make(name, color, attrs, weak, resist, skills, { cat: i < 16 ? 'demonio' : 'humano', ...o })),
-    ...BOSS.map(([el, name, weak, attr, wp, tune]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, cat: 'chefe', tune: tune || {}, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
+    ...BOSS.map(([el, name, weak, attr, wp, tune]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], s => ray(el)(s) || (BIA[el]?.dom && s.dom && s.el === el), { boss: true, cat: 'chefe', ...(BIA[el] ? { ia: BIA[el] } : {}), tune: tune || {}, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 })),
+    ...TRIO.map(([name, color, el, attrs, sk]) => make(name, color, attrs, [], [], [...sk, tn(el)], { cat: 'demonio', ia: { trio: 1 }, xpR: 15, gmNote: 'Trio: a técnica "Tempestade Ígnea" só sai com os três (Oni, Tengu e Raijū) de pé; use-os juntos.' }))];
 }
 
 // cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local

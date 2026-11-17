@@ -29,7 +29,8 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 // ---------- regras ----------
 // Números de balanceamento (ajustados com tools/sim.js). VJ_RULES='{"hit":50}' sobrescreve para testar.
-const R = { hit: 60, dmgDiv: 10, healDiv: 5, hpCon: 2, hpBase: 10, enemyAttr: 50, enemyXp: 10, aiFocus: .5,
+const R = { hit: 60, dmgDiv: 10, healDiv: 5, hpCon: 2, hpBase: 10, enemyAttr: 50, enemyXp: 10, aiFocus: .5, iaExtra: true, domCap: 35, // iaExtra: false desliga Domínio, Defender, Concentrar e trio dos inimigos (campo `ia` do bestiário)
+ 
   // gerador de inimigos: por patente, d = diferença do atributo principal em relação ao poder do grupo; hp = bônus de HP; sk = nº de skills; cost = peso no orçamento do encontro
   rank: { lacaio: { d: -7, hp: -25, sk: 1, xp: 5, cost: .5 }, comum: { d: 1, hp: 0, sk: 2, xp: 10, cost: 1 }, elite: { d: 7, hp: 40, sk: 4, xp: 25, cost: 2 }, chefe: { d: -8, hpPer: 34, sk: 8, xp: 80, arma: 8, tpl: -5, g: .78 } }, // tpl: desconto extra dos chefes do bestiário (têm atributos altos em tudo); g: quanto do crescimento do grupo o chefe acompanha
   diff: { facil: 1.3, normal: 1.5, dificil: 1.68, mortal: 1.86 },
@@ -355,6 +356,8 @@ function allOut(a) { // Ataque Total: com todo inimigo Derrubado ou Quebrado, o 
   const mates = battlers().filter(o => o.enemy === a.enemy && o.hp > 0 && !skipping(o) && !o.summon);
   for (const o of mates) { const f = battlers().filter(x => x.enemy !== a.enemy && x.hp > 0); if (!f.length) break; strike(o, basicOf(o), pick(f), null, 0, { mult: 1.5, nochain: true }); }
 }
+function doDefend(a) { a.brv = Math.min(3, Math.max(0, a.brv || 0) + 1); applySt(a, 'defUp', 2); log(a.name, `se defende e guarda Coragem (${a.brv}/3).`, 'ok'); endTurn(a.id, 70); }
+function doFocus(a) { a.ten = Math.min(3, (a.ten || 0) + 1); log(a.name, `concentra a Tensão (${a.ten}/3): o próximo golpe causa ×${TEN[a.ten]}.`, 'ok'); endTurn(a.id, 70); }
 function openDomain(a, s) { // Expansão de Domínio: gasta toda a Aura; dois Domínios se chocam numa disputa de Aura
   const B = S.battle, old = B.dom, stat = x => Math.max(at(x, 'INT'), at(x, 'SAB')) + x.aura / 2, mine = stat(a) + d100() / 2;
   a.aura = 0;
@@ -664,6 +667,16 @@ function summonOf(a, s) { // invocação: aliado temporário que age sozinho, co
   S.battle.ticks[id] = S.battle.ticks[a.id] + Math.round(delay(ch) / 2);
   log(a.name, `invoca ${s.summon}!`, 'ok');
 }
+// IA opcional por modelo do bestiário (campo `ia`, desligado por padrão): { dom: 1 } abre a Expansão de Domínio uma vez por combate;
+// { defend: p } defende com a vida baixa; { focus: p } concentra Tensão com a vida alta; p = chance por turno. Devolve true se gastou o turno.
+function iaExtra(a, usable) {
+  const ia = a.ia, dk = ia.dom && !a.domUsed && usable.find(k => S.skills[k].dom), D = S.battle.dom;
+  if (dk && !(D && D.side === a.enemy) && (D ? D.side !== a.enemy : a.rage || a.hp < a.hpMax * .75) && Math.random() < .6 && doAct(a, { skill: dk, target: a.id })) { a.domUsed = 1; return true; } // contra um Domínio rival abre já, para o Choque
+  if (a.icd > 0) { a.icd--; return false; }
+  if (ia.defend && a.hp < a.hpMax * .4 && !a.st.defUp && Math.random() < ia.defend) { a.icd = 3; doDefend(a); return true; }
+  if (ia.focus && !a.ten && !a.chg && a.hp > a.hpMax * .5 && Math.random() < ia.focus) { a.icd = 3; doFocus(a); return true; }
+  return false;
+}
 // IA: Limite, transformação, reerguer caído, curar, purificar, invocar, buffs, dano; serve para inimigos e invocações
 function aiAct(a) {
   const all = battlers(), alive = all.filter(o => o.hp > 0), foesAll = alive.filter(o => o.enemy !== a.enemy), mates = alive.filter(o => o.enemy === a.enemy);
@@ -671,15 +684,16 @@ function aiAct(a) {
   const foes = foesAll.filter(o => !o.st.stealth || a.st.focus).length ? foesAll.filter(o => !o.st.stealth || a.st.focus) : foesAll;
   const K = k => S.skills[k], has = (k, t) => K(k).fx?.some(f => f.t === t), pw = k => K(k).power * (K(k).hits || 1) * (K(k).area ? 1.5 : 1);
   const strong = l => { const o = [...l].sort((x, y) => pw(y) - pw(x)); return Math.random() < .6 ? pick(o.slice(0, 3)) : pick(o); }; // repertório grande: prefere os golpes mais fortes
-  const usable = a.skills.filter(k => K(k) && K(k).kind !== 'passive' && !cantUse(a, effSkill(a, k)));
+  const usable = a.skills.filter(k => K(k) && K(k).kind !== 'passive' && !((K(k).trio && !(R.iaExtra && a.ia?.trio)) || K(k).dom && !(R.iaExtra && a.ia?.dom)) && !cantUse(a, effSkill(a, k))); // Domínio e trio só com `ia` explícito
   const lim = usable.find(k => K(k).limit); // Limite carregado tem prioridade
   const hurt0 = [...mates].sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0], fallen = all.filter(o => o.enemy === a.enemy && o.hp <= 0 && !o.dead);
-  const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => (K(k).kind === 'heal' && !K(k).power || K(k).kind === 'util') && !K(k).summon && !has(k, 'revive'));
+  const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => (K(k).kind === 'heal' && !K(k).power || K(k).kind === 'util') && !K(k).summon && !K(k).dom && !has(k, 'revive'));
   const hits = usable.filter(k => K(k).kind === 'dmg' && !K(k).limit), mental = usable.filter(k => K(k).kind === 'mental' && !K(k).limit);
   const forms = usable.filter(k => K(k).kind === 'form'), revs = usable.filter(k => has(k, 'revive')), sums = usable.filter(k => K(k).summon), cl = usable.filter(k => has(k, 'cleanse'));
   const sick = mates.find(o => RU.NEG.filter(k => o.st[k]).length >= 2);
   const tgt = Math.random() < R.aiFocus ? [...foes].sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
   if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
+  if (!lim && R.iaExtra && a.ia && iaExtra(a, usable)) return;
   let skill = 'atk', t = tgt;
   if (lim) skill = lim;
   else if (forms.length && !a.form && (a.rage || Math.random() < .2)) { skill = pick(forms); t = a; }
@@ -768,7 +782,7 @@ function genFoe(el, role, rank, ref = partyRef()) {
 const fitBoss = (ch, ref = partyRef()) => { const up = Math.max(0, ref.p - 58) * R.rank.chefe.g, P = ref.p + up * R.grow.attr + R.rank.chefe.tpl, f = (P + R.rank.chefe.d) / Math.max(...ATTRS.map(a => ch.attrs[a])); for (const a of ATTRS) ch.attrs[a] = int(ch.attrs[a] * f, 15, 95); ch.attrs.FOR = Math.max(ch.attrs.FOR, int(P + R.rank.chefe.d - 6, 15, 95)); const T = ch.tune || {}; // ajuste fino por chefe, medido no simulador
   ch.bon.hpMax = Math.round((R.rank.chefe.hpPer + up * R.grow.hp * .5) * ref.n * (ref.n / 4) * (T.hp || 1)); ch.bon.sanMax = 60;
   ch.arma = int(R.rank.chefe.arma + (ref.p - 45) / 4 + up * R.grow.arma + (T.arma || 0), 4, 40); ch.armor = Math.round(2 + up * R.grow.armor);
-  const cap = 20 + up * 2.5; ch.skills = ch.skills.filter(k => S.skills[k] && (S.skills[k].limit || S.skills[k].xp <= cap)); }; // só as skills do estágio do grupo
+  const cap = 20 + up * 2.5; ch.skills = ch.skills.filter(k => S.skills[k] && (S.skills[k].limit || S.skills[k].xp <= cap || R.iaExtra && ch.ia?.dom && S.skills[k].dom && cap >= R.domCap)); }; // o Domínio de chefe (opt-in) só entra para grupos veteranos (domCap) // só as skills do estágio do grupo
 function spawn(tpl, tier = 'normal', x = 0, y = 0) { // cria um inimigo a partir de um modelo, no nível de ameaça pedido
   const id = rid(), ch = S.chars[id] = { ...structuredClone(tpl), id, x, y, scene: S.scene, tpl: tpl.tpl || tpl.name, known: S.known?.[tpl.tpl || tpl.name] || 0 }, [k, rw] = TIER[tier] || TIER.normal;
   if (k !== 1) { for (const a of ATTRS) ch.attrs[a] = int(ch.attrs[a] * k, 1, 100); ch.xpR = Math.round(ch.xpR * rw); ch.goldR = Math.round(ch.goldR * rw); ch.name += ` (${tier})`; }
@@ -1036,7 +1050,7 @@ const H = {
   battle(c, m) {
     if (c.role !== 'gm') return;
     const all = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(Boolean), dead = all.filter(o => o.enemy && o.hp <= 0), pcs = all.filter(o => !o.enemy);
-    all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; delete o.brv; delete o.ten; delete o.brk; o.shield = 0; });
+    all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; delete o.brv; delete o.ten; delete o.brk; delete o.domUsed; delete o.icd; o.shield = 0; });
     for (const [k, o] of Object.entries(S.chars)) if (o.summon) delete S.chars[k]; // invocações somem com o fim da luta
     if (!m.on && m.win && pcs.length && dead.length) { // recompensas divididas entre os heróis
       const sum = f => Math.floor(dead.reduce((a, o) => a + o[f], 0) / pcs.length), xp = sum('xpR'), gold = sum('goldR'), drops = [];
@@ -1072,14 +1086,12 @@ const H = {
   defend(c, m) {
     const a = S.chars[current()];
     if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || a.hp <= 0) return;
-    a.brv = Math.min(3, Math.max(0, a.brv || 0) + 1); applySt(a, 'defUp', 2);
-    log(a.name, `se defende e guarda Coragem (${a.brv}/3).`, 'ok'); endTurn(a.id, 70);
+    doDefend(a);
   },
   focus(c, m) {
     const a = S.chars[current()];
     if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || a.hp <= 0 || a.chg) return;
-    a.ten = Math.min(3, (a.ten || 0) + 1);
-    log(a.name, `concentra a Tensão (${a.ten}/3): o próximo golpe causa ×${TEN[a.ten]}.`, 'ok'); endTurn(a.id, 70);
+    doFocus(a);
   },
   allOut(c, m) {
     const a = S.chars[current()];

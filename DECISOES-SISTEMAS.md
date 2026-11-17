@@ -34,7 +34,7 @@ Regra geral: **cada mecânica ganha teste em `tools/test.js`; as de combate pass
 
 ## Pendências
 - **`tools/audit.js`:** acha poder/XP fora da curva, nomes que não cumprem o efeito e repetições nos ~600 nós não revisados; corrigir o que ele apontar.
-- **Serafim Caído:** menos lacaios curandeiros na fúria.
+- **Serafim Caído:** resolvido (lacaios da fúria sem suporte); ver o balanço abaixo.
 - **Renomear o id `radiacao` → `hiruko`**, com migração das fichas salvas na inicialização.
 
 ## Divisão de trabalho
@@ -45,3 +45,14 @@ Tudo acima foi implementado nesta sessão. Detalhes e arquivos: `ARVORE-SISTEMAS
 - Fraqueza que adianta o turno: derrubar já dava um turno extra; agora acertar fraqueza em quem já está Derrubado reduz a ação em 25%.
 - Passar a Vez e Coragem vão na própria ação (`pass`, `brave`); Defender, Concentrar e Ataque Total são comandos novos.
 - Os nós-chave somam bônus permanentes (`bon`) mesmo que a passiva saia dos slots.
+
+## IA dos inimigos: Domínio, Defender, Concentrar e trio (decisões desta frente, escolhidas pela opção mais conservadora)
+- **Opt-in por entrada do bestiário:** campo `ia` ausente = comportamento antigo. `dom: 1`, `defend: p`, `focus: p`, `trio: 1`. O interruptor geral é `R.iaExtra` (`VJ_RULES='{"iaExtra":false}'`).
+- **Domínio:** só chefes, **no máximo 1 por combate** (`domUsed`), com o mesmo custo/duração/Choque dos heróis. Abre com a vida < 75% ou na fúria, ou na hora se um Domínio dos heróis está aberto (para o Choque). Só entra na lista de skills do chefe se o grupo é veterano (`domCap` 35 ≈ poder 64+); com grupos novos o chefe não leva o Domínio. Escolhidos: **Leviatã do Porto** (Mar Sem Fim), **Condessa Escarlate** (Banquete Rubro), **Filho de Hiruko** (Reator Aberrante). Ifrit, Senhor dos Pesadelos e Serafim ficaram sem (já estavam no limite baixo ou, no caso do Serafim, a luta já é longa e o Domínio defensivo a levava a ~94%).
+- **Defender** (vida < 40%) e **Concentrar** (vida > 50%): intervalo de 3 turnos entre os dois, chance `p` por turno. Leviatã e Condessa concentram (.15), Serafim defende (.2). Coragem (ação extra) **não** foi dada aos inimigos.
+- **Trio:** o Oni de Brasa, o Tengu do Vendaval e o Raijū trazem a técnica "Tempestade Ígnea" (só sai com os três de pé). Comuns gerados (`genFoe`) e encontros automáticos continuam sem Domínio nem trio.
+- **Cadeia** segue só dos heróis.
+- **Ajustes de equilíbrio:** Leviatã `hp 1,4` e Condessa `hp 1,2` (o Domínio os deixava ~96% / 91%); Serafim voltou a `arma -4 / hp 0,6` (com `hp 0,7-0,8` o nível 0 caía sem o nível 2 mudar).
+- **Medições** (`sim.js 80 boss`, 4 heróis, nível 0 / nível 2; antes → depois): Leviatã 88/91 → 78/93 · Condessa 80/88 → 74/86 · Filho de Hiruko 68/66 → 66/77 · Serafim 80/80 → 76/89 (agora dentro da faixa; ainda alto no nível 2, anotado) · Ifrit 56/49 → 53/55 · Colosso 71/71 → 83/80 · Arconte 75/81 → 78/72 · Rainha 66/71 → 72/64 · Senhor dos Pesadelos 51/51 → 50/58 (os sem `ia` variam só por ruído).
+- **Encontros** (`sim.js 60 enc`, fácil→mortal; antes → depois, 4 heróis nível 0: 88/75/57/32 → 95/72/50/37; nível 1: 100/95/92/77 → 100/95/88/83; nível 2: 97/80/58/25 → 100/73/45/23). Inalterados (os encontros gerados não usam `ia`), tudo dentro do ruído de ±10.
+- `tools/sim.js` ganhou `SIMDOM=1` (conta Domínios abertos) e `SIMDBG=1` (vida/Aura do chefe a cada turno).

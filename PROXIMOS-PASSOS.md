@@ -4,7 +4,7 @@ Leia primeiro: `README.md`, `ARVORE-SISTEMAS.md` (mecânicas e notação dos nó
 O usuário escreve em português; responda e comente o código em português, no estilo existente. Decisões já tomadas não se perguntam de novo: use `AskUserQuestion` só para decisões novas.
 
 ## Como trabalhar
-- `npm install && npm test` (54 testes devem passar) · `npm run audit` (0 erros; 5 avisos conhecidos de nomes metafóricos) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio.
+- `npm install && npm test` (58 testes devem passar) · `npm run audit` (0 erros; 5 avisos conhecidos de nomes metafóricos) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio.
 - Compare sempre com a base: encontros (nível 0/1/2, fácil→mortal) estavam em ~90/77/93/73/42/23 e chefes entre 46% e 89%. Variação de ±10 pontos é ruído.
 - Toda mecânica nova ganha teste em `tools/test.js`; as de combate passam pelo simulador antes de entrar.
 - Mudou `tree.js` ou `arvore/`: a grade é refeita ao iniciar (skills ficam pelo nome). Nomes de nós precisam ser únicos (`npm run audit` confere).
@@ -13,8 +13,8 @@ O usuário escreve em português; responda e comente o código em português, no
 ## Pendências, em ordem sugerida
 1. **Revisar os 154 nós novos** (`arvore/sistemas.js`) ramo por ramo com o usuário, como foi feito no Kagutsuchi: poder e XP, efeitos, nomes e descrições. Os nós 🆕 das expansões anteriores também continuam sem revisão nó a nó (`REVISAO-ARVORE.md`).
 2. **Testar a interface na mesa de verdade** (só foram abertas a ficha do mestre, a grade e a aba Ofícios, sem erros). Conferir: tela de batalha do jogador (Defender, Concentrar, Coragem, Passar a vez, Ataque Total), faixa de clima/Cadeia/Domínio, barra de Quebra, aprovação de rolagem com Vantagem/Desvantagem, escolha de "conversar com" no acampamento, aba Ofícios do jogador. Ajustar o CSS (`public/style.css`, blocos no fim) em celular.
-3. **IA dos inimigos não usa** Defender, Concentrar, Coragem nem Domínio (de propósito: chefes e gerados só levam ataques e transformações). Decidir com o usuário se algum chefe deve ter Domínio.
-4. **Domínios e trios no bestiário:** `solo` em `content.js` exclui `dom`, `trio` e `v2` dos inimigos.
+3. ✅ **IA dos inimigos** (feito): campo opt-in `ia` no bestiário (`dom`, `defend`, `focus`, `trio`); Domínio em 3 chefes, Defender/Concentrar em 3, trio da Tempestade Ígnea; Coragem **não** foi dada aos inimigos. Ver `DECISOES-SISTEMAS.md`. Pendente: `v2` (fusões) continua fora dos inimigos.
+4. ✅ **Domínios e trios no bestiário** (feito); `solo` continua excluindo `dom`, `trio` e `v2` dos chefes comuns e dos gerados, só o campo `ia` os reabilita.
 5. **Ofícios a refinar:**
    - Ações `checar` (Arrombar, Intimidar, Invenção…) só rolam e pagam ouro; falta uma forma de o mestre registrar o resultado narrado.
    - Receitas de munição: o ouro/preço das munições e runas ainda não está balanceado; loja não vende ingredientes além dos que as cenas dão.
@@ -22,7 +22,7 @@ O usuário escreve em português; responda e comente o código em português, no
    - Slot de munição (`mun`) não aparece na área de equipamentos da ficha.
    - Dívida de Coragem, Tensão e Cadeia não têm som nem animação.
 6. **Itens para o mestre:** janela de edição de receitas, `gather` por cena já existe (chips em Cena); falta editar o catálogo de ofícios sem mexer no código.
-7. **Limpeza:** `README.md` ainda descreve o fluxo antigo de "Forjar" na aba Forja (essências) sem citar Economia de Essência; revisar `docs/index.html` se mudar algo de acesso.
+7. ✅ **Limpeza** (feito): `README.md` descreve a Forja com Economia de Essência e os Ofícios; `docs/index.html` não menciona forja nem acesso novo, ficou como está.
 
 ## Armadilhas conhecidas
 - `strike` e `doAct` em `server.js` concentram quase todos os efeitos; mudanças ali quebram testes de longe. Rode `npm test` a cada passo.
