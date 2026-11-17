@@ -1,4 +1,4 @@
-# Perícias (Ofícios): especificação
+# Perícias (Ofícios): especificação e estado
 
 Ramo de perícias de exploração e passivas, liberado pelo mestre. Decisões tomadas pelo usuário em questionário; implementar
 seguindo `ARVORE-SISTEMAS.md` (notação dos nós) e o motor atual (`server.js`, `public/rules.js`, `content.js`).
@@ -58,3 +58,11 @@ invocações (`SUMMONS`). Se caírem, voltam no descanso longo.
 - Rerrolagem por sessão (Jogos de Azar) com reset pelo mestre.
 - Identificação de demônio salva no bestiário.
 - Pedidos de aprovação do mestre (`GATE`) para as ações novas (`craft`, `gather`, rolagem de perícia).
+
+## Estado da implementação
+Implementado por inteiro em `public/oficios.js` (catálogo: 15 perícias, 227 nós, 30 receitas, runas e assinaturas), `server.js` (ações `ofiAw`, `ofiLearn`, `ofiGive`, `ofiUse`, `craft`, `reroll`, `newSession`, `gatherSet`) e na aba Ofícios de `public/app.js`.
+- **Ficha:** `ofi` (Iniciações), `po`, `pof` (nós aprendidos), `up` (peças modificadas: poder `p`, têmpera `t`, engastes `g`, segundo elemento `el2`, assinatura `sig`, arma viva `living`/`kills`), `rrUsed`.
+- **Forja:** Têmpera até +3 (Armeiro +3 de poder por nível, Couraceiro +1 de armadura, Ourives +2 no atributo), até 3 engastes com runas, Liga de duas essências, Assinatura (12 bônus; crítico dá obra-prima +2), Arma Viva (10/25/50 abates: +1 de poder por estágio; no 3º ignora 40% da armadura e ganha +10 de crítico). Falha comum perde 1 material, desastre perde metade (o ouro só é cobrado no sucesso).
+- **Interpretações:** "Arma Viva aprende uma skill" virou habilidade da própria arma (o 3º estágio); Reparar virou Reciclar; a Invenção do Engenheiro e os testes narrativos são rolagens que o mestre resolve ao aprovar.
+- **Cenas:** `gather` lista o que a coleta acha; o mestre marca na janela Cena.
+- **Testes:** 5 testes novos em `tools/test.js`.

@@ -339,7 +339,8 @@ function brkHit(t, n, by) { // barra de Quebra de chefes e elites: fraquezas a e
   if (by) addChain(by, 25);
   return ` ${t.name} QUEBROU!`;
 }
-function addChain(a, v) { if (!S.battle.active) return; const B = S.battle.chain ??= { h: 0, e: 0 }; B[sideOf(a)] = Math.min(100, B[sideOf(a)] + v); }
+// a Cadeia é só do grupo de heróis
+function addChain(a, v) { if (!S.battle.active || a.enemy) return; const B = S.battle.chain ??= { h: 0, e: 0 }; B[sideOf(a)] = Math.min(100, B[sideOf(a)] + v); }
 function chainBurst(a) { // barra de Cadeia cheia: cada aliado ataca em seguida, com bônus crescente
   const B = S.battle.chain; if (!B || B[sideOf(a)] < 100) return;
   const mates = battlers().filter(o => o.enemy === a.enemy && o.hp > 0 && !skipping(o) && !o.summon);

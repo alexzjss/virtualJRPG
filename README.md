@@ -50,12 +50,12 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
 
 ## Conteúdo padrão
-`content.js` gera a grade de skills (1187 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
+`content.js` gera a grade de skills (1341 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
 Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.
 
 ## Vínculos e personagens base
 Cada caçador tem um ou mais **Vínculos** (Kagutsuchi, Susanoo, Atlas, Indra, Fuhaku, Amaterasu, Tsukuyomi, Shukketsu, Hiruko). Ele só aprende o tronco Marcial e as skills dos próprios Vínculos, e resiste ao elemento deles. O mestre concede Vínculos na aba **Mestre** da ficha.
-A árvore (1187 nós: 90 por Vínculo em 9 ramos, 157 marciais, 110 de Aura e 110 de Ocultismo; veja `REVISAO-ARVORE.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
+A árvore (1341 nós: 90 por Vínculo em 9 ramos, 157 marciais, 110 de Aura e 110 de Ocultismo; veja `REVISAO-ARVORE.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
 
 ## Árvore expandida: transformações, rituais, votos e mais
 Além de dano, cura e condições, os nós agora têm efeitos compostos e sistemas próprios: transformações (uma por vez, com dreno por turno e efeito colateral), golpes concentrados, multi-golpe e ricochete, roubo de vida, detonar condições, execução, escudo, regeneração, purificar, reerguer caídos, contra-ataque, reflexo, esquiva, provocar, guarda-costas, selos que explodem depois, invocações que agem sozinhas, técnicas em dupla, votos e restrições, rituais em círculos com versões Discente e Verdadeiro, e passivas com gatilho. A descrição mecânica de cada nó aparece na grade.
@@ -79,3 +79,14 @@ Os parâmetros ficam em `R.rank`, `R.diff` e `R.grow` no topo de `server.js`. Pa
 ## Requisitos e bifurcações da árvore
 Em cada ramo de 10 nós, os quatro primeiros são o tronco; do nó 4 saem o caminho A (atributo principal do Vínculo) e o caminho B (atributo secundário). As entradas dos caminhos e o nó final têm requisito de atributo (`rq` em `tree.js`).
 Sanidade em 0 é Colapso: o personagem ataca os próprios aliados até recuperar Sanidade. Quem perde um turno por controle fica imune a novo controle por dois turnos.
+
+## Sistemas de batalha e de mesa novos
+Veja `ARVORE-SISTEMAS.md` (mecânicas) e `DECISOES-SISTEMAS.md` (o que foi decidido).
+- **Batalha:** barra de Quebra (chefes e elites), Cadeia, Ataque Total, Passar a Vez, Coragem, Tensão, clima por cena, 8 reações elementais, Expansão de Domínio (nó final de cada Vínculo) e técnicas em trio.
+- **Mesa:** Aflição e Virtude quando a Sanidade zera, Vantagem e Desvantagem (o mestre escolhe ao aprovar a rolagem), laços entre personagens que sobem no "conversar" do acampamento.
+- **Árvore:** slots de passivas (4, mais 1 a cada 100 XP gasto; troca no acampamento), fusões entre Vínculos vizinhos, nós-chave, sinergias Aura × Vínculo, ponte Aura ↔ Ocultismo, busca por efeito e função, caminho até o nó, plano e builds salvas.
+- `npm run audit` confere a árvore (nomes repetidos, XP, poder fora da curva, nomes que não cumprem o efeito).
+
+## Ofícios (perícias)
+Aba própria na ficha, separada da árvore de combate. O mestre concede a **Iniciação** em cada uma das 15 perícias (Forja, Alquimia, Culinária, Medicina, Caça, Investigação, Lábia, Pilotagem, Engenharia, Ladinagem, Sobrevivência, Talismãs, Adestramento, Música, Jogos de Azar). Os nós custam **Pontos de Ofício**, ganhos em sucessos nas rolagens da perícia ou dados pelo mestre. Cada perícia tem 3 graus (Aprendiz, Oficial, Mestre) e a rolagem é d100 contra o melhor atributo dela, mais 10/20/30 pelo grau. Detalhes em `PERICIAS.md`.
+Na janela Cena o mestre marca os **recursos da cena** (o que a coleta acha) e o clima.

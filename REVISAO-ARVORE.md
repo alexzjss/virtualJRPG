@@ -88,3 +88,8 @@ Ramo 1 · nó 1 (Golpe Pesado) apresentado, ainda sem decisão. Demais nós: nã
 - `buildSkills` (content.js): grade 41×41; a 1ª passada põe o ramo 1 de cada Vínculo e os estilos de arma do Marcial,
   depois vêm os 8 treinos (agora reservados antes dos ramos laterais, senão não achavam casa) e por fim os ramos 2..6.
 - `README.md` atualizado para a árvore expandida (1187 nós).
+
+## Sistemas novos (+154 nós) — 🆕 aguardando revisão
+Árvore 1187 → **1341 nós**: ramos 10 e 11 de cada Vínculo (clima, Quebra, fusões, nós-chave, Domínio e 4 trios), sinergias da Aura, ponte do Ocultismo e Quebra e laços no Marcial. `npm run audit` não acha erros (5 avisos conhecidos: nomes como "Muralha de Fogo" e "Gelo na Espinha" que são só metáfora).
+Chefes depois da Quebra (4 heróis, nível 0/2): Ifrit 46/49 · Leviatã 81/81 · Colosso 70/66 · Arconte 71/70 · Rainha dos Corvos 71/65 · Serafim Caído 65/71 · Senhor dos Pesadelos 53/56 · Condessa 78/89 · Filho de Hiruko 60/63. Serafim Caído resolvido (lacaios da fúria sem suporte, HP 0,6, arma −4).
+Id interno `radiacao` renomeado para `hiruko`, com migração do estado salvo.

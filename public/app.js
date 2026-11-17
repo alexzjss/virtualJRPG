@@ -5,7 +5,7 @@ const EL = { fis: 'Físico', kagutsuchi: 'Kagutsuchi·Fogo', susanoo: 'Susanoo·
 const ELC = { fis: '#ffffff', kagutsuchi: '#ff5a1f', susanoo: '#2e8bff', atlas: '#b9853c', indra: '#ffe600', fuhaku: '#7dffb0', amaterasu: '#fff3a0', tsukuyomi: '#8a4dff', shukketsu: '#c10020', hiruko: '#9dff00', aura: '#40e0d0', oculto: '#ff2bd6' };
 const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passiva', form: 'Transformação', util: 'Suporte' }, PASL = { hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx', res: 'Resistência', ...AO }, RES = { aura: 'Aura', san: 'Sanidade' };
 const ST = RULES.ST, STD = RULES.STD; // nomes das condições vêm das regras compartilhadas com o servidor
-const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material' }, WT = { '': '—', lamina: 'Lâmina', lanca: 'Lança', fogo: 'Arma de fogo', punho: 'Punhos' };
+const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material', mun: 'Munição' }, WT = { '': '—', lamina: 'Lâmina', lanca: 'Lança', fogo: 'Arma de fogo', punho: 'Punhos' };
 const EFF = { hp: 'HP', aura: 'Aura', san: 'Sanidade', cure: 'Cura condições', body: 'Trata ferimentos', rev: 'Reanima caído', bomb: 'Bomba' };
 const idesc = i => i.type === 'cons' ? (['hp', 'aura', 'san'].includes(i.eff) ? `+${i.power} ${EFF[i.eff]}` : EFF[i.eff] + (i.eff === 'bomb' ? ` ${i.power} ${EL[i.el] || EL.fis}` : i.power ? ' ' + i.power : ''))
   : i.type === 'arma' ? `${WT[i.wt] || 'Arma'} ${i.power}${i.el ? ' · ' + EL[i.el] : ''}` : i.type === 'acess' ? `${i.attr} +${i.power}${i.el ? ' · resiste ' + EL[i.el] : ''}` : i.type === 'mat' ? 'Material' + (i.el ? ' · ' + EL[i.el] : '') : `Armadura ${i.power}`;
@@ -269,7 +269,7 @@ function iniWin() {
 }
 
 // ===== fichas na tela do mestre: cartão resumido na lista e, na janela própria, as mesmas páginas do jogador mais a aba Mestre =====
-const FT = { pers: 'Personagem', hab: 'Habilidades', itens: 'Itens', hist: 'Diário', gm: 'Mestre' }, ftab = {};
+const FT = { pers: 'Personagem', hab: 'Habilidades', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário', gm: 'Mestre' }, ftab = {};
 const selC = new Set(), qa = { v: 5, st: 'burn', item: '' }; let asking = new Set();
 const sheetCard = c => `<div class="scard ${selC.has(c.id) ? 'sel' : ''} ${asking.has(c.id) ? 'asking' : ''}" data-a="selCard" data-id="${c.id}" style="--c:${esc(c.color)}" aria-pressed="${selC.has(c.id)}">
     <div class="sc-h"><i class="chk" aria-hidden="true"></i><b>${esc(c.name)}</b><small>${c.enemy ? 'Inimigo' : esc(c.owner || 'sem dono')}${(c.vinc || []).map(e => ' · ' + PATRON[e]).join('')}</small></div>
@@ -314,15 +314,57 @@ function gmPanel(c) {
     <div class="card"><h3>Ferimentos <small>clique numa parte para ferir ou curar</small></h3>${bodyFig(c, 'gm')}
       <h3>Ações</h3><div class="row">${btn('horror', 'Teste de horror')}${btn('evolve', 'Evoluir atributos')}${btn('place', c.x == null || c.scene !== S.scene ? 'Pôr no mapa' : 'Tirar do mapa')}${btn('bSave', 'Salvar no bestiário')}${btn('delChar', 'Excluir')}</div></div></section>`;
 }
+
+// ===== Ofícios (perícias): aba própria, pontos de ofício e ações de exploração =====
+const OFI = globalThis.OFI, oUi = {}, oOpen = {};
+const CAMPX = { afiar: 'Afiar a arma (+3 no ataque básico)', armadilha: 'Preparar armadilha', cantar: 'Cantar (Sanidade do grupo)' };
+const campExtra = c => Object.fromEntries((c.pof || []).map(id => OFI.PER[id.split('.')[0]]?.nodes.find(n => n.id === id)).filter(n => n?.camp && CAMPX[n.camp]).map(n => [n.camp, CAMPX[n.camp]]));
+function oficiosPage(c) {
+  const ini = c.ofi || [], mineC = !c.enemy && (gm || mine(c)), inv = Object.entries(c.inv).filter(([k]) => S.items[k]);
+  const ally = Object.values(S.chars).filter(o => !o.enemy && !o.dead), foes = Object.values(S.chars).filter(o => o.enemy);
+  const sel = (nid, f, opts, ph) => `<select data-ou="${nid}:${f}" aria-label="${ph}"><option value="">${ph}</option>${opts.map(([v, l]) => `<option value="${v}" ${oUi[nid]?.[f] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const itemsOf = pred => inv.filter(([k]) => pred(S.items[k])).map(([k]) => [k, S.items[k].name + (c.up?.[k]?.t ? ` +${c.up[k].t}` : '')]);
+  const form = n => { // parâmetros de cada ação
+    const A = n.act, W = i => i.type === 'arma', ALL = i => ['arma', 'armadura', 'acess'].includes(i.type);
+    if (A === 'avaliar') return sel(n.id, 'item', itemsOf(i => ['arma', 'armadura', 'acess', 'cons'].includes(i.type)), 'Item');
+    if (A === 'reciclar') return sel(n.id, 'item', itemsOf(i => ['arma', 'armadura', 'acess', 'cons'].includes(i.type)), 'Item a desmontar');
+    if (A === 'temperar') return sel(n.id, 'item', itemsOf(ALL), 'Peça');
+    if (A === 'engastar') return sel(n.id, 'item', itemsOf(W), 'Arma') + sel(n.id, 'rune', inv.filter(([k]) => S.items[k].rune).map(([k]) => [k, S.items[k].name]), 'Runa');
+    if (A === 'ligar') return sel(n.id, 'item', itemsOf(W), 'Arma') + sel(n.id, 'el2', Object.keys(OFI.ELST).map(e => [e, PATRON[e]]), 'Segundo elemento');
+    if (A === 'assinar') return sel(n.id, 'item', itemsOf(W), 'Arma') + sel(n.id, 'sig', OFI.SIG.map((s, i) => [String(i), `${s.n} (${RULES.modText(s.m)})`]), 'Bônus') + `<input data-ou="${n.id}:nm" placeholder="Nome da peça" value="${esc(oUi[n.id]?.nm || '')}" aria-label="Nome da peça">`;
+    if (A === 'vivo') return sel(n.id, 'item', itemsOf(W), 'Arma');
+    if (A === 'tratar') return sel(n.id, 'target', ally.map(o => [o.id, o.name]), 'Paciente') + (n.v < 3 ? sel(n.id, 'part', Object.entries(PL).map(([k, l]) => [k, l]), 'Parte do corpo') : '');
+    if (A === 'estabilizar') return sel(n.id, 'target', ally.filter(o => o.hp <= 0).map(o => [o.id, o.name]), 'Caído');
+    if (A === 'identificar') return sel(n.id, 'target', foes.map(o => [o.id, o.name]), 'Inimigo');
+    if (A === 'esfolar') return sel(n.id, 'target', foes.filter(o => o.dead && !o.skinned).map(o => [o.id, o.name]), 'Abatido');
+    return '';
+  };
+  const nodeBtn = (p, n) => { const own = (c.pof || []).includes(n.id), why = own ? '' : OFI.whyNot(c, n.id);
+    const info = [n.po + ' PO', n.act && 'ação', n.rec && 'receita', n.camp && 'acampamento', n.comp && 'companheiro', n.hk && 'passivo', n.r && `+${n.r} rolagens`, n.ex && 'escolha excludente'].filter(Boolean).join(' · ');
+    return `<div class="onode ${own ? 'own' : why ? 'lock' : 'av'}" title="${esc(own ? n.d : why || n.d)}"><b>${esc(n.n)}</b><small>${esc(n.d)}</small><i>${own ? 'Aprendido' : info}</i>${own || !mineC ? '' : `<button data-a="ofiLearn" data-id="${c.id}" data-node="${n.id}" ${why ? 'disabled' : ''}>${why ? esc(why) : 'Aprender'}</button>`}${gm ? `<button class="ghost" data-a="ofiGive" data-id="${c.id}" data-node="${n.id}" title="Sem custo (mestre)">${own ? '−' : '+'}</button>` : ''}</div>`; };
+  const perCard = id => {
+    const p = OFI.PER[id], g = OFI.grau(c, id), learnedN = OFI.learned(c, id), acts = learnedN.filter(n => n.act), recs = [...new Set(learnedN.flatMap(n => n.rec || []))].map(r => OFI.REC[r]);
+    const have = (k, q) => (c.inv[Object.keys(S.items).find(i => S.items[i].name === k)] || 0) >= q;
+    return `<details class="card oper" data-oper="${id}" ${oOpen[id] !== false ? 'open' : ''}><summary><b>${esc(p.n)}</b> <small>${g ? OFI.GRAU[g] : 'Iniciado'} · rolagem ${p.a.join('/')} +${OFI.rollBonus(c, id)}%</small></summary><p class="hint">${esc(p.d)}</p>
+      ${[1, 2, 3].map(t => `<h4>${OFI.GRAU[t]}</h4><div class="onodes">${p.nodes.filter(n => n.t === t).map(n => nodeBtn(p, n)).join('')}</div>`).join('')}
+      ${acts.length && mineC ? `<h4>Ações <small>${S.battle.active ? 'fora de combate' : 'rola a perícia; o mestre pode aprovar'}</small></h4>${acts.map(n => `<div class="oact"><b>${esc(n.n)}</b>${form(n)}<button data-a="ofiUse" data-id="${c.id}" data-node="${n.id}" ${S.battle.active && n.act !== 'identificar' ? 'disabled' : ''}>Usar</button></div>`).join('')}` : ''}
+      ${recs.length && mineC ? `<h4>Receitas</h4><div class="orec">${recs.map(r => `<div class="oact"><b>${esc(r.n)}</b><small>${Object.entries(r.mats).map(([k, q]) => `<span class="${have(k, q) ? 'ok' : 'no'}">${q}× ${esc(k)}</span>`).join(' · ')}${r.mealD ? ' → ' + esc(r.mealD) : ''}</small><button data-a="craft" data-id="${c.id}" data-rec="${r.id}" ${S.battle.active ? 'disabled' : ''}>Preparar</button></div>`).join('')}</div>` : ''}</details>`;
+  };
+  const rr = OFI.hook(c, 'rr'), left = Math.max(0, rr - (c.rrUsed || 0));
+  return `<section class="ofi"><div class="card"><h3>Ofícios <small>perícias de exploração e passivas; o mestre concede a Iniciação</small></h3>
+    <div class="row"><span class="rv"><em>PO</em>${edv(c, 'po', c.po || 0)}</span><small>Pontos de Ofício: ganhos com sucessos nas rolagens de perícia ou dados pelo mestre.</small>${rr ? `<button data-a="reroll" data-id="${c.id}" ${left || OFI.hook(c, 'rrSor') ? '' : 'disabled'} title="Repete a última rolagem de atributo">Rolar de novo (${left}/${rr})</button>` : ''}</div>
+    ${gm ? `<h4>Iniciações <small>(mestre)</small></h4><div class="row chips">${chips(Object.fromEntries(OFI.order.map(k => [k, OFI.PER[k].n])), (k, l) => `<span class="${ini.includes(k) ? 'weak' : ''}" data-a="ofiAw" data-id="${c.id}" data-per="${k}">${l}</span>`)}</div>` : ''}</div>
+    ${ini.length ? ini.map(perCard).join('') : '<p class="card none">Nenhuma Iniciação ainda. O mestre concede a Iniciação em cada perícia quando fizer sentido na história.</p>'}</section>`;
+}
 function gmSheet(c) {
   const t = ftab[c.id] || 'pers';
-  const page = t === 'pers' ? persPage(c) : t === 'hab' ? skillPage(c) : t === 'itens' ? itemsPage(c) : t === 'gm' ? gmPanel(c)
+  const page = t === 'pers' ? persPage(c) : t === 'hab' ? skillPage(c) : t === 'ofi' ? oficiosPage(c) : t === 'itens' ? itemsPage(c) : t === 'gm' ? gmPanel(c)
     : `<section class="card hist"><h3>Diário</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio">${esc(c.bio)}</textarea><h3>Notas secretas do mestre</h3><textarea aria-label="Notas do mestre" data-id="${c.id}" data-f="gmNote">${esc(c.gmNote)}</textarea></section>`;
   return `<div class="ftabs">${chips(FT, (k, l) => `<button data-ftab="${k}" data-id="${c.id}" class="${k === t ? 'on' : ''}">${l}</button>`)}</div><div class="fbody">${page}</div>`;
 }
 
 // ===== páginas fora de combate (jogador; o mestre abre a grade em tela cheia pela ficha) =====
-const PAGES = { mesa: 'Mesa', pers: 'Ficha', hab: 'Habilidades', itens: 'Itens', hist: 'Diário' };
+const PAGES = { mesa: 'Mesa', pers: 'Ficha', hab: 'Habilidades', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário' };
 const PATRON = { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' };
 let pg = 'mesa', selCh = null, chatOpen = innerWidth >= 1000, gridFull = null, wasBattle = false;
 const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
@@ -422,7 +464,7 @@ function persPage(c) {
       <div class="card"><h3>Ferimentos</h3>${bodyFig(c)}</div>
       <div class="card"><h3>Equipamento</h3><div class="slots"><div><em>Arma</em>${eqn('arma')}</div><div><em>Armadura</em>${eqn('armadura')}</div><div><em>Acessório</em>${eqn('acess')}</div></div>
         <h3>Afinidades</h3><div class="row chips">${[...c.weak.map(k => `<span class="weak">Fraco: ${EL[k]}</span>`), ...c.resist.map(k => `<span class="res">Resiste: ${EL[k]}</span>`), eq(c, 'acess')?.el ? `<span class="res">Resiste: ${EL[eq(c, 'acess').el]}</span>` : ''].join('') || '<small>Nenhuma fraqueza ou resistência.</small>'}</div></div>
-      ${S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}" data-w="${campWith[c.id] || S.camp.with?.[c.id] || ''}">${l}</span>`)}</div><div class="row"><label>Conversar com <select data-a="campWith" data-id="${c.id}"><option value="">ninguém em especial</option>${Object.values(S.chars).filter(o => !o.enemy && o.id !== c.id && !o.summon).map(o => `<option value="${o.id}" ${(campWith[c.id] || S.camp.with?.[c.id]) === o.id ? 'selected' : ''}>${esc(o.name)} · laço ${RULES.bondLv(S.bonds?.[[c.id, o.id].sort().join('|')] || 0)}</option>`).join('')}</select></label></div></div>` : ''}
+      ${S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips({ ...CAMPL, ...campExtra(c) }, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}" data-w="${campWith[c.id] || S.camp.with?.[c.id] || ''}">${l}</span>`)}</div><div class="row"><label>Conversar com <select data-a="campWith" data-id="${c.id}"><option value="">ninguém em especial</option>${Object.values(S.chars).filter(o => !o.enemy && o.id !== c.id && !o.summon).map(o => `<option value="${o.id}" ${(campWith[c.id] || S.camp.with?.[c.id]) === o.id ? 'selected' : ''}>${esc(o.name)} · laço ${RULES.bondLv(S.bonds?.[[c.id, o.id].sort().join('|')] || 0)}</option>`).join('')}</select></label></div></div>` : ''}
       <div class="card"><h3>Contratos de caça</h3><ul class="plain">${cts || '<li><small>Nenhum contrato aberto.</small></li>'}</ul></div></div></section>`;
 }
 
@@ -446,7 +488,7 @@ function itemsPage(c) {
     <div class="seg" role="tablist">${chips(T, (k, l) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-a="itab" data-k="${k}">${l}</button>`)}</div>${body}
     ${gm ? `<h3>Entregar item <small>só o mestre</small></h3><div class="row"><input class="bq" data-bf="giveq" placeholder="Buscar item pelo nome…" aria-label="Buscar item para entregar" value="${esc(bf.giveq || '')}"></div><div class="row chips">${giveL.map(([k, i]) => `<span data-a="give" data-id="${c.id}" data-item="${k}">+ ${esc(i.name)}</span>`).join('') || '<small>Nenhum item com esse nome.</small>'}${!gq && Object.keys(S.items).length > 12 ? '<small>Digite para achar os outros.</small>' : ''}</div>` : ''}</section>`;
 }
-const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat'];
+const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat', 'mun'];
 
 // tela do jogador em batalha: 1) alvo, 2) ação, 3) pedir ao mestre
 let pick = { k: 'atk', id: 'atk' }, aimOpen = false, braveOn = false, passTo = '', campWith = {};
@@ -511,6 +553,7 @@ function render() {
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
       <div class="row"><label>Casas na largura <input type="number" step="0.25" min="4" max="80" data-map="cols" value="${sc.cols}"></label><small>${Math.round(sc.rows * 10) / 10} de altura</small></div>
       <div class="row"><label>Grade → <input type="range" min="0" max="0.95" step="0.05" data-map="ox" value="${sc.ox}" aria-label="Deslocar grade na horizontal"></label><label>↓ <input type="range" min="0" max="0.95" step="0.05" data-map="oy" value="${sc.oy}" aria-label="Deslocar grade na vertical"></label></div>
+      <div class="row chips">Recursos da cena: ${Object.entries(S.items).filter(([, i]) => i.type === 'mat' && i.tag).map(([k, i]) => `<span class="${(sc.gather || []).includes(k) ? 'weak' : ''}" data-a="gatherSet" data-item="${k}" data-on="${(sc.gather || []).includes(k) ? '' : '1'}" title="O que os ofícios de coleta acham aqui">${esc(i.name)}</span>`).join('')}</div>
       <div class="row chips">Clima: <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
       <div class="row chips">Fundo da batalha: <span class="${sc.bbg ? '' : 'weak'}" data-a="map" data-f="bbg" data-v="" title="Usa a imagem do mapa desta cena">Mapa da cena</span>${chips(BBG, (k, l) => `<span class="${sc.bbg === k ? 'weak' : ''}" data-a="map" data-f="bbg" data-v="${k}">${l}</span>`)}</div>
       <div class="row"><input aria-label="Imagem própria para o fundo da batalha" data-map="bbg" placeholder="Ou cole o link de uma imagem" value="${esc(sc.bbg && !BBG[sc.bbg] ? sc.bbg : '')}"><label class="up">Enviar fundo<input type="file" accept="image/*" data-up="bbg"></label></div>
@@ -529,7 +572,7 @@ function render() {
     if (b && !wasBattle) pg = 'mesa'; // a batalha começou: leva o jogador para a mesa
     wasBattle = b;
     const page = !c ? `<section class="card"><h3>Bem-vindo, ${esc(name)}</h3><p>Você entrou na campanha. O mestre ainda não ligou um personagem à sua conta: assim que ele fizer isso, a ficha aparece aqui sozinha.</p></section>`
-      : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'itens' ? itemsPage(c)
+      : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'ofi' ? oficiosPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
       : chaseBar() + (actor ? battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
     const unread = chatOpen ? 0 : S.log.filter(l => l.n > chatSeen).length, pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
@@ -623,6 +666,7 @@ app.addEventListener('change', e => {
   const el = e.target, d = el.dataset, v = el.type === 'number' || el.type === 'range' ? +el.value : el.type === 'checkbox' ? el.checked : el.value;
   if (el.tagName === 'SELECT' || el.type === 'file') el.blur();
   if (d.a === 'passSel') { passTo = v; return; }
+  if (d.ou) { const [nd, f] = d.ou.split(':'); (oUi[nd] ||= {})[f] = v; return; }
   if (d.a === 'planLoad') { const b = lsGet('vj.builds', [])[+v]; if (b) lsSet('vj.plan.' + d.id, b.nodes); return render(); }
   if (d.a === 'campWith') { campWith[d.id] = v; if (S.camp.acts[d.id] === 'conversar') send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); }
   if (d.up) {
@@ -705,6 +749,7 @@ app.addEventListener('click', e => {
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
   if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
+  if (d.a === 'ofiUse') { const u = oUi[d.node] || {}; return send({ t: 'ofiUse', id: d.id, node: d.node, item: u.item, rune: u.rune, el2: u.el2, sig: u.sig, nm: u.nm, target: u.target, part: u.part }); }
   if (d.a === 'skF') { bf.skf = bf.skf === d.v ? '' : d.v; return render(); }
   if (d.a === 'planT') { const k = 'vj.plan.' + d.id, p = lsGet(k, []); lsSet(k, p.includes(d.name) ? p.filter(n => n !== d.name) : [...p, d.name]); return render(); }
   if (d.a === 'planClear') { lsSet('vj.plan.' + d.id, []); return render(); }

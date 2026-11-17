@@ -38,4 +38,10 @@ Regra geral: **cada mecânica ganha teste em `tools/test.js`; as de combate pass
 - **Renomear o id `radiacao` → `hiruko`**, com migração das fichas salvas na inicialização.
 
 ## Divisão de trabalho
-Perícias em outra sessão (`PERICIAS.md`). Combate, mesa, árvore e pendências nesta.
+Tudo foi feito numa só sessão (a sessão separada de Perícias foi interrompida antes de começar).
+
+## Estado
+Tudo acima foi implementado nesta sessão. Detalhes e arquivos: `ARVORE-SISTEMAS.md` (mecânicas), `PERICIAS.md` (ofícios), `tools/audit.js` e `tools/test.js`.
+- Fraqueza que adianta o turno: derrubar já dava um turno extra; agora acertar fraqueza em quem já está Derrubado reduz a ação em 25%.
+- Passar a Vez e Coragem vão na própria ação (`pass`, `brave`); Defender, Concentrar e Ataque Total são comandos novos.
+- Os nós-chave somam bônus permanentes (`bon`) mesmo que a passiva saia dos slots.
