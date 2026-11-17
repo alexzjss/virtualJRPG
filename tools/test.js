@@ -885,6 +885,14 @@ test('importar pacote com skill de mesmo nome mantém ligações e posição', a
   const s = S.skills[id]; assert.equal(s.power, 99); assert.deepEqual(s.ln, s0.ln); assert.equal(s.wx, s0.wx); assert.equal(s.wy, s0.wy);
   S.skills[id] = s0;
 });
+test('editor: "Liga a" grava ligações nos dois lados e vazio volta à grade', () => {
+  const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const nid = Object.keys(S.skills).find(k => !before.has(k)), gp = sk('Golpe Pesado');
+  H.edSet(gm, { coll: 'skills', id: nid, f: 'lk', v: 'Golpe Pesado|Inexistente' });
+  assert.deepEqual(S.skills[nid].ln, [gp]); assert.ok(S.skills[gp].ln.includes(nid));
+  H.edSet(gm, { coll: 'skills', id: nid, f: 'lk', v: '' });
+  assert.equal(S.skills[nid].ln, undefined); assert.ok(!S.skills[gp].ln.includes(nid));
+  delete S.skills[nid];
+});
 test('segredo: silhueta leva ln, wx, wy; vizinho de grade sem ligação continua escondido', async () => {
   const net = await import('../src/net.js'); reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; const [a, b] = unlinkedPair('kagutsuchi'); h.skills = [a];
   const hid = net.hiddenSkills({ role: 'player', name: 'Ana' }); assert.ok(hid.includes(b), 'vizinho sem ligação à vista');

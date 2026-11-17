@@ -85,6 +85,13 @@ function cleanFoe(o, map) {
   if (o.tune && typeof o.tune === 'object') ch.tune = { hp: Math.min(5, Math.max(.2, +o.tune.hp || 1)), arma: int(o.tune.arma, -20, 20) };
   return ch;
 }
+// "Liga a" do editor: nomes separados por | viram as ligações (ln) do nó, gravadas também nos alvos; vazio volta à vizinhança de grade
+function relink(id, lk) {
+  const o = S.skills[id], want = [...new Set(String(lk || '').split('|').map(n => n.trim()).filter(Boolean).map(n => Object.keys(S.skills).find(k => k !== id && S.skills[k].name === n)).filter(Boolean))];
+  for (const k of o.ln || []) if (S.skills[k]?.ln) S.skills[k].ln = S.skills[k].ln.filter(j => j !== id);
+  if (!want.length) { delete o.ln; return; }
+  o.ln = want; for (const k of want) (S.skills[k].ln ||= []).includes(id) || S.skills[k].ln.push(id);
+}
 // importa juntando pelo nome: o que já existe com o mesmo nome é atualizado, o resto entra como novo; nada do que existe é apagado
 function importPack(p) {
   if (!p || typeof p !== 'object' || p.vj !== 'conteudo') throw new Error('Este arquivo não é um pacote de conteúdo do virtualJRPG.');
@@ -132,6 +139,7 @@ Object.assign(H, {
   edSet: gm((c, m) => {
     if (!Object.hasOwn(SCH, m.coll) || !Object.hasOwn(SCH[m.coll], m.f) || !Object.hasOwn(S[m.coll], m.id)) return;
     const o = S[m.coll][m.id]; o[m.f] = coerce(SCH[m.coll][m.f], m.v, o[m.f]);
+    if (m.coll === 'skills' && m.f === 'lk') relink(m.id, o.lk);
   }),
 });
 
