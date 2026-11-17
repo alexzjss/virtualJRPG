@@ -631,3 +631,10 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
 @keyframes domChip{from{box-shadow:0 0 0 0 #ff7a5900}to{box-shadow:0 0 .8rem 2px #ff7a5999}}
 .stage .domfx{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 38%,#5b21b6aa 100%);mix-blend-mode:screen;animation:domBreath 2.2s ease-in-out infinite alternate}
 @keyframes domBreath{from{opacity:.45}to{opacity:1}}
+body[data-role=table] .stage>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;bottom:1.2vw}
+.unit .brk{font-size:max(10px,1.5cqw);line-height:1.15}
+/* celular: cartões do palco só com barras (os números ficam no painel de comandos) e barra "Sua ação" mais baixa */
+@media(max-width:600px){
+  .stage .unit .duo small,.stage .unit .lim small{display:none}
+  .cmd-go{padding:8px 10px;gap:8px}.cmd-go .sum b{font-size:17px}.cmd-go .go{font-size:16px;white-space:nowrap;min-height:44px}.cmd-go .go:disabled{font-size:14px}
+}
