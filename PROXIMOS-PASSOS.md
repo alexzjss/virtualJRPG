@@ -4,7 +4,7 @@ Leia primeiro: `README.md`, `ARVORE-SISTEMAS.md` (mecânicas e notação dos nó
 O usuário escreve em português; responda e comente o código em português, no estilo existente. Decisões já tomadas não se perguntam de novo: use `AskUserQuestion` só para decisões novas.
 
 ## Como trabalhar
-- `npm install && npm test` (66 testes devem passar) · `npm run audit` (0 erros; 5 avisos conhecidos de nomes metafóricos) · `npm run ui` (teste de fumaça da interface com Chromium/Playwright; `UI_SHOTS=pasta` guarda capturas, `UI_ONLY=celular` roda só um bloco) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio; `node tools/sim.js 300 armas` para o ataque básico de cada arma.
+- `npm install && npm test` (67 testes devem passar) · `npm run audit` (0 erros; 7 avisos conhecidos: 5 de nomes metafóricos e 2 de poder alto nas Pinças do Marcial) · `npm run ui` (teste de fumaça da interface com Chromium/Playwright; `UI_SHOTS=pasta` guarda capturas, `UI_ONLY=celular` roda só um bloco) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio; `node tools/sim.js 300 armas` para o ataque básico de cada arma.
 - Compare sempre com a base: encontros (nível 0/1/2, fácil→mortal) estavam em ~90/77/93/73/42/23 e chefes entre 46% e 89%. Variação de ±10 pontos é ruído.
 - Toda mecânica nova ganha teste em `tools/test.js`; as de combate passam pelo simulador antes de entrar.
 - Mudou `tree.js` ou `arvore/`: a grade é refeita ao iniciar (skills ficam pelo nome). Nomes de nós precisam ser únicos (`npm run audit` confere).
@@ -46,6 +46,7 @@ Ainda sem tratamento: o jogador não vê Coragem/Tensão dos inimigos (a IA nem 
 Feito: perfil do ataque básico pela arma, técnicas da arma (`w:<item>:<n>`), tipos pesada e foco, categorias, níveis, 27 modelos, catálogo de 47 armas, janela **Forja de armas** do mestre, migração `S.itemsV = 2`, 4 testes novos e o bloco de interface no `npm run ui`. Ver `ARMAS.md`.
 Ideias que sobraram:
 - Inimigos do bestiário com arma equipada (hoje só o mestre equipa à mão; os humanos seriam os candidatos). Mexe no equilíbrio: passar no `sim.js` antes.
-- Trilhas da árvore para os tipos novos (pesada e foco ainda não têm técnicas `req` na árvore; vivem das técnicas da arma).
+- ✅ Trilhas da árvore para pesada, foco, corrente, arremesso e arco (10 nós cada). Falta revisá-las nó a nó com o usuário, como as outras.
+- Os 44 modelos da expansão estão só na Forja de armas (o usuário pediu para não mexer em catálogo e lojas agora).
 - Trocar de arma em batalha não custa tempo hoje; se virar abuso, cobrar meio turno.
 - A régua de orçamento não conta as técnicas nem o elemento.

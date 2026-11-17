@@ -200,7 +200,7 @@
     if (s.duo) o.push(`técnica em dupla: um aliado com "${s.duo}" gasta o próximo turno junto`);
     if (s.vow) o.push(`${VOW[s.vow][0]}: ${VOW[s.vow][1]}`);
     if (s.on) o.push(`${ON[s.on]}${s.ch && s.ch < 100 ? ` (${s.ch}%)` : ''}: ${fxText(s.fx)}`);
-    if (s.mod) o.push(modText(s.mod) + (s.sc ? ' ' + (SCN[s.sc] || 'com ' + (g.RULES.PATRON[s.sc] || s.sc)) : ''));
+    if (s.mod) o.push(modText(s.mod) + (s.sc ? ' ' + (SCN[s.sc] || (String(s.sc).startsWith('wt:') ? 'com ' + (g.ARMAS?.TIPOS[s.sc.slice(3)]?.n || s.sc.slice(3)).toLowerCase() + ' (básico e técnicas)' : 'com ' + (g.RULES.PATRON[s.sc] || s.sc))) : ''));
     if (s.bon) o.push(Object.entries(s.bon).map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx' })[k] || k}`).join(', '));
     if (s.amp) o.push(`amplia "${s.amp}": ${[s.up?.p && `+${s.up.p} poder`, s.up?.c && `+${s.up.c} custo`, s.up?.san && `+${s.up.san} Sanidade`, s.up?.area && 'passa a ser em área', s.up?.hits && `${s.up.hits} golpes`, s.up?.fx && fxText(s.up.fx)].filter(Boolean).join(', ')}`);
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);

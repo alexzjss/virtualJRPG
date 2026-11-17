@@ -11,7 +11,7 @@ As técnicas de lâmina, lança, tiro e punho da árvore (`req`) continuam pedin
 
 ## Arquivos
 - `public/armas.js` (compartilhado, `globalThis.ARMAS`): tipos, categorias, níveis, **modelos**, perfil do ataque (`prof`), efeitos do básico (`basicFx`), régua de orçamento (`score`/`rel`), montador (`make`), técnicas (`skill`) e limpeza do rascunho do criador (`clean`).
-- `content.js` → `WEAPONS`: o catálogo padrão (47 armas), todas montadas a partir dos modelos.
+- `content.js` → `WEAPONS`: o catálogo padrão (47 armas), todas montadas a partir dos modelos. Os modelos da expansão (44) ficam só na Forja de armas: o mestre cria as peças quando quiser.
 - `server.js`: `basicOf` (ataque básico pela arma), `SK`/`wSk` (técnicas da arma), `modsOf` (traços, bônus e requisito), `wpnSave` (criador do mestre), migração `S.itemsV = 2`.
 - `public/app.js`: cartões e ficha com os traços e técnicas, aba **Arma** na batalha, botões ⚔ do mestre e a janela **Forja de armas**.
 - `rules.js` ganhou `parseFx`/`parseForm` (antes só em `content.js`) e o caminho inverso `fxSrc`/`formSrc`, para o navegador validar efeitos e copiar técnicas da árvore.
@@ -23,8 +23,25 @@ As técnicas de lâmina, lança, tiro e punho da árvore (`req`) continuam pedin
 | Haste | FOR | alcance e perfuração; técnicas de lança |
 | Arma de fogo | DES | usam a munição equipada; técnicas de tiro |
 | Punhos | FOR | rápidas; técnicas de luta |
-| Arma pesada (nova) | FOR | lentas, derrubam e racham armadura, pedem FOR mínima |
-| Foco místico (novo) | INT | grimórios, cajados, sinos e leques; podem usar SAB ou CAR, ou ferir a Sanidade |
+| Arma pesada | FOR | lentas, derrubam e racham armadura, pedem FOR mínima |
+| Foco místico | INT | grimórios, cajados, sinos, espelhos, tambores, bonecas e tarô; podem usar SAB, CAR ou SOR, ou ferir a Sanidade |
+| Corrente | DES | kusarigama, chicote, mangual, nunchaku, martelo-meteoro: enroscam, derrubam |
+| Arremesso | DES | shuriken, kunai, facas de circo, bumerangue, chakram, boleadeira: rápidos, vários golpes (bumerangue e chakram usam DES/AGI) |
+| Arco e besta | DES | arco curto, yumi, besta, besta de repetição, zarabatana: precisão, perfuração, flechas |
+
+**Distância:** fogo, corrente, arremesso e arco não sofrem **contra-ataque** com o ataque básico, as técnicas da arma e as técnicas de arma da árvore.
+**Munição:** fogo usa balas e arco usa **flechas** (campo `for: 'arco'` no item). A munição pode dar elemento, condição com chance (`st`, `stc`, `stn`) e perfuração (`pierce`); munição do tipo errado não é gasta.
+
+| Flecha | Efeito (8 disparos por pacote) | Receita (Caça) |
+|---|---|---|
+| Flecha de Prata | Amaterasu | Flecheiro (Aprendiz) |
+| Flecha Incendiária | Kagutsuchi | Flecheiro |
+| Flecha Envenenada | 40% de Veneno 3t | Pontas Especiais (Oficial) |
+| Flecha de Ponta de Aço | ignora 40% da armadura | Pontas Especiais |
+| Flecha de Corda | 30% de Enraizado | Flechas de Caçada (Oficial) |
+| Flecha-Sinal | 50% de Marcado | Flechas de Caçada |
+
+Os três nós de Caça entram no fim da lista da perícia, para não mudar os ids dos nós já aprendidos.
 
 ## Campos de uma arma
 Todos opcionais; o padrão vem do tipo.
@@ -34,7 +51,8 @@ Todos opcionais; o padrão vem do tipo.
 | `wa`, `wa2` | atributo do ataque; com dois, usa a **média** (katana: FOR/DES) |
 | `hit`, `crit` | acerto e chance de crítico **do ataque básico** |
 | `ct` | tempo da ação em % (adaga 75, marreta 135) |
-| `hits` | golpes por ataque (pistolas 2, submetralhadora 3); o bônus de atributo se divide e a armadura conta em cada golpe |
+| `hits` | golpes por ataque (submetralhadora 3, shuriken 3); o bônus de atributo se divide e a armadura conta em cada golpe |
+| `dupla` | **arma em par**: um 2º golpe a 50% no mesmo alvo ("Ataque (2ª mão)"). Só com golpe único e sem área; o criador tira o traço se não couber. Sabres Gêmeos, Tonfas, Sai e Pistolas Gêmeas |
 | `area` | o básico acerta todos os inimigos (escopeta, montante) |
 | `pierce` | % da armadura ignorada |
 | `mental` | o básico fere a Sanidade e ignora armadura (sino) |
@@ -70,7 +88,7 @@ Lendárias e malditas não saem da forja elemental: o mestre as entrega.
 `node tools/sim.js 300 armas` mede o mesmo no motor real: as diferenças vêm de sangramento, atordoamento e atraso, que a régua estima e a medição de um golpe não vê.
 
 ## Forja de armas (janela do mestre)
-1. **Modelo**: 27 modelos em 6 tipos. Escolha nível, categoria e elemento; o rascunho é montado na hora.
+1. **Modelo**: 71 modelos em 9 tipos. Escolha nível, categoria e elemento; o rascunho é montado na hora.
 2. **Arma**: nome, tipo, categoria, poder, preço, elemento.
 3. **Ataque básico**: todos os campos acima, com aviso imediato de efeito ou bônus inválido.
 4. **Técnicas**: até 4, novas ou **copiadas da árvore** pela busca; poder, custo, tempo, golpes, usos, % de HP, área, em si, efeitos, forma.
@@ -79,3 +97,12 @@ Lendárias e malditas não saem da forja elemental: o mestre as entrega.
 
 ## Fichas salvas
 Ao iniciar uma campanha antiga (`S.itemsV` < 2), as armas do catálogo antigo ganham os campos novos **pelo nome** (inventários e equipamentos continuam valendo) e as armas novas entram no catálogo. Armas criadas pelo mestre no editor genérico ficam como estavam (sem modelo: punhos neutros no perfil, só poder, tipo e elemento).
+
+## Trilhas da árvore dos tipos novos
+No tronco Marcial (`arvore/marcial.js` → `ARMAS_NOVAS`), 10 nós cada para **pesada, foco, corrente, arremesso e arco**, todos com `req` do tipo e XP 10→45:
+golpes, uma **reação** (contra-ataque, esquiva ou escudo), uma **postura** (transformação), uma **passiva de maestria** e o **golpe final** com requisito 55 (FOR na pesada, INT no foco, DES nos outros).
+A maestria usa o escopo novo `sc: 'wt:<tipo>'`: vale no ataque básico e nas técnicas só com aquele tipo empunhado (ocupa slot de passiva).
+Golpes finais: Queda do Titã, Canal Aberto, Dragão de Ferro, Nuvem de Lâminas, Flecha do Céu Partido.
+
+## Fichas salvas (expansão)
+`S.itemsV = 3`: as Pistolas Gêmeas do catálogo viram arma em par e as flechas entram no catálogo. Skills aprendidas continuam pelo nome (a grade é refeita).

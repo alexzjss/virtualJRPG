@@ -94,6 +94,10 @@
     N('Armadilha Mortal', 'A armadilha deixa o inimigo Atordoado por um turno.', 3, { hk: 'trapStun', v: 1 }),
     N('Cão de Caça', 'Um cão adestrado acompanha o grupo nas lutas.', 3, { comp: 'Lobo Adestrado' }),
     N('Rei da Mata', 'Colheitas de caça rendem o dobro.', 3, { hk: 'yield', v: 2 }),
+    // flechas: no fim da lista, para não mudar os ids dos nós já aprendidos (caca.N)
+    N('Flecheiro', 'Faz flechas de prata e incendiárias para arcos e bestas.', 1, { rec: ['flechaPrata', 'flechaFogo'] }),
+    N('Pontas Especiais', 'Flechas envenenadas e de ponta de aço.', 2, { rec: ['flechaVeneno', 'flechaAco'] }),
+    N('Flechas de Caçada', 'Flechas de corda, que prendem, e flechas-sinal, que marcam o alvo.', 2, { rec: ['flechaCorda', 'flechaSinal'] }),
   ]);
   add('investigacao', 'Investigação', ['INT', 'SAB'], 'Ler o inimigo, decifrar selos e juntar pistas.', [
     N('Olhar Atento', 'Repara no que os outros deixam passar: pista para o mestre.', 1, { act: 'checar', g: 0, r: 5 }),
@@ -279,6 +283,9 @@
     R('atadura', 'Atadura', 'medicina', 1, 'Atadura', { 'Erva Medicinal': 1, 'Papel de Arroz': 1 }), R('isca', 'Isca', 'caca', 2, 'Isca', { 'Carne de Caça': 1, 'Erva Medicinal': 1 }, { qty: 2 }),
     R('municaoPrata', 'Munição de Prata', 'engenharia', 1, 'Munição de Prata', { 'Pólvora': 1, 'Sucata de Ferro': 2 }, { dc: -5 }), R('municaoFogo', 'Munição Incendiária', 'engenharia', 1, 'Munição Incendiária', { 'Pólvora': 1, 'Óleo de Lamparina': 1 }, { dc: -5 }),
     R('municaoSal', 'Munição de Sal', 'engenharia', 2, 'Munição de Sal', { 'Pólvora': 1, 'Sal Sagrado': 2 }, { dc: -5 }),
+    R('flechaPrata', 'Flecha de Prata', 'caca', 1, 'Flecha de Prata', { 'Sucata de Ferro': 2, 'Sal Sagrado': 1 }, { dc: -5 }), R('flechaFogo', 'Flecha Incendiária', 'caca', 1, 'Flecha Incendiária', { 'Sucata de Ferro': 1, 'Óleo de Lamparina': 1 }, { dc: -5 }),
+    R('flechaVeneno', 'Flecha Envenenada', 'caca', 2, 'Flecha Envenenada', { 'Sucata de Ferro': 1, 'Raiz Amarga': 1 }, { dc: -5 }), R('flechaAco', 'Flecha de Ponta de Aço', 'caca', 2, 'Flecha de Ponta de Aço', { 'Sucata de Ferro': 3 }, { dc: -5 }),
+    R('flechaCorda', 'Flecha de Corda', 'caca', 2, 'Flecha de Corda', { 'Sucata de Ferro': 1, 'Couro Curtido': 1 }, { dc: -5 }), R('flechaSinal', 'Flecha-Sinal', 'caca', 2, 'Flecha-Sinal', { 'Sucata de Ferro': 1, 'Pólvora': 1 }, { dc: -5 }),
     R('ofudaCura', 'Ofuda de Cura', 'talismas', 1, 'Ofuda de Cura', { 'Papel de Arroz': 2, 'Sal Sagrado': 2 }), R('ofudaPura', 'Ofuda Purificadora', 'talismas', 1, 'Ofuda Purificadora', { 'Papel de Arroz': 2, 'Sal Sagrado': 1 }),
     R('ofudaFogo', 'Ofuda de Fogo', 'talismas', 2, 'Ofuda de Fogo', { 'Papel de Arroz': 2, 'Óleo de Lamparina': 2 }, { dc: -5 }), R('ofudaSelo', 'Ofuda de Selo', 'talismas', 2, 'Ofuda de Selo', { 'Papel de Arroz': 2, 'Sal Sagrado': 2 }, { dc: -5 }),
     R('ofudaRet', 'Ofuda de Retorno', 'talismas', 2, 'Ofuda de Retorno', { 'Papel de Arroz': 3, 'Sal Sagrado': 3, 'Cogumelo Pálido': 1 }, { dc: -10 }),

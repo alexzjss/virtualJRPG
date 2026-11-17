@@ -56,3 +56,12 @@ Tudo acima foi implementado nesta sessão. Detalhes e arquivos: `ARVORE-SISTEMAS
 - **Medições** (`sim.js 80 boss`, 4 heróis, nível 0 / nível 2; antes → depois): Leviatã 88/91 → 78/93 · Condessa 80/88 → 74/86 · Filho de Hiruko 68/66 → 66/77 · Serafim 80/80 → 76/89 (agora dentro da faixa; ainda alto no nível 2, anotado) · Ifrit 56/49 → 53/55 · Colosso 71/71 → 83/80 · Arconte 75/81 → 78/72 · Rainha 66/71 → 72/64 · Senhor dos Pesadelos 51/51 → 50/58 (os sem `ia` variam só por ruído).
 - **Encontros** (`sim.js 60 enc`, fácil→mortal; antes → depois, 4 heróis nível 0: 88/75/57/32 → 95/72/50/37; nível 1: 100/95/92/77 → 100/95/88/83; nível 2: 97/80/58/25 → 100/73/45/23). Inalterados (os encontros gerados não usam `ia`), tudo dentro do ruído de ±10.
 - `tools/sim.js` ganhou `SIMDOM=1` (conta Domínios abertos) e `SIMDBG=1` (vida/Aura do chefe a cada turno).
+
+## Armas: expansão (questionário desta frente)
+- Tipos novos: **corrente**, **arremesso**, **arco e besta**; armas em par são um **traço** (`dupla`, 2º golpe a 50% no mesmo alvo, só em golpe único), não um tipo.
+- 4 a 6 modelos novos por tipo (71 no total), com o tom misto atual (caçadores de 1910-1920 + folclore japonês). **Só na Forja**: catálogo e lojas ficam para depois.
+- Armas de distância (fogo, corrente, arremesso, arco) **não sofrem contra-ataque**; nenhuma outra regra de distância.
+- **Flechas** no slot de munição (prata, incendiária, envenenada, ponta de aço, corda, sinal), no catálogo e com receita na Caça; arremesso não usa munição.
+- Arremesso usa DES (bumerangue e chakram: média DES/AGI). Os tipos novos ganham golpe supremo de lendária.
+- Pistolas Gêmeas viram arma em par.
+- **Trilhas de 10 nós** no tronco Marcial para pesada, foco, corrente, arremesso e arco, com postura, reação, passiva de maestria e golpe final com requisito 55 do atributo do tipo.

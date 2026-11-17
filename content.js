@@ -140,6 +140,10 @@ export function buildItems(it) {
   // runas: o preço acompanha o custo da receita (~1,7× os ingredientes) e o poder do efeito; veja a economia em PERICIAS.md
   [['Precisão', 45], ['Força', 45], ['Brasa', 55], ['Veneno', 55], ['Trovão', 60], ['Sangue', 60]].forEach(([r, price]) => add('Runa de ' + r, 'mat', 0, { rune: 1, price }));
   add('Munição de Prata', 'mun', 0, { el: 'amaterasu', shots: 6, price: 30 }); add('Munição Incendiária', 'mun', 0, { el: 'kagutsuchi', shots: 6, price: 24 }); add('Munição de Sal', 'mun', 0, { el: 'amaterasu', shots: 6, price: 36, salt: 1 });
+  // flechas (slot de munição de arcos e bestas): elemento, condição ou perfuração por 8 disparos; feitas na Caça
+  [['Flecha de Prata', { el: 'amaterasu', price: 26 }], ['Flecha Incendiária', { el: 'kagutsuchi', price: 18 }], ['Flecha Envenenada', { st: 'poison', stc: 40, stn: 3, price: 20 }],
+    ['Flecha de Ponta de Aço', { pierce: 40, price: 22 }], ['Flecha de Corda', { st: 'root', stc: 30, stn: 1, price: 18 }], ['Flecha-Sinal', { st: 'marked', stc: 50, stn: 2, price: 20 }]]
+    .forEach(([name, o]) => add(name, 'mun', 0, { for: 'arco', shots: 8, el: '', ...o }));
   add('Ofuda de Cura', 'cons', 40, { eff: 'hp', price: 30 }); add('Ofuda Purificadora', 'cons', 0, { eff: 'cure', price: 25 }); add('Ofuda de Fogo', 'cons', 30, { eff: 'bomb', el: 'kagutsuchi', price: 30 });
   add('Ofuda de Selo', 'cons', 32, { eff: 'bomb', el: 'amaterasu', price: 32 }); add('Ofuda de Retorno', 'cons', 35, { eff: 'rev', price: 60 }); add('Isca', 'mat', 0, { tag: 'carne', price: 5 });
   // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)

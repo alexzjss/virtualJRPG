@@ -551,7 +551,7 @@ test('armas: o ataque básico vem da arma (atributo, tempo, golpes, área, condi
   assert.equal(hp - e.hp, b.power + Math.floor(50 / 10)); // stat = (90 + 10) / 2 = 50
   [a, e] = duelW(); const e2 = mk(gm, { enemy: true }); derive(e2); e2.hp = e2.hpMax; S.battle.ticks[e2.id] = 900; arm(a, 'Escopeta de Cano Serrado'); assert.equal(basicOf(a).area, true);
   const h1 = e.hp, h2 = e2.hp; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.hp < h1 && e2.hp < h2, 'escopeta acerta todos');
-  [a, e] = duelW(); arm(a, 'Pistolas Gêmeas'); const n0 = S.log.length; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.equal(S.log.slice(n0).filter(l => /^Ataque → /.test(l.text)).length, 2, 'dois tiros');
+  [a, e] = duelW(); arm(a, 'Pistolas Gêmeas'); const n0 = S.log.length; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.equal(basicOf(a).dupla, true); assert.equal(S.log.slice(n0).filter(l => /^Ataque → /.test(l.text)).length, 1); assert.equal(S.log.slice(n0).filter(l => /^Ataque \(2ª mão\) → /.test(l.text)).length, 1, 'arma em par: segundo tiro');
   [a, e] = duelW(); arm(a, 'Garras de Ferro'); assert.ok(basicOf(a).fx.some(f => f.t === 'st' && f.k === 'bleed' && f.ch === 20)); turn(a); fixR(.1, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.st.bleed > 0, 'sangramento por chance');
   [a, e] = duelW(); arm(a, 'Sino de Exorcismo'); assert.equal(basicOf(a).kind, 'mental'); assert.equal(basicOf(a).attr, 'CAR'); const san = e.san; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.san < san, 'o sino fere a Sanidade');
 });
@@ -592,4 +592,34 @@ test('armas: modelos geram armas válidas e dentro da régua; o criador do mestr
   assert.ok(S.log.at(-1).to === '@gm' && /Corrigido/.test(S.log.at(-1).text), 'erros avisados só ao mestre');
   H.wpnSave(gm, { id: k, w: { ...w, power: 33 } }); assert.equal(S.items[k].power, 33); assert.equal(Object.keys(S.items).length, n + 1, 'regravar não cria outra');
   const h = mk(ana, {}), lend = itm2('Aurora do Último Dia'), ess = itm2('Essência de Amaterasu'); h.inv[ess] = 9; h.gold = 99999; H.forge(ana, { id: h.id, item: lend }); assert.equal(h.inv[lend], undefined, 'lendária não sai da forja');
+});
+test('armas (expansão): distância não sofre contra-ataque, flechas no slot de munição, arma em par e trilhas novas', () => {
+  const novo = (tpl, o = {}) => { const k = 'tw' + tpl; S.items[k] = { ...AR.make(tpl, o), eff: 'hp', attr: 'SOR' }; return k; };
+  const equipK = (a, k) => { a.inv[k] = 1; a.equip.arma = k; };
+  // contra-ataque: a lâmina leva o revide, o arco e a corrente não
+  for (const [tpl, revida] of [['sabre', true], ['arcocurto', false], ['chicote', false]]) {
+    const [a, e] = duelW(); equipK(a, novo(tpl)); e.st.counter = 3; e.hp = e.hpMax = 999; const hp = a.hp; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id }));
+    assert.equal(S.log.some(l => /contra-ataca/.test(l.text)), revida, tpl); if (!revida) assert.equal(a.hp, hp);
+  }
+  // flechas: só valem no arco, gastam disparos e trazem condição e perfuração
+  let [a, e] = duelW(); equipK(a, novo('yumi')); const fl = itm2('Flecha Envenenada'); a.inv[fl] = 2; a.equip.mun = fl; e.hp = e.hpMax = 999;
+  turn(a); fixR(.1, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(e.st.poison > 0, 'flecha envenenada'); assert.equal(a.shots[fl], 7); assert.equal(a.inv[fl], 1);
+  const bala = itm2('Munição de Prata'); a.inv[bala] = 1; a.equip.mun = bala; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.equal(a.shots?.[bala], undefined, 'bala não serve no arco');
+  [a, e] = duelW(); equipK(a, novo('arcocurto')); const aco = itm2('Flecha de Ponta de Aço'); a.inv[aco] = 1; a.equip.mun = aco; e.armor = 10; e.hp = e.hpMax = 999; const h0 = e.hp;
+  turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); const comAco = h0 - e.hp;
+  delete a.equip.mun; e.hp = 999; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'atk', target: e.id })); assert.ok(comAco > 999 - e.hp, 'ponta de aço ignora armadura');
+  assert.ok(['Flecha de Prata', 'Flecha Incendiária', 'Flecha de Corda', 'Flecha-Sinal'].every(n => S.items[itm2(n)]?.for === 'arco'));
+  // em par: o criador tira o traço de arma com área ou vários golpes
+  const { w, errs } = AR.clean({ ...AR.make('escopeta'), dupla: true }); assert.equal(w.dupla, undefined); assert.ok(errs.length);
+  assert.ok(AR.make('sabresg').dupla && AR.make('tonfas').dupla && AR.make('sai').dupla && AR.make('pistolas').dupla);
+  // trilhas novas: 10 nós por tipo, com req, postura, reação, maestria e golpe final com requisito 55
+  for (const wt of ['pesada', 'foco', 'corrente', 'arremesso', 'arco']) {
+    const ns = Object.values(S.skills).filter(x => x.req === wt); assert.equal(ns.length, 10, wt);
+    assert.ok(ns.some(x => x.kind === 'form') && ns.some(x => x.kind === 'util') && ns.some(x => x.rq && Object.values(x.rq)[0] === 55), wt);
+    assert.ok(ns.some(x => x.kind === 'passive' && x.sc === 'wt:' + wt), wt + ': maestria');
+  }
+  // maestria: só com o tipo certo empunhado
+  [a, e] = duelW(); a.skills.push(sk('Olho de Falcão')); a.pslots = [sk('Olho de Falcão')]; equipK(a, novo('arcocurto'));
+  const comArco = modsOf(a, { basic: true }).hit; equipK(a, novo('sabre')); assert.equal((comArco - 5) - (modsOf(a, { basic: true }).hit - 5), 10, 'Olho de Falcão: +10 de acerto só com arco'); // arco curto e sabre têm +5 de acerto próprio
+  for (const k of Object.keys(S.items)) if (k.startsWith('tw')) delete S.items[k];
 });

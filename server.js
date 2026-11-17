@@ -83,12 +83,18 @@ if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; del
 S.items ??= buildItems(it);
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
-if (S.itemsV !== 2) { // armas com modelo (perfil do ataque e técnicas): as do catálogo antigo ganham os campos novos pelo nome, as que faltam entram no catálogo
+if ((S.itemsV || 0) < 2) { // armas com modelo (perfil do ataque e técnicas): as do catálogo antigo ganham os campos novos pelo nome, as que faltam entram no catálogo
   const cat0 = buildItems(it), byName = Object.fromEntries(Object.values(cat0).map(i => [i.name, i]));
   for (const i of Object.values(S.items)) if (i.type === 'arma' && !i.tpl && byName[i.name]?.type === 'arma') Object.assign(i, structuredClone(byName[i.name]));
   const have = new Set(Object.values(S.items).map(i => i.name));
   for (const w of Object.values(cat0)) if (w.type === 'arma' && !have.has(w.name)) S.items['w' + crypto.randomBytes(4).toString('hex')] = structuredClone(w);
   S.itemsV = 2;
+}
+if (S.itemsV < 3) { // expansão das armas: Pistolas Gêmeas viram arma em par; flechas entram no catálogo
+  const cat0 = buildItems(it), byName = Object.fromEntries(Object.values(cat0).map(i => [i.name, i])), have = new Set(Object.values(S.items).map(i => i.name));
+  for (const i of Object.values(S.items)) if (i.tpl === 'pistolas' && i.hits === 2 && byName[i.name]) Object.assign(i, structuredClone(byName[i.name]), { hits: undefined });
+  for (const m of Object.values(cat0)) if (m.type === 'mun' && !have.has(m.name)) S.items['m' + crypto.randomBytes(4).toString('hex')] = structuredClone(m);
+  S.itemsV = 3;
 }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
@@ -226,7 +232,7 @@ function normSlots(ch) { // mantém só passivas aprendidas, respeita o limite e
 }
 const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; return s && s.kind === 'passive' && (!slotted(s) || ch.enemy || ch.summon || !Array.isArray(ch.pslots) || ch.pslots.includes(k)); }).map(k => S.skills[k]);
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
-const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : s.el === sc;
+const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : sc.startsWith('wt:') ? !!(s.basic || s.req || s.wpn) && wtype(ch) === sc.slice(3) : s.el === sc; // wt:<tipo> = maestria de um tipo de arma
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
   const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
@@ -282,7 +288,7 @@ const wpPow = a => { const u = a.up?.[a.equip?.arma]; return u ? (u.p || 0) + (u
 // ataque básico: vem da arma empunhada (atributo, tempo, golpes, área, condições e efeitos do perfil); sem arma, punhos com FOR e o poder base
 const basicOf = a => { const wp = eq(a, 'arma'), P = AR.prof(wp);
   return { name: P.atkN || 'Ataque', kind: P.mental ? 'mental' : 'dmg', attr: P.wa, ...(P.wa2 ? { attr2: P.wa2 } : {}), el: wp?.el || 'fis', power: (wp?.power ?? a.arma) + wpPow(a) + modsOf(a, { basic: true }).atkP, cost: 0, res: 'aura', basic: true,
-    ct: P.ct, ...(P.hits > 1 ? { hits: P.hits } : {}), area: P.area, fx: AR.basicFx(wp), pay: {} }; };
+    ct: P.ct, ...(P.hits > 1 ? { hits: P.hits } : {}), ...(P.dupla ? { dupla: true } : {}), area: P.area, fx: AR.basicFx(wp), pay: {} }; };
 const battlers = () => Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead);
 const skipping = o => o.st.stun || o.st.frozen || o.st.sleep || o.chg;
 // técnica em dupla (1 nome) ou em trio (2 nomes): aliados de pé e distintos, que conhecem a skill par e podem pagar por ela
@@ -552,15 +558,15 @@ function redirect(a, t) { // provocar, guarda-costas e furtividade mudam o alvo 
   const g = t.st.guarded && S.chars[t.guardBy]; if (g && g.hp > 0 && g.id in S.battle.ticks && g.enemy === t.enemy) t = g;
   return t;
 }
-function ammoFor(a, s) { // munição equipada: dá o elemento por N tiros, só em armas de fogo
-  const id = a.equip?.mun, am = S.items[id];
-  if (!am || am.type !== 'mun' || wtype(a) !== 'fogo' || !(s.basic || s.req === 'fogo' || s.wpn) || s.kind === 'mental') return null;
+function ammoFor(a, s) { // munição equipada: balas (armas de fogo) ou flechas (arcos e bestas), por N tiros: elemento, condição e perfuração
+  const id = a.equip?.mun, am = S.items[id], wt = wtype(a);
+  if (!am || am.type !== 'mun' || !AR.MUN(wt) || (am.for || 'fogo') !== wt || !(s.basic || s.req === wt || s.wpn) || s.kind === 'mental') return null;
   a.shots ??= {};
   if (!(a.shots[id] > 0)) { if (!(a.inv[id] > 0)) { delete a.equip.mun; return null; } if (--a.inv[id] <= 0) delete a.inv[id]; a.shots[id] = am.shots + OF.hook(a, 'tiros'); log(a.name, `abre um pacote de ${am.name} (${a.shots[id]} tiros).`, ''); }
   a.shots[id]--; return am;
 }
 function strike(a, s, t, aim, bonus = 0, o = {}) {
-  const am = ammoFor(a, s); if (am) s = { ...s, el: am.el };
+  const am = ammoFor(a, s); if (am) { const pi = Math.max(am.pierce || 0, s.fx?.find(f => f.t === 'pierce')?.p || 0); s = { ...s, el: am.el || s.el, fx: [...(s.fx || []).filter(f => f.t !== 'pierce'), ...(pi ? [{ t: 'pierce', p: pi }] : []), ...(am.st ? [{ t: 'st', k: am.st, n: am.stn || 2, ch: am.stc ?? 100 }] : [])] }; }
   const ma = modsOf(a, s), stat = statOf(a, s), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal' || s.kind === 'util') {
     const fallen = t.hp <= 0; let txt = '';
@@ -623,7 +629,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (w) a.bt.wkNow = true;
   if (crit) trig(a, 'crit', t);
   if (w) trig(a, 'weak', t);
-  if (t.st.counter && t.hp > 0 && !mental && !s.area && !o.counter && a.hp > 0 && t !== a && t.enemy !== a.enemy && !skipping(t)) { log(t.name, 'contra-ataca!', 'ok'); strike(t, basicOf(t), a, null, 0, { counter: true }); }
+  if (t.st.counter && t.hp > 0 && !mental && !s.area && !o.counter && !((s.basic || s.req || s.wpn) && AR.DIST(wtype(a))) /* arma de distância não sofre contra-ataque */ && a.hp > 0 && t !== a && t.enemy !== a.enemy && !skipping(t)) { log(t.name, 'contra-ataca!', 'ok'); strike(t, basicOf(t), a, null, 0, { counter: true }); }
   return down && was;
 }
 // ---------- ação de combate (jogador aprovado, mestre, IA, concentração liberada) ----------
@@ -659,7 +665,10 @@ function doAct(a, m, bonus = 0) {
   if (prs.length) log(a.name, `e ${prs.map(pr => pr.p.name).join(' e ')} executam juntos ${s.name}!`, 'ok');
   let more = false; a.bt ??= {}; a.bt.wkNow = false;
   const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : null;
-  for (const t of ts) for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus }) || more; }
+  for (const t of ts) {
+    for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus }) || more; }
+    if (s.dupla && off && !t.dead && t.hp > 0) more = strike(a, { ...s, name: s.name + ' (2ª mão)' }, t, aim, bonus, { plus, mult: .5 }) || more; // arma em par: segundo golpe a 50%
+  }
   const ch = s.fx?.find(f => f.t === 'chain');
   if (ch && off && ts.length === 1) inB.filter(o => o.enemy === ts[0].enemy && o !== ts[0] && o.hp > 0).sort(() => Math.random() - .5).slice(0, ch.n).forEach((o, i) => strike(a, s, o, null, bonus, { mult: ch.m ** (i + 1), plus }));
   onceFx(a, s, stat);

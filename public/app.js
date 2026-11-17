@@ -7,7 +7,7 @@ const KIND = { dmg: 'Dano', mental: 'Dano mental', heal: 'Cura', passive: 'Passi
 const ST = RULES.ST, STD = RULES.STD; // nomes das condições vêm das regras compartilhadas com o servidor
 const IT = { cons: 'Consumível', arma: 'Arma', armadura: 'Armadura', acess: 'Acessório', mat: 'Material', mun: 'Munição' }, WT = { '': '—', ...Object.fromEntries(Object.entries(ARMAS.TIPOS).map(([k, t]) => [k, t.n])) }, CATN = Object.fromEntries(Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]));
 const EFF = { hp: 'HP', aura: 'Aura', san: 'Sanidade', cure: 'Cura condições', body: 'Trata ferimentos', rev: 'Reanima caído', bomb: 'Bomba' };
-const idesc = i => i.type === 'mun' ? `${i.shots} tiros${i.el ? ' · ' + EL[i.el] : ''}${i.salt ? ' · purifica' : ''}` : i.type === 'cons' ? (['hp', 'aura', 'san'].includes(i.eff) ? `+${i.power} ${EFF[i.eff]}` : EFF[i.eff] + (i.eff === 'bomb' ? ` ${i.power} ${EL[i.el] || EL.fis}` : i.power ? ' ' + i.power : ''))
+const idesc = i => i.type === 'mun' ? `${i.for === 'arco' ? 'Flechas' : 'Balas'} · ${i.shots} disparos${i.el ? ' · ' + EL[i.el] : ''}${i.st ? ` · ${i.stc < 100 ? i.stc + '% de ' : ''}${ST[i.st]}` : ''}${i.pierce ? ` · ignora ${i.pierce}% da armadura` : ''}${i.salt ? ' · purifica' : ''}` : i.type === 'cons' ? (['hp', 'aura', 'san'].includes(i.eff) ? `+${i.power} ${EFF[i.eff]}` : EFF[i.eff] + (i.eff === 'bomb' ? ` ${i.power} ${EL[i.el] || EL.fis}` : i.power ? ' ' + i.power : ''))
   : i.type === 'arma' ? `${WT[i.wt] || 'Arma'}${i.cat && i.cat !== 'basica' ? ' ' + (CATN[i.cat] || '').toLowerCase() : ''} · poder ${i.power}${i.el ? ' · ' + EL[i.el] : ''}` : i.type === 'acess' ? `${i.attr} +${i.power}${i.el ? ' · resiste ' + EL[i.el] : ''}` : i.type === 'mat' ? 'Material' + (i.el ? ' · ' + EL[i.el] : '') : `Armadura ${i.power}`;
 const shop = () => S.scenes[S.scene].shop; // cada cena tem a sua loja
 let ctMode = false;
@@ -432,7 +432,7 @@ function armasWin() {
     <div class="row"><label>Poder ${num('power', D.power, 0, 99)}</label><label>Preço ${num('price', D.price, 0, 99999)}</label><label>Elemento ${sel('el', D.el, ELO)}</label><label>Nível ${sel('lvl', D.lvl, ARMAS.NIVEIS.map((n, i) => [i, n.n]))}</label></div>
     <h4>3. Ataque básico <small>${esc(T0?.d || '')}</small></h4>
     <div class="row"><label>Nome ${txt('atkN', D.atkN, 'Ataque', '', 30)}</label><label>Atributo ${sel('wa', D.wa, [['', `do tipo (${T0?.wa || 'FOR'})`], ...AT])}</label><label>2º atributo ${sel('wa2', D.wa2, [['', '— nenhum'], ...AT])}</label></div>
-    <div class="row"><label>Acerto ${num('hit', D.hit, -50, 50)}</label><label>Crítico ${num('crit', D.crit, 0, 50)}</label><label>Tempo % ${num('ct', D.ct || 100, 40, 200)}</label><label>Golpes ${num('hits', D.hits || 1, 1, 6)}</label><label>Perfura % ${num('pierce', D.pierce, 0, 100)}</label>${chk('area', D.area, 'em área')}${chk('mental', D.mental, 'fere a Sanidade')}</div>
+    <div class="row"><label>Acerto ${num('hit', D.hit, -50, 50)}</label><label>Crítico ${num('crit', D.crit, 0, 50)}</label><label>Tempo % ${num('ct', D.ct || 100, 40, 200)}</label><label>Golpes ${num('hits', D.hits || 1, 1, 6)}</label><label>Perfura % ${num('pierce', D.pierce, 0, 100)}</label>${chk('area', D.area, 'em área')}${chk('dupla', D.dupla, 'em par (2º golpe a 50%)')}${chk('mental', D.mental, 'fere a Sanidade')}</div>
     <div class="row"><label>Condição ${sel('st', D.st, STO)}</label><label>Chance % ${num('stc', D.st ? D.stc ?? 100 : 0, 0, 100)}</label><label>Turnos ${num('stn', D.stn || 3, 1, 6)}</label></div>
     <div class="row"><label class="g">Efeitos ${txt('fx', D.fx, 'exec 30 1.5; vs bleed 1.3; push 20; drain hp 20; st marked 2 30%')}</label></div>
     <div class="row"><label class="g">Bônus empunhada ${txt('mod', D.mod, 'def 5; agi -5; FOR 3', 'w', 80)}</label><label>Requisito ${txt('rq', D.rq, 'FOR 50', '', 40)}</label></div>
@@ -653,7 +653,7 @@ function persPage(c) {
 }
 
 // resumo da munição equipada na página Personagem
-const munLine = c => { const i = S.items[c.equip.mun]; return i ? `<b>${esc(i.name)}</b><small>${c.shots?.[c.equip.mun] || 0} tiro(s) no pente · ${c.inv[c.equip.mun] || 0} pacote(s)</small>` : '<b class="none">Vazio</b><small>só para armas de fogo</small>'; };
+const munLine = c => { const i = S.items[c.equip.mun]; return i ? `<b>${esc(i.name)}</b><small>${c.shots?.[c.equip.mun] || 0} tiro(s) no pente · ${c.inv[c.equip.mun] || 0} pacote(s)</small>` : '<b class="none">Vazio</b><small>balas para armas de fogo, flechas para arcos e bestas</small>'; };
 let itab = 'inv';
 // peças modificadas pelos ofícios: têmpera, engastes, segundo elemento, assinatura e arma viva (c.up[id])
 const ESTAGIOS = [10, 25, 50];
@@ -670,10 +670,10 @@ function upInfo(c, k, i) {
 }
 // munição: o slot "mun" vale só para armas de fogo; guarda os tiros restantes do pente aberto (c.shots) e os pacotes no inventário
 function munSlot(c, btn) {
-  const k = c.equip.mun, i = S.items[k], fogo = eq(c, 'arma')?.wt === 'fogo', per = i ? i.shots + OFI.hook(c, 'tiros') : 0;
-  if (!i) { const tem = Object.entries(c.inv).filter(([id]) => S.items[id]?.type === 'mun'); return `<div class="slot"><em>Munição</em><b class="none">Vazio</b><small>${tem.length ? 'só para armas de fogo' : 'prepare na Engenharia ou compre na loja'}</small>${tem.map(([id, q]) => btn('equip', `Equipar ${esc(S.items[id].name.replace('Munição de ', '').replace('Munição ', ''))} ×${q}`, id, 'class="ghost"')).join('')}</div>`; }
+  const k = c.equip.mun, i = S.items[k], fogo = !!i && (i.for || 'fogo') === (eq(c, 'arma')?.wt || 'punho'), per = i ? i.shots + OFI.hook(c, 'tiros') : 0;
+  if (!i) { const tem = Object.entries(c.inv).filter(([id]) => S.items[id]?.type === 'mun'); return `<div class="slot"><em>Munição</em><b class="none">Vazio</b><small>${tem.length ? 'balas para armas de fogo, flechas para arcos e bestas' : 'balas na Engenharia, flechas na Caça, ou compre na loja'}</small>${tem.map(([id, q]) => btn('equip', `Equipar ${esc(S.items[id].name.replace('Munição de ', '').replace('Munição ', ''))} ×${q}`, id, 'class="ghost"')).join('')}</div>`; }
   const pente = c.shots?.[k] || 0, pac = c.inv[k] || 0;
-  return `<div class="slot on"><em>Munição</em><b>${esc(i.name)}</b><small>${pente} tiro(s) no pente${pac ? ` · ${pac} pacote(s) de ${per}` : ' · sem pacotes de reserva'}${i.el ? ` · ${EL[i.el]}` : ''}</small>${fogo ? '' : '<small class="warn">A arma equipada não é de fogo: a munição não é usada.</small>'}${btn('equip', 'Tirar', k, 'class="ghost"')}</div>`;
+  return `<div class="slot on"><em>Munição</em><b>${esc(i.name)}</b><small>${pente} tiro(s) no pente${pac ? ` · ${pac} pacote(s) de ${per}` : ' · sem pacotes de reserva'}${i.el ? ` · ${EL[i.el]}` : ''}</small>${fogo ? '' : `<small class="warn">A arma equipada não usa ${i.for === 'arco' ? 'flechas' : 'balas'}: a munição não é gasta.</small>`}${btn('equip', 'Tirar', k, 'class="ghost"')}</div>`;
 }
 function itemsPage(c) {
   const sh = shop(), card = (k, i, foot, q) => `<div class="icard t-${i.type}" style="--e:${ELC[i.el] || 'var(--line)'}"><em>${IT[i.type]}${i.type === 'arma' && i.cat ? ` · ${CATN[i.cat]}` : ''}</em><b>${esc(i.name)}${q > 1 ? ` <i>×${q}</i>` : ''}</b><small>${esc(idesc(i))}</small>${wpnInfo(i, c)}${upInfo(c, k, i)}<div class="row">${foot}</div></div>`;
