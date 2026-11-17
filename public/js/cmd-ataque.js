@@ -27,8 +27,8 @@
 .cm-aim .xh:before,.cm-aim .xh:after{content:'';position:absolute;background:#ff2b3d;left:50%;top:50%}.cm-aim .xh:before{width:3px;height:92px;margin:-46px 0 0 -1.5px}.cm-aim .xh:after{height:3px;width:92px;margin:-1.5px 0 0 -46px}
 @keyframes cmpt{to{box-shadow:0 0 18px #ffd24a;transform:translate(-50%,-50%) scale(1.12)}}
 .cm canvas{width:min(100%,100%);aspect-ratio:1/1;border-radius:14px;background:rgba(10,6,16,.75);border:4px solid #000;box-shadow:0 0 0 3px var(--ac);touch-action:none}
-.cm-skip{position:absolute;right:12px;bottom:calc(11vh + 14px);z-index:11;font:800 14px/1 Barlow,sans-serif;letter-spacing:2px;padding:12px 18px;min-height:44px;border-radius:8px;border:2px solid #fff;background:rgba(0,0,0,.6);color:#fff;pointer-events:auto}
-@media (max-width:599px){.cm-skip{bottom:calc(8vh + 8px)}}`;
+.cm-skip{position:absolute;right:12px;bottom:calc(11vh + 64px);z-index:11;font:800 14px/1 Barlow,sans-serif;letter-spacing:2px;padding:12px 18px;min-height:44px;border-radius:8px;border:2px solid #fff;background:rgba(0,0,0,.6);color:#fff;pointer-events:auto}
+@media (max-width:599px){.cm-skip{bottom:calc(8vh + 72px)}}`;
   document.head.append(css);
   const ARROW = { ArrowUp: '↑', KeyW: '↑', ArrowRight: '→', KeyD: '→', ArrowDown: '↓', KeyS: '↓', ArrowLeft: '←', KeyA: '←' };
   const PART_POS = { head: [.5, .14], torso: [.5, .42], armL: [.22, .42], armR: [.78, .42], legL: [.38, .8], legR: [.62, .8] };
