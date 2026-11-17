@@ -94,6 +94,7 @@ function fixShape() {
   if (!isObj(S.battle.ticks)) S.battle.ticks = {};
   for (const [id, t] of Object.entries(S.battle.ticks)) if (!Number.isFinite(t) || !S.chars[id]) delete S.battle.ticks[id];
   S.battle.active = !!S.battle.active;
+  S.paused = !!S.paused;
   if (!isObj(S.camp)) S.camp = { open: false, acts: {} };
   if (!isObj(S.camp.acts)) S.camp.acts = {};
   for (const sc of Object.values(S.scenes)) {
