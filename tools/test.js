@@ -2,7 +2,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
-const { H, S, current, derive, view, handle } = await import('../server.js');
+const { H, S, current, derive, view, handle, modsOf, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 const { TREE } = await import('../tree.js');
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
@@ -10,15 +10,15 @@ const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, c.role === 'player' ? { ...m, owner: c.name } : m); /* só o mestre cria; o de jogador nasce com dono */ const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 
-test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1180); assert.ok(Object.keys(S.items).length >= 50); });
+test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1330); assert.ok(Object.keys(S.items).length >= 50); });
 test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam todos os seus nós passando só por eles e pelo tronco Marcial', () => {
   const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
-  for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao', 'aura', 'oculto']) {
+  for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
     const set = ns.filter(s => s.el === el || s.el === 'fis'), start = set.findIndex(s => s.el === el && (s.root || s.br === el + '-0')), seen = new Set([start]), q = [start];
     assert.ok(start >= 0, 'raiz de ' + el);
     while (q.length) { const x = set[q.pop()]; set.forEach((y, i) => { if (!seen.has(i) && Math.max(Math.abs(x.gx - y.gx), Math.abs(x.gy - y.gy)) <= 1) { seen.add(i); q.push(i); } }); }
     assert.deepEqual(set.filter((_, i) => !seen.has(i)).map(s => s.name), [], el);
-    assert.equal(ns.filter(s => s.el === el).length, ['aura', 'oculto'].includes(el) ? 110 : 90);
+    assert.equal(ns.filter(s => s.el === el).length, ['aura', 'oculto'].includes(el) ? 120 : 104);
   }
 });
 test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {
@@ -263,7 +263,7 @@ test('requisitos novos: Despertar, nó anterior, nós do ramo, estado e afinidad
   H.aw(ana, { id: h.id, k: 'outro' }); assert.deepEqual(h.aw, []); H.aw(gm, { id: h.id, k: 'outro' }); H.learn(ana, { id: h.id, skill: oc }); assert.ok(h.skills.includes(oc));
   const amp = id('Lacre de Brasa — Discente'); h.vinc = ['kagutsuchi']; h.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'kagutsuchi-7' && k !== amp && k !== id('Ritual: Lacre de Brasa'));
   H.learn(ana, { id: h.id, skill: amp }); assert.ok(!h.skills.includes(amp)); h.skills.push(id('Ritual: Lacre de Brasa')); H.learn(ana, { id: h.id, skill: amp }); assert.ok(h.skills.includes(amp));
-  const q = id('Mutação Final: Quimera'); h.vinc = ['radiacao']; h.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'radiacao-8').slice(0, 9).filter(k => k !== q).slice(0, 5);
+  const q = id('Mutação Final: Quimera'); h.vinc = ['hiruko']; h.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'hiruko-8').slice(0, 9).filter(k => k !== q).slice(0, 5);
   H.learn(ana, { id: h.id, skill: q }); assert.ok(!h.skills.includes(q)); // 5 de 6 nós do ramo
   const fin = id('Restrição Autoimposta'), F = S.skills[fin]; h.skills = Object.keys(S.skills).filter(k => k !== fin && !S.skills[k].vow && ['fis', 'aura'].includes(S.skills[k].el) && Math.max(Math.abs(S.skills[k].gx - F.gx), Math.abs(S.skills[k].gy - F.gy)) <= 1);
   if (!h.skills.length) h.skills = [Object.keys(S.skills).find(k => k !== fin && Math.max(Math.abs(S.skills[k].gx - F.gx), Math.abs(S.skills[k].gy - F.gy)) <= 1)];
@@ -282,3 +282,150 @@ test('a IA dos inimigos usa transformação, cura e ataques sem travar a fila', 
   assert.ok(formed); assert.ok(Object.values(S.battle.ticks).every(Number.isFinite));
 });
 test.after(() => setTimeout(() => process.exit(0), 50));
+
+// ---------- sistemas de combate novos: Quebra, Cadeia, Ataque Total, Coragem, Tensão, clima e reações ----------
+const dmgOf = el => TREE[el].branches[0].find(n => n.k === 'dmg' && !n.req && !n.area && !n.chg && !n.fx && !n.hits).n;
+test('Quebra: fraquezas esvaziam a barra; Quebrado perde o turno e sofre +50%', () => {
+  const [a, e] = duel(); e.brk = { max: 2, cur: 2 }; e.weak = ['indra']; e.hp = e.hpMax = 9999;
+  use(a, dmgOf('indra'), e); assert.equal(e.brk.cur, 1); assert.ok(!e.st.broken);
+  use(a, dmgOf('indra'), e); assert.ok(e.st.broken); assert.equal(e.brk.cur, 2);
+  const n = S.log.length; turn(a); S.battle.ticks[e.id] = 3; H.next(gm); assert.ok(S.log.slice(n).some(l => /quebrado e perde o turno/.test(l.text)));
+  e.st.broken = 2; e.weak = []; const hp = e.hp; use(a, dmgOf('fuhaku'), e); const quebrado = hp - e.hp;
+  delete e.st.broken; e.hp = hp; use(a, dmgOf('fuhaku'), e); assert.ok(quebrado > (hp - e.hp) * 1.35);
+});
+test('Cadeia: barra cheia faz o grupo atacar em seguida', () => {
+  const [a, e] = duel(); const b = mk(ana, {}); S.battle.ticks[b.id] = 500; e.hp = e.hpMax = 9999; S.battle.chain.h = 99;
+  const hp = e.hp; use(a, dmgOf('fuhaku'), e); assert.ok(S.log.some(l => /CADEIA/.test(l.text))); assert.equal(S.battle.chain.h, 0); assert.ok(e.hp < hp);
+});
+test('Ataque Total: só quando todo inimigo está Derrubado ou Quebrado', () => {
+  const [a, e] = duel(); const b = mk(ana, {}); S.battle.ticks[b.id] = 500; e.hp = e.hpMax = 9999; turn(a);
+  H.allOut(gm, { id: a.id }); assert.ok(!S.log.some(l => /ATAQUE TOTAL/.test(l.text))); // ninguém Derrubado
+  e.st.down = 1; const hp = e.hp; turn(a); fixR(.3, () => H.allOut(gm, { id: a.id })); assert.ok(S.log.some(l => /ATAQUE TOTAL/.test(l.text))); assert.ok(e.hp < hp);
+});
+test('Coragem: defender guarda pontos; gastar dá ação extra e a dívida atrasa', () => {
+  const [a, e] = duel(); turn(a); H.defend(gm, { id: a.id }); assert.equal(a.brv, 1); assert.ok(a.st.defUp);
+  e.hp = e.hpMax = 9999; use(a, dmgOf('fuhaku'), e, { brave: true }); assert.equal(a.brv, 0); assert.equal(current(), a.id); // age de novo
+  use(a, dmgOf('fuhaku'), e, { brave: true }); assert.equal(a.brv, -1); assert.equal(current(), a.id);
+  const t0 = S.battle.ticks[a.id]; use(a, dmgOf('fuhaku'), e); assert.equal(a.brv, 0); assert.ok(S.battle.ticks[a.id] > t0 + 1000 / a.attrs.AGI * 1.2); // dívida pagou em tempo
+});
+test('Tensão: cada concentração multiplica o próximo golpe (×1,5 / ×2 / ×3)', () => {
+  const [a, e] = duel(); e.hp = e.hpMax = 9999; use(a, dmgOf('fuhaku'), e); const base = 9999 - e.hp; e.hp = 9999;
+  turn(a); H.focus(gm, { id: a.id }); turn(a); H.focus(gm, { id: a.id }); assert.equal(a.ten, 2);
+  use(a, dmgOf('fuhaku'), e); assert.ok(9999 - e.hp > base * 1.8); assert.equal(a.ten, 0);
+});
+test('clima e reações: água molha, raio em Molhado paralisa; óleo e fogo explodem', () => {
+  let [a, e] = duel(); e.hp = e.hpMax = 9999; S.battle.wx = { k: 'chuva', ttl: 0 };
+  use(a, dmgOf('susanoo'), e); assert.ok(e.st.wet); const hp = e.hp; use(a, dmgOf('indra'), e); assert.ok(e.st.para); assert.ok(!e.st.wet); assert.ok(S.log.some(l => /Reação: Eletrocutar/.test(l.text))); assert.ok(e.hp < hp);
+  [a, e] = duel(); e.hp = e.hpMax = 9999; e.st.oil = 3; use(a, dmgOf('kagutsuchi'), e); assert.ok(e.st.burn); assert.ok(!e.st.oil); assert.ok(S.log.some(l => /Reação: Explosão/.test(l.text)));
+  [a, e] = duel(); e.hp = e.hpMax = 9999; use(a, dmgOf('kagutsuchi'), e); const sem = 9999 - e.hp; e.hp = 9999; delete e.st.burn; S.battle.wx = { k: 'sol', ttl: 0 }; use(a, dmgOf('kagutsuchi'), e); assert.ok(9999 - e.hp > sem); // sol reforça o fogo
+});
+test('passar a vez: depois de uma fraqueza, o aliado age em seguida com bônus', () => {
+  const [a, e] = duel(); const b = mk(ana, {}); S.battle.ticks[b.id] = 400; e.weak = ['indra']; e.hp = e.hpMax = 9999;
+  use(a, dmgOf('indra'), e, { pass: b.id }); assert.equal(current(), b.id); assert.ok(b.st.atkUp);
+});
+test('Expansão de Domínio: gasta toda a Aura, mexe nos modificadores, vence o choque e deixa Exausto ao fim', () => {
+  let [a, e] = duel({ aw: ['kagutsuchi'] }); const dom = 'Fornalha Infinita'; a.aura = Math.floor(a.auraMax / 2) - 1; use(a, dom, a); assert.ok(!S.battle.dom); // metade da Aura exigida
+  a.aura = a.auraMax; use(a, dom, a); assert.ok(S.battle.dom); assert.ok(a.aura <= Math.ceil(a.auraMax / 10)); assert.ok(modsOf(a).atk >= 20 && modsOf(e).def <= -10);
+  for (let i = 0; i < 3; i++) { turn(e); S.battle.ticks[e.id] = 0; H.next(gm); turn(a); H.next(gm); } assert.ok(!S.battle.dom); assert.ok(a.st.exaus);
+  [a, e] = duel({ aw: ['kagutsuchi'] }); S.battle.dom = { by: e.id, side: true, name: 'Rival', ttl: 3, ally: {}, foe: {}, pow: 0 }; a.aura = a.auraMax; use(a, dom, a);
+  assert.equal(S.battle.dom.by, a.id); assert.ok(e.st.exaus);
+});
+test('técnica em trio: os dois parceiros pagam e perdem o próximo turno; sem eles, recusa', () => {
+  const [a, e] = duel(); const b = mk(ana, {}), c = mk(ana, {}); S.battle.ticks[b.id] = 500; S.battle.ticks[c.id] = 500; e.hp = e.hpMax = 9999;
+  const t = 'Tempestade Ígnea'; a.skills = [sk(`${t}: Kagutsuchi`)]; b.skills = [sk(`${t}: Fuhaku`)]; c.skills = [sk(`${t}: Indra`)]; b.aura = c.aura = 30;
+  c.skills = []; const au = a.aura; use(a, `${t}: Kagutsuchi`, e); assert.equal(a.aura, au); // falta um parceiro
+  c.skills = [sk(`${t}: Indra`)]; use(a, `${t}: Kagutsuchi`, e); assert.ok(a.aura < au); assert.ok(b.aura < 30 && c.aura < 30); assert.ok(S.battle.ticks[b.id] > 500 && S.battle.ticks[c.id] > 500); assert.ok(S.log.some(l => /executam juntos/.test(l.text)));
+});
+test('fusão exige os dois Vínculos; nós-chave dão bônus com desvantagem; sinergia de Aura exige o Vínculo', () => {
+  reset(); const h = mk(ana, {}); h.xp = 999; const f = sk('Vapor Ardente (Kagutsuchi)'); h.vinc = ['kagutsuchi'];
+  assert.match(RU.whyNot(h, S.skills[f], S.skills, S.items, f, true), /Exige também o Vínculo com Susanoo/);
+  h.vinc = ['kagutsuchi', 'susanoo']; assert.ok(!/Exige também/.test(RU.whyNot(h, S.skills[f], S.skills, S.items, f, true)));
+  const k = S.skills[sk('Coração Ígneo')]; assert.ok(k.mod.atk >= 30 && k.bon.hpMax < 0);
+  const sn = sk('Ren Ígneo'); h.vinc = []; assert.match(RU.whyNot(h, S.skills[sn], S.skills, S.items, sn, true), /Exige também o Vínculo/);
+});
+test('Aflição e Virtude: Sanidade zerada pede teste de SAB; descanso longo limpa', () => {
+  reset(); const h = mk(ana, {}); h.attrs.SAB = 1; derive(h); h.san = 0; fixR(.9, () => { H.rest(gm, { long: true }); }); // sem batalha: o descanso não mexe
+  fixR(.9, () => handle(gm, { t: 'set', id: h.id, f: 'san', v: 0 }));
+  assert.ok(h.afl && h.afl.t === 'a'); assert.ok(h.san > 0); assert.ok(modsOf(h).atk !== 0 || modsOf(h).hit !== 0 || modsOf(h).agi !== 0 || modsOf(h).def !== 0);
+  h.san = 0; handle(gm, { t: 'set', id: h.id, f: 'san', v: 0 }); const k = h.afl; assert.deepEqual(h.afl, k); // enquanto está em zero, não repete
+  reset(); const g = mk(ana, {}); g.attrs.SAB = 90; derive(g); fixR(0, () => handle(gm, { t: 'set', id: g.id, f: 'san', v: 0 })); assert.equal(g.afl.t, 'v');
+  H.rest(gm, { long: true }); assert.equal(g.afl, undefined);
+});
+test('Vantagem e Desvantagem: o mestre escolhe ao aprovar; Foco dá vantagem', () => {
+  reset(); const h = mk(ana, {}); h.attrs.FOR = 50; derive(h); const rolls = [.7, .2]; const r0 = Math.random; let i = 0; Math.random = () => rolls[i++ % 2]; // d100 = 71 e 21
+  try { H.roll(gm, { id: h.id, attr: 'FOR', adv: 'adv' }); assert.match(S.log.at(-1).text, /→ 21: .*vantagem/); H.roll(gm, { id: h.id, attr: 'FOR', adv: 'dis' }); assert.match(S.log.at(-1).text, /→ 71: .*desvantagem/); h.st.focus = 2; H.roll(gm, { id: h.id, attr: 'FOR' }); assert.match(S.log.at(-1).text, /vantagem/); } finally { Math.random = r0; }
+});
+test('laços: conversar no acampamento sobe o laço, que reforça a dupla em batalha', () => {
+  reset(); const a = mk(ana, {}), b = mk(bia, {}); S.camp = { open: true, acts: {}, with: {} };
+  for (let n = 0; n < 4; n++) { H.campAct(ana, { id: a.id, k: 'conversar', w: b.id }); H.campAct(bia, { id: b.id, k: 'conversar', w: a.id }); H.rest(gm, { long: true }); S.camp = { open: true, acts: {}, with: {} }; }
+  assert.equal(S.bonds[[a.id, b.id].sort().join('|')], 8); assert.equal(a.bondMax ?? 0, 0); handle(gm, { t: 'set', id: a.id, f: 'name', v: a.name }); assert.equal(a.bondMax, 3); // 8 pontos = nível 3
+  a.xp = 999; a.skills = []; const n = sk('Olhar de Cumplicidade'); assert.ok(!/laço/.test(RU.whyNot(a, S.skills[n], S.skills, S.items, n, true)));
+  reset(); const c = mk(ana, {}); assert.match(RU.whyNot(c, S.skills[n], S.skills, S.items, n, true), /laço/);
+});
+test('slots de passivas: 4 + 1 a cada 100 XP gasto; só as ativas valem; trocar exige o acampamento', () => {
+  reset(); S.camp = { open: false, acts: {}, with: {} }; const h = mk(ana, {}); const votos = ['Voto de Sangue', 'Voto da Presa', 'Voto do Corpo Fechado', 'Voto da Última Chama', 'Seiyaku: Silêncio', 'Seiyaku: Pureza'].map(sk).filter(Boolean);
+  assert.ok(votos.length >= 6); h.skills = votos.slice(0, 6); handle(gm, { t: 'set', id: h.id, f: 'name', v: h.name });
+  assert.equal(h.pslots.length, slotMaxOf(h)); assert.ok(slotMaxOf(h) < 6); assert.ok(!h.pslots.includes(votos[5])); // o último ficou sem slot
+  H.pslot(ana, { id: h.id, skill: votos[0] }); assert.ok(h.pslots.includes(votos[0])); // fora do acampamento: nada muda
+  S.camp = { open: true, acts: {}, with: {} }; H.pslot(ana, { id: h.id, skill: votos[0] }); assert.ok(!h.pslots.includes(votos[0])); assert.ok(h.pslots.includes(votos[5])); // a vaga livre é ocupada pelo que estava de fora
+  const gasto = h.skills.reduce((a, k) => a + S.skills[k].xp, 0); assert.equal(slotMaxOf(h), 4 + Math.floor(gasto / 100));
+});
+
+// ---------- Ofícios (perícias) ----------
+const OF = globalThis.OFI, itm = n => Object.keys(S.items).find(k => S.items[k].name === n);
+const ofiChar = (per, upTo = 99) => { reset(); S.camp = { open: false, acts: {}, with: {} }; const h = mk(ana, {}); h.attrs = { ...h.attrs, FOR: 80, DES: 80, INT: 80, SAB: 80, CAR: 80, SOR: 80, AGI: 80, CON: 60 }; derive(h); h.ofi = [per]; h.po = 100; OF.PER[per].nodes.slice(0, upTo).forEach(n => { if (!n.ex || !OF.learned(h, per).some(o => o.ex === n.ex)) h.pof.push(n.id); }); return h; };
+const nid = (per, name) => OF.PER[per].nodes.find(n => n.n === name).id;
+test('ofícios: catálogo com 15 perícias; Iniciação, grau, exclusão e PO controlam o aprendizado', () => {
+  assert.equal(OF.order.length, 15); for (const p of Object.values(OF.PER)) { assert.ok(p.nodes.length >= 15, p.n); assert.equal(new Set(p.nodes.map(n => n.n)).size, p.nodes.length, p.n); }
+  reset(); const h = mk(ana, {}); h.po = 50; const t1 = nid('forja', 'Olho de Ferreiro'), t2 = nid('forja', 'Têmpera II');
+  assert.match(OF.whyNot(h, t1), /Iniciação/); H.ofiAw(gm, { id: h.id, per: 'forja' }); assert.equal(OF.whyNot(h, t1), '');
+  assert.match(OF.whyNot(h, t2), /grau Aprendiz/); H.ofiLearn(ana, { id: h.id, node: t1 }); assert.ok(h.pof.includes(t1)); assert.equal(h.po, 48);
+  for (const n of ['Reciclar Sucata', 'Afiar a Lâmina', 'Têmpera I']) H.ofiLearn(ana, { id: h.id, node: nid('forja', n) }); assert.equal(OF.grau(h, 'forja'), 1);
+  H.ofiLearn(ana, { id: h.id, node: nid('forja', 'Engaste I') }); assert.equal(OF.whyNot(h, t2), ''); H.ofiLearn(ana, { id: h.id, node: t2 }); assert.equal(OF.grau(h, 'forja'), 2);
+  H.ofiLearn(ana, { id: h.id, node: nid('forja', 'Armeiro') }); assert.match(OF.whyNot(h, nid('forja', 'Couraceiro')), /Trancado/);
+  const po = h.po; H.ofiLearn(bia, { id: h.id, node: nid('forja', 'Engaste II') }); assert.equal(h.po, po); // não é dele
+  assert.equal(OF.rollBonus(h, 'forja'), 20 + 5);
+});
+test('ofícios: colher na cena, preparar receita, desconto e rolar de novo', () => {
+  const h = ofiChar('alquimia'); h.gold = 0; const sc = S.scenes[S.scene]; sc.gather = [itm('Erva Medicinal')];
+  fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('alquimia', 'Colher Ervas') })); assert.ok(h.inv[itm('Erva Medicinal')] >= 1); assert.ok(h.po > 100);
+  h.inv[itm('Erva Medicinal')] = 5; fixR(.05, () => H.craft(ana, { id: h.id, rec: 'tonico' })); assert.ok(h.inv[itm('Tônico')] >= 1); assert.ok(h.inv[itm('Erva Medicinal')] <= 3);
+  h.inv[itm('Erva Medicinal')] = 5; const before = h.inv[itm('Tônico')]; fixR(.99, () => H.craft(ana, { id: h.id, rec: 'tonico' })); assert.equal(h.inv[itm('Tônico')], before); assert.ok(h.inv[itm('Erva Medicinal')] >= 3);
+  const l = ofiChar('labia'); l.gold = 1000; const sh = S.items[itm('Tônico')]; S.scenes[S.scene].shop = { open: true, stock: [itm('Tônico')] }; H.buy(ana, { id: l.id, item: itm('Tônico') }); assert.equal(l.gold, 1000 - Math.ceil(sh.price * .8));
+  const j = ofiChar('jogos'); j.attrs.FOR = 70; derive(j); fixR(.9, () => H.roll(ana, { id: j.id, attr: 'FOR' })); assert.match(S.log.at(-1).text, /Falha|DESASTRE/); fixR(.1, () => H.reroll(ana, { id: j.id })); assert.equal(j.rrUsed, 1); assert.match(S.log.at(-1).text, /Sucesso|CRÍTICO/);
+  H.reroll(ana, { id: j.id }); assert.equal(j.rrUsed, 2); H.reroll(ana, { id: j.id }); assert.equal(j.rrUsed, 2); H.newSession(gm); assert.equal(j.rrUsed, 0);
+});
+test('forja: têmpera, engaste, liga, assinatura e arma viva mudam o dano; falha e desastre custam materiais', () => {
+  const h = ofiChar('forja'); h.gold = 1000; const w = itm('Sabre de Cavalaria'), sucata = itm('Sucata de Ferro'); h.inv[w] = 1; h.equip.arma = w; h.inv[sucata] = 20;
+  const T1 = { id: h.id, node: nid('forja', 'Têmpera I'), item: w };
+  fixR(.05, () => H.ofiUse(ana, T1)); assert.equal(h.up[w].t, 1); assert.equal(h.up[w].p, 3); // Armeiro: +3 por nível
+  const fortes = { FOR: h.attrs.FOR, INT: h.attrs.INT }; h.attrs.FOR = h.attrs.INT = 10; derive(h); const s0 = h.inv[sucata]; fixR(.6, () => H.ofiUse(ana, T1)); assert.equal(h.up[w].t, 1); assert.equal(h.inv[sucata], s0 - 1); // falha: perde uma
+  fixR(.99, () => H.ofiUse(ana, T1)); assert.equal(h.inv[sucata], s0 - 1 - 2); // desastre: metade dos 4 materiais
+  Object.assign(h.attrs, fortes); derive(h); h.inv[sucata] = 20; fixR(.05, () => H.ofiUse(ana, T1)); fixR(.05, () => H.ofiUse(ana, T1)); assert.equal(h.up[w].t, 3);
+  fixR(.05, () => H.ofiUse(ana, T1)); assert.equal(h.up[w].t, 3); // teto do grau
+  const run = itm('Runa de Força'); h.inv[run] = 1; fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('forja', 'Engaste I'), item: w, rune: run })); assert.deepEqual(h.up[w].g, ['Runa de Força']); assert.equal(h.inv[run], undefined);
+  const LG = { id: h.id, node: nid('forja', 'Liga de Essências'), item: w, el2: 'kagutsuchi' };
+  fixR(.05, () => H.ofiUse(ana, LG)); assert.equal(h.up[w].el2, undefined); // sem essências: recusa
+  h.inv[itm('Essência de Kagutsuchi')] = 2; fixR(.05, () => H.ofiUse(ana, LG)); assert.equal(h.up[w].el2, 'kagutsuchi');
+  fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('forja', 'Assinatura do Ferreiro'), item: w, sig: 0, nm: 'Dente de Lobo' })); assert.equal(h.up[w].sig, 0); assert.equal(h.up[w].nm, 'Dente de Lobo');
+  h.inv[itm('Garra de Demônio')] = 5; fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('forja', 'Arma Viva'), item: w })); assert.ok(h.up[w].living);
+  const a2 = mk(ana, {}), e = mk(gm, { enemy: true }); Object.assign(a2.attrs, { FOR: 70, DES: 70, AGI: 90 }); a2.inv[w] = 1; a2.equip.arma = w; e.attrs.AGI = 1; e.hp = e.hpMax = 9999; e.armor = 0; derive(a2); a2.hp = a2.hpMax; H.battle(gm, { on: true }); turn(a2);
+  fixR(.3, () => H.act(gm, { id: a2.id, skill: 'atk', target: e.id })); const base = 9999 - e.hp; a2.up[w] = { p: 9, t: 3, g: ['Runa de Força'], sig: 0, living: true, kills: 0 }; e.hp = 9999; turn(a2); fixR(.3, () => H.act(gm, { id: a2.id, skill: 'atk', target: e.id })); assert.ok(9999 - e.hp > base * 1.4); // têmpera + runa + assinatura
+  a2.up[w].kills = 9; const e2 = mk(gm, { enemy: true }); e2.hp = 1; S.battle.ticks[e2.id] = 900; turn(a2); fixR(.3, () => H.act(gm, { id: a2.id, skill: 'atk', target: e2.id })); assert.equal(a2.up[w].kills, 10); // abates sobem o estágio
+  const d = ofiChar('forja'); d.gold = 1000; d.inv[w] = 1; d.inv[sucata] = 8; d.attrs.FOR = d.attrs.INT = 10; derive(d); fixR(.6, () => H.ofiUse(ana, { id: d.id, node: nid('forja', 'Têmpera I'), item: w })); assert.equal(d.inv[sucata], 7); // falha comum: perde uma
+});
+test('culinária, tratamento, identificação, armadilha e companheiros', () => {
+  let h = ofiChar('culinaria'); h.inv[itm('Carne de Caça')] = 4; h.inv[itm('Ervas de Cozinha')] = 4; const e0 = mk(gm, { enemy: true }); fixR(.05, () => H.craft(ana, { id: h.id, rec: 'ensopado' })); assert.ok(S.meal); assert.equal(S.meal.m.atk, 16); // Cozinheiro de Guerra dobra o ensopado
+  h.attrs.AGI = 99; e0.attrs.AGI = 1; derive(h); e0.hp = e0.hpMax = 9999; h.hp = h.hpMax; H.battle(gm, { on: true }); assert.ok(modsOf(h).atk >= 16); H.battle(gm, { on: false }); assert.ok(!S.meal || S.meal.left > 0);
+  h = ofiChar('medicina'); const f = mk(ana, {}); f.body.armL = 40; f.body.torso = 30; fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('medicina', 'Sutura'), target: f.id, part: 'armL' })); assert.equal(f.body.armL, 0); assert.equal(f.body.torso, 30);
+  fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('medicina', 'Cirurgia'), target: f.id })); assert.equal(f.body.torso, 0);
+  h = ofiChar('investigacao'); const en = mk(gm, { enemy: true }); en.weak = ['indra']; en.resist = ['susanoo']; en.weakPart = 'head'; en.tpl = 'Teste'; fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('investigacao', 'Anatomia Demoníaca'), target: en.id })); assert.equal(en.known, 3); assert.equal(S.known.Teste, 3);
+  h = ofiChar('caca'); const ez = mk(gm, { enemy: true }); S.camp = { open: true, acts: {}, with: {} }; H.campAct(ana, { id: h.id, k: 'armadilha' }); assert.equal(S.camp.acts[h.id], 'armadilha'); H.rest(gm, { long: true }); assert.ok(S.trap);
+  h.attrs.AGI = 50; derive(h); ez.hp = ez.hpMax = 99; H.battle(gm, { on: true }); assert.ok(ez.st.root && ez.st.bleed); assert.ok(Object.values(S.chars).some(c => c.summon?.k === 'Lobo Adestrado')); // o cão de caça entra sozinho
+  assert.ok(S.battle.ticks[h.id] <= 1000 / 50 * .7); assert.ok(OF.hook(h, 'emb') >= 35); // emboscada: o grupo começa à frente
+});
+test('Música no acampamento, Pilotagem na perseguição e identificação lembrada pelo bestiário', () => {
+  const m = ofiChar('musica'); const b = mk(ana, {}); derive(b); m.san = 1; b.san = 1; S.camp = { open: true, acts: {}, with: {} }; H.campAct(ana, { id: m.id, k: 'cantar' }); H.rest(gm, { long: true }); assert.ok(m.san >= 9); assert.ok(b.san >= 9);
+  const p = ofiChar('pilotagem'); assert.equal(OF.hook(p, 'chase'), 15);
+  reset(); const bid = Object.keys(S.bestiary).find(k => !S.bestiary[k].boss); S.known = { [S.bestiary[bid].name]: 2 }; H.bSpawn(gm, { id: bid }); const nu = Object.values(S.chars).find(c => c.enemy); assert.equal(nu.known, 2);
+});

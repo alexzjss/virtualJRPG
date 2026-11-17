@@ -89,7 +89,7 @@ export const AURA = [
   ],
   [ // Emissão
     { n: "Projétil de Aura", k: "dmg", d: "Uma bola de aura atirada como pedra.", xp: 10, a: "INT", p: 14, c: 4, cat: "emi" },
-    { n: "Jan-Ken: Papel!", k: "dmg", d: "Mão aberta: a aura sai num disparo largo e pesado.", xp: 10, a: "INT", p: 22, c: 7, ct: 120, cat: "emi" },
+    { n: "Jan-Ken: Papel!", k: "dmg", d: "Mão aberta: a aura sai num disparo largo e pesado.", xp: 10, a: "INT", p: 17, c: 7, ct: 120, cat: "emi" },
     { n: "Rajada de Aura", k: "dmg", d: "Três disparos curtos, um atrás do outro.", xp: 15, a: "DES", p: 6, c: 6, hits: 3, cat: "emi" },
     { n: "Bola Ricochete", k: "dmg", d: "Uma bola de aura que quica de inimigo em inimigo.", xp: 15, a: "DES", p: 12, c: 6, cat: "emi", fx: "chain 2 .7" },
     { n: "Aura à Distância", k: "passive", d: "A aura emitida não perde força com a distância.", xp: 20, cat: "emi", mod: "hit 8", rq: { INT: 50 } },
@@ -113,7 +113,7 @@ export const AURA = [
   ],
   [ // Aura em grupo
     { n: "Doar Aura", k: "util", d: "A mão no ombro do aliado passa um pouco de aura.", xp: 10, a: "SAB", c: 4, fx: "res aura 6" },
-    { n: "Sincronizar Ren", k: "dmg", d: "Dois usuários de aura empurram o Ren ao mesmo tempo contra um alvo. Exige um parceiro com a mesma técnica.", xp: 10, a: "SAB", p: 26, c: 6, duo: "Sincronizar Ren" },
+    { n: "Sincronizar Ren", k: "dmg", d: "Dois usuários de aura empurram o Ren ao mesmo tempo contra um alvo. Exige um parceiro com a mesma técnica.", xp: 25, a: "SAB", p: 26, c: 6, duo: "Sincronizar Ren" },
     { n: "En Coletivo", k: "util", d: "Os campos de aura se juntam e todos sentem tudo.", xp: 15, a: "SAB", c: 6, area: true, fx: "st focus 2; st defUp 1" },
     { n: "Escudo em Corrente", k: "util", d: "Um escudo de aura se estende de aliado em aliado.", xp: 15, a: "SAB", c: 10, area: true, fx: "shield 8" },
     { n: "Ressonância", k: "passive", d: "Quando um aliado cai, a aura dos outros responde.", xp: 20, on: "ally", fx: "st atkUp 2 ally" },

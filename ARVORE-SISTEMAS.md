@@ -96,3 +96,17 @@ Dano contínuo agora acumula duração (até 6 turnos).
 A IA usa Limite, transformação, reerguer (com o mesmo intervalo das curas), cura, purificar, invocar, buffs e dano (prefere os golpes
 físicos mais fortes). Chefes e inimigos gerados recebem dos ramos 7-9 só ataques e transformações (sem as que aumentam cura); duplas,
 rituais, Despertares e invocações ficam só com os heróis.
+
+## Sistemas de batalha novos
+- **Barra de Quebra** (`brk` no personagem): chefes têm 3 pontos e elites 2. Fraqueza elemental e ponto fraco tiram 1 cada; o efeito `brk N` tira N. Zerada, o alvo fica **Quebrado** por 2 turnos: perde o turno e sofre +50%.
+- **Cadeia**: fraqueza +15, crítico +10, outro golpe +4. A 100%, cada aliado ataca em seguida (bônus de +25% por posição).
+- **Ataque Total**: com todo inimigo vivo **Derrubado ou Quebrado**, o jogador da vez chama o golpe conjunto (×1,5), gastando 150% do tempo.
+- **Fraqueza**: derrubar um inimigo dá um turno extra (já era assim); acertar fraqueza em quem já está Derrubado reduz o tempo da ação em 25%. **Passar a Vez** (`pass` na ação): depois de acertar uma fraqueza, o aliado escolhido age em seguida com ATQ↑.
+- **Coragem**: Defender guarda 1 ponto (máx. 3) e dá −25% de dano; `brave` gasta 1 ponto para agir de novo. Com 0 pontos é possível ficar devendo até 2: a dívida atrasa na fila em 50% do intervalo por ponto.
+- **Tensão**: Concentrar gasta o turno (70% do tempo): o próximo golpe causa ×1,5 / ×2 / ×3.
+- **Clima** (`sol`, `chuva`, `neblina`, `tempestade`, `eclipse`): o mestre escolhe na cena; `fx: 'clima chuva 3 self'` troca por N rodadas. Mexe no dano por elemento e no acerto (tabela `CLIMA` em `rules.js`). Na chuva a água sempre molha.
+- **Reações elementais** (tabela `REACT`): Eletrocutar (raio em Molhado), Explosão (fogo em Oleado), Vapor (fogo em Molhado), Faíscas (raio em Oleado), Estilhaçar (impacto em Congelado), Vento Gélido (vento em Molhado), Lama (terra em Molhado), Purgar (luz em Veneno/Radiação). Golpes de Susanoo molham com 35%.
+- **Expansão de Domínio** (`dom: 'dur 3; ally atk 20; foe def -10; tick burn'`, com `aw`): exige metade da Aura, gasta toda, dura N turnos do usuário e o deixa Exausto ao fim. Dois Domínios disputam `INT/SAB + Aura/2 + d100/2`; o perdedor desmorona.
+- **Técnicas em trio** (`trio: 'Nome B|Nome C'`): dois aliados distintos com as skills pares pagam e perdem o próximo turno.
+- Requisito `v2: 'indra'`: exige também esse Vínculo (fusões e sinergias de Aura).
+- Condições novas: Molhado, Oleado, Quebrado.
