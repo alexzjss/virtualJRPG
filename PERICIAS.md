@@ -1,7 +1,7 @@
 # Perícias (Ofícios): especificação e estado
 
 Ramo de perícias de exploração e passivas, liberado pelo mestre. Decisões tomadas pelo usuário em questionário; implementar
-seguindo `ARVORE-SISTEMAS.md` (notação dos nós) e o motor atual (`server.js`, `public/rules.js`, `content.js`).
+seguindo `ARVORE-SISTEMAS.md` (notação dos nós) e o motor atual (`src/`, `public/rules.js`, `content.js`).
 
 ## Decisões de estrutura
 - **Lugar:** aba própria **Ofícios** na ficha, com uma mini-árvore por perícia. Fica fora da grade 91×91 de combate.

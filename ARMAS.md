@@ -12,8 +12,8 @@ As técnicas de lâmina, lança, tiro e punho da árvore (`req`) continuam pedin
 ## Arquivos
 - `public/armas.js` (compartilhado, `globalThis.ARMAS`): tipos, categorias, níveis, **modelos**, perfil do ataque (`prof`), efeitos do básico (`basicFx`), régua de orçamento (`score`/`rel`), montador (`make`), técnicas (`skill`) e limpeza do rascunho do criador (`clean`).
 - `content.js` → `WEAPONS`: o catálogo padrão (47 armas), todas montadas a partir dos modelos. Os modelos da expansão (44) ficam só na Forja de armas: o mestre cria as peças quando quiser.
-- `server.js`: `basicOf` (ataque básico pela arma), `SK`/`wSk` (técnicas da arma), `modsOf` (traços, bônus e requisito), `wpnSave` (criador do mestre), migração `S.itemsV = 2`.
-- `public/app.js`: cartões e ficha com os traços e técnicas, aba **Arma** na batalha, botões ⚔ do mestre e a janela **Forja de armas**.
+- `src/rules.js` e `src/handlers.js`: `basicOf` (ataque básico pela arma), `SK`/`wSk` (técnicas da arma), `modsOf` (traços, bônus e requisito), `wpnSave` (criador do mestre), migração `S.itemsV = 2`.
+- `public/js/*.js` (interface): cartões e ficha com os traços e técnicas, aba **Arma** na batalha, botões ⚔ do mestre e a janela **Forja de armas**.
 - `rules.js` ganhou `parseFx`/`parseForm` (antes só em `content.js`) e o caminho inverso `fxSrc`/`formSrc`, para o navegador validar efeitos e copiar técnicas da árvore.
 
 ## Tipos

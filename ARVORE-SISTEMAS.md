@@ -1,6 +1,6 @@
 # Árvore de habilidades: sistemas e notação
 
-Referência das mecânicas que a árvore usa e de como escrever um nó. As regras ficam em `server.js` (combate), `public/rules.js`
+Referência das mecânicas que a árvore usa e de como escrever um nó. As regras ficam em `src/rules.js` (combate), `public/rules.js`
 (requisitos, nomes e a descrição mostrada na tela, iguais para servidor e navegador) e `content.js` (montagem da grade).
 
 ## Estrutura (1187 nós)

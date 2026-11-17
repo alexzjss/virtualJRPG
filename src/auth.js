@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { S } from './state.js';
 
+
 // ---------- limites ----------
 const UPMAX = 300e6; // teto de todas as imagens enviadas
 const dirSize = d => { try { return fs.readdirSync(d).reduce((a, f) => a + fs.statSync(path.join(d, f)).size, 0); } catch { return 0; } };
@@ -24,4 +25,4 @@ const okName = n => !!n && !/[@\s]/.test(n) && n.toLowerCase() !== 'mestre';
 const same = (a, b) => { const x = Buffer.from(String(a ?? '')), y = Buffer.from(String(b ?? '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 const checkUser = (name, pass) => { const u = Object.hasOwn(S.users, name) ? S.users[name] : null; return typeof u === 'string' && u.includes(':') && same(hash(pass, u.split(':')[0]), u); };
 
-export { UPMAX, dirSize, MAGIC, magic, fails, FAIL_MAX, FAIL_WIN, ipOf, blocked, penalize, clean, flood, hash, okName, same, checkUser };
+export { FAIL_MAX, FAIL_WIN, MAGIC, UPMAX, blocked, checkUser, clean, dirSize, fails, flood, hash, ipOf, magic, okName, penalize, same };

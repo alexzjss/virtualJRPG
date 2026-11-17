@@ -1,19 +1,21 @@
 import { spawn as runCmd } from 'child_process';
-import http from 'http';
 import { Readable } from 'stream';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import os from 'os';
-import zlib from 'zlib';
 import { WebSocketServer } from 'ws';
 import { startTunnel } from '../tunnel.js';
-import { SEA, seaMod, dir, PUB, DATA, UP, PORT, PORTAL, KEY, VEND, IMG, MIME, AUD, GM } from './config.js';
+import zlib from 'zlib';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
+import { AUD, DATA, GM, IMG, KEY, MIME, OF, PORT, PORTAL, PUB, SEA, UP, VEND, seaMod } from './config.js';
+import { UPMAX, blocked, checkUser, clean, dirSize, flood, ipOf, magic, penalize, same } from './auth.js';
 import { ATTRS, PARTS, PL } from './consts.js';
-import { S, save, log } from './state.js';
-import { UPMAX, dirSize, magic, ipOf, blocked, penalize, clean, flood, same, checkUser } from './auth.js';
-import { rid, int, can, scene, at, current, order, prep, reseat } from './rules.js';
-import { undoStack, NOUNDO, H } from './handlers.js';
+import { S, log, save } from './state.js';
+import { SK, breakCheck, can, current, int, ofiSync, order, prep, reseat, rid, scene, usable } from './rules.js';
+import { H, NOUNDO, undoStack } from './handlers.js';
+import { nodeOf } from './oficios.js';
+
 
 // ---------- http ----------
 const hooks = { api: null, store: () => ({ camps: [], backups: [] }) }; // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
@@ -99,8 +101,8 @@ wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('e
 const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
 // cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
 // jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
-const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, hp: Math.ceil(ch.hp * k), hpMax: 100,
-  body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: [], resist: [], marks: {}, bon: {} }; };
+const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, brk: ch.brk, hp: Math.ceil(ch.hp * k), hpMax: 100,
+  body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: ch.known >= 1 ? ch.weak : [], resist: ch.known >= 2 ? ch.resist : [], weakPart: ch.known >= 3 ? ch.weakPart : undefined, known: ch.known || 0, marks: {}, bon: {} }; };
 const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
 const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
 let net = { status: 'off', url: '', code: '', msg: 'Túnel desligado.' }; // situação do túnel, só para o mestre (não é salva)
@@ -127,7 +129,7 @@ const battleWatch = () => {
   B.end = end;
 };
 const push = () => {
-  try { prep(); reseat(); pruneReqs(); battleWatch(); S.battle.order = S.battle.active ? order() : []; } catch (e) { console.error('Falha ao preparar o estado:', e); }
+  try { ofiSync(); Object.values(S.chars).forEach(breakCheck); prep(); reseat(); pruneReqs(); usable(); battleWatch(); S.battle.order = S.battle.active ? order() : []; } catch (e) { console.error('Falha ao preparar o estado:', e); }
   defsDirty = true;
   wss.clients.forEach(c => { try { sendState(c); } catch (e) { console.error('Falha ao enviar o estado:', e.message); } });
   save();
@@ -142,24 +144,32 @@ function handle(c, m) {
     if (!can(c, ch) || (cat === 'act' && !(S.battle.active && current() === ch.id))) return;
     for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
     S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq,
-      m: { id: m.id, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k } };
+      m: { node: m.node, rec: m.rec, rune: m.rune, el2: m.el2, sig: m.sig, nm: m.nm, part: m.part, part2: m.part2, id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
     return push();
   }
   try { H[m.t](c, m); } catch (e) { console.error(e); } push();
 }
 // o que o jogador pede e o mestre precisa aprovar, por tipo (S.auto[tipo] = true dispensa a aprovação)
-const GATE = { roll: 'roll', act: 'act', learn: 'learn', use: 'item', equip: 'item', drop: 'item', buy: 'item', sell: 'item', forge: 'item', campAct: 'camp' };
+const GATE = { roll: 'roll', act: 'act', learn: 'learn', use: 'item', equip: 'item', drop: 'item', buy: 'item', sell: 'item', forge: 'item', campAct: 'camp', ofiUse: 'roll', ofiLearn: 'learn', craft: 'item', reroll: 'roll', defend: 'act', focus: 'act', allOut: 'act' };
 const gateOf = m => m.t === 'use' && S.battle.active && m.id in S.battle.ticks ? 'act' : GATE[m.t];
 const reqText = m => { // frase curta que o mestre lê na fila
   const ch = S.chars[m.id], i = S.items[m.item], tg = S.chars[m.target], sg = v => (v > 0 ? '+' : '') + v;
   if (m.t === 'roll') return `rolar ${m.attr}${int(m.mod, -100, 100) ? ' ' + sg(int(m.mod, -100, 100)) : ''}`;
-  if (m.t === 'act') return `${m.skill === 'atk' ? 'Ataque' : S.skills[m.skill]?.name || '?'} → ${tg?.name || '?'}${PARTS.includes(m.aim) ? ` (mira: ${PL[m.aim]})` : ''}`;
+  if (m.t === 'act') return `${m.skill === 'atk' ? 'Ataque' : SK(m.skill)?.name || '?'} → ${tg?.name || '?'}${PARTS.includes(m.aim) ? ` (mira: ${PL[m.aim]})` : ''}`;
   if (m.t === 'learn') return `aprender ${S.skills[m.skill]?.name || '?'} (${S.skills[m.skill]?.xp ?? '?'} XP)`;
   if (m.t === 'campAct') return `acampamento: ${m.k}`;
+  if (m.t === 'ofiUse') { const n = nodeOf(ch, m.node); return `ofício: ${n?.n || '?'}${tg ? ' → ' + tg.name : ''}${i ? ' · ' + i.name : ''}`; }
+  if (m.t === 'craft') return `preparar ${OF.REC[m.rec]?.n || '?'}`;
+  if (m.t === 'ofiLearn') return `aprender ofício ${OF.PER[String(m.node).split('.')[0]]?.nodes[+String(m.node).split('.')[1]]?.n || '?'}`;
+  if (m.t === 'reroll') return 'rolar de novo';
+  if (m.t === 'defend') return 'defender (Coragem)';
+  if (m.t === 'focus') return 'concentrar Tensão';
+  if (m.t === 'allOut') return 'ATAQUE TOTAL';
   const V = { use: 'usar', equip: ch?.equip[i?.type] === m.item ? 'tirar' : 'equipar', drop: 'descartar', buy: `comprar (${i?.price} ouro)`, sell: `vender (${Math.floor((i?.price || 0) / 2)} ouro)`, forge: 'forjar' };
   return `${V[m.t]} ${i?.name || '?'}${m.t === 'use' && tg && tg !== ch ? ' em ' + tg.name : ''}`;
 };
 const pruneReqs = () => { for (const [id, r] of Object.entries(S.reqs)) { const ch = S.chars[r.m.id]; if (!ch || ch.owner !== r.by || (r.cat === 'act' && !(S.battle.active && current() === ch.id))) delete S.reqs[id]; } };
+const tell0 = (c, o) => c.readyState === 1 && c.send(JSON.stringify({ t: 'note', ...o })); // aviso só para quem mandou
 const tell = (name, o) => wss.clients.forEach(x => x.role === 'player' && x.name === name && x.readyState === 1 && x.send(JSON.stringify({ t: 'note', ...o })));
 const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
 // conexões paradas: quem não responde ao ping em 30 s (aba fechada, celular sem sinal, túnel caído) ou não faz login em 30 s é encerrado
@@ -227,4 +237,4 @@ function start() {
   });
 }
 
-export { server, wss, strip, scrub, hiddenFoe, pubChars, net, lan, view, sendState, push, handle, GATE, gateOf, reqText, pruneReqs, tell, kick, start, hooks };
+export { GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };
