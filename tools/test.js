@@ -37,6 +37,19 @@ test('ligações: cada setor alcança todos os seus nós andando só por ln, por
     assert.deepEqual(Object.keys(S.skills).filter(id => ok(id) && !seen.has(id)).map(id => S.skills[id].name), [], el);
   }
 });
+test('mandala: todo nó tem posição e nenhum par de esferas se sobrepõe', () => {
+  const ns = Object.values(S.skills); assert.ok(ns.every(s => Number.isFinite(s.wx) && Number.isFinite(s.wy)), 'nó sem wx/wy');
+  const cell = new Map(), K = s => [Math.floor(s.wx / 34), Math.floor(s.wy / 34)];
+  for (const s of ns) { const k = K(s).join(','); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(s); }
+  for (const a of ns) { const [cx, cy] = K(a); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const b of cell.get((cx + dx) + ',' + (cy + dy)) || [])
+    if (a !== b) assert.ok(Math.hypot(a.wx - b.wx, a.wy - b.wy) >= 30, a.name + ' × ' + b.name); }
+});
+test('mandala: os setores ficam na ordem da roda (ângulo médio crescente)', () => {
+  const ORD = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'aura', 'amaterasu', 'tsukuyomi', 'oculto', 'shukketsu', 'hiruko'], ns = Object.values(S.skills);
+  const ang = el => { const v = ns.filter(s => s.el === el).reduce((a, s) => [a[0] + s.wx, a[1] + s.wy], [0, 0]); return Math.atan2(v[1], v[0]); };
+  const a0 = ang(ORD[0]), rel = ORD.map(el => ((ang(el) - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
+  rel.slice(1).forEach((r, i) => assert.ok(r > rel[i], ORD[i + 1]));
+});
 test('ligações: ramo de 10 nós segue tronco 1-4, A 5-7, B 8-9 e final', () => {
   const br = Object.entries(S.skills).filter(([, s]) => s.br === 'kagutsuchi-0'); assert.equal(br.length, 10);
   const id = i => br[i][0], L = i => br[i][1].ln;

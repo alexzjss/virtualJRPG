@@ -99,8 +99,13 @@ export function buildSkills(sk) {
     const groups = br.every(o => o.req) ? Object.values(br.reduce((g, o) => ((g[o.req] ||= []).push(o), g), {})) : [br];
     cells[el][b] = groups.flatMap((g, m) => groups.length > 1 ? chain(deg + (m - (groups.length - 1) / 2) * 2.5, r0, g.map(mk), anchor) : forked(deg, r0, g.map(mk), anchor, b % 2 === 0));
   });
+  // posição na mandala (wx, wy): a própria grade em escala, centrada no núcleo Marcial. Apertar as pétalas em direção ao eixo cruzaria
+  // nós de setores vizinhos que se invadem na grade; a forma de pétala vem das ligações (ln), que são o que o mapa desenha.
+  for (const s of Object.values(G)) { s.wx = (s.gx - C) * MANDALA_U; s.wy = (s.gy - C) * MANDALA_U; }
   return G;
 }
+// unidades de mundo por casa da grade (a esfera tem raio 16)
+export const MANDALA_U = 48;
 
 // versão do catálogo (5: nomes novos dos consumáveis e equipamentos + catálogo completo de armas com modelo); saves em versão menor passam por migrateItems (state.js)
 export const ITEMS_V = 5;
