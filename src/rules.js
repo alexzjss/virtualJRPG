@@ -507,20 +507,36 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   }
   return down && was;
 }
-// Aparar: golpe de alvo único e não mental. Jogadores apertam o botão na janela (S.battle.parry); chefes e elites aparam por chance.
+// Defesa: janela S.battle.cmd (Aparar e Esquiva numa tecla só, medida no servidor). Golpe anunciado (tel) abre Esquiva para todo alvo;
+// golpe físico de alvo único não anunciado abre só Aparar, para quem tem o nó e Aura. Chefes e elites também aparam golpes dos heróis por chance.
 const parryable = (a, s, t, o, sure) => s.kind === 'dmg' && !s.area && !o.counter && t && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure;
 const parNode = ch => (ch.skills || []).map(k => S.skills[k]).filter(x => x?.par).sort((x, y) => y.par - x.par)[0];
-const parriers = foe => battlers().filter(p => !p.enemy && p.enemy !== foe.enemy && p.hp > 0 && !p.parT && !skipping(p) && !p.st.silence && (p => { const n = parNode(p); return n && p.aura >= (n.cost || 0); })(p));
-function parryCheck(a, s, t, o, sure) {
-  if (!parryable(a, s, t, o, sure)) return '';
-  const P = S.battle.parry, v = P && P.foe === a.id && P.p?.[t.id];
-  if (v) {
-    delete P.p[t.id];
-    if (v === 'ok') { const n = parNode(t), g = n?.power || 0; t.aura = Math.min(t.auraMax, t.aura + g); addLimit(t, 10); log(t.name, `APARA ${s.name} de ${a.name}!${g ? ` (+${g} Aura)` : ''}${a.brk ? brkHit(a, 1, t) : ''}`, 'ok', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok'; }
-    applySt(t, 'exposed', 1); log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad';
+const canPar = p => { const n = parNode(p); return !!n && !p.parT && !p.st.silence && p.aura >= (n.cost || 0); };
+const telOf = (a, k) => k !== 'atk' && (SK(k)?.tel === 1 || !!a.telK?.includes(k)); // golpe anunciado: a ficha do inimigo (telK) e o próprio nó
+function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devolve null se ninguém pode se defender
+  const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), D = RU.CMD.DEF;
+  if (!s || !plan.tgs.length || !['dmg', 'mental'].includes(s.kind) || s.fx?.some(f => f.t === 'sure')) return null;
+  const tel = telOf(a, plan.skill), ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (tel || (parryable(a, s, t, {}, false) && canPar(t))));
+  if (!ts.length) return null;
+  const beat = D.beat, hits = s.hits || 1, beats = Array.from({ length: hits }, (_, i) => beat + i * D.gap);
+  return { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+}
+function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'bad' (golpe sai +50%) ou ''
+  const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
+  if (inWin) {
+    const v = C.p[t.id][o.beat], fx = { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 };
+    if (v === 'par') {
+      if (!C.done[t.id]) { C.done[t.id] = 1; const g = parNode(t)?.power || 0; t.aura = Math.min(t.auraMax, t.aura + g); addLimit(t, 10); log(t.name, `APARA ${s.name} de ${a.name}!${g ? ` (+${g} Aura)` : ''}${a.brk ? brkHit(a, 1, t) : ''}`, 'ok', { fx }); }
+      else log(t.name, `apara mais uma batida de ${s.name}!`, 'ok', { fx });
+      applySt(a, 'exposed', 2); return 'ok'; // 2: o atacante gasta 1 no próprio fim de turno
+    }
+    if (v === 'esq') { log(t.name, `ESQUIVA ${s.name} de ${a.name}!`, 'ok', { fx }); return 'ok'; }
+    if (v === 'cedo') { applySt(t, 'exposed', 1); if (!C.tel) { log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad'; } log(t.name, `erra o tempo da esquiva e fica exposto!`, 'bad'); }
+    return '';
   }
+  if (!parryable(a, s, t, o, sure)) return '';
   if (t.enemy && !a.enemy && (t.boss || t.rank === 'elite') && !t.parT && !skipping(t) && Math.random() < (t.boss ? .15 : .1)) {
-    t.parT = 1; applySt(a, 'exposed', 1); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok';
+    t.parT = 1; applySt(a, 'exposed', 2); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok';
   }
   return '';
 }
@@ -583,7 +599,7 @@ function doAct(a, m, bonus = 0) {
   let more = false; a.bt ??= {}; a.bt.wkNow = false;
   const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : null;
   for (const t of ts) {
-    for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus }) || more; }
+    for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus, beat: h }) || more; }
     if (s.dupla && off && !t.dead && t.hp > 0) more = strike(a, { ...s, name: s.name + ' (2ª mão)' }, t, aim, bonus, { plus, mult: .5 }) || more; // arma em par: segundo golpe a 50%
   }
   const ch = s.fx?.find(f => f.t === 'chain');
@@ -750,4 +766,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { parriers, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { defWindow, telOf, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

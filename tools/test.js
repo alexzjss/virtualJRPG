@@ -972,17 +972,42 @@ test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e c
   H.battle(gm, { on: true }); c.hp = c.hpMax; c.aura = 99; const hpC = c.hp; S.battle.ticks[c.id] = -1; H.act(ana, { id: c.id, skill: sk('Fábrica de Cópias'), target: c.id });
   const cl = Object.values(S.chars).filter(o => o.clone === c.id); assert.equal(cl.length, 2); assert.ok(c.hp < hpC); assert.ok(cl.every(o => o.hp > 0 && o.id in S.battle.ticks && o.skills.includes(sk('Fagulha Negra'))));
 });
-test('leva 3: Aparar — janela aberta pela IA, acerto anula o golpe e dá Aura; erro pune; só golpe único não mental', async () => {
-  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.skills = [sk('Aparar')]; derive(h); e.attrs.AGI = 99; h.attrs.AGI = 1; e.skills = [];
-  H.battle(gm, { on: true }); h.aura = 20; while (current() !== e.id) H.next(gm);
-  H.ai(gm); assert.ok(S.battle.parry && S.battle.parry.foe === e.id, 'janela aberta'); const hp = h.hp;
-  S.battle.parry.at = Date.now() - S.battle.parry.w + 100; H.parry(ana, { id: h.id }); assert.equal(S.battle.parry.p[h.id], 'ok'); assert.equal(h.aura, 16);
-  H.parry(ana, { id: h.id }); assert.equal(h.aura, 16, '1× por rodada');
-  await new Promise(r => setTimeout(r, 1900)); assert.equal(S.battle.parry, null); assert.equal(h.hp, hp, 'golpe aparado'); assert.ok(S.log.some(l => /APARA/.test(l.text || ''))); assert.equal(h.aura, 18);
-  reset(); const h2 = mk(ana, {}), e2 = mk(gm, { enemy: true }); h2.skills = [sk('Aparar')]; derive(h2); e2.attrs.AGI = 99; h2.attrs.AGI = 1;
-  H.battle(gm, { on: true }); h2.aura = 20; while (current() !== e2.id) H.next(gm); H.ai(gm); H.parry(ana, { id: h2.id }); assert.equal(S.battle.parry.p[h2.id], 'bad', 'cedo demais');
-  await new Promise(r => setTimeout(r, 1900)); assert.ok(S.log.some(l => /fora do tempo|errou/.test(l.text || '')));
-  reset(); const h3 = mk(ana, {}), e3 = mk(gm, { enemy: true }); derive(h3); H.battle(gm, { on: true }); while (current() !== e3.id) H.next(gm); H.ai(gm); assert.ok(!S.battle.parry, 'sem nó de Aparar, sem janela');
+// ---- comandos de ação: janela de defesa (Aparar e Esquiva) ----
+const dfx = (names = ['Aparar'], heroes = 1) => { // um inimigo rápido e `heroes` heróis; o inimigo só tem o ataque básico
+  reset(); const hs = Array.from({ length: heroes }, (_, i) => { const h = mk(i ? bia : ana, {}); h.skills = names.map(sk).filter(Boolean); derive(h); h.attrs.AGI = 1; h.aura = 20; return h; });
+  const e = mk(gm, { enemy: true }); e.skills = []; e.attrs.AGI = 99; derive(e); H.battle(gm, { on: true }); while (current() !== e.id) H.next(gm); return { hs, e };
+};
+const openAt = left => { const C = S.battle.cmd; C.at = Date.now() - C.beats[0] + left; return C; }; // põe o impacto da 1ª batida daqui a `left` ms
+const waitCmd = () => new Promise(r => setTimeout(r, (S.battle.cmd?.w || 1100) + 350));
+test('defesa: golpe não anunciado abre só Aparar e só para o alvo', () => {
+  const { hs, e } = dfx(['Aparar'], 2); H.ai(gm); const C = S.battle.cmd;
+  assert.ok(C && C.foe === e.id && C.tel === false); assert.equal(C.tgs.length, 1);
+  const other = hs.find(h => !C.tgs.includes(h.id)), aura = other.aura; H.def(other.owner === 'Ana' ? ana : bia, { id: other.id });
+  assert.equal(other.aura, aura, 'quem não é o alvo não paga Aura'); assert.deepEqual(C.p[other.id] ?? [], []);
+});
+test('defesa: Aparar certo anula o golpe, dá Aura e deixa o inimigo Exposto', async () => {
+  const { hs: [h], e } = dfx(); H.ai(gm); const hp = h.hp; openAt(100); H.def(ana, { id: h.id });
+  assert.deepEqual(S.battle.cmd.p[h.id], ['par']); await waitCmd();
+  assert.equal(S.battle.cmd, null); assert.equal(h.hp, hp, 'golpe aparado'); assert.ok(e.st.exposed > 0, 'inimigo Exposto');
+  assert.equal(h.aura, 20 - S.skills[sk('Aparar')].cost + S.skills[sk('Aparar')].power); assert.ok(S.log.some(l => /APARA/.test(l.text || '')));
+});
+test('defesa: cedo demais em Aparar fica Exposto e leva +50%; só uma vez por rodada', async () => {
+  const { hs: [h] } = dfx(); H.ai(gm); openAt(1000); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['cedo']);
+  const aura = h.aura; H.def(ana, { id: h.id }); assert.equal(h.aura, aura, '1× por rodada'); await waitCmd(); assert.ok(h.st.exposed > 0);
+});
+test('defesa: golpe anunciado — esquiva de graça, sem precisar de nó', async () => {
+  const { hs: [h], e } = dfx([]); e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; // técnica anunciada
+  fixR(0, () => H.ai(gm)); const C = S.battle.cmd; assert.ok(C && C.tel, 'janela com esquiva'); const hp = h.hp, aura = h.aura; openAt(450); H.def(ana, { id: h.id });
+  assert.deepEqual(C.p[h.id], ['esq']); await waitCmd(); assert.equal(h.hp, hp); assert.equal(h.aura, aura); assert.ok(!e.st.exposed);
+});
+test('defesa: sem Aura a zona de Aparar vira esquiva (anunciado) e não abre janela (não anunciado); sem nó, sem janela', () => {
+  let { hs: [h], e } = dfx(); h.aura = 0; H.ai(gm); assert.ok(!S.battle.cmd, 'sem Aura e sem golpe anunciado: nenhuma janela');
+  ({ hs: [h], e } = dfx(['Aparar'])); h.aura = 0; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['esq']); assert.equal(h.aura, 0);
+  dfx([]); H.ai(gm); assert.ok(!S.battle.cmd, 'sem nó de Aparar e sem golpe anunciado, sem janela');
+});
+test('defesa: janela velha (servidor reiniciado) é descartada e o inimigo age', () => {
+  const { hs: [h], e } = dfx(); S.battle.cmd = { foe: e.id, at: Date.now() - 10000, w: 1100, beats: [1100], tgs: [h.id], p: { [h.id]: [] } };
+  const hp = h.hp; H.ai(gm); assert.ok(!S.battle.cmd || S.battle.cmd.at > Date.now() - 5000, 'a janela velha saiu');
 });
 
 test('comandos: expand valida campos e gradeDef decide a zona', async () => {
