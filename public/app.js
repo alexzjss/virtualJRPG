@@ -186,7 +186,7 @@ function battle() {
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
   const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
   return `<section class="stage battle heat-${heat} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
+    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {
