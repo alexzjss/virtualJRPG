@@ -66,7 +66,7 @@
     const loop = () => { if (over) return; const now = performance.now(); loops.forEach(f => f(now)); rafId = requestAnimationFrame(loop); }; rafId = requestAnimationFrame(loop);
     ui.innerHTML = '<div class="cm"></div>'; const body = ui.firstChild;
     if (k !== 'mira' && k !== 'runa' && k !== 'seq') ui.addEventListener('pointerdown', e => { e.preventDefault(); onPress(performance.now()); });
-    ui.addEventListener('pointerup', () => onRelease(performance.now()));
+    ui.style.touchAction = 'none'; ui.addEventListener('pointerup', () => onRelease(performance.now())); ui.addEventListener('pointercancel', () => onRelease(performance.now()));
     later(() => finish(), k === 'ritmo' ? 12000 : 6400); // prazo: sem nota, o golpe sai normal
 
     if (k === 'tempo') { // anel que fecha sobre o alvo: aperte no impacto (nível médio acelera e freia; difícil tem anel falso)
@@ -131,7 +131,7 @@
       const at = e => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) / b.width * 480, (e.clientY - b.top) / b.height * 480]; };
       cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); down = true; const p = at(e); pts.push(p); g.strokeStyle = '#ffd24a'; g.shadowColor = '#ff7a1a'; g.shadowBlur = 18; g.lineWidth = 10; g.beginPath(); g.moveTo(...p); });
       cv.addEventListener('pointermove', e => { if (!down) return; const p = at(e); pts.push(p); g.lineTo(...p); g.stroke(); if (pts.length % 4 === 0) stage.fx.burst(e.clientX, e.clientY, 2, '#ffb84a'); });
-      const end = () => { if (over) return; const sc = Math.min(100, CM.runeScore(pts, rune) + (mods.rn || 0)); tap(null, null, '#ffd24a', 30); if (sc >= R.perf) stage.fx.word('✦', { color: '#ffd24a' });
+      const end = () => { if (over) return; const sc = Math.min(100, CM.runeScore(pts, rune)); // as passivas `rn` já baixaram os limites em tune() tap(null, null, '#ffd24a', 30); if (sc >= R.perf) stage.fx.word('✦', { color: '#ffd24a' });
         finish(pts.length < 4 ? '' : sc >= R.perf ? 'perf' : sc >= R.otimo ? 'otimo' : sc >= R.bom ? 'bom' : 'erro', 0, sc / 100); };
       cv.addEventListener('pointerup', () => { if (down) { down = false; end(); } }); later(end, 4000 + 380);
     }
