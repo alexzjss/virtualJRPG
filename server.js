@@ -137,7 +137,19 @@ const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.k
 const sendState = c => c.role && c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
 // recalcula máximos de personagens e modelos antes de enviar o estado
 const prep = () => { Object.values(S.chars).forEach(derive); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
-const push = () => { prep(); pruneReqs(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+// herói que caiu e voltou (cura, item, mestre) é reencaixado na fila logo após o tempo atual, sem tempo velho ou ausente
+const reseat = () => {
+  const T = S.battle.ticks;
+  for (const ch of Object.values(S.chars)) {
+    if (!ch.fell || ch.enemy) continue;
+    if (ch.hp <= 0) { if (ch.dead) delete T[ch.id]; continue; } // ainda caído: continua na contagem; morto sai
+    delete ch.fell; delete ch.dying;
+    if (!S.battle.active || ch.dead || !(ch.id in T || onMap(ch))) continue;
+    const others = Object.keys(T).filter(k => k !== ch.id && S.chars[k] && !S.chars[k].dead && (S.chars[k].hp > 0 || !S.chars[k].enemy)).map(k => T[k]);
+    T[ch.id] = (others.length ? Math.min(...others) : 0) + delay(ch);
+  }
+};
+const push = () => { prep(); reseat(); pruneReqs(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -181,7 +193,7 @@ function hurt(t, d) { // dano em HP: enche Limite, acorda, avisa queda
     return ` ${t.name} entra em fúria e invoca lacaios!`;
   }
   if (!was || t.hp) return '';
-  if (!t.enemy) t.dying = 3;
+  if (!t.enemy) { t.dying = 3; t.fell = true; }
   Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && o !== t && o.enemy === t.enemy).forEach(o => addLimit(o, 25));
   return ` ${t.name} caiu!`;
 }
@@ -193,7 +205,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
     if (!n) return;
     if (n.hp <= 0) { // contagem de morte
       n.dying = (n.dying ?? 3) - 1;
-      if (n.dying <= 0) { n.dead = true; delete n.dying; delete S.battle.ticks[n.id]; log(n.name, 'não resistiu e morreu.', 'bad'); }
+      if (n.dying <= 0) { n.dead = true; n.fell = true; delete n.dying; delete S.battle.ticks[n.id]; log(n.name, 'não resistiu e morreu.', 'bad'); }
       else { log(n.name, `está caído: ${n.dying} turno(s) até a morte`, 'bad'); S.battle.ticks[n.id] += delay(n); }
       continue;
     }
@@ -498,6 +510,7 @@ const H = {
     if (m.k === 'in') { if (!(ch.id in T) && ch.hp > 0) T[ch.id] = Math.max(0, ...Object.values(T)) + 1; }
     else if (!(ch.id in T)) return;
     else if (m.k === 'out') delete T[ch.id];
+    else if (m.k === 'set') T[ch.id] = int(m.v, 0, 999999);
     else T[ch.id] = Math.max(0, T[ch.id] + (m.k === 'up' ? -1 : 1) * Math.ceil(delay(ch) / 2));
   },
   next(c) { const id = current(); if (S.battle.active && id && can(c, S.chars[id])) endTurn(id, 50); }, // passar custa metade do tempo
