@@ -29,7 +29,7 @@ const CURVA = [10, 10, 15, 15, 20, 25, 30, 40, 45, 60];
 for (const n of nodes) {
   if (n.el === 'marcial' || n.el === 'aura' || n.el === 'oculto') continue;
   const br = TREE[n.el].branches[n.bi];
-  if (br.length !== 10 || br.some(o => o.req)) continue;
+  if (br.length !== 10 || br.some(o => o.req) || n.bi > 8) continue;
   const esperado = CURVA[n.ni];
   if (n.xp < esperado * .5 || n.xp > esperado * 2.5) add('aviso', 'curva de XP', n, `XP ${n.xp}, a curva pede cerca de ${esperado}`);
 }
@@ -46,7 +46,7 @@ for (const n of dmg) {
 
 // 5. o nome promete algo que o efeito não faz
 const PROMESSAS = [
-  [/Escudo|Muralha|Barreira|Égide|Bastião/i, /shield|st defUp|st guarded|st taunt|fm|pas|reflect/i, 'escudo/defesa'],
+  [/Escudo|Muralha|Barreira|Égide|Bastião/i, /shield|st defUp|st guarded|st taunt|fm|pas|reflect|brk|st defDn/i, 'escudo/defesa'],
   [/Ricochete|Cadeia|Em Cadeia/i, /chain|spread/i, 'ricochete'],
   [/Execu|Guilhotina|Misericórdia/i, /exec/i, 'execução'],
   [/Reviver|Ressurre|Renascer|Ressurgir/i, /revive|fall|on/i, 'reerguer'],

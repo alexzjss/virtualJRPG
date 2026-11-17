@@ -4,6 +4,7 @@ import { VINC } from './arvore/vinculos.js';
 import { AURA } from './arvore/aura.js';
 import { OCULTO } from './arvore/oculto.js';
 import { ARMAS, NOVOS } from './arvore/marcial.js';
+import { SISTEMAS, AURA_SIN, OCULTO_PONTE, MARCIAL_SIST } from './arvore/sistemas.js';
 // Em cada ramo de 10 nós: 1-4 tronco, 5-7 caminho A (atributo principal), 8-9 caminho B (atributo secundário), 10 nó final.
 // rq = requisito de atributo para aprender, ex.: rq: { INT: 50 }.
 export const TREE = {
@@ -735,3 +736,8 @@ for (const [el, br] of Object.entries(VINC)) TREE[el].branches.push(...br);
 TREE.marcial.branches.push(...NOVOS);
 TREE.aura = { branches: AURA };
 TREE.oculto = { branches: OCULTO };
+// sistemas novos: ramos 10 e 11 dos Vínculos, sinergias da Aura, ponte do Ocultismo e Quebra no Marcial
+for (const [el, br] of Object.entries(SISTEMAS)) TREE[el].branches.push(...br);
+TREE.aura.branches.push(AURA_SIN);
+TREE.oculto.branches.push(OCULTO_PONTE);
+TREE.marcial.branches.push(MARCIAL_SIST);

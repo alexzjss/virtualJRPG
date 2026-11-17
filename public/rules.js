@@ -5,13 +5,33 @@
   const DOT = ['burn', 'bleed', 'poison', 'rad'];
   const CTRL = ['stun', 'sleep', 'para', 'frozen', 'possess', 'confuse'];
   const ST = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão',
-    shield: 'Escudo', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor' };
+    shield: 'Escudo', wet: 'Molhado', oil: 'Oleado', broken: 'Quebrado', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor' };
   // o que cada condição nova faz (as antigas já são conhecidas na mesa)
   const STD = { shield: 'absorve dano antes do HP', regen: 'recupera HP no início do turno', taunt: 'inimigos só conseguem mirar nele', guarded: 'um guarda-costas recebe os golpes no lugar', counter: 'revida golpes corpo a corpo com um ataque', reflect: 'devolve 30% do dano recebido',
+    wet: 'conduz raio e vento (reações elementais)', oil: 'queima e explode com fogo e raio', broken: 'perdeu o turno, sofre +50% de dano e não age até se recompor',
     evade: 'o próximo golpe erra', stealth: 'não pode ser alvo direto; o próximo ataque tem +25% e crítico dobrado', focus: '+15% de acerto e enxerga quem está Furtivo', exposed: 'armadura não conta', exaus: '−15% de acerto, −15% de dano e não pode se transformar', seal: 'explode quando acaba ou ao ser detonado',
     blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental' };
-  const NEG = [...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal'];
+  const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal'];
   const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt'];
+  // clima da batalha: a cena define o inicial e algumas skills trocam; reforça ou enfraquece elementos e mexe no acerto
+  const CLIMA = {
+    sol: ['Sol Forte', { kagutsuchi: 1.2, amaterasu: 1.2, susanoo: .85, tsukuyomi: .85 }],
+    chuva: ['Chuva', { susanoo: 1.2, indra: 1.15, kagutsuchi: .8 }],
+    neblina: ['Névoa', { tsukuyomi: 1.2, hit: -10 }],
+    tempestade: ['Tempestade', { indra: 1.25, fuhaku: 1.15, hit: -5 }],
+    eclipse: ['Eclipse', { tsukuyomi: 1.25, shukketsu: 1.15, amaterasu: .8 }],
+  };
+  // reações elementais: um golpe do elemento em alvo com a condição consome a condição, multiplica o dano e pode aplicar outra
+  const REACT = [
+    { n: 'Eletrocutar', el: ['indra'], on: ['wet'], m: 1.3, a: ['para', 2], d: 'raio em Molhado: ×1,3 e Paralisia' },
+    { n: 'Explosão', el: ['kagutsuchi'], on: ['oil'], m: 1.5, a: ['burn', 3], d: 'fogo em Oleado: ×1,5 e Queimadura' },
+    { n: 'Vapor', el: ['kagutsuchi'], on: ['wet'], m: .9, a: ['blind', 2], d: 'fogo em Molhado: Cego' },
+    { n: 'Faíscas', el: ['indra'], on: ['oil'], m: 1.2, a: ['burn', 2], d: 'raio em Oleado: ×1,2 e Queimadura' },
+    { n: 'Estilhaçar', el: ['atlas', 'fis'], on: ['frozen'], m: 1.6, d: 'impacto em Congelado: ×1,6' },
+    { n: 'Vento Gélido', el: ['fuhaku'], on: ['wet'], m: 1.1, a: ['frozen', 1], d: 'vento em Molhado: Congelado' },
+    { n: 'Lama', el: ['atlas'], on: ['wet'], m: 1, a: ['root', 2], d: 'terra em Molhado: Enraizado' },
+    { n: 'Purgar', el: ['amaterasu'], on: ['poison', 'rad'], m: 1.4, d: 'luz em Veneno ou Radiação: ×1,4 e remove' },
+  ];
   const RESN = { hp: 'HP', aura: 'Aura', san: 'Sanidade', limit: 'Limite' };
   // votos e restrições (Seiyaku): nó passivo sempre ativo, com bônus e o preço cobrado pelo motor
   const VOW = {
@@ -52,6 +72,7 @@
     if (s.el === 'oculto' && !(ch.aw || []).includes('outro')) return `Exige o Despertar "${AW.outro}" (dado pelo mestre).`;
     if (s.aw && !(ch.aw || []).includes(s.aw)) return `Exige o Despertar "${AW[s.aw] || s.aw}" (dado pelo mestre).`;
     if (s.cat === 'esp' && !(ch.aw || []).includes('esp') && ch.nen !== 'esp') return `Especialização exige o Despertar "${AW.esp}".`;
+    if (s.v2 && !(ch.vinc || []).includes(s.v2)) return `Exige também o Vínculo com ${PN[s.v2] || s.v2}.`;
     if (s.ex && own.some(o => o.ex === s.ex && o !== s)) return 'Trancada: você escolheu o outro caminho.';
     if (own.length && !own.some(o => near(o, s))) return 'Precisa de um nó vizinho já aprendido.';
     const pre = (s.pre || '').split('|').filter(Boolean).filter(n => !byName(n));
@@ -94,6 +115,8 @@
       case 'spread': return `espalha ${ST[f.k] || f.k} do alvo para os aliados dele`;
       case 'guard': return `protege o alvo por ${f.n}t (recebe os golpes dele)`;
       case 'turn': return 'você age de novo';
+      case 'clima': return `muda o clima para ${CLIMA[f.k]?.[0] || f.k} por ${f.n} rodadas`;
+      case 'brk': return `abala a barra de Quebra do alvo em ${f.n}`;
       default: return f.t;
     }
   }
@@ -115,6 +138,8 @@
     if (s.kind === 'form' && s.form) o.push(formText(s.form));
     if (s.fx?.length && s.kind !== 'passive') o.push((s.kind === 'form' ? 'ao assumir: ' : '') + fxText(s.fx));
     if (s.summon) o.push(`invoca ${s.summon}`);
+    if (s.trio) o.push(`técnica em trio: dois aliados com "${s.trio.join('" e "')}" gastam o próximo turno junto`);
+    if (s.dom) o.push(`Expansão de Domínio por ${s.dom.dur} turnos (gasta toda a Aura, exige metade dela; Exausto ao fim): aliados ${modText(s.dom.ally) || '—'} · inimigos ${modText(s.dom.foe) || '—'}${s.dom.tick ? ' · inimigos ganham ' + (ST[s.dom.tick] || s.dom.tick) + ' a cada turno' : ''}`);
     if (s.duo) o.push(`técnica em dupla: um aliado com "${s.duo}" gasta o próximo turno junto`);
     if (s.vow) o.push(`${VOW[s.vow][0]}: ${VOW[s.vow][1]}`);
     if (s.on) o.push(`${ON[s.on]}${s.ch && s.ch < 100 ? ` (${s.ch}%)` : ''}: ${fxText(s.fx)}`);
@@ -124,5 +149,5 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

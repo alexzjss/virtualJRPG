@@ -10,9 +10,20 @@ const PATRON = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', i
 // mod / bon: 'atk 10; hit 5' e 'INT 4; sanMax -5' → modificadores e bônus das passivas.
 const TO = new Set(['self', 'ally', 'foes', 'tgt']);
 const ARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'],
-  push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
+  push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
 const DEF = { st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 } };
 const TXT = new Set(['k', 'r']);
+// dom: 'dur 3; ally atk 20; ally hit 10; foe def -20; foe agi -15; tick burn' → Expansão de Domínio
+export function parseDom(str, where = '') {
+  const d = { dur: 3, ally: {}, foe: {}, tick: '' };
+  for (const item of String(str).split(';').map(x => x.trim()).filter(Boolean)) {
+    const [k, a, b] = item.split(/\s+/);
+    if (k === 'dur') d.dur = +a; else if (k === 'tick') d.tick = a;
+    else if ((k === 'ally' || k === 'foe') && ['atk', 'def', 'agi', 'hit', 'crit'].includes(a) && !Number.isNaN(+b)) d[k][a] = +b;
+    else throw new Error(`campo de domínio desconhecido "${item}" em ${where}`);
+  }
+  return d;
+}
 export function parseFx(str, where = '') {
   if (!str) return undefined;
   return String(str).split(';').map(x => x.trim()).filter(Boolean).map(item => {
@@ -42,10 +53,12 @@ export function parseForm(str, where = '') {
 }
 // converte um nó dos dados para os campos que o servidor usa
 export function expand(o) {
-  const { fx, fm, mod, bon, up, ...rest } = o, w = o.n;
+  const { fx, fm, mod, bon, up, dom, trio, ...rest } = o, w = o.n;
   const out = { ...rest };
   if (fx) out.fx = parseFx(fx, w);
   if (fm) out.form = parseForm(fm, w);
+  if (dom) out.dom = parseDom(dom, w);
+  if (trio) out.trio = String(trio).split('|');
   if (mod) out.mod = kv(mod, w);
   if (bon) out.bon = kv(bon, w);
   if (up) out.up = { ...up, ...(up.fx ? { fx: parseFx(up.fx, w) } : {}) };
@@ -192,7 +205,7 @@ export function buildBestiary(make) {
     ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR', { arma: -4, hp: .6, nosup: 1 }], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head', { hp: .7 }], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso'], ['hiruko', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
   const PN = { head: 'cabeça', torso: 'torso', armL: 'braço esquerdo', armR: 'braço direito', legL: 'perna esquerda', legR: 'perna direita' };
   // chefes não usam dupla, ritual, Despertar nem invocação; dos ramos novos (7-9) só levam ataques e transformações (sem as que aumentam cura), senão o suporte deixa a luta sem fim
-  const solo = s => !s.duo && !s.circ && !s.aw && !s.summon && !s.form?.m?.heal && (+String(s.br).split('-')[1] < 6 || ['dmg', 'mental', 'form'].includes(s.kind));
+  const solo = s => !s.duo && !s.trio && !s.dom && !s.v2 && !s.circ && !s.aw && !s.summon && !s.form?.m?.heal && (+String(s.br).split('-')[1] < 6 || ['dmg', 'mental', 'form'].includes(s.kind));
   const ray = el => s => solo(s) && (s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back));
   return [...B.map(([name, color, attrs, weak, resist, skills, o], i) => make(name, color, attrs, weak, resist, skills, { cat: i < 16 ? 'demonio' : 'humano', ...o })),
     ...BOSS.map(([el, name, weak, attr, wp, tune]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], ray(el), { boss: true, cat: 'chefe', tune: tune || {}, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 }))];
