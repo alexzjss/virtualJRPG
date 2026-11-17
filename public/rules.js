@@ -27,7 +27,7 @@
     preco: ['Voto do Preço', 'Rituais não gastam Aura; cada ritual custa +4 de Sanidade.'],
   };
   // Despertares: selos narrativos que só o mestre concede na ficha
-  const AW = { outro: 'Tocado pelo Outro Lado', esp: 'Aura Singular', eremita: 'Comunhão Eremita', kagutsuchi: 'Despertar de Kagutsuchi', susanoo: 'Despertar de Susanoo', atlas: 'Despertar de Atlas', indra: 'Despertar de Indra', fuhaku: 'Despertar de Fuhaku', amaterasu: 'Despertar de Amaterasu', tsukuyomi: 'Despertar de Tsukuyomi', shukketsu: 'Despertar de Shukketsu', radiacao: 'Despertar de Hiruko' };
+  const AW = { outro: 'Tocado pelo Outro Lado', esp: 'Aura Singular', eremita: 'Comunhão Eremita', kagutsuchi: 'Despertar de Kagutsuchi', susanoo: 'Despertar de Susanoo', atlas: 'Despertar de Atlas', indra: 'Despertar de Indra', fuhaku: 'Despertar de Fuhaku', amaterasu: 'Despertar de Amaterasu', tsukuyomi: 'Despertar de Tsukuyomi', shukketsu: 'Despertar de Shukketsu', hiruko: 'Despertar de Hiruko' };
   // estados do personagem exigidos por alguns nós
   const CS = {
     duplo: ['ter dois Vínculos', ch => (ch.vinc || []).length >= 2],
@@ -124,5 +124,5 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', radiacao: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

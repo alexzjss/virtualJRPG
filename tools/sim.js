@@ -10,7 +10,7 @@ const TREE = (await import('../tree.js')).TREE, ids = (el, b, n) => TREE[el].bra
 console.log = () => {};
 const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
 // grupo de heróis por nível: 0 = recém-criado, 1 = algumas sessões, 2 = veterano. O 4º herói é curandeiro de Amaterasu.
-const VINC = [['indra', 'AGI', 'INT'], ['fuhaku', 'DES', 'INT'], ['radiacao', 'CON', 'FOR'], ['amaterasu', 'SAB', 'CAR']];
+const VINC = [['indra', 'AGI', 'INT'], ['fuhaku', 'DES', 'INT'], ['hiruko', 'CON', 'FOR'], ['amaterasu', 'SAB', 'CAR']];
 function party(size, lvl) {
   return VINC.slice(0, size).map(([el, a1, a2]) => {
     const had = new Set(Object.keys(S.chars)); H.addChar(gm, { owner: 'p' }); const h = S.chars[Object.keys(S.chars).find(k => !had.has(k))], up = lvl * 8;

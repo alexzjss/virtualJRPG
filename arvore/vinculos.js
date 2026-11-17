@@ -306,7 +306,7 @@ export const VINC = {
       { n: "Coração de Shukketsu", k: "passive", d: "Quem jurou com sangue ganha um coração que bebe dos mortos.", xp: 80, cs: "voto", mod: "atk 15", on: "kill", fx: "res hp 20; gain aura 6" },
     ],
   ],
-  radiacao: [
+  hiruko: [
     [ // Transformação: Forma Mutante
       { n: "Pele Radiante", k: "form", d: "A pele brilha esverdeada e fica dura como couro curtido.", xp: 10, a: "CON", c: 4, fm: "dur 3; def 15; atk 10; dr aura 2" },
       { n: "Metabolismo Instável", k: "passive", d: "Transformado, o corpo queima energia sem controle e bate mais forte.", xp: 10, mod: "atk 8", sc: "form" },
@@ -317,7 +317,7 @@ export const VINC = {
       { n: "Adaptação Imediata", k: "passive", d: "O corpo muda para aguentar o golpe que acabou de levar.", xp: 30, on: "hurt", ch: 30, fx: "st defUp 2" },
       { n: "Mão Derretida", k: "dmg", d: "Uma mão que derrete armadura e carne ao mesmo tempo.", xp: 40, a: "CON", p: 24, c: 10, nf: 1, fx: "st exposed 2; pierce 50", rq: { CON: 50 } },
       { n: "Mutação Hemorrágica", k: "dmg", d: "Com um aliado de Shukketsu, a radiação faz o sangue do alvo virar contra ele.", xp: 45, a: "INT", p: 42, c: 12, duo: "Sangue Mutante", fx: "st rad 3; st bleed 3" },
-      { n: "Avatar de Hiruko", k: "form", d: "O deus-sanguessuga abandonado sobe do mar e veste o caçador. Tudo em volta adoece.", xp: 90, a: "INT", c: 14, aw: "radiacao", fm: "dur 4; atk 40; def 25; dr hp 3; end st exaus 3; end lose san 6", fx: "st regen 3; st rad 3 foes", rq: { INT: 62 } },
+      { n: "Avatar de Hiruko", k: "form", d: "O deus-sanguessuga abandonado sobe do mar e veste o caçador. Tudo em volta adoece.", xp: 90, a: "INT", c: 14, aw: "hiruko", fm: "dur 4; atk 40; def 25; dr hp 3; end st exaus 3; end lose san 6", fx: "st regen 3; st rad 3 foes", rq: { INT: 62 } },
     ],
     [ // Rituais radioativos
       { n: "Ritual: Luz Fantasma", k: "dmg", d: "Uma luz verde que não vem de lugar nenhum e não sai mais da pele.", xp: 10, a: "INT", p: 12, c: 4, circ: 1, pay: { san: 2 }, fx: "st rad 2; st blind 1 50%" },

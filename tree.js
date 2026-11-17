@@ -302,7 +302,7 @@ export const TREE = {
       { n: "Nuvem Carregada", k: "dmg", d: "Uma nuvem negra cresce sobre os inimigos e solta o primeiro estalo.", xp: 10, a: "INT", p: 12, c: 9, area: true, ct: 120 },
       { n: "Chuva de Raios", k: "dmg", d: "Dezenas de raios finos caem sem aviso por todo o campo.", xp: 15, a: "INT", p: 15, c: 12, area: true },
       { n: "Raio Esférico", k: "dmg", d: "Uma esfera de raio rola até o alvo e explode com todo o seu peso.", xp: 15, a: "INT", p: 26, c: 10, ct: 130 },
-      { n: "Descarga em Cadeia", k: "dmg", d: "A corrente salta de inimigo em inimigo, sem dar descanso.", xp: 20, a: "INT", p: 18, c: 13, area: true, ct: 125, rq: { INT: 50 } },
+      { n: "Descarga em Cadeia", k: "dmg", d: "A corrente salta de inimigo em inimigo, sem dar descanso.", xp: 20, a: "INT", p: 20, c: 13, ct: 110, fx: "chain 2 .7", rq: { INT: 50 } },
       { n: "Tempestade Perfeita", k: "dmg", d: "O céu inteiro cobra a dívida do mundo em raios sem fim.", xp: 25, a: "INT", p: 22, c: 15, area: true, ct: 120 },
       { n: "Raio Divino", k: "dmg", d: "Um raio desce do céu como decreto do rei dos deuses.", xp: 30, a: "INT", p: 32, c: 12, ct: 150, st: "para" },
       { n: "Tormenta de Indra", k: "dmg", d: "O céu inteiro explode em trovões sobre a linha inimiga.", xp: 40, a: "AGI", p: 24, c: 15, area: true, ct: 140, rq: { AGI: 50 } },
@@ -441,7 +441,7 @@ export const TREE = {
       { n: "Lâmina de Luz", k: "dmg", d: "Uma espada feita de luz pura, cortando sombras e demônios.", xp: 20, a: "SAB", p: 18, c: 8, rq: { SAB: 50 } },
       { n: "Orvalho Dourado", k: "heal", d: "Gotas de luz líquida caem sobre as feridas e as selam.", xp: 25, a: "SAB", p: 24, c: 9 },
       { n: "Cura Instantânea", k: "heal", d: "Uma luz rápida, na medida certa, antes que seja tarde.", xp: 30, a: "SAB", p: 22, c: 8, ct: 60 },
-      { n: "Raio Purificador", k: "dmg", d: "Um feixe de luz que queima o que é impuro e marca o condenado.", xp: 40, a: "CAR", p: 22, c: 9, st: "marked", rq: { CAR: 50 } },
+      { n: "Raio Purificador", k: "dmg", d: "Um feixe de luz que queima o que é impuro e marca o condenado.", xp: 40, a: "CAR", p: 22, c: 9, st: "marked", fx: "vs demon 1.3", rq: { CAR: 50 } },
       { n: "Graça Solar", k: "heal", d: "Uma graça que cura o corpo e acende o espírito.", xp: 45, a: "CAR", p: 27, c: 10, st: "atkUp" },
       { n: "Milagre do Meio-Dia", k: "heal", d: "Um milagre sob o sol a pino que devolve a vida a quem já a perdia.", xp: 60, a: "SAB", p: 30, c: 12, ct: 140, rq: { SAB: 62 }, fx: "revive 40" },
     ],
@@ -582,7 +582,7 @@ export const TREE = {
   ] },
   shukketsu: { branches: [
     [
-      { n: "Sangria", k: "dmg", d: "Um corte que arranca sangue como quem abre uma torneira.", xp: 10, a: "INT", p: 12, c: 3, res: "san" },
+      { n: "Sangria", k: "dmg", d: "Um corte que arranca sangue como quem abre uma torneira.", xp: 10, a: "INT", p: 12, c: 3, res: "san", st: "bleed" },
       { n: "Corte Venoso", k: "dmg", d: "Um talho profundo numa veia que não deixa de verter.", xp: 10, a: "INT", p: 15, c: 3, res: "san", st: "bleed" },
       { n: "Gota Carmesim", k: "dmg", d: "Uma gota de sangue lançada como projétil, pequena e certeira.", xp: 15, a: "INT", p: 17, c: 3, res: "san" },
       { n: "Pacto de Shukketsu", k: "dmg", d: "Um pacto selado em vermelho, em que a dor do outro paga a dívida.", xp: 15, a: "INT", p: 20, c: 5, res: "san", st: "bleed" },
@@ -654,7 +654,7 @@ export const TREE = {
       { n: "Rito de Sangue", k: "dmg", d: "Um rito proibido: tudo em troca de um único golpe, e o corpo sangra em troca.", xp: 60, a: "CON", p: 50, c: 8, res: "san", back: "bleed", st: "bleed", rq: { CON: 62 } },
     ],
   ] },
-  radiacao: { branches: [
+  hiruko: { branches: [
     [
       { n: "Raio Gama", k: "dmg", d: "Um feixe invisível que atravessa a carne e deixa o mal para depois.", xp: 10, a: "INT", p: 12, c: 4 },
       { n: "Isótopo Instável", k: "dmg", d: "Um núcleo instável incrustado no alvo, que irradia aos poucos.", xp: 10, a: "INT", p: 15, c: 5, st: "rad" },
@@ -718,8 +718,8 @@ export const TREE = {
     [
       { n: "Sangue Inerte", k: "passive", d: "O sangue do caçador deixou de reagir ao que o contamina.", xp: 10, p: 0, pas: "res" },
       { n: "Núcleo Estável", k: "passive", d: "Um núcleo dentro do peito que não se desfaz, mesmo sob pressão.", xp: 10, p: 10, pas: "auraMax" },
-      { n: "Garras Mutantes", k: "passive", d: "Os dedos endurecem, ganhando o gume de uma garra.", xp: 15, p: 5, pas: "FOR", ex: "radiacao-1" },
-      { n: "Pele Quitinosa", k: "passive", d: "Uma casca de quitina brota nos ombros e dá firmeza ao corpo.", xp: 15, p: 5, pas: "CON", ex: "radiacao-1" },
+      { n: "Garras Mutantes", k: "passive", d: "Os dedos endurecem, ganhando o gume de uma garra.", xp: 15, p: 5, pas: "FOR", ex: "hiruko-1" },
+      { n: "Pele Quitinosa", k: "passive", d: "Uma casca de quitina brota nos ombros e dá firmeza ao corpo.", xp: 15, p: 5, pas: "CON", ex: "hiruko-1" },
       { n: "Mente Irradiada", k: "passive", d: "Uma mente que já viu a luz estranha e não se deixa abalar.", xp: 20, p: 8, pas: "sanMax", rq: { INT: 50 } },
       { n: "Dom de Hiruko", k: "passive", d: "Hiruko, o deus sem osso, concede um golpe de sorte aos seus escolhidos.", xp: 25, p: 5, pas: "SOR" },
       { n: "Resistência Mutante", k: "passive", d: "Um corpo que se adapta ao que o machuca, e fica mais forte por isso.", xp: 30, p: 10, pas: "hpMax" },
