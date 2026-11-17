@@ -1008,6 +1008,9 @@ details.mais>.row{margin:8px 10px}
 .fxl .seal b{font:900 clamp(34px,9vw,92px)/1 'Barlow Condensed','Barlow',sans-serif;letter-spacing:5px;transform:skewX(-8deg);color:#fff;text-shadow:3px 3px 0 #111,0 0 26px var(--sc,#ffb84a)}
 .fxl .seal.perf{--sc:#ffb84a}.fxl .seal.perf b{color:#ffd24a}
 .fxl .seal.bom{--sc:#3ddc84}.fxl .seal.bom b{font-size:clamp(24px,6vw,56px);color:#7dffa3}
+.fxl .seal.otimo{--sc:#1fb8a0}.fxl .seal.otimo b{font-size:clamp(28px,7.5vw,72px);color:#7dffe0}
+.fxl .seal.erro{--sc:#7a1020}.fxl .seal.erro b{font-size:clamp(20px,5vw,44px);color:#ff8a8a;letter-spacing:3px}
+.fxl .seal.perf b{text-shadow:3px 3px 0 #111,0 0 36px #ffb84a,0 0 70px #ff7a00}
 .fxl .seal.ctr{--sc:#5fb8ff}.fxl .seal.ctr b{color:#9fd8ff}
 .fxl .seal.chq{--sc:#ff9f1a}.fxl .seal.chq b{color:#ffcf6e}
 .fxl .seal.bf{--sc:#e4002b}.fxl .seal.bf b{color:#fff;text-shadow:4px 4px 0 #e4002b,0 0 34px #000,0 0 60px #e4002b}

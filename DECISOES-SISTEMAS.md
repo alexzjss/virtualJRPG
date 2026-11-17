@@ -97,3 +97,11 @@ Martelar, Segurar e soltar, Sequência, Ritmo do instrumento, Mira em ponto frac
 - **Black Flash** deixou de ser sorte no d100: só o Perfeito do Golpe no tempo dispara. Chefes têm 20% de golpe anunciado Perfeito.
 - **Aparar todas as batidas** de um golpe de vários golpes devolve um contra-ataque automático (básico ×1,5).
 - Decisões minhas conferidas no spec §11: alvo escolhido antes da janela; Exposto no atacante dura 2 (1 se gasta no próprio fim de turno); Choque só em alvo único; `telK` calculado uma vez; `pre` dos nós novos = primeiro nó do ramo temático.
+
+## Comandos cinemáticos — Leva 1 (questionário de 2026-11-17; spec `2026-11-17-comandos-cinematicos-design.md`)
+- **Palco de tela cheia** (`public/js/palco-cmd.js`, estilo QTE de anime) para os 7 comandos de ataque e para a defesa/Choque: faixas de cinema, retratos, linhas de velocidade, faíscas por toque, tremor, hit-stop, sons sintetizados, vibração e tela de resultado com "o que rendeu".
+- **Graus:** `'' | erro | bom | otimo | perf`. Pular, Esc e prazo sem toque = normal (sem punição); só **tentar e errar feio** (`erro`) custa ×0,85. Ótimo (×1,3 no Tempo, ×1,45 no Segurar) não dá `pf`. Mecânicas de contagem: ≥100% Perfeito, ≥75% Ótimo, ≥35% Bom, abaixo disso Erro.
+- **Dificuldade pelo requisito do nó** (`RULES.CMD.tier`): fácil < 20, médio 20–49, difícil ≥ 50; janelas menores, fintas (anel que acelera e freia, anel falso, mira que muda de direção e ponto que se move, notas coladas no Ritmo, batidas irregulares na Sequência) e Perfeito ×1,5 (Segurar ×1,7) no difícil. A nota vem do navegador; o servidor só limita o teto (confiança numa mesa de amigos).
+- **Fintas na defesa** (servidor: `finPlan`, `C.fin` paralelo a `C.beats`): só elites (30% das batidas) e chefes (todas; combos irregulares e direção ←/→ da esquiva em golpe anunciado). Anel falso = apertar ali é "cedo"; o tempo do impacto é sempre o do servidor.
+- `C.beats` continuou `number[]`; as fintas ficam em `C.fin` para não quebrar o resto.
+- Adiado para as próximas levas: QTE/Girar/Corte, Limite em 3 fases, série de Perfeitos, comandos em centenas de nós, filtro/ícone na mandala, Praticar e painel da mesa.
