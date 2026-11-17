@@ -982,3 +982,13 @@ body[data-role=gm] h1{right:var(--gwr,0px)}
 .gcmd .p5i span{overflow:visible}
 .gstage .aim,.gstage .aimbox{flex:none}
 @media(max-width:1400px){.gtab{padding:4px 9px;font-size:12px}.gcmd .p5i{font-size:14px}}
+/* menos botões: seções "Mais…", uma ação principal por painel, ⋯ nos cartões */
+details.mais{margin:2px 0 0;border:1px solid var(--line);background:#ffffff05}
+details.mais>summary{list-style:none;cursor:pointer;padding:7px 10px;font:600 12px var(--cond);letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:8px}
+details.mais>summary::-webkit-details-marker{display:none}
+details.mais>summary::before{content:"▸";color:var(--red);transition:transform .15s}details.mais[open]>summary::before{transform:rotate(90deg)}
+details.mais>summary:hover{color:#fff}details.mais[open]>summary{color:#fff;border-bottom:1px solid var(--line)}
+details.mais>.row{margin:8px 10px}
+.row.prim button{min-height:42px;font-size:16px;flex:1}.row.prim button.own{box-shadow:4px 4px 0 #000}
+.sc-f .more{min-width:30px;font-size:16px;line-height:1;padding:2px 8px}
+.bulk:not(.on) .row+small{display:block;margin-top:2px}

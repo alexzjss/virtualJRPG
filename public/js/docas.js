@@ -44,9 +44,11 @@ app.addEventListener('click', e => {
   const g = e.target.closest('[data-g]'); if (!g || !gm) return;
   const k = g.dataset.id;
   if (g.dataset.g === 'x') { e.stopPropagation(); gClose(k); return render(); }
+  if (g.dataset.g === 'more') { e.stopPropagation(); const r = g.getBoundingClientRect(); ctx = ctx?.id === k ? null : { id: k, x: r.left, y: r.bottom + 4 }; return render(); } // ⋯ do cartão: o mesmo menu do botão direito
   if (g.dataset.g === 'tab') { dock.act[dockOf(k)] = k; saveDock(); return render(); }
   if (g.dataset.g === 'wide') { if (isWide(k)) dock.nar[k] = 1; else delete dock.nar[k]; saveDock(); return render(); }
 }, true);
+app.addEventListener('contextmenu', e => { const c = gm && e.target.closest('.scard'); if (!c || e.target.closest('input,textarea')) return; e.preventDefault(); ctx = { id: c.dataset.id, x: e.clientX, y: e.clientY }; render(); });
 app.addEventListener('auxclick', e => { const t = e.target.closest('.gtab.sheet'); if (t && e.button === 1) { gClose(t.dataset.id); render(); } }); // botão do meio fecha a ficha
 app.addEventListener('dragstart', e => { const t = e.target.closest?.('.gtab'); if (!t) return; gdragTab = t.dataset.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', gdragTab); document.body.classList.add('gdragging'); });
 app.addEventListener('dragover', e => { if (!gdragTab) return; const d = e.target.closest('.gdock'); if (!d) return; e.preventDefault(); app.querySelectorAll('.gdock.over').forEach(x => x !== d && x.classList.remove('over')); d.classList.add('over'); });
@@ -72,3 +74,8 @@ addEventListener('pointermove', e => {
   else { const w = Math.round(Math.max(260, Math.min(innerWidth * .4, gres.side === 'L' ? e.clientX : innerWidth - e.clientX))); dock.w[gres.side] = w; gres.el.style.setProperty(gres.side === 'L' ? '--wl' : '--wr', w + 'px'); }
 });
 addEventListener('pointerup', () => { if (!gres) return; gres = null; document.body.classList.remove('gresizing'); saveDock(); render(); });
+
+// ===== seções "Mais…": o que fica aberto sobrevive aos redesenhos e ao recarregar =====
+const maisOpen = new Set((() => { try { return JSON.parse(localStorage.vj_mais || '[]'); } catch { return []; } })());
+const maisO = k => maisOpen.has(k) ? 'open' : '';
+app.addEventListener('toggle', e => { const d = e.target; if (!d.matches?.('details[data-mais]')) return; d.open ? maisOpen.add(d.dataset.mais) : maisOpen.delete(d.dataset.mais); try { localStorage.vj_mais = JSON.stringify([...maisOpen]); } catch {} }, true);

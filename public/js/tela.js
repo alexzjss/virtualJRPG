@@ -18,22 +18,26 @@ function render() {
   if (gm) {
     if (b && gmWasB === false) for (const d of DOCKS) if (isWide(dock.act[d] || '')) dock.act[d] = dock[d].find(k => !isWide(k)) || dock.act[d]; // a batalha começou: tira as abas largas da frente do palco
     gmWasB = b;
-    const cena = `<div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
-      <div class="row">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
+    // Cena: o que se usa toda hora fica à mostra; mapa, grade, recursos e fundo da batalha ficam em "Mais…" (o aberto fica lembrado)
+    const cena = `<div class="row prim">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1">Iniciar batalha</button>'}</div>
+      <div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
       <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button></div>
       <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span><span data-a="content" data-coll="scenes">+ cenas de exemplo</span></div>
+      <div class="row chips">Clima: <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
+      <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
+      ${xCena(sc)}
+      <details class="mais" data-mais="mapa" ${maisO('mapa')}><summary>Mapa e grade</summary>
       <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"></div>
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
       <div class="row"><label>Casas na largura <input type="number" step="0.25" min="4" max="80" data-map="cols" value="${sc.cols}"></label><small>${Math.round(sc.rows * 10) / 10} de altura</small></div>
       <div class="row"><label>Grade → <input type="range" min="0" max="0.95" step="0.05" data-map="ox" value="${sc.ox}" aria-label="Deslocar grade na horizontal"></label><label>↓ <input type="range" min="0" max="0.95" step="0.05" data-map="oy" value="${sc.oy}" aria-label="Deslocar grade na vertical"></label></div>
+      <div class="row"><button data-a="camFix" title="Todos passam a ver o mapa com o seu zoom e posição atuais">Fixar minha vista para todos</button>${sc.cam ? '<button data-a="camFree" class="own">Liberar vista</button>' : ''}</div>
+      </details>
+      <details class="mais" data-mais="fundo" ${maisO('fundo')}><summary>Recursos e fundo da batalha</summary>
       <div class="row chips">Recursos da cena: ${Object.entries(S.items).filter(([, i]) => i.type === 'mat' && i.tag).map(([k, i]) => `<span class="${(sc.gather || []).includes(k) ? 'weak' : ''}" data-a="gatherSet" data-item="${k}" data-on="${(sc.gather || []).includes(k) ? '' : '1'}" title="O que os ofícios de coleta acham aqui">${esc(i.name)}</span>`).join('')}</div>
-      <div class="row chips">Clima: <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
       <div class="row chips">Fundo da batalha: <span class="${sc.bbg ? '' : 'weak'}" data-a="map" data-f="bbg" data-v="" title="Usa a imagem do mapa desta cena">Mapa da cena</span>${chips(BBG, (k, l) => `<span class="${sc.bbg === k ? 'weak' : ''}" data-a="map" data-f="bbg" data-v="${k}">${l}</span>`)}</div>
       <div class="row"><input aria-label="Imagem própria para o fundo da batalha" data-map="bbg" placeholder="Ou cole o link de uma imagem" value="${esc(sc.bbg && !BBG[sc.bbg] ? sc.bbg : '')}"><label class="up">Enviar fundo<input type="file" accept="image/*" data-up="bbg"></label></div>
-      <div class="row"><button data-a="camFix" title="Todos passam a ver o mapa com o seu zoom e posição atuais">Fixar minha vista para todos</button>${sc.cam ? '<button data-a="camFree" class="own">Liberar vista</button>' : ''}</div>
-
-      <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
-      ${xCena(sc)}
+      </details>
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
     dockFix();
     const fw = DOCKS.map(d => dock.act[d]).filter(k => k?.startsWith('f_'));
