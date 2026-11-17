@@ -9,6 +9,7 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 - `/player` — fichas do jogador (login e senha criados pelo mestre)
 - `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura; entra com a conta de um jogador ou login `mestre` + chave
 - `docs/index.html` — página fixa de entrada (GitHub Pages): o jogador digita o código da sessão, o login e a senha
+- `/painel` — as três telas lado a lado (mestre, jogador e mesa) para acompanhar e mexer em tudo ao mesmo tempo; cada quadro é a tela real, então o que muda em um aparece nos outros na hora. Pede a chave do mestre, o nome e a senha do jogador uma vez e usa `⤢` para ver uma tela inteira
 
 Ao iniciar, o servidor abre sozinho um túnel gratuito do Cloudflare (baixa o `cloudflared` na primeira vez) e mostra o **código da sessão**. Veja `GUIA-RODAR.md`.
 
