@@ -1,0 +1,32 @@
+# Próximos passos (instruções para o agente que continuar)
+
+Leia primeiro: `README.md`, `ARVORE-SISTEMAS.md` (mecânicas e notação dos nós), `DECISOES-SISTEMAS.md` (o que o usuário decidiu), `PERICIAS.md` (ofícios) e `REVISAO-ARVORE.md`.
+O usuário escreve em português; responda e comente o código em português, no estilo existente. Decisões já tomadas não se perguntam de novo: use `AskUserQuestion` só para decisões novas.
+
+## Como trabalhar
+- `npm install && npm test` (54 testes devem passar) · `npm run audit` (0 erros; 5 avisos conhecidos de nomes metafóricos) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio.
+- Compare sempre com a base: encontros (nível 0/1/2, fácil→mortal) estavam em ~90/77/93/73/42/23 e chefes entre 46% e 89%. Variação de ±10 pontos é ruído.
+- Toda mecânica nova ganha teste em `tools/test.js`; as de combate passam pelo simulador antes de entrar.
+- Mudou `tree.js` ou `arvore/`: a grade é refeita ao iniciar (skills ficam pelo nome). Nomes de nós precisam ser únicos (`npm run audit` confere).
+- Arquivos: `server.js` (motor), `public/rules.js` e `public/oficios.js` (compartilhados com o navegador), `public/app.js` (interface), `content.js` (grade, itens, bestiário, cenas), `arvore/*.js` (nós).
+
+## Pendências, em ordem sugerida
+1. **Revisar os 154 nós novos** (`arvore/sistemas.js`) ramo por ramo com o usuário, como foi feito no Kagutsuchi: poder e XP, efeitos, nomes e descrições. Os nós 🆕 das expansões anteriores também continuam sem revisão nó a nó (`REVISAO-ARVORE.md`).
+2. **Testar a interface na mesa de verdade** (só foram abertas a ficha do mestre, a grade e a aba Ofícios, sem erros). Conferir: tela de batalha do jogador (Defender, Concentrar, Coragem, Passar a vez, Ataque Total), faixa de clima/Cadeia/Domínio, barra de Quebra, aprovação de rolagem com Vantagem/Desvantagem, escolha de "conversar com" no acampamento, aba Ofícios do jogador. Ajustar o CSS (`public/style.css`, blocos no fim) em celular.
+3. **IA dos inimigos não usa** Defender, Concentrar, Coragem nem Domínio (de propósito: chefes e gerados só levam ataques e transformações). Decidir com o usuário se algum chefe deve ter Domínio.
+4. **Domínios e trios no bestiário:** `solo` em `content.js` exclui `dom`, `trio` e `v2` dos inimigos.
+5. **Ofícios a refinar:**
+   - Ações `checar` (Arrombar, Intimidar, Invenção…) só rolam e pagam ouro; falta uma forma de o mestre registrar o resultado narrado.
+   - Receitas de munição: o ouro/preço das munições e runas ainda não está balanceado; loja não vende ingredientes além dos que as cenas dão.
+   - `Couraceiro`/`Ourives` temperam armadura/acessório, mas a interface de itens não mostra o bônus de têmpera nem o nome da assinatura; mostrar em `itemsPage`.
+   - Slot de munição (`mun`) não aparece na área de equipamentos da ficha.
+   - Dívida de Coragem, Tensão e Cadeia não têm som nem animação.
+6. **Itens para o mestre:** janela de edição de receitas, `gather` por cena já existe (chips em Cena); falta editar o catálogo de ofícios sem mexer no código.
+7. **Limpeza:** `README.md` ainda descreve o fluxo antigo de "Forjar" na aba Forja (essências) sem citar Economia de Essência; revisar `docs/index.html` se mudar algo de acesso.
+
+## Armadilhas conhecidas
+- `strike` e `doAct` em `server.js` concentram quase todos os efeitos; mudanças ali quebram testes de longe. Rode `npm test` a cada passo.
+- Testes que usam `reset()` não reiniciam `S.camp` nem `S.known`: defina o que precisar no começo do teste.
+- A Cadeia é só dos heróis (`addChain`); dar Cadeia aos inimigos deixou os encontros bem mais difíceis.
+- `normSlots` roda a cada `push()`: passivas lidas na hora (mod, gatilho, voto, amplificação) só valem se estiverem nos slots; passivas de atributo e de `bon` valem sempre.
+- O id do Vínculo de Hiruko é `hiruko`; estados salvos com `radiacao` são convertidos ao iniciar.
