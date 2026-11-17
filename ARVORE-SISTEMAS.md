@@ -153,3 +153,16 @@ Jogadores (e a mesa) recebem do servidor os nós que ainda não alcançam como *
 (`src/net.js`, `hiddenSkills`/`defsFor`). Fica à vista o que algum herói já aprendeu, os vizinhos do que os personagens do jogador já
 têm (respeitando Vínculo, Despertar e o Vínculo extra `v2`) e, para quem não aprendeu nada, o centro Marcial. O mestre vê tudo.
 As versões com silhueta são cacheadas por conjunto de nós escondidos, então o custo por atualização é pequeno.
+
+## Ligações e mandala
+
+Cada nó tem `ln`: os ids dos nós a que se liga, sempre simétrico. O `buildSkills` grava a ligação com a casa de onde cada nó saiu ao
+montar a grade (nó anterior do ramo, ponto da bifurcação A/B, âncora do ramo, o centro Marcial para o anel). Aprender, o segredo
+(`src/net.js`) e a rota mais barata usam `RULES.linked(a, b, ida, idb)`: ligados se um está no `ln` do outro; uma skill sem `ln`
+(criada pelo mestre ou importada) também liga pela vizinhança de grade de antes. Vizinho de grade sem ligação não basta.
+
+No editor do mestre, "Liga a" recebe nomes separados por `|` e grava as ligações nos dois lados; vazio volta à vizinhança de grade.
+
+A tela desenha a árvore como mandala em canvas (`public/js/mandala.js`): `wx, wy` = grade em escala (`MANDALA_U` = 96 por casa),
+cada linha é uma ligação. Afastado, os setores viram selos; de perto, esferas com nome, XP e ícone, selo 鎖 de requisito, portão ⛩
+na trilha antes de nó travado e névoa nos secretos.

@@ -104,8 +104,8 @@ export function buildSkills(sk) {
   for (const s of Object.values(G)) { s.wx = (s.gx - C) * MANDALA_U; s.wy = (s.gy - C) * MANDALA_U; }
   return G;
 }
-// unidades de mundo por casa da grade (a esfera tem raio 16)
-export const MANDALA_U = 48;
+// unidades de mundo por casa da grade (a esfera tem raio 24; sobra espaço para o nome em duas linhas)
+export const MANDALA_U = 96;
 
 // versão do catálogo (5: nomes novos dos consumáveis e equipamentos + catálogo completo de armas com modelo); saves em versão menor passam por migrateItems (state.js)
 export const ITEMS_V = 5;

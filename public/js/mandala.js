@@ -2,7 +2,7 @@
 // Marcial no centro, os setores (9 Vínculos, Aura, Ocultismo) como pétalas; cada linha é uma ligação de verdade (RULES.linked).
 // place/edges são puros (testados no Node); mount/focus/zoom/learned desenham e cuidam da câmera, que sobrevive às renderizações da página.
 (g => {
-  const U = 48, C = 55, R = 16, LOD = 0.32, TAU = Math.PI * 2;
+  const U = 96, C = 55, R = 24, LOD = 0.25, TAU = Math.PI * 2;
   // posição de cada nó: wx, wy do servidor; skill sem posição (do mestre ou importada) segue a mesma escala da grade
   const place = skills => { const P = new Map(); for (const [id, s] of Object.entries(skills)) P.set(id, Number.isFinite(s.wx) && Number.isFinite(s.wy) ? [s.wx, s.wy] : [((s.gx ?? 0) - C) * U, ((s.gy ?? 0) - C) * U]); return P; };
   // pares ligados, cada um uma vez, só entre nós visíveis. Os que têm ln saem dele; os sem ln procuram vizinhos de grade.
@@ -19,13 +19,17 @@
   if (typeof document === 'undefined') return;
 
   // ---------- desenho ----------
-  const cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
+  const cam = M.cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
   let ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
   const hexA = (h, a) => { const v = parseInt((h || '#ffffff').slice(1), 16); return `rgba(${v >> 16},${v >> 8 & 255},${v & 255},${a})`; };
   const col = el => (typeof ELC !== 'undefined' && ELC[el]) || '#ffffff';
-  const w2s = (x, y) => [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2], s2w = (x, y) => [(x - W / 2) / cam.z + cam.x, (y - H / 2) / cam.z + cam.y];
-  const MINI = 150, miniRect = () => [W - MINI - 12, H - MINI - 12, MINI, MINI];
+  // IN: largura coberta pela gaveta à direita; o centro da câmera e o minimapa ficam na parte visível
+  const VW = () => W - (o?.inset || 0);
+  const w2s = (x, y) => [(x - cam.x) * cam.z + VW() / 2, (y - cam.y) * cam.z + H / 2], s2w = (x, y) => [(x - VW() / 2) / cam.z + cam.x, (y - H / 2) / cam.z + cam.y];
+  const MINI = 150, miniRect = () => [12, 12, MINI, MINI]; // canto de cima à esquerda: embaixo ficam os botões, à direita o zoom
   const ICON = { dmg: '⚔', mental: '⚔', heal: '✚', passive: '◆', util: '✦', form: '変' };
+  // nome em até duas linhas de ~13 letras
+  const wrap = n => { const out = []; let l = ''; for (const w of n.split(' ')) { if (l && (l + ' ' + w).length > 13) { out.push(l); l = w; } else l = l ? l + ' ' + w : w; } out.push(l); return out.length > 2 ? [out[0], out.slice(1).join(' ').slice(0, 14) + '…'] : out; };
   const mark = s => s.secret ? '?' : s.back ? '禁' : s.limit ? '極' : s.kind === 'form' ? '変' : s.circ ? '儀' : s.duo ? '双' : s.vow ? '誓' : s.summon ? '召' : ICON[s.kind] || (typeof KANJI !== 'undefined' ? KANJI[s.el] : '•');
 
   function build() { // posições, ligações e selos dos setores; refeito quando as definições ou a lista visível mudam
@@ -83,10 +87,12 @@
       if (id === hover || mk.sel) { cx.strokeStyle = '#ffffff'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * 1.8, 0, TAU); cx.stroke(); }
       const t = anim.get(id); if (t != null) { const k = (now - t) / 700; if (k >= 1.3) anim.delete(id); else { cx.fillStyle = hexA(c, Math.max(0, .8 * (1 - k))); cx.beginPath(); cx.arc(x, y, r * (1 + k * 2.5), 0, TAU); cx.fill(); } }
       if (st === 'secret') { const f = cx.createRadialGradient(x, y, 0, x, y, r * 2.6); f.addColorStop(0, 'rgba(40,36,60,.92)'); f.addColorStop(1, 'rgba(40,36,60,0)'); cx.fillStyle = f; cx.beginPath(); cx.arc(x, y, r * 2.6, 0, TAU); cx.fill(); }
+      const full = cam.z >= .8, named = full || st === 'own' || st === 'av' || id === hover || mk.sel; // com zoom médio, só os nomes que importam
       if (cam.z > .5) { cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = st === 'own' ? '#111' : hexA(c, .95); cx.font = `${Math.round(r * .95)}px serif`;
         cx.fillText(st === 'secret' ? '?' : mk.rq && st !== 'own' ? '鎖' : mark(s), x, y + 1);
-        const fs = Math.round(Math.min(15, r * .62)); cx.fillStyle = st === 'secret' ? '#7a7799' : st === 'out' ? '#77738f' : '#ece8ff'; cx.font = `600 ${fs}px system-ui,sans-serif`; cx.fillText(st === 'secret' ? '???' : s.name, x, y + r * 1.9);
-        if (st !== 'own' && st !== 'secret' && mk.xp != null) { cx.fillStyle = mk.poor ? 'rgba(255,120,120,.9)' : hexA(c, .85); cx.font = `${Math.round(Math.min(12, r * .5))}px system-ui,sans-serif`; cx.fillText(mk.xp + ' XP', x, y + r * 1.9 + fs + 2); } }
+        const fs = Math.round(Math.min(14, 9 + 4 * cam.z)), lines = st === 'secret' ? ['???'] : wrap(s.name); cx.fillStyle = st === 'secret' ? '#7a7799' : st === 'out' ? '#77738f' : '#ece8ff'; cx.font = `600 ${fs}px system-ui,sans-serif`;
+        if (named) lines.forEach((l, i) => cx.fillText(l, x, y + r + fs * (i + .9)));
+        if (named && st !== 'own' && st !== 'secret' && mk.xp != null) { cx.fillStyle = mk.poor ? 'rgba(255,120,120,.9)' : hexA(c, .85); cx.font = `${Math.round(Math.min(12, r * .5))}px system-ui,sans-serif`; cx.fillText(mk.xp + ' XP', x, y + r + fs * (lines.length + .9)); } }
       cx.globalAlpha = 1; }
     // minimapa
     const [mx0, my0, mw] = miniRect(), k = mw / (bound * 2.2); cx.fillStyle = 'rgba(11,11,20,.88)'; cx.fillRect(mx0, my0, mw, mw); cx.strokeStyle = 'rgba(255,255,255,.18)'; cx.strokeRect(mx0, my0, mw, mw);
@@ -102,12 +108,12 @@
   const fly = (x, y, z) => { const a = { ...cam }, t0 = performance.now(), id = ++flying; (function step() { if (id !== flying) return; const k = Math.min(1, (performance.now() - t0) / 550), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; cam.x = a.x + (x - a.x) * e; cam.y = a.y + (y - a.y) * e; cam.z = a.z * Math.pow(clampZ(z) / a.z, e); kick(); if (k < 1) requestAnimationFrame(step); })(); };
   const zoomAt = (px, py, z) => { const [wx, wy] = s2w(px, py); cam.z = clampZ(z); const [nx, ny] = s2w(px, py); cam.x += wx - nx; cam.y += wy - ny; kick(); };
   const pick = (px, py) => { if (cam.z < LOD) return null; let best = null, bd = Math.max(8, R * 1.3 * cam.z) ** 2; for (const id of o.ids) { const [x, y] = w2s(...P.get(id)), d = (x - px) ** 2 + (y - py) ** 2; if (d < bd) { bd = d; best = id; } } return best; };
-  const fitAll = () => fly(0, 0, Math.min(W, H) / (bound * 2.2));
+  const fitAll = () => fly(0, 0, Math.min(VW(), H) / (bound * 2.2));
   M.focus = t => { if (!o) return; if (t === 'all') return fitAll();
-    if (t === 'core') { const p = P.get('g0') || [0, 0]; return fly(p[0], p[1], Math.max(cam.z, 1)); }
-    if (t === 'mine') { const own = o.ids.filter(id => o.state(id) === 'own'); if (!own.length) return M.focus('core'); const xs = own.map(id => P.get(id)); return fly(xs.reduce((a, p) => a + p[0], 0) / xs.length, xs.reduce((a, p) => a + p[1], 0) / xs.length, .8); }
+    if (t === 'core') { const p = P.get('g0') || [0, 0]; return fly(p[0], p[1], Math.max(cam.z, .9)); }
+    if (t === 'mine') { const own = o.ids.filter(id => o.state(id) === 'own'); if (!own.length) return M.focus('core'); const xs = own.map(id => P.get(id)); return fly(xs.reduce((a, p) => a + p[0], 0) / xs.length, xs.reduce((a, p) => a + p[1], 0) / xs.length, .9); }
     const p = P.get(t); if (p) fly(p[0], p[1], Math.max(cam.z, .9)); };
-  M.zoom = f => zoomAt(W / 2, H / 2, cam.z * f);
+  M.zoom = f => zoomAt(VW() / 2, H / 2, cam.z * f);
   M.learned = id => { anim.set(id, performance.now()); kick(); };
 
   const ptr = new Map(); let drag = null, pinch = null;
@@ -132,14 +138,14 @@
     document.addEventListener('visibilitychange', kick);
   }
 
-  // monta (ou reencaixa) o canvas em host. opts: { skills, ids, state(id), marks(id), route, mineEls, key, onPick(id), onHover(id, x, y) }
+  // monta (ou reencaixa) o canvas em host. opts: { skills, ids, state(id), marks(id), route, mineEls, key, inset, onPick(id), onHover(id, x, y) }
   M.mount = (h, opts) => {
     if (!cv) { cv = document.createElement('canvas'); cv.tabIndex = 0; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'Mandala de habilidades: arraste para mover, roda ou + − para o zoom, setas para andar'); cx = cv.getContext('2d'); }
     const rebuild = !o || o.skills !== opts.skills || o.ids.length !== opts.ids.length || o.ids.some((id, i) => id !== opts.ids[i]);
     if (host !== h) { host = h; h.prepend(cv); if (!ro) { ro = new ResizeObserver(resize); wire(); } ro.disconnect(); ro.observe(h); }
     else if (!h.contains(cv)) h.prepend(cv);
     o = opts; resize(); if (rebuild) build();
-    if (opts.key !== key) { key = opts.key; const own = o.ids.filter(id => o.state(id) === 'own'); if (own.length) { const xs = own.map(id => P.get(id)); Object.assign(cam, { x: xs.reduce((a, p) => a + p[0], 0) / xs.length, y: xs.reduce((a, p) => a + p[1], 0) / xs.length, z: .8 }); } else { const p = P.get('g0') || [0, 0]; Object.assign(cam, { x: p[0], y: p[1], z: 1 }); } }
+    if (opts.key !== key) { key = opts.key; const own = o.ids.filter(id => o.state(id) === 'own'); if (own.length) { const xs = own.map(id => P.get(id)); Object.assign(cam, { x: xs.reduce((a, p) => a + p[0], 0) / xs.length, y: xs.reduce((a, p) => a + p[1], 0) / xs.length, z: .9 }); } else { const p = P.get('g0') || [0, 0]; Object.assign(cam, { x: p[0], y: p[1], z: .9 }); } }
     kick();
   };
 })(globalThis);
