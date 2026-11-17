@@ -50,6 +50,19 @@ test('mandala: os setores ficam na ordem da roda (ângulo médio crescente)', ()
   const a0 = ang(ORD[0]), rel = ORD.map(el => ((ang(el) - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
   rel.slice(1).forEach((r, i) => assert.ok(r > rel[i], ORD[i + 1]));
 });
+test('mandala (navegador): place usa wx/wy e põe skill sem posição junto do vizinho de grade', async () => {
+  await import('../public/js/mandala.js'); const M = globalThis.MANDALA, g0 = S.skills.g0;
+  const sks = { ...S.skills, x1: { name: 'Nova', el: 'fis', gx: g0.gx + 6, gy: g0.gy - 9 } }, near = Object.keys(S.skills).find(k => RU.near(S.skills[k], sks.x1));
+  const P = M.place(sks); assert.deepEqual(P.get('g0'), [g0.wx, g0.wy]);
+  if (near) { const [x, y] = P.get('x1'), [a, b] = P.get(near); assert.ok(Math.hypot(x - a, y - b) < 60); }
+  assert.ok(P.get('x1').every(Number.isFinite));
+});
+test('mandala (navegador): edges sem repetição, só entre visíveis, com o núcleo ligado', async () => {
+  await import('../public/js/mandala.js'); const M = globalThis.MANDALA, vis = new Set(Object.keys(S.skills).filter(k => S.skills[k].el !== 'hiruko'));
+  const E = M.edges(S.skills, vis), keys = E.map(([a, b]) => [a, b].sort().join('|'));
+  assert.equal(new Set(keys).size, keys.length); assert.ok(E.every(([a, b]) => vis.has(a) && vis.has(b)));
+  assert.ok(keys.includes(['g0', 'g1'].sort().join('|'))); assert.ok(E.length >= vis.size - 12);
+});
 test('ligações: ramo de 10 nós segue tronco 1-4, A 5-7, B 8-9 e final', () => {
   const br = Object.entries(S.skills).filter(([, s]) => s.br === 'kagutsuchi-0'); assert.equal(br.length, 10);
   const id = i => br[i][0], L = i => br[i][1].ln;
