@@ -28,7 +28,7 @@ function fight(heroes, foes) {
     const live = Object.values(S.chars), liveF = live.filter(f => f.enemy && f.hp > 0), liveH = heroes.filter(h => h.hp > 0), a = S.chars[current()];
     if (!liveF.length || !liveH.length || !a) break;
     acts[a.id] = (acts[a.id] || 0) + 1;
-    if (a.enemy) { H.ai(gm); continue; }
+    if (a.enemy) { if (process.env.SIMDBG && a.boss) process.stderr.write(`boss hp ${Math.round(100*a.hp/a.hpMax)}% aura ${a.aura}/${a.auraMax} lim ${a.limit} dom ${!!a.skills.find(k=>S.skills[k].dom)}\n`); H.ai(gm); continue; }
     // heróis: Limite se cheio, cura quem está mal, poção em emergência, senão a skill mais forte que puder pagar no inimigo mais ferido
     const sks = a.skills.map(k => [k, S.skills[k]]).filter(([, s]) => s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100) && !a.st.silence && !a.st.fury);
     const hurt = heroes.filter(h => !h.dead && h.hp < h.hpMax * .45).sort((x, y) => x.hp - y.hp)[0], weak = liveF.sort((x, y) => x.hp - y.hp)[0], pot = Object.keys(a.inv).find(k => S.items[k]?.eff === 'hp');
@@ -38,6 +38,7 @@ function fight(heroes, foes) {
     else if (a.hp < a.hpMax * .3 && pot) H.use(gm, { id: a.id, item: pot, target: a.id });
     else H.act(gm, { id: a.id, skill: dmg && Math.random() < .65 ? dmg[0] : 'atk', target: weak.id });
   }
+  if (process.env.SIMDOM) globalThis.__dom = (globalThis.__dom || 0) + Object.values(S.chars).filter(c => c.domUsed).length;
   const win = !Object.values(S.chars).some(f => f.enemy && f.hp > 0) && heroes.some(h => h.hp > 0);
   return { win, rounds: Math.max(...heroes.map(h => acts[h.id] || 0)), dead: heroes.filter(h => h.dead).length };
 }
@@ -52,4 +53,5 @@ if (MODE === 'boss') {
   for (const size of [3, 4]) for (const lvl of [0, 2]) run(`${size} heróis nível ${lvl} · chefe gerado`, () => { const hs = party(size, lvl); H.foeGen(gm, { el: ['kagutsuchi', 'atlas', 'tsukuyomi', 'indra'][Math.floor(Math.random() * 4)], role: ['bruto', 'conjurador'][Math.floor(Math.random() * 2)], rank: 'chefe' }); return [hs, foesNow()]; });
   for (const [id, b] of Object.entries(S.bestiary).filter(([, b]) => b.boss)) for (const lvl of [0, 2]) run(`4 heróis nível ${lvl} · ${b.name}`, () => { const hs = party(4, lvl); H.bSpawn(gm, { id }); return [hs, foesNow()]; });
 }
+if (process.env.SIMDOM) out("Domínios abertos: " + (globalThis.__dom || 0));
 process.exit(0);

@@ -93,3 +93,5 @@ Ramo 1 · nó 1 (Golpe Pesado) apresentado, ainda sem decisão. Demais nós: nã
 Árvore 1187 → **1341 nós**: ramos 10 e 11 de cada Vínculo (clima, Quebra, fusões, nós-chave, Domínio e 4 trios), sinergias da Aura, ponte do Ocultismo e Quebra e laços no Marcial. `npm run audit` não acha erros (5 avisos conhecidos: nomes como "Muralha de Fogo" e "Gelo na Espinha" que são só metáfora).
 Chefes depois da Quebra (4 heróis, nível 0/2): Ifrit 46/49 · Leviatã 81/81 · Colosso 70/66 · Arconte 71/70 · Rainha dos Corvos 71/65 · Serafim Caído 65/71 · Senhor dos Pesadelos 53/56 · Condessa 78/89 · Filho de Hiruko 60/63. Serafim Caído resolvido (lacaios da fúria sem suporte, HP 0,6, arma −4).
 Id interno `radiacao` renomeado para `hiruko`, com migração do estado salvo.
+
+Serafim Caído (revisto na frente de IA dos inimigos): 76% / 89% no nível 0 / 2 com Defender (.2) e `arma -4 / hp 0,6`. Dentro da faixa de 46-89%. Ponto em aberto encerrado.

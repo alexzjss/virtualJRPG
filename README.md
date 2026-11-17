@@ -50,7 +50,7 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
 
 ## Conteúdo padrão
-`content.js` gera a grade de skills (1341 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
+`content.js` gera a grade de skills (1341 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes + o trio da Tempestade Ígnea), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
 Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.
 
 ## Vínculos e personagens base
@@ -86,6 +86,14 @@ Veja `ARVORE-SISTEMAS.md` (mecânicas) e `DECISOES-SISTEMAS.md` (o que foi decid
 - **Mesa:** Aflição e Virtude quando a Sanidade zera, Vantagem e Desvantagem (o mestre escolhe ao aprovar a rolagem), laços entre personagens que sobem no "conversar" do acampamento.
 - **Árvore:** slots de passivas (4, mais 1 a cada 100 XP gasto; troca no acampamento), fusões entre Vínculos vizinhos, nós-chave, sinergias Aura × Vínculo, ponte Aura ↔ Ocultismo, busca por efeito e função, caminho até o nó, plano e builds salvas.
 - `npm run audit` confere a árvore (nomes repetidos, XP, poder fora da curva, nomes que não cumprem o efeito).
+
+## Forja (aba Forja do inventário)
+Duas formas de forjar, ambas fora de batalha e com aprovação do mestre:
+- **Forja elemental (aba Forja):** gasta **essências** do elemento da peça mais metade do preço em ouro. Arma = 3 essências, relíquia = 5. Com o Ofício **Forja** (nó de **Economia de Essência**) a arma passa a custar **2** essências. A aba lista só o que a ficha pode forjar e mostra `essências possuídas/necessárias` e o ouro.
+- **Forja dos Ofícios (aba Ofícios → Forja):** receitas com materiais da coleta e das cenas, Têmpera (+3 no máximo), até 3 engastes com runas, Liga de duas essências, Assinatura do Ferreiro e Arma Viva. Falha comum perde 1 material; desastre perde metade. Detalhes em `PERICIAS.md`.
+
+## Inimigos com IA opcional
+Cada entrada do bestiário pode trazer o campo `ia` (desligado por padrão): `dom` (Expansão de Domínio, 1 vez por combate), `defend` e `focus` (chance de Defender com vida baixa e de Concentrar Tensão com vida alta) e `trio` (técnicas em trio). Hoje: Domínio em Leviatã do Porto, Condessa Escarlate e Filho de Hiruko (só para grupos veteranos); Concentrar/Defender em alguns chefes; trio no Oni de Brasa, Tengu do Vendaval e Raijū. `iaExtra: false` em `R` (ou `VJ_RULES='{"iaExtra":false}'`) desliga tudo. A Cadeia continua só dos heróis. Números e medições em `DECISOES-SISTEMAS.md`.
 
 ## Ofícios (perícias)
 Aba própria na ficha, separada da árvore de combate. O mestre concede a **Iniciação** em cada uma das 15 perícias (Forja, Alquimia, Culinária, Medicina, Caça, Investigação, Lábia, Pilotagem, Engenharia, Ladinagem, Sobrevivência, Talismãs, Adestramento, Música, Jogos de Azar). Os nós custam **Pontos de Ofício**, ganhos em sucessos nas rolagens da perícia ou dados pelo mestre. Cada perícia tem 3 graus (Aprendiz, Oficial, Mestre) e a rolagem é d100 contra o melhor atributo dela, mais 10/20/30 pelo grau. Detalhes em `PERICIAS.md`.

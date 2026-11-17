@@ -13,8 +13,8 @@ O usuário escreve em português; responda e comente o código em português, no
 ## Pendências, em ordem sugerida
 1. **Revisar os 154 nós novos** (`arvore/sistemas.js`) ramo por ramo com o usuário, como foi feito no Kagutsuchi: poder e XP, efeitos, nomes e descrições. Os nós 🆕 das expansões anteriores também continuam sem revisão nó a nó (`REVISAO-ARVORE.md`).
 2. **Testar a interface na mesa de verdade** (só foram abertas a ficha do mestre, a grade e a aba Ofícios, sem erros). Conferir: tela de batalha do jogador (Defender, Concentrar, Coragem, Passar a vez, Ataque Total), faixa de clima/Cadeia/Domínio, barra de Quebra, aprovação de rolagem com Vantagem/Desvantagem, escolha de "conversar com" no acampamento, aba Ofícios do jogador. Ajustar o CSS (`public/style.css`, blocos no fim) em celular.
-3. **IA dos inimigos não usa** Defender, Concentrar, Coragem nem Domínio (de propósito: chefes e gerados só levam ataques e transformações). Decidir com o usuário se algum chefe deve ter Domínio.
-4. **Domínios e trios no bestiário:** `solo` em `content.js` exclui `dom`, `trio` e `v2` dos inimigos.
+3. ✅ **IA dos inimigos** (feito): campo opt-in `ia` no bestiário (`dom`, `defend`, `focus`, `trio`); Domínio em 3 chefes, Defender/Concentrar em 3, trio da Tempestade Ígnea; Coragem **não** foi dada aos inimigos. Ver `DECISOES-SISTEMAS.md`. Pendente: `v2` (fusões) continua fora dos inimigos.
+4. ✅ **Domínios e trios no bestiário** (feito); `solo` continua excluindo `dom`, `trio` e `v2` dos chefes comuns e dos gerados, só o campo `ia` os reabilita.
 5. **Ofícios a refinar:** (feito na sessão `oficios-refino`, veja `PERICIAS.md`, seção "Refino")
    - [x] Ações `checar`: diário de testes na ficha, narração do mestre ao aprovar ou depois.
    - [x] Receitas: preços e custos equilibrados (teste de economia), runas viraram receitas da Forja, loja vende ingredientes básicos.
@@ -22,7 +22,7 @@ O usuário escreve em português; responda e comente o código em português, no
    - [x] Slot de munição (`mun`) na área de equipamentos.
    - [ ] Dívida de Coragem, Tensão e Cadeia não têm som nem animação (fica com a sessão de interface/sons).
 6. **Itens para o mestre:** [x] janela **Catálogo de ofícios** (receitas, perícias, nós e nós novos, persistido em `S.ofiCfg`). Ideias que sobraram: editar runas e assinaturas, ligar uma receita nova a um nó específico, importar/exportar o catálogo.
-7. **Limpeza:** `README.md` ainda descreve o fluxo antigo de "Forjar" na aba Forja (essências) sem citar Economia de Essência; revisar `docs/index.html` se mudar algo de acesso.
+7. ✅ **Limpeza** (feito): `README.md` descreve a Forja com Economia de Essência e os Ofícios; `docs/index.html` não menciona forja nem acesso novo, ficou como está.
 
 ## Armadilhas conhecidas
 - `strike` e `doAct` em `server.js` concentram quase todos os efeitos; mudanças ali quebram testes de longe. Rode `npm test` a cada passo.

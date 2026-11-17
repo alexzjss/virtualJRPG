@@ -497,3 +497,43 @@ test('forja: as runas são receitas da Forja e o engaste aceita a runa preparada
   fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('forja', 'Engaste I'), item: w, rune: itm('Runa de Força') })); assert.deepEqual(h.up[w].g, ['Runa de Força']);
   const fraco = ofiChar('forja', 4); assert.ok(!OF.recipes(fraco, 'forja').some(r => r.id === 'runaBrasa')); // Brasa é do Engaste II
 });
+// ----- IA opcional dos inimigos (campo `ia` do bestiário): Domínio, Defender, Concentrar e trio -----
+const { R: RS } = await import('../server.js');
+const bst = n => Object.keys(S.bestiary).find(k => S.bestiary[k].name === n);
+test('bestiário: Domínio só em 3 chefes (Leviatã, Condessa, Filho de Hiruko), trio só nos 3 da Tempestade; nenhum gerado ou comum leva dom/trio', () => {
+  const doms = Object.values(S.bestiary).filter(b => b.skills.some(k => S.skills[k].dom)).map(b => b.name).sort();
+  assert.deepEqual(doms, ['Condessa Escarlate', 'Filho de Hiruko', 'Leviatã do Porto']);
+  assert.ok(doms.every(n => S.bestiary[bst(n)].boss && S.bestiary[bst(n)].ia.dom && S.bestiary[bst(n)].skills.filter(k => S.skills[k].dom).length === 1));
+  const trios = Object.values(S.bestiary).filter(b => b.skills.some(k => S.skills[k].trio)).map(b => b.name).sort(); assert.deepEqual(trios, ['Oni de Brasa', 'Raijū', 'Tengu do Vendaval']);
+  assert.ok(Object.values(S.bestiary).filter(b => !b.ia).every(b => b.skills.every(k => !S.skills[k].dom && !S.skills[k].trio)));
+  reset(); for (let i = 0; i < 10; i++) { H.foeGen(gm, { el: ['kagutsuchi', 'susanoo', 'amaterasu'][i % 3], role: 'conjurador', rank: 'chefe' }); }
+  assert.ok(Object.values(S.chars).every(c => c.skills.every(k => !S.skills[k].dom && !S.skills[k].trio)));
+});
+const foeTurn = (e, f) => { turn(e); return fixR(.3, () => H.ai(gm)); };
+test('IA: o chefe abre o Domínio uma única vez, com Aura cheia e vida < 75%, e o Choque vale contra herói', () => {
+  reset(); const h = mk(ana, {}); H.bSpawn(gm, { id: bst('Condessa Escarlate'), fit: false }); const b = Object.values(S.chars).find(c => c.boss); derive(b); b.hp = b.hpMax; b.aura = b.auraMax;
+  H.battle(gm, { on: true }); foeTurn(b); assert.ok(!S.battle.dom && !b.domUsed); // vida cheia: não abre
+  b.hp = Math.floor(b.hpMax * .6); b.aura = b.auraMax; foeTurn(b); assert.ok(S.battle.dom && S.battle.dom.by === b.id && S.battle.dom.side === true && b.domUsed); assert.ok(b.aura <= Math.ceil(b.auraMax / 10));
+  const nome = S.battle.dom.name; closeDom(); b.aura = b.auraMax; foeTurn(b); assert.ok(!S.battle.dom, nome + ' não reabre'); // no máximo 1
+  // com o Domínio do herói aberto, o chefe responde de imediato e o Choque decide
+  reset(); const a = mk(ana, {}); a.vinc = ['kagutsuchi']; Object.assign(a.attrs, { INT: 90, SAB: 90 }); derive(a); a.hp = a.hpMax; a.aura = a.auraMax; H.bSpawn(gm, { id: bst('Leviatã do Porto'), fit: false });
+  const l = Object.values(S.chars).find(c => c.boss); derive(l); l.hp = l.hpMax; l.aura = l.auraMax; H.battle(gm, { on: true }); use(a, 'Fornalha Infinita', a); assert.ok(S.battle.dom && S.battle.dom.side === false);
+  l.aura = l.auraMax; foeTurn(l); assert.ok(l.domUsed && S.battle.dom.name && (S.battle.dom.by === l.id || S.battle.dom.by === a.id)); assert.ok((S.battle.dom.by === l.id ? a : l).st.exaus); // o perdedor fica Exausto
+});
+const closeDom = () => { delete S.battle.dom; };
+test('IA: Defender com vida baixa, Concentrar com vida alta, com intervalo; sem `ia` ou com iaExtra desligado, nada disso', () => {
+  let [a, e] = duel(); e.ia = { defend: 1, focus: 1 }; e.hp = Math.floor(e.hpMax * .3); foeTurn(e); assert.ok(e.st.defUp && e.brv === 1 && !e.ten); assert.ok(e.icd > 0);
+  [a, e] = duel(); e.ia = { focus: 1 }; foeTurn(e); assert.equal(e.ten, 1); assert.match(S.log.at(-1).text, /concentra a Tensão/);
+  [a, e] = duel(); foeTurn(e); assert.ok(!e.ten && !e.brv); // sem `ia`
+  [a, e] = duel(); e.ia = { focus: 1 }; RS.iaExtra = false; try { foeTurn(e); } finally { RS.iaExtra = true; } assert.ok(!e.ten);
+  [a, e] = duel(); e.ia = { focus: 1 }; e.hp = Math.floor(e.hpMax * .3); foeTurn(e); assert.ok(!e.ten); // vida baixa não concentra
+});
+test('IA: o trio de inimigos só usa a técnica com os três de pé', () => {
+  reset(); const h = mk(ana, {}); for (const n of ['Oni de Brasa', 'Tengu do Vendaval', 'Raijū']) H.bSpawn(gm, { id: bst(n) });
+  const [x, y, z] = Object.values(S.chars).filter(c => c.enemy); [x, y, z].forEach(c => { derive(c); c.hp = c.hpMax; c.aura = c.auraMax; }); H.battle(gm, { on: true });
+  const tk = c => c.skills.find(k => S.skills[k].trio); assert.ok(tk(x) && tk(y) && tk(z));
+  const au = x.aura; turn(x); fixR(.3, () => H.act(gm, { id: x.id, skill: tk(x), target: h.id })); assert.ok(x.aura < au && y.aura < au && z.aura < au, 'com os três'); assert.ok(S.log.some(l => /executam juntos/.test(l.text)));
+  reset(); const h2 = mk(ana, {}); for (const n of ['Oni de Brasa', 'Tengu do Vendaval']) H.bSpawn(gm, { id: bst(n) });
+  const [p, q] = Object.values(S.chars).filter(c => c.enemy); [p, q].forEach(c => { derive(c); c.hp = c.hpMax; c.aura = c.auraMax; }); H.battle(gm, { on: true }); turn(p); const ap = p.aura;
+  fixR(.3, () => H.act(gm, { id: p.id, skill: p.skills.find(k => S.skills[k].trio), target: h2.id })); assert.equal(p.aura, ap, 'sem o terceiro');
+});
