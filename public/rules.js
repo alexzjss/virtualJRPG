@@ -85,6 +85,9 @@
   const nenEff = (ch, s) => !s.cat || !ch.nen ? 1 : [1, .8, .6, .4][nenD(ch.nen, s.cat)];
   const xpCost = (ch, s) => !s.cat || !ch.nen ? s.xp : Math.ceil(s.xp * [1, 1.25, 1.5, 2][nenD(ch.nen, s.cat)] / 5) * 5;
   const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
+  // ligados: um está no ln do outro; skill solta (sem posição na mandala: criada, movida ou importada pelo mestre) também liga pela vizinhança de grade
+  const loose = s => !Number.isFinite(s.wx);
+  const linked = (a, b, ida, idb) => !!(a && b) && (!!a.ln?.includes(idb) || !!b.ln?.includes(ida) || ((loose(a) || loose(b)) && near(a, b)));
   const att = (ch, a, items) => ch.attrs[a] + (items && ch.equip?.acess && items[ch.equip.acess]?.attr === a ? items[ch.equip.acess].power : 0);
   // motivo pelo qual o personagem não pode aprender o nó agora ('' = pode). Inimigos não têm restrição.
   function whyNot(ch, s, sk, items, id, soft) { // soft: ignora XP e atributo mínimo (para pintar a grade)
@@ -97,7 +100,7 @@
     if (s.cat === 'esp' && !(ch.aw || []).includes('esp') && ch.nen !== 'esp') return `Especialização exige o Despertar "${AW.esp}".`;
     if (s.v2 && !(ch.vinc || []).includes(s.v2)) return `Exige também o Vínculo com ${PN[s.v2] || s.v2}.`;
     if (s.ex && own.some(o => o.ex === s.ex && o !== s)) return 'Trancada: você escolheu o outro caminho.';
-    if (own.length && !s.open && !own.some(o => near(o, s))) return 'Precisa de um nó vizinho já aprendido.';
+    if (own.length && !s.open && !ch.skills.some(k => linked(sk[k], s, k, id))) return 'Precisa de um nó vizinho já aprendido.';
     const pre = (s.pre || '').split('|').filter(Boolean).filter(n => !byName(n));
     if (pre.length) return `Precisa aprender antes: ${pre.join(', ')}.`;
     if (s.nb && own.filter(o => o.br === s.br).length < s.nb) return `Precisa de ${s.nb} nós deste ramo (tem ${own.filter(o => o.br === s.br).length}).`;
@@ -221,5 +224,5 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

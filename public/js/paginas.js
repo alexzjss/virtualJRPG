@@ -2,23 +2,23 @@
 const PAGES = { mesa: 'Mesa', pers: 'Ficha', hab: 'Skills', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário' };
 const PATRON = { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' };
 let pg = 'mesa', selCh = null, chatOpen = innerWidth >= 1000, gridFull = null, wasBattle = false;
-const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
 const figCard = (c, w) => `<div class="unit hero cur static" style="--c:${esc(c.color)};--w:${w}"><div class="figw"><div class="fig">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div></div>`;
 
 // grade de habilidades como constelação: círculo = ativa, losango = passiva; brilho = aprendida, tracejado = disponível
-const lab2 = n => { const w = n.split(' '), a = []; let l = ''; for (const x of w) { if (l && (l + ' ' + x).length > 11) { a.push(l); l = x; } else l = l ? l + ' ' + x : x; } a.push(l); return a.slice(0, 2).map((t, i) => `<tspan x="0" dy="${i ? 14 : 0}">${esc(i === 1 && a.length > 2 ? t + '…' : t)}</tspan>`).join(''); };
-let skOnly = false, gvFor = null; // personagem para o qual a grade já foi enquadrada
-// far: casas pequenas demais na tela para mostrar os nomes
-const gv = { z: 1, x: 0, y: 0, far: true }; let skd = null, skMoved = false;
+let skOnly = false; // só o que posso aprender
 // plano e builds salvas ficam só neste navegador (por nome do nó, para sobreviverem a mudanças na grade)
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+// aba da gaveta e gaveta aberta; skMount = o que a mandala desenha na próxima renderização; skSeen = skills já vistas por personagem (para acender as novas)
+let skTab = lsGet('vj.skTab', 'no'), skDrawer = true, skMount = null; const skSeen = {};
 const slotted = s => s && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
 const FUNC = { dmg: ['Dano', s => ['dmg', 'mental'].includes(s.kind)], ctrl: ['Controle', s => s.kind !== 'passive' && (RULES.CTRL.includes(s.st) || (s.fx || []).some(f => (f.t === 'st' && RULES.CTRL.includes(f.k)) || f.t === 'push' || f.t === 'seal'))],
   supp: ['Suporte', s => s.kind === 'heal' || (s.kind === 'util' && !(s.fx || []).some(f => f.t === 'shield' || f.t === 'guard'))], tank: ['Defesa', s => (s.fx || []).some(f => ['shield', 'guard', 'cleanse'].includes(f.t) || (f.t === 'st' && ['taunt', 'defUp', 'reflect', 'counter', 'evade'].includes(f.k))) || s.mod?.def > 0], pas: ['Passiva', s => s.kind === 'passive'], form: ['Forma', s => s.kind === 'form'] };
-let skAdj = null, skAdjN = 0; // vizinhança da grade, para achar o caminho mais barato
+let skAdj = null, skAdjS = null; // ligações da árvore em índices, para achar o caminho mais barato
 function skPath(N, own, mineV, xpOf, target) {
   if (!own.size) return null;
-  if (skAdjN !== N.length) { skAdj = N.map(([, a], i) => N.flatMap(([, b], j) => j !== i && near(a, b) && (a.el === b.el || a.el === 'fis' || b.el === 'fis') ? [j] : [])); skAdjN = N.length; }
+  if (skAdjS !== S.skills || skAdj.length !== N.length) { const ix = new Map(N.map(([id], i) => [id, i])), loose = N.map(([, a]) => !Number.isFinite(a.wx));
+    skAdj = N.map(([id, a], i) => [...new Set([...(a.ln || []).map(j => ix.get(j)).filter(j => j != null), ...N.flatMap(([jd, b], j) => j !== i && (loose[i] || loose[j]) && RULES.linked(a, b, id, jd) && (a.el === b.el || a.el === 'fis' || b.el === 'fis') ? [j] : [])])]);
+    skAdjS = S.skills; }
   const idx = new Map(N.map(([id], i) => [id, i])), dist = N.map(() => Infinity), prev = N.map(() => -1), q = [];
   N.forEach(([id], i) => { if (own.has(id)) { dist[i] = 0; q.push(i); } });
   while (q.length) { // Dijkstra simples (custo = XP dos nós ainda não aprendidos)
@@ -26,15 +26,15 @@ function skPath(N, own, mineV, xpOf, target) {
     for (const v of skAdj[u]) { const [vid, vs] = N[v]; if (!mineV(vs)) continue; const nd = dist[u] + (own.has(vid) ? 0 : xpOf(vs)); if (nd < dist[v]) { dist[v] = nd; prev[v] = u; q.push(v); } }
   }
   const t = idx.get(target); if (t == null || !isFinite(dist[t])) return null;
-  const path = []; for (let i = t; i >= 0 && dist[i] > 0; i = prev[i]) path.unshift(N[i]);
-  return { path, cost: dist[t] };
+  const path = []; let i = t; for (; i >= 0 && dist[i] > 0; i = prev[i]) path.unshift(N[i]);
+  return { path, cost: dist[t], from: i >= 0 ? N[i][0] : null };
 }
 function skillPage(c) {
-  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean), U = 86, G = Math.max(17, ...N.map(([, s]) => Math.max(s.gx, s.gy) + 1)), mid = (G - 1) / 2, P = s => [s.gx * U + U / 2, s.gy * U + U / 2];
+  const N = Object.entries(S.skills), own = new Set(c.skills), ownL = c.skills.map(k => S.skills[k]).filter(Boolean);
   const rqMiss = s => c.enemy || !s.rq ? [] : Object.entries(s.rq).filter(([a, v]) => c.attrs[a] + (eq(c, 'acess')?.attr === a ? eq(c, 'acess').power : 0) < v);
   const mineV = s => c.enemy || s.el === 'fis' || s.el === 'aura' || (s.el === 'oculto' ? (c.aw || []).includes('outro') : (c.vinc || []).includes(s.el)), exTaken = s => s.ex && ownL.some(o => o.ex === s.ex && o !== s);
   const xpOf = s => RULES.xpCost(c, s), whyF = (s, id, soft) => RULES.whyNot(c, s, S.skills, S.items, id, soft);
-  const avail = s => mineV(s) && !whyF(s, null, true), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
+  const avail = (s, id) => mineV(s) && !whyF(s, id, true), sel = selNode[c.id] && S.skills[selNode[c.id]] ? selNode[c.id] : null, ss = S.skills[sel];
   const canNow = N.filter(([id, s]) => !own.has(id) && mineV(s) && !whyF(s, id)).length, sq = (bf.skq || '').trim().toLowerCase();
   const planKey = 'vj.plan.' + c.id, planN = lsGet(planKey, []).filter(n => N.some(([, s]) => s.name === n)), inPlan = s => planN.includes(s.name);
   const planLeft = planN.map(n => N.find(([, s]) => s.name === n)).filter(([id]) => !own.has(id)), planXp = planLeft.reduce((a, [, s]) => a + xpOf(s), 0);
@@ -45,15 +45,16 @@ function skillPage(c) {
   const almost = N.filter(([id, s]) => !own.has(id) && mineV(s) && /^Faltam \d+ XP/.test(whyF(s, id))).map(([id, s]) => [id, s, xpOf(s) - c.xp]).sort((a, b) => a[2] - b[2]).slice(0, 5);
   const route = sel && !own.has(sel) && mineV(ss) ? skPath(N, own, mineV, xpOf, sel) : null;
   const sMax = 4 + Math.floor(c.skills.reduce((a, k) => a + (S.skills[k]?.xp || 0), 0) / 100), sOwn = c.skills.filter(k => slotted(S.skills[k])), sOn = new Set(c.pslots || sOwn.slice(0, sMax)), canSwap = !S.battle.active && (gm || S.camp.open) && mine(c);
-  let lines = '';
-  const cells = new Map(); N.forEach(([, s], i) => { const k = s.gx + ',' + s.gy; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i); });
-  for (let p = 0; p < N.length; p++) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [1, -1]]) for (const q of cells.get((N[p][1].gx + dx) + ',' + (N[p][1].gy + dy)) || []) { if (!dx && !dy && q <= p) continue; const i = Math.min(p, q), j = Math.max(p, q), a = N[i][1], b = N[j][1];
-    if (a.el === b.el || a.el === 'fis' || b.el === 'fis') { const [x1, y1] = P(a), [x2, y2] = P(b), on = own.has(N[i][0]) && own.has(N[j][0]); lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${on ? 'on' : ''} ${mineV(a) && mineV(b) ? '' : 'out'}" style="--e:${ELC[a.el === 'fis' ? b.el : a.el]}"/>`; } }
-  const cen = {}; for (const [, s] of N) { const o = cen[s.el] ||= [0, 0, 0]; o[0] += s.gx; o[1] += s.gy; o[2]++; }
-  const halos = Object.entries(cen).filter(([el]) => el !== 'fis').map(([el, [x, y, n]]) => { const dx = x / n - mid, dy = y / n - mid, d = Math.hypot(dx, dy) || 1, px = (mid + dx / d * G * .46) * U + U / 2, py = (mid + dy / d * G * .46) * U + U / 2, mineS = (c.vinc || []).includes(el);
-    return `<g class="${mineS ? 'vmine' : 'vout'}"><text class="halo" x="${px}" y="${py}" style="--e:${ELC[el]};font-size:${G * 12}px">${KANJI[el]}</text><text class="hname" x="${px}" y="${py + G * 4}" style="--e:${ELC[el]};font-size:${G * 1.9}px">${PATRON[el]}${mineS ? ' · seu Vínculo' : ''}</text></g>`; }).join('');
-  const nodes = N.map(([id, s]) => { const [x, y] = P(s), st = own.has(id) ? 'own' : !mineV(s) ? 'out' : avail(s) ? 'av' : 'lock', pas = s.kind === 'passive', mark = s.secret ? '?' : s.back ? '禁' : s.limit ? '極' : s.kind === 'form' ? '変' : s.circ ? '儀' : s.duo ? '双' : s.vow ? '誓' : s.summon ? '召' : pas ? '+' : KANJI[s.el];
-    return `<g class="nd ${st} ${s.secret ? 'secret' : ''} ${id === sel ? 'sel' : ''} ${inPlan(s) ? 'plan' : ''} ${hitSet.has(id) ? 'hit' : ''} ${c.xp >= xpOf(s) ? '' : 'poor'} ${s.rq ? (rqMiss(s).length ? 'rqno' : 'rqok') : ''}" data-node="${id}" data-id="${c.id}" transform="translate(${x} ${y})" style="--e:${ELC[s.el]}"><title>${esc(s.name)} · ${xpOf(s)} XP</title>${pas ? '<rect x="-12" y="-12" width="24" height="24" transform="rotate(45)"/>' : `<circle r="${s.limit || s.back ? 19 : 15}"/>`}<text class="mk" y="6">${mark}</text>${s.rq ? `<text class="rq" x="17" y="-13">${Object.entries(s.rq).map(([a, v]) => a + v).join(' ')}</text>` : ''}<text class="lb" y="30">${lab2(s.name)}</text></g>`; }).join('');
+  // estado e marcas de cada nó (memorizados: a mandala consulta a cada quadro)
+  const stC = new Map(), mkC = new Map(), awOk = s => !s.aw || (c.aw || []).includes(s.aw);
+  const stOf = id => { if (!stC.has(id)) { const s = S.skills[id]; stC.set(id, own.has(id) ? 'own' : s.secret ? 'secret' : !mineV(s) ? 'out' : avail(s, id) ? 'av' : 'lock'); } return stC.get(id); };
+  const marks = id => { if (!mkC.has(id)) { const s = S.skills[id], st = stOf(id), rqn = !!s.rq && rqMiss(s).length > 0;
+    mkC.set(id, { sel: id === sel, plan: inPlan(s), hit: hitSet.has(id), poor: c.xp < xpOf(s), xp: xpOf(s), rq: rqn, gate: st !== 'own' && st !== 'out' && (rqn || !awOk(s) || exTaken(s)), dim: skOnly && st !== 'own' && st !== 'av' }); } return mkC.get(id); };
+  const seen = skSeen[c.id]; skSeen[c.id] = new Set(c.skills);
+  skMount = { skills: S.skills, ids: N.map(([id]) => id), key: c.id, inset: skDrawer && innerWidth >= 1000 ? 370 : 0, state: stOf, marks, fresh: seen ? c.skills.filter(k => !seen.has(k)) : [],
+    mineEls: new Set(['aura', ...(c.vinc || []), ...((c.aw || []).includes('outro') ? ['oculto'] : [])]),
+    route: route && route.from && route.path.length ? [route.from, ...route.path.map(([id]) => id)] : null,
+    onPick: id => { selNode[c.id] = id; skTab = 'no'; lsSet('vj.skTab', 'no'); render(); }, onHover: (id, x, y) => skTip(id, x, y, c) };
   const tag = (l, v) => `<div><small>${l}</small><b>${v}</b></div>`;
   const why = !ss || own.has(sel) ? '' : whyF(ss, sel);
   const exOther = ss?.ex ? N.filter(([k, s]) => s.ex === ss.ex && k !== sel).map(([, s]) => s.name).join(', ') : '';
@@ -71,18 +72,28 @@ function skillPage(c) {
     : '<div class="ndcard empty"><h2>Escolha um nó</h2><small>Clique em um nó para ver o que ele faz. Você aprende o tronco Marcial, a Aura e as skills do seu Vínculo (o Ocultismo pede um Despertar), sempre a partir de um nó vizinho de um que já tem.</small></div>';
   const mineL = c.skills.filter(k => S.skills[k]).map(k => `<li style="--e:${ELC[S.skills[k].el]}" data-node="${k}" data-id="${c.id}"><b>${esc(S.skills[k].name)}</b><small>${esc(desc(S.skills[k]))}</small></li>`).join('');
   const found = gm && sq ? N.filter(([, s]) => s.name.toLowerCase().includes(sq)).slice(0, 10).map(([id, s]) => `<span class="${own.has(id) ? 'weak' : ''}" data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)}</span>`).join('') || '<small>Nenhuma skill com esse nome.</small>' : '';
-  return `<section class="skp"><div class="skmap ${gv.far ? 'far' : 'near'} ${skOnly ? 'only' : ''}" data-cid="${c.id}" data-g="${G}"><svg viewBox="0 0 ${G * U} ${G * U}" role="group" aria-label="Grade de habilidades" style="transform:translate(${gv.x}px,${gv.y}px) scale(${gv.z})">${halos}<g class="ln">${lines}</g>${nodes}</svg>
+  const TABS = (c.enemy ? [['no', 'Nó'], ['apr', 'Aprendidas']] : [['no', 'Nó'], ['plano', 'Plano'], ['busca', 'Procurar'], ['alc', 'Alcance'], ['pas', 'Passivas'], ['apr', 'Aprendidas']]).concat(c.enemy && gm ? [['busca', 'Dar skill']] : []);
+  const tab = TABS.some(([k]) => k === skTab) ? skTab : 'no', hid = k => tab === k ? '' : 'hidden';
+  const legend = '<div class="legend"><span><i class="lc"></i>Ativa</span><span><i class="lp"></i>Passiva</span><span><i class="lo"></i>Aprendida</span><span><i class="la"></i>Dá para aprender</span><span><i class="lx"></i>Outro Vínculo</span><span>鎖 Requisito</span><span>⛩ Trava no caminho</span><span>??? Segredo</span><span>変 Transformação</span><span>儀 Ritual</span><span>双 Dupla</span><span>誓 Voto</span><span>召 Invocação</span></div>';
+  return `<section class="skp ${skDrawer ? '' : 'closed'}"><div class="skmap" data-cid="${c.id}"><div class="sktip" hidden></div>
       <div class="skzoom"><button data-a="skZoom" data-v="1.5" aria-label="Aproximar">+</button><button data-a="skZoom" data-v="0.667" aria-label="Afastar">−</button></div>
-      <div class="skhint"><button data-a="skReset">Minha árvore</button><button data-a="skCore">Marcial</button><button data-a="skAll">Ver tudo</button><button class="tog ${skOnly ? 'on' : ''}" data-a="skOnly" aria-pressed="${skOnly}">Só o que posso aprender</button><small>Arraste para mover · roda do mouse, pinça ou + − para o zoom</small></div></div>
-    <aside class="skside"><div class="xp"><small>XP disponível de ${esc(c.name)}<br>${c.enemy ? '' : canNow ? `<i class="can">${canNow} ${canNow > 1 ? 'habilidades' : 'habilidade'} ao seu alcance</i>` : 'nada ao alcance com esse XP'}</small><b>${edv(c, 'xp', c.xp)}</b></div>${detail}
-      ${c.enemy ? '' : `<div class="card skslots"><h3>Passivas ativas <small>${Math.min(sOn.size, sMax)}/${sMax} slots · +1 a cada 100 XP gasto${canSwap ? '' : ' · troque no acampamento'}</small></h3><div class="row chips">${sOwn.map(k => `<button class="tog ${sOn.has(k) ? 'on' : ''}" data-a="pslot" data-id="${c.id}" data-skill="${k}" aria-pressed="${sOn.has(k)}" ${canSwap ? '' : 'disabled'} title="${esc(desc(S.skills[k]))}">${esc(S.skills[k].name)}</button>`).join('') || '<small>Nenhuma passiva de efeito ainda.</small>'}</div></div>
-      <div class="card skq"><h3>Procurar na árvore <small>nome, efeito ou função</small></h3><input class="bq" data-bf="skq" placeholder="Ex.: reerguer, escudo, ricochete…" aria-label="Procurar na árvore" value="${esc(bf.skq || '')}"><div class="row chips">${Object.entries(FUNC).map(([k, [l]]) => `<button class="tog ${fkey === k ? 'on' : ''}" data-a="skF" data-v="${k}" aria-pressed="${fkey === k}">${l}</button>`).join('')}</div>${sq || fkey ? `<div class="row chips">${hits.slice(0, 14).map(([id, s]) => `<span class="${own.has(id) ? 'weak' : ''} ${mineV(s) ? '' : 'out'}" data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)}</span>`).join('') || '<small>Nada encontrado.</small>'}${hits.length > 14 ? `<small>+${hits.length - 14} no mapa (brilham)</small>` : ''}</div>` : ''}</div>
-      <div class="card skplan"><h3>Plano <small>${planLeft.length ? `${planLeft.length} nós · ${planXp} XP${planXp > c.xp ? ` (faltam ${planXp - c.xp})` : ''}` : 'marque nós que quer aprender'}</small></h3><div class="row chips">${planLeft.map(([id, s]) => `<span data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)} · ${xpOf(s)}</span>`).join('')}</div>
+      <div class="skhint"><button data-a="skReset">Minha árvore</button><button data-a="skCore">Marcial</button><button data-a="skAll">Ver tudo</button><button class="tog ${skOnly ? 'on' : ''}" data-a="skOnly" aria-pressed="${skOnly}">Só o que posso aprender</button><button data-a="skDrawer" aria-expanded="${skDrawer}">${skDrawer ? 'Fechar painel' : 'Abrir painel'}</button><small>Arraste para mover · roda do mouse, pinça ou + − para o zoom</small></div></div>
+    <aside class="skside"><nav class="sktabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" data-a="skTab" data-v="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</nav><div class="xp"><small>XP disponível de ${esc(c.name)}<br>${c.enemy ? '' : canNow ? `<i class="can">${canNow} ${canNow > 1 ? 'habilidades' : 'habilidade'} ao seu alcance</i>` : 'nada ao alcance com esse XP'}</small><b>${edv(c, 'xp', c.xp)}</b></div><div class="skpane" ${hid('no')}>${detail}${legend}</div>
+      ${c.enemy ? '' : `<div class="card skslots skpane" ${hid('pas')}><h3>Passivas ativas <small>${Math.min(sOn.size, sMax)}/${sMax} slots · +1 a cada 100 XP gasto${canSwap ? '' : ' · troque no acampamento'}</small></h3><div class="row chips">${sOwn.map(k => `<button class="tog ${sOn.has(k) ? 'on' : ''}" data-a="pslot" data-id="${c.id}" data-skill="${k}" aria-pressed="${sOn.has(k)}" ${canSwap ? '' : 'disabled'} title="${esc(desc(S.skills[k]))}">${esc(S.skills[k].name)}</button>`).join('') || '<small>Nenhuma passiva de efeito ainda.</small>'}</div></div>
+      <div class="card skq skpane" ${hid('busca')}><h3>Procurar na árvore <small>nome, efeito ou função</small></h3><input class="bq" data-bf="skq" placeholder="Ex.: reerguer, escudo, ricochete…" aria-label="Procurar na árvore" value="${esc(bf.skq || '')}"><div class="row chips">${Object.entries(FUNC).map(([k, [l]]) => `<button class="tog ${fkey === k ? 'on' : ''}" data-a="skF" data-v="${k}" aria-pressed="${fkey === k}">${l}</button>`).join('')}</div>${sq || fkey ? `<div class="row chips">${hits.slice(0, 14).map(([id, s]) => `<span class="${own.has(id) ? 'weak' : ''} ${mineV(s) ? '' : 'out'}" data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)}</span>`).join('') || '<small>Nada encontrado.</small>'}${hits.length > 14 ? `<small>+${hits.length - 14} no mapa (brilham)</small>` : ''}</div>` : ''}</div>
+      <div class="card skplan skpane" ${hid('plano')}><h3>Plano <small>${planLeft.length ? `${planLeft.length} nós · ${planXp} XP${planXp > c.xp ? ` (faltam ${planXp - c.xp})` : ''}` : 'marque nós que quer aprender'}</small></h3><div class="row chips">${planLeft.map(([id, s]) => `<span data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)} · ${xpOf(s)}</span>`).join('')}</div>
         <div class="row"><button class="ghost" data-a="planSave" data-id="${c.id}" ${planN.length ? '' : 'disabled'}>Salvar build</button><select data-a="planLoad" data-id="${c.id}" aria-label="Carregar build"><option value="">Carregar build…</option>${builds.map((b, i) => `<option value="${i}">${esc(b.name)} (${b.nodes.length})</option>`).join('')}</select><button class="ghost" data-a="planClear" data-id="${c.id}" ${planN.length ? '' : 'disabled'}>Limpar</button></div></div>
-      <div class="card skreach"><h3>Ao seu alcance <small>${c.xp} XP</small></h3><div class="row chips">${reach.map(([id, s]) => `<span data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)} · ${xpOf(s)}</span>`).join('') || '<small>Nada com esse XP.</small>'}</div>${almost.length ? `<small>Quase lá: ${almost.map(([id, s, f]) => `<a data-node="${id}" data-id="${c.id}">${esc(s.name)} (faltam ${f})</a>`).join(' · ')}</small>` : ''}</div>`}
-      ${gm ? `<div class="card skfind"><h3>Dar skill <small>só o mestre</small></h3><input class="bq" data-bf="skq" placeholder="Buscar skill pelo nome…" aria-label="Buscar skill" value="${esc(bf.skq || '')}"><div class="row chips">${found}</div></div>` : ''}
-      <div class="legend"><span><i class="lc"></i>Ativa</span><span><i class="lp"></i>Passiva</span><span><i class="lo"></i>Aprendida</span><span><i class="la"></i>Dá para aprender</span><span><i class="lx"></i>Outro Vínculo</span><span>変 Transformação</span><span>儀 Ritual</span><span>双 Dupla</span><span>誓 Voto</span><span>召 Invocação</span></div>
-      <h3>Aprendidas (${c.skills.length})</h3><ul class="mine">${mineL || '<li class="none"><small>Nenhuma ainda.</small></li>'}</ul></aside></section>`;
+      <div class="card skreach skpane" ${hid('alc')}><h3>Ao seu alcance <small>${c.xp} XP</small></h3><div class="row chips">${reach.map(([id, s]) => `<span data-node="${id}" data-id="${c.id}" style="border-color:${ELC[s.el]}">${esc(s.name)} · ${xpOf(s)}</span>`).join('') || '<small>Nada com esse XP.</small>'}</div>${almost.length ? `<small>Quase lá: ${almost.map(([id, s, f]) => `<a data-node="${id}" data-id="${c.id}">${esc(s.name)} (faltam ${f})</a>`).join(' · ')}</small>` : ''}</div>`}
+      ${gm ? `<div class="card skfind skpane" ${hid('busca')}><h3>Dar skill <small>só o mestre</small></h3><input class="bq" data-bf="skq" placeholder="Buscar skill pelo nome…" aria-label="Buscar skill" value="${esc(bf.skq || '')}"><div class="row chips">${found}</div></div>` : ''}
+      <div class="skpane" ${hid('apr')}><h3>Aprendidas (${c.skills.length})</h3><ul class="mine">${mineL || '<li class="none"><small>Nenhuma ainda.</small></li>'}</ul></div></aside></section>`;
+}
+
+// resumo do nó sob o cursor (a mandala avisa; não passa pelo render)
+function skTip(id, x, y, c) {
+  const t = app.querySelector('.sktip'); if (!t) return; if (!id || !S.skills[id]) { t.hidden = true; return; }
+  const s = S.skills[id], has = c.skills.includes(id); t.hidden = false; t.style.left = Math.min(innerWidth - 300, x + 16) + 'px'; t.style.top = Math.min(innerHeight - 160, y + 16) + 'px'; t.style.setProperty('--e', ELC[s.el]);
+  t.innerHTML = s.secret ? `<small>${PATRON[s.el] || ''}</small><b>???</b><small>Fora do alcance. Aprenda um nó ligado a ele para revelar.</small>`
+    : `<small>${PATRON[s.el] || ''} · ${KIND[s.kind] || s.kind}${s.limit ? ' · Limite' : ''}</small><b>${esc(s.name)}</b><small>${esc(desc(s))}</small><em>${has ? 'Aprendida' : RULES.xpCost(c, s) + ' XP'}</em>`;
 }
 
 function persPage(c) {

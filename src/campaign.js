@@ -85,13 +85,23 @@ function cleanFoe(o, map) {
   if (o.tune && typeof o.tune === 'object') ch.tune = { hp: Math.min(5, Math.max(.2, +o.tune.hp || 1)), arma: int(o.tune.arma, -20, 20) };
   return ch;
 }
+// "Liga a" do editor: nomes separados por | viram ligações a mais (ln) do nó, gravadas também nos alvos. As ligações da árvore ficam;
+// o que o campo acrescentou fica em lkIds, para sair quando o nome sai do campo. ln vazio some (o nó solto volta só à vizinhança de grade).
+const dropLn = (k, id) => { const t = S.skills[k]; if (!t?.ln) return; t.ln = t.ln.filter(j => j !== id); if (!t.ln.length) delete t.ln; };
+function relink(id, lk) {
+  const o = S.skills[id], want = [...new Set(String(lk || '').split('|').map(n => n.trim()).filter(Boolean).map(n => Object.keys(S.skills).find(k => k !== id && S.skills[k].name === n)).filter(Boolean))];
+  for (const k of o.lkIds || []) { dropLn(k, id); dropLn(id, k); }
+  const add = want.filter(k => !(o.ln || []).includes(k));
+  for (const k of add) { (o.ln ||= []).push(k); (S.skills[k].ln ||= []).includes(id) || S.skills[k].ln.push(id); }
+  if (add.length) o.lkIds = add; else delete o.lkIds;
+}
 // importa juntando pelo nome: o que já existe com o mesmo nome é atualizado, o resto entra como novo; nada do que existe é apagado
 function importPack(p) {
   if (!p || typeof p !== 'object' || p.vj !== 'conteudo') throw new Error('Este arquivo não é um pacote de conteúdo do virtualJRPG.');
   const map = { skills: {}, items: {}, best: {} }, n = { skills: 0, items: 0, best: 0, enc: 0 };
   for (const coll of ['skills', 'items']) for (const [k, o] of Object.entries(p[coll] || {}).slice(0, 2000)) {
     const d = cleanDef(coll, o), cur = Object.keys(S[coll]).find(id => S[coll][id].name === d.name), id = cur || rid();
-    if (coll === 'skills' && cur) { d.gx = S.skills[cur].gx; d.gy = S.skills[cur].gy; } // quem já está na grade fica onde está
+    if (coll === 'skills' && cur) for (const f of ['gx', 'gy', 'wx', 'wy', 'ln']) if (S.skills[cur][f] !== undefined) d[f] = S.skills[cur][f]; // quem já está na grade fica onde está, com as mesmas ligações
     S[coll][id] = d; map[coll][k] = id; n[coll]++;
   }
   for (const [k, o] of Object.entries(p.bestiary || {}).slice(0, 500)) {
@@ -126,12 +136,15 @@ Object.assign(H, {
   edDup: gm((c, m) => { // duplica uma skill ou item do editor
     if (!Object.hasOwn(NEW, m.coll) || !Object.hasOwn(S[m.coll], m.id)) return;
     const o = structuredClone(S[m.coll][m.id]); o.name = (o.name + ' (cópia)').slice(0, 40); delete o.root;
+    if (m.coll === 'skills') for (const f of ['ln', 'lk', 'lkIds', 'wx', 'wy', 'open']) delete o[f]; // a cópia nasce solta, ligada só pela grade
     if (m.coll === 'skills') { const used = new Set(Object.values(S.skills).map(s => s.gx + ',' + s.gy)); while (used.has(o.gx + ',' + o.gy)) o.gx++; } // primeira casa livre à direita
     S[m.coll][rid()] = o;
   }),
   edSet: gm((c, m) => {
     if (!Object.hasOwn(SCH, m.coll) || !Object.hasOwn(SCH[m.coll], m.f) || !Object.hasOwn(S[m.coll], m.id)) return;
     const o = S[m.coll][m.id]; o[m.f] = coerce(SCH[m.coll][m.f], m.v, o[m.f]);
+    if (m.coll === 'skills' && m.f === 'lk') relink(m.id, o.lk);
+    if (m.coll === 'skills' && (m.f === 'gx' || m.f === 'gy')) { delete o.wx; delete o.wy; } // movido pelo mestre: desenhado na casa nova e ligado também pela grade
   }),
 });
 

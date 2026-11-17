@@ -117,7 +117,7 @@ const curDefs = () => { if (defsDirty) { defsDirty = false; const json = JSON.st
 // Segredo da árvore: jogador e mesa recebem como silhueta "???" os nós que os personagens deles ainda não alcançam (não é vizinho do
 // que já aprenderam, ou exige um Vínculo/Despertar que não têm). Nós que algum herói já tem e técnicas fora da grade ficam à vista.
 const RUL = globalThis.RULES;
-const reachable = (ch, s) => {
+const reachable = (ch, s, id) => {
   if (ch.enemy) return false;
   const vinc = ch.vinc || [], aw = ch.aw || [];
   if (!['fis', 'aura', 'oculto'].includes(s.el) && !vinc.includes(s.el)) return false;
@@ -125,16 +125,16 @@ const reachable = (ch, s) => {
   if (s.aw && !aw.includes(s.aw)) return false;
   if (s.v2 && !vinc.includes(s.v2)) return false;
   if (s.open) return true; // núcleo Marcial: sempre à vista
-  const own = ch.skills.map(k => S.skills[k]).filter(o => o && o.gx != null);
-  return own.length ? own.some(o => RUL.near(o, s) && (o.el === s.el || o.el === 'fis' || s.el === 'fis')) : s.el === 'fis' && !!S.skills.g0 && Math.max(Math.abs(s.gx - S.skills.g0.gx), Math.abs(s.gy - S.skills.g0.gy)) <= 1; // sem nada aprendido: só o centro Marcial
+  const own = ch.skills.filter(k => S.skills[k]?.gx != null);
+  return own.length ? own.some(k => { const o = S.skills[k]; return RUL.linked(o, s, k, id) && (o.el === s.el || o.el === 'fis' || s.el === 'fis'); }) : s.el === 'fis' && !!S.skills.g0 && Math.max(Math.abs(s.gx - S.skills.g0.gx), Math.abs(s.gy - S.skills.g0.gy)) <= 1; // sem nada aprendido: só o centro Marcial
 };
 const hiddenSkills = c => {
   if (c.role === 'gm' || !c.role) return [];
   const heroes = Object.values(S.chars).filter(ch => !ch.enemy), owned = new Set(heroes.flatMap(ch => ch.skills || []));
   const mine = c.role === 'table' ? heroes : heroes.filter(ch => ch.owner === c.name);
-  return Object.keys(S.skills).filter(id => { const s = S.skills[id]; return s.gx != null && !owned.has(id) && !mine.some(ch => reachable(ch, s)); });
+  return Object.keys(S.skills).filter(id => { const s = S.skills[id]; return s.gx != null && !owned.has(id) && !mine.some(ch => reachable(ch, s, id)); });
 };
-const silhouette = s => ({ name: '???', d: '', kind: s.kind === 'passive' ? 'passive' : s.kind === 'form' ? 'form' : 'dmg', attr: '', el: s.el, power: 0, cost: 0, res: s.res, gx: s.gx, gy: s.gy, br: s.br, root: s.root, xp: s.xp, secret: 1 });
+const silhouette = s => ({ name: '???', d: '', kind: s.kind === 'passive' ? 'passive' : s.kind === 'form' ? 'form' : 'dmg', attr: '', el: s.el, power: 0, cost: 0, res: s.res, gx: s.gx, gy: s.gy, wx: s.wx, wy: s.wy, ln: s.ln, br: s.br, root: s.root, xp: s.xp, secret: 1 });
 let secCache = { v: -1, m: new Map() };
 const defsFor = (c, d) => { // versão das definições com os nós secretos trocados pela silhueta; cacheada por conjunto de nós escondidos
   const hid = hiddenSkills(c);

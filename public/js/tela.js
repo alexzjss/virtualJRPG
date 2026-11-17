@@ -62,16 +62,8 @@ function render() {
     lastReq = (myReq() || [])[0] || null;
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
   if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
-  { const skm = app.querySelector(".skmap"); // a grade abre já aproximada na árvore do personagem, não no mapa inteiro
-    if (skm && gvFor !== skm.dataset.cid) { gvFor = skm.dataset.cid; Object.assign(gv, { z: 1, x: 0, y: 0 }); applyGv();
-      // enquadra os nós do personagem e o que ele pode aprender logo ao lado (o núcleo Marcial, aberto a todos, fica no botão "Marcial"),
-      // com casas grandes o bastante para ler os nomes (90–130 px)
-      const m = skm.getBoundingClientRect(), cell = gvCell(skm), mid = r => [(r.left + r.right) / 2, (r.top + r.bottom) / 2];
-      const own = [...skm.querySelectorAll('.nd.own')].map(n => n.getBoundingClientRect()), base = own.length ? own : [...skm.querySelectorAll('.nd.av')].map(n => n.getBoundingClientRect());
-      const near = [...skm.querySelectorAll('.nd.av')].map(n => n.getBoundingClientRect()).filter(r => own.some(o => Math.hypot(mid(r)[0] - mid(o)[0], mid(r)[1] - mid(o)[1]) < cell * 1.6));
-      if (base.length) { const rs = [...base, ...near], x0 = Math.min(...rs.map(r => r.left)), x1 = Math.max(...rs.map(r => r.right)), y0 = Math.min(...rs.map(r => r.top)), y1 = Math.max(...rs.map(r => r.bottom));
-        const fit = Math.min(m.width / (x1 - x0 + 2 * cell), m.height / (y1 - y0 + 2 * cell)), z = Math.min(130 / cell, Math.max(90 / cell, fit));
-        Object.assign(gv, { z, x: m.width / 2 - ((x0 + x1) / 2 - m.left) * z, y: m.height / 2 - ((y0 + y1) / 2 - m.top) * z }); applyGv(); } } }
+  { const maps = skMount ? app.querySelectorAll(`.skmap[data-cid="${skMount.key}"]`) : [], skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes; uma por vez (a última aberta)
+    if (skm && skMount) { MANDALA.mount(skm, skMount); skMount.fresh.forEach(id => MANDALA.learned(id)); } }
   if (editFocus) { editFocus = false; const el = app.querySelector('.edin'); if (el) { el.focus(); el.select(); } }
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
   app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody').forEach((el, i) => el.scrollTop = scr[i] || 0);

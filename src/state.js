@@ -28,6 +28,8 @@ if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; del
 {
   const built = buildSkills(sk), sig = crypto.createHash('sha1').update(JSON.stringify(built)).digest('hex');
   if (S.skills && S.skillsSig !== sig) {
+    // skills criadas pelo mestre (fora da árvore e com nome que ela não tem) continuam, com o mesmo id
+    { const names = new Set(Object.values(built).map(s => s.name)); for (const [k, s] of Object.entries(S.skills)) if (!/^g\d+$/.test(k) && s && !names.has(s.name)) built[k] = s; }
     const byName = Object.fromEntries(Object.entries(built).map(([k, s]) => [s.name, k])), old = S.skills; let lost = 0;
     for (const ch of [...Object.values(S.chars), ...Object.values(S.bestiary || {})]) {
       const keep = [];

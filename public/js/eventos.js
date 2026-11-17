@@ -46,7 +46,7 @@ app.addEventListener('click', e => {
   const op = e.target.closest('[data-open]');
   if (op) { open[op.dataset.open] = !(open[op.dataset.open] ?? !gm); return render(); }
   const nd = e.target.closest('[data-node]:not([data-a])'); // os botões dos Ofícios também têm data-node, mas são ações (data-a)
-  if (nd) { selNode[nd.dataset.id] = nd.dataset.node; return render(); }
+  if (nd) { selNode[nd.dataset.id] = nd.dataset.node; const inSk = nd.closest('.skside'); if (inSk) skTab = 'no'; render(); if (inSk) MANDALA.focus(nd.dataset.node); return; }
   const am = e.target.closest('[data-aim]'), sb = e.target.closest('[data-sub]'), pvb = e.target.closest('[data-pv]');
   const czb = e.target.closest('[data-cz]');
   if (czb) { cz[czb.dataset.cz] = czb.dataset.v; return render(); }
@@ -55,7 +55,6 @@ app.addEventListener('click', e => {
   if (pvb) { pv = pvb.dataset.pv; return render(); }
   const ftb = e.target.closest('[data-ftab]');
   if (ftb) { ftab[ftb.dataset.id] = ftb.dataset.ftab; return render(); }
-  if (skMoved) { skMoved = false; return; } // foi um arrasto na grade, não um clique
   const pgb = e.target.closest('[data-pg]'), sl = e.target.closest('[data-sel]');
   if (pgb) { pg = pgb.dataset.pg; if (innerWidth < 1000) chatOpen = false; scrollTo(0, 0); return render(); }
   if (sl) { selCh = sl.dataset.sel; return render(); }
@@ -82,10 +81,11 @@ app.addEventListener('click', e => {
   }
   if (d.a === 'camFix') { const w = mapEl().offsetWidth; return send({ t: 'map', f: 'cam', v: { z: view.z, fx: view.x / w, fy: view.y / w } }); }
   if (d.a === 'camFree') return send({ t: 'map', f: 'cam', v: null });
-  if (d.a === 'skReset') { gvFor = null; return render(); }
-  if (d.a === 'skCore') { const m = app.querySelector('.skmap'), n = m?.querySelector('.nd[data-node="g0"]'); if (!n) return; const r = m.getBoundingClientRect(), q = n.getBoundingClientRect(), z = Math.max(gv.z, 95 / gvCell(m)) / gv.z;
-    gv.x = r.width / 2 - (q.left + q.width / 2 - r.left - gv.x) * z; gv.y = r.height / 2 - (q.top + q.height / 2 - r.top - gv.y) * z; gv.z *= z; return applyGv(); } // centraliza no núcleo Marcial
-  if (d.a === 'skAll') { Object.assign(gv, { z: 1, x: 0, y: 0 }); return render(); }
+  if (d.a === 'skReset') return MANDALA.focus('mine');
+  if (d.a === 'skCore') return MANDALA.focus('core'); // centraliza no núcleo Marcial
+  if (d.a === 'skAll') return MANDALA.focus('all');
+  if (d.a === 'skTab') { skTab = d.v; lsSet('vj.skTab', d.v); return render(); }
+  if (d.a === 'skDrawer') { skDrawer = !skDrawer; return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'chatSend') return sayChat(e.target.closest('.chatin').querySelector('input'));
   if (d.a === 'meT') { meOpen = !meOpen; return render(); }
@@ -120,7 +120,7 @@ app.addEventListener('click', e => {
   if (d.a === 'bulk') return send({ t: 'bulk', ids: [...selC], k: d.k, v: qa.v, st: qa.st, item: qa.item || Object.entries(S.items).sort((a, b) => a[1].name.localeCompare(b[1].name))[0]?.[0] });
   if (d.a === 'peek') return void window.open(`/player?as=${encodeURIComponent(d.k)}${d.v ? '&ctl=1' : ''}`, '_blank', 'noopener');
   if (d.a === 'skOnly') { skOnly = !skOnly; return render(); }
-  if (d.a === 'skZoom') { const m = app.querySelector('.skmap').getBoundingClientRect(); zoomGv(m.width / 2, m.height / 2, gv.z * +d.v); return; }
+  if (d.a === 'skZoom') return MANDALA.zoom(+d.v);
   if (d.a === 'gridFull') { gridFull = d.id || null; return render(); }
   if (d.a === 'chaseStart') return send({ t: 'chase', k: 'start', ...cz });
   if (d.a === 'genSet') { gen[d.k] = d.v; return render(); }
@@ -175,46 +175,32 @@ app.addEventListener('wheel', e => {
   const r = m.getBoundingClientRect(), z = Math.min(4, Math.max(.4, view.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
   view.x += (e.clientX - r.left) / view.z * (view.z - z); view.y += (e.clientY - r.top) / view.z * (view.z - z); view.z = z; applyView();
 }, { passive: false });
-// gvCell: quantos pixels de tela tem uma casa da grade com zoom 1 (o SVG quadrado cabe no menor lado da área)
-const gvCell = m => { const r = m.getBoundingClientRect(); return Math.min(r.width, r.height) / (+m.dataset.g || 1) || 1; };
-const applyGv = () => { const s = app.querySelector('.skmap svg'); if (s) { s.style.transform = `translate(${gv.x}px,${gv.y}px) scale(${gv.z})`; gv.far = gvCell(s.parentElement) * gv.z < 46; s.parentElement.classList.toggle('far', gv.far); s.parentElement.classList.toggle('near', !gv.far); } };
-// zoom da grade em torno de um ponto (px, py) da própria área; usado pela roda, pelos botões e pela pinça
-// zoom máximo: ~220 px por casa, seja qual for o tamanho da grade
-const zoomGv = (px, py, z0) => { const m = app.querySelector('.skmap'), z = Math.min(m ? 220 / gvCell(m) : 8, Math.max(1, z0)); gv.x = px - (px - gv.x) * z / gv.z; gv.y = py - (py - gv.y) * z / gv.z; gv.z = z; if (z === 1) gv.x = gv.y = 0; applyGv(); };
-app.addEventListener('wheel', e => {
-  const m = e.target.closest?.('.skmap');
-  if (!m) return;
-  e.preventDefault();
-  const r = m.getBoundingClientRect(); zoomGv(e.clientX - r.left, e.clientY - r.top, gv.z * Math.exp(-Math.max(-120, Math.min(120, e.deltaY * (e.deltaMode ? 33 : 1))) / 400)); // suave no touchpad, ~1.35× por clique da roda
-}, { passive: false });
-// toque: um dedo move, dois dedos dão zoom, na grade de habilidades e no mapa
+// toque: um dedo move, dois dedos dão zoom, no mapa (a mandala das habilidades cuida dos próprios gestos)
 const pts = new Map(); let pinch = null, tpan = null;
 app.addEventListener('pointerdown', e => {
-  const zone = e.target.closest('.skmap,.mapwrap');
+  const zone = e.target.closest('.mapwrap');
   if (e.pointerType !== 'touch' || !zone) return;
   pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  const sk = zone.classList.contains('skmap'), o = sk ? gv : view;
-  if (pts.size === 2) { const [a, b] = [...pts.values()], r = (sk ? zone : mapEl().parentElement).getBoundingClientRect(); pinch = { sk, d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: o.z, x: o.x, y: o.y, px: (a.x + b.x) / 2 - r.left, py: (a.y + b.y) / 2 - r.top }; skd = null; tpan = null; drag = null; }
-  else if (!sk && !e.target.closest('.tok.mine') && !fogMode && !mapTool && !e.target.closest('.maptools')) tpan = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+  const o = view;
+  if (pts.size === 2) { const [a, b] = [...pts.values()], r = mapEl().parentElement.getBoundingClientRect(); pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: o.z, x: o.x, y: o.y, px: (a.x + b.x) / 2 - r.left, py: (a.y + b.y) / 2 - r.top }; tpan = null; drag = null; }
+  else if (!e.target.closest('.tok.mine') && !fogMode && !mapTool && !e.target.closest('.maptools')) tpan = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
 });
 app.addEventListener('pointermove', e => {
   if (!pts.has(e.pointerId)) return;
   pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (pinch && pts.size === 2) { const [a, b] = [...pts.values()], k = Math.hypot(a.x - b.x, a.y - b.y) / pinch.d; skMoved = true;
-    if (pinch.sk) { Object.assign(gv, { z: pinch.z, x: pinch.x, y: pinch.y }); zoomGv(pinch.px, pinch.py, pinch.z * k); }
-    else { const z = Math.min(4, Math.max(.4, pinch.z * k)); Object.assign(view, { z, x: pinch.px - (pinch.px - pinch.x) * z / pinch.z, y: pinch.py - (pinch.py - pinch.y) * z / pinch.z }); applyView(); } }
+  if (pinch && pts.size === 2) { const [a, b] = [...pts.values()], k = Math.hypot(a.x - b.x, a.y - b.y) / pinch.d;
+    const z = Math.min(4, Math.max(.4, pinch.z * k)); Object.assign(view, { z, x: pinch.px - (pinch.px - pinch.x) * z / pinch.z, y: pinch.py - (pinch.py - pinch.y) * z / pinch.z }); applyView(); }
   else if (tpan) { view.x = tpan.vx + e.clientX - tpan.sx; view.y = tpan.vy + e.clientY - tpan.sy; applyView(); }
 });
 const tEnd = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) tpan = null; };
 addEventListener('pointerup', tEnd); addEventListener('pointercancel', tEnd);
-app.addEventListener('pointerdown', e => { if (e.button === 0 && e.target.closest('.skmap') && !e.target.closest('button')) skd = { sx: e.clientX, sy: e.clientY, x: gv.x, y: gv.y }; const cb = e.target.closest('.cropbox');
+app.addEventListener('pointerdown', e => { const cb = e.target.closest('.cropbox');
   if (cb && e.button === 0) { const r = cb.querySelector('img').getBoundingClientRect(); cdrag = { r, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; cb.setPointerCapture(e.pointerId); e.preventDefault(); } });
 app.addEventListener('pointermove', e => {
-  if (skd && (Math.abs(e.clientX - skd.sx) + Math.abs(e.clientY - skd.sy) > 5)) { skMoved = true; gv.x = skd.x + e.clientX - skd.sx; gv.y = skd.y + e.clientY - skd.sy; applyGv(); }
   if (cdrag) { const cl = v => Math.min(1, Math.max(0, v)), x = cl((e.clientX - cdrag.r.left) / cdrag.r.width), y = cl((e.clientY - cdrag.r.top) / cdrag.r.height);
     cropSel = { x: Math.min(x, cdrag.x), y: Math.min(y, cdrag.y), w: Math.abs(x - cdrag.x), h: Math.abs(y - cdrag.y) }; const s = app.querySelector('.csel'); if (s) Object.assign(s.style, { left: cropSel.x * 100 + '%', top: cropSel.y * 100 + '%', width: cropSel.w * 100 + '%', height: cropSel.h * 100 + '%' }); }
 });
-addEventListener('pointerup', () => { skd = null; cdrag = null; setTimeout(() => skMoved = false, 50); });
+addEventListener('pointerup', () => { cdrag = null; });
 app.addEventListener('mousedown', e => { if (e.button === 1 && e.target.closest('.mapwrap')) e.preventDefault(); });
 app.addEventListener('contextmenu', e => { const t = e.target.closest('.tok'); if (t) { e.preventDefault(); ctx = { id: t.dataset.id, x: e.clientX, y: e.clientY }; render(); } });
 app.addEventListener('dblclick', e => {

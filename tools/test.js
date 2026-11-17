@@ -21,6 +21,56 @@ test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam t
     assert.equal(ns.filter(s => s.el === el).length, TREE[el].branches.flat().length); assert.ok(ns.filter(s => s.el === el).length >= (['aura', 'oculto'].includes(el) ? 120 : 104));
   }
 });
+test('ligações: simétricas, nunca entre setores diferentes (só com o Marcial), sem repetição', () => {
+  for (const [id, s] of Object.entries(S.skills)) {
+    assert.ok(Array.isArray(s.ln) && s.ln.length, 'sem ligação: ' + s.name);
+    assert.equal(new Set(s.ln).size, s.ln.length, s.name);
+    for (const j of s.ln) { const o = S.skills[j]; assert.ok(o && o.ln.includes(id), `${s.name} → ${o?.name} não volta`);
+      assert.ok(o.el === s.el || o.el === 'fis' || s.el === 'fis', `${s.name} liga a ${o.name}`); }
+  }
+});
+test('ligações: cada setor alcança todos os seus nós andando só por ln, por ele e pelo Marcial', () => {
+  for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
+    const ok = id => [el, 'fis'].includes(S.skills[id].el), start = Object.keys(S.skills).find(id => S.skills[id].el === el && S.skills[id].root), seen = new Set([start]), q = [start];
+    assert.ok(start, 'raiz de ' + el);
+    while (q.length) for (const j of S.skills[q.pop()].ln || []) if (!seen.has(j) && ok(j)) { seen.add(j); q.push(j); }
+    assert.deepEqual(Object.keys(S.skills).filter(id => ok(id) && !seen.has(id)).map(id => S.skills[id].name), [], el);
+  }
+});
+test('mandala: todo nó tem posição e nenhum par de esferas se sobrepõe', () => {
+  const ns = Object.values(S.skills); assert.ok(ns.every(s => Number.isFinite(s.wx) && Number.isFinite(s.wy)), 'nó sem wx/wy');
+  const cell = new Map(), K = s => [Math.floor(s.wx / 34), Math.floor(s.wy / 34)];
+  for (const s of ns) { const k = K(s).join(','); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(s); }
+  for (const a of ns) { const [cx, cy] = K(a); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const b of cell.get((cx + dx) + ',' + (cy + dy)) || [])
+    if (a !== b) assert.ok(Math.hypot(a.wx - b.wx, a.wy - b.wy) >= 30, a.name + ' × ' + b.name); }
+});
+test('mandala: os setores ficam na ordem da roda (ângulo médio crescente)', () => {
+  const ORD = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'aura', 'amaterasu', 'tsukuyomi', 'oculto', 'shukketsu', 'hiruko'], ns = Object.values(S.skills);
+  const ang = el => { const v = ns.filter(s => s.el === el).reduce((a, s) => [a[0] + s.wx, a[1] + s.wy], [0, 0]); return Math.atan2(v[1], v[0]); };
+  const a0 = ang(ORD[0]), rel = ORD.map(el => ((ang(el) - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
+  rel.slice(1).forEach((r, i) => assert.ok(r > rel[i], ORD[i + 1]));
+});
+test('mandala (navegador): place usa wx/wy e põe skill sem posição junto do vizinho de grade', async () => {
+  await import('../public/js/mandala.js'); const M = globalThis.MANDALA, g0 = S.skills.g0;
+  const sks = { ...S.skills, x1: { name: 'Nova', el: 'fis', gx: g0.gx + 6, gy: g0.gy - 9 } }, near = Object.keys(S.skills).find(k => RU.near(S.skills[k], sks.x1));
+  const P = M.place(sks); assert.deepEqual(P.get('g0'), [g0.wx, g0.wy]);
+  if (near) { const [x, y] = P.get('x1'), [a, b] = P.get(near); assert.ok(Math.hypot(x - a, y - b) < M.U * 1.5); }
+  assert.ok(P.get('x1').every(Number.isFinite));
+});
+test('mandala (navegador): edges sem repetição, só entre visíveis, com o núcleo ligado', async () => {
+  await import('../public/js/mandala.js'); const M = globalThis.MANDALA, vis = new Set(Object.keys(S.skills).filter(k => S.skills[k].el !== 'hiruko'));
+  const E = M.edges(S.skills, vis), keys = E.map(([a, b]) => [a, b].sort().join('|'));
+  assert.equal(new Set(keys).size, keys.length); assert.ok(E.every(([a, b]) => vis.has(a) && vis.has(b)));
+  assert.ok(keys.includes(['g0', 'g1'].sort().join('|'))); assert.ok(E.length >= vis.size - 12);
+});
+test('ligações: ramo de 10 nós segue tronco 1-4, A 5-7, B 8-9 e final', () => {
+  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'kagutsuchi-0'); assert.equal(br.length, 10);
+  const id = i => br[i][0], L = i => br[i][1].ln;
+  assert.ok(L(1).includes(id(0)) && L(2).includes(id(1)) && L(3).includes(id(2)));
+  assert.ok(L(4).includes(id(3)) && L(7).includes(id(3)));
+  assert.ok(L(5).includes(id(4)) && L(6).includes(id(5)) && L(8).includes(id(7)));
+  assert.ok(L(9).includes(id(6)));
+});
 test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), it = n => Object.keys(S.items).find(k => S.items[k].name === n);
   h.attrs.AGI = 95; e.attrs.AGI = 1; h.skills = [sk('Tiro Duplo')]; h.aura = 20; H.battle(gm, { on: true });
@@ -816,6 +866,85 @@ test('núcleo Marcial e raízes dos setores: abertos sem exigir vizinho aprendid
   assert.equal(RU.whyNot(h, S.skills[auraRoot], S.skills, S.items, auraRoot, true), '');
   const susRoot = Object.keys(S.skills).find(k => S.skills[k].el === 'susanoo' && S.skills[k].root);
   assert.match(RU.whyNot(h, S.skills[susRoot], S.skills, S.items, susRoot, true), /Vínculo/);
+});
+// par do mesmo setor vizinho na grade mas sem ligação (existe entre ramos que se encostam)
+const unlinkedPair = el => { const ids = Object.keys(S.skills).filter(k => S.skills[k].el === el && !S.skills[k].open && !S.skills[k].pre && !S.skills[k].rq && !S.skills[k].nb && !S.skills[k].cs && !S.skills[k].ex && !S.skills[k].aw && !S.skills[k].v2);
+  for (const a of ids) for (const b of ids) if (a !== b && RU.near(S.skills[a], S.skills[b]) && !S.skills[a].ln.includes(b) && !S.skills[b].ln.some(j => RU.near(S.skills[j], S.skills[a]) && S.skills[a].ln.includes(j))) return [a, b];
+};
+test('regras: vizinho de grade sem ligação não basta; ligação basta', () => {
+  reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; h.xp = 999; const [a, b] = unlinkedPair('kagutsuchi');
+  h.skills = [a]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), 'Precisa de um nó vizinho já aprendido.');
+  h.skills = [S.skills[b].ln[0]]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), '');
+});
+test('regras: skill do mestre sem ln encostada na grade continua aprendível', () => {
+  reset(); const h = mk(ana, {}); h.xp = 999; const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const nid = Object.keys(S.skills).find(k => !before.has(k));
+  const used = new Set(Object.values(S.skills).map(s => s.gx + ',' + s.gy)); let spot, host;
+  for (const k of Object.keys(S.skills).filter(k => S.skills[k].el === 'fis' && k !== nid)) { const s = S.skills[k]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!spot && !used.has((s.gx + dx) + ',' + (s.gy + dy))) { spot = [s.gx + dx, s.gy + dy]; host = k; } }
+  Object.assign(S.skills[nid], { gx: spot[0], gy: spot[1] }); h.skills = [host];
+  assert.equal(RU.whyNot(h, S.skills[nid], S.skills, S.items, nid), '');
+  delete S.skills[nid];
+});
+test('regras: save antigo mantém as skills e sempre deixa algo para aprender', async () => {
+  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; h.xp = 999;
+  const cur = S.skills, picks = Object.keys(cur).filter(k => cur[k].el === 'kagutsuchi' && cur[k].br && /-[0-5]$/.test(cur[k].br)).filter((k, i, a) => a.findIndex(j => cur[j].br === cur[k].br) === i).slice(0, 6);
+  const old = Object.fromEntries(Object.entries(cur).map(([k, s]) => ['o' + k, { ...s, ln: undefined }])); h.skills = picks.map(k => 'o' + k);
+  const names = picks.map(k => cur[k].name).sort(); S.skills = old; S.skillsSig = 'antiga'; migrate(false);
+  assert.deepEqual(h.skills.map(k => S.skills[k].name).sort(), names);
+  assert.ok(Object.keys(S.skills).some(k => !h.skills.includes(k) && RU.whyNot(h, S.skills[k], S.skills, S.items, k) === ''));
+});
+test('revisão: atualizar a árvore mantém as skills criadas pelo mestre (e quem as aprendeu)', async () => {
+  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, {}); const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' });
+  const nid = Object.keys(S.skills).find(k => !before.has(k)); H.edSet(gm, { coll: 'skills', id: nid, f: 'name', v: 'Golpe da Casa' }); h.skills = [nid];
+  S.skillsSig = 'antiga'; migrate(false);
+  assert.equal(S.skills[nid]?.name, 'Golpe da Casa'); assert.deepEqual(h.skills, [nid]); delete S.skills[nid];
+});
+const newSkill = (name, extra = {}) => { const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const id = Object.keys(S.skills).find(k => !before.has(k)); Object.assign(S.skills[id], { name, ...extra }); return id; };
+const freeNear = host => { const used = new Set(Object.values(S.skills).map(s => s.gx + ',' + s.gy)), s = S.skills[host]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (!used.has((s.gx + dx) + ',' + (s.gy + dy))) return [s.gx + dx, s.gy + dy]; };
+test('revisão: "Liga a" num nó oficial acrescenta ligações sem cortar as da árvore; vazio tira só as acrescentadas', () => {
+  const gp = sk('Golpe Pesado'), orig = [...S.skills[gp].ln], x = newSkill('Extra Teste');
+  H.edSet(gm, { coll: 'skills', id: gp, f: 'lk', v: 'Extra Teste' });
+  assert.ok(orig.every(j => S.skills[gp].ln.includes(j))); assert.ok(S.skills[gp].ln.includes(x));
+  H.edSet(gm, { coll: 'skills', id: gp, f: 'lk', v: '' });
+  assert.deepEqual([...S.skills[gp].ln].sort(), [...orig].sort()); assert.ok(!(S.skills[x].ln || []).includes(gp)); delete S.skills[x];
+});
+test('revisão: skill solta do mestre continua ligada pela grade mesmo depois de ganhar ou perder "Liga a"', () => {
+  reset(); const h = mk(ana, {}); h.xp = 999; const host = Object.keys(S.skills).find(k => S.skills[k].el === 'fis' && freeNear(k)), [gx, gy] = freeNear(host);
+  const y = newSkill('Solta Y', { gx, gy }), x = newSkill('Solta X', { gx: 0, gy: 0 }); h.skills = [host];
+  H.edSet(gm, { coll: 'skills', id: x, f: 'lk', v: 'Solta Y' }); assert.equal(RU.whyNot(h, S.skills[y], S.skills, S.items, y), '');
+  H.edSet(gm, { coll: 'skills', id: x, f: 'lk', v: '' }); assert.equal(RU.whyNot(h, S.skills[y], S.skills, S.items, y), ''); assert.equal(S.skills[y].ln, undefined);
+  delete S.skills[x]; delete S.skills[y];
+});
+test('revisão: apagar um nó do meio do ramo religa os vizinhos dele', () => {
+  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'susanoo-1'), [a, b, cc] = br.slice(0, 3).map(([k]) => k), saved = structuredClone(S.skills);
+  H.edDel(gm, { coll: 'skills', id: b });
+  assert.ok(S.skills[a].ln.includes(cc) || S.skills[cc].ln.includes(a)); assert.ok(!Object.values(S.skills).some(s => (s.ln || []).includes(b)));
+  S.skills = saved;
+});
+test('revisão: duplicar não copia ligações nem posição; mover X/Y tira a posição da mandala', () => {
+  const id = sk('Brasa Viva'), before = new Set(Object.keys(S.skills)), saved = structuredClone(S.skills[id]); H.edDup(gm, { coll: 'skills', id });
+  const d = S.skills[Object.keys(S.skills).find(k => !before.has(k))]; assert.equal(d.ln, undefined); assert.equal(d.wx, undefined);
+  H.edSet(gm, { coll: 'skills', id, f: 'gx', v: S.skills[id].gx + 40 }); assert.equal(S.skills[id].wx, undefined);
+  delete S.skills[Object.keys(S.skills).find(k => !before.has(k))]; S.skills[id] = saved;
+});
+test('importar pacote com skill de mesmo nome mantém ligações e posição', async () => {
+  const { importPack } = await import('../server.js'); const id = sk('Brasa Viva'), s0 = structuredClone(S.skills[id]);
+  importPack({ vj: 'conteudo', skills: { a: { name: 'Brasa Viva', kind: 'dmg', el: 'kagutsuchi', power: 99 } } });
+  const s = S.skills[id]; assert.equal(s.power, 99); assert.deepEqual(s.ln, s0.ln); assert.equal(s.wx, s0.wx); assert.equal(s.wy, s0.wy);
+  S.skills[id] = s0;
+});
+test('editor: "Liga a" grava ligações nos dois lados e vazio volta à grade', () => {
+  const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const nid = Object.keys(S.skills).find(k => !before.has(k)), gp = sk('Golpe Pesado');
+  H.edSet(gm, { coll: 'skills', id: nid, f: 'lk', v: 'Golpe Pesado|Inexistente' });
+  assert.deepEqual(S.skills[nid].ln, [gp]); assert.ok(S.skills[gp].ln.includes(nid));
+  H.edSet(gm, { coll: 'skills', id: nid, f: 'lk', v: '' });
+  assert.equal(S.skills[nid].ln, undefined); assert.ok(!S.skills[gp].ln.includes(nid));
+  delete S.skills[nid];
+});
+test('segredo: silhueta leva ln, wx, wy; vizinho de grade sem ligação continua escondido', async () => {
+  const net = await import('../src/net.js'); reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; const [a, b] = unlinkedPair('kagutsuchi'); h.skills = [a];
+  const hid = net.hiddenSkills({ role: 'player', name: 'Ana' }); assert.ok(hid.includes(b), 'vizinho sem ligação à vista');
+  const sks = JSON.parse(net.defsFor({ role: 'player', name: 'Ana' }, net.curDefs()).json).skills, o = S.skills[b];
+  assert.equal(sks[b].name, '???'); assert.deepEqual(sks[b].ln, o.ln); assert.equal(sks[b].wx, o.wx); assert.equal(sks[b].wy, o.wy);
 });
 test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo', async () => {
   const net = await import('../src/net.js'); reset();

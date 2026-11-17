@@ -460,6 +460,12 @@ const H = {
   edAdd(c, m) { if (c.role === 'gm' && Object.hasOwn(NEW, m.coll)) S[m.coll][rid()] = NEW[m.coll](); },
   edDel(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(NEW, m.coll)) return;
+    if (m.coll === 'skills' && S.skills[m.id]?.ln) { // o ramo não se parte: os vizinhos do nó apagado passam a se ligar entre si
+      const nb = S.skills[m.id].ln.filter(k => S.skills[k]);
+      for (const k of nb) { const t = S.skills[k]; t.ln = t.ln.filter(j => j !== m.id); }
+      for (const a of nb) for (const b of nb) { const A = S.skills[a], B = S.skills[b]; if (a < b && (A.el === B.el || A.el === 'fis' || B.el === 'fis') && !A.ln.includes(b)) { A.ln.push(b); B.ln.push(a); } }
+      for (const k of nb) if (!S.skills[k].ln.length) delete S.skills[k].ln;
+    }
     delete S[m.coll][m.id];
     for (const ch of Object.values(S.chars)) {
       if (m.coll === 'skills') ch.skills = ch.skills.filter(k => k !== m.id);

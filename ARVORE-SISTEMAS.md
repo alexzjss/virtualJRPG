@@ -172,3 +172,16 @@ um ramo de 7 nós cada (Aparar temático, revide, Marca ou Técnica Reversa e um
 - **Marca** (condição `mark`): +30% de dano, +20% de velocidade e +10% de crítico. Os nós de Marca são gatilhos `on: 'low'` (30% do HP, 1×/batalha).
 - **Clones** (`clone N P`, normalmente `self`): N combatentes reais na fila, cada um com P% do HP atual do dono (que perde esse HP).
   Copiam atributos e até 4 técnicas de dano simples, causam 50% do dano, agem sozinhos, duram 3 turnos e somem ao cair. No máximo 3 por dono.
+
+## Ligações e mandala
+
+Cada nó tem `ln`: os ids dos nós a que se liga, sempre simétrico. O `buildSkills` grava a ligação com a casa de onde cada nó saiu ao
+montar a grade (nó anterior do ramo, ponto da bifurcação A/B, âncora do ramo, o centro Marcial para o anel). Aprender, o segredo
+(`src/net.js`) e a rota mais barata usam `RULES.linked(a, b, ida, idb)`: ligados se um está no `ln` do outro; uma skill sem `ln`
+(criada pelo mestre ou importada) também liga pela vizinhança de grade de antes. Vizinho de grade sem ligação não basta.
+
+No editor do mestre, "Liga a" recebe nomes separados por `|` e grava as ligações nos dois lados; vazio volta à vizinhança de grade.
+
+A tela desenha a árvore como mandala em canvas (`public/js/mandala.js`): `wx, wy` = grade em escala (`MANDALA_U` = 96 por casa),
+cada linha é uma ligação. Afastado, os setores viram selos; de perto, esferas com nome, XP e ícone, selo 鎖 de requisito, portão ⛩
+na trilha antes de nó travado e névoa nos secretos.

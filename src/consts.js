@@ -30,7 +30,7 @@ const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind,
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
 const SCH = {
-  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', 'vow', 'trig', 'mod', 'amp', 'bon', ...ATTRS], req: WT, back: ['', ...STK], ex: 't', d: 't' },
+  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', lk: 't', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', 'vow', 'trig', 'mod', 'amp', 'bon', ...ATTRS], req: WT, back: ['', ...STK], ex: 't', d: 't' },
   items: { name: 's', type: ITYPES, eff: EFF, attr: ATTRS, wt: WT, el: ['', ...EL], power: 'n', price: 'n' },
 };
 const TIER = { fraco: [.8, .6], normal: [1, 1], elite: [1.25, 1.6] }; // multiplicadores de atributos e de recompensa
