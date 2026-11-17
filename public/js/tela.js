@@ -62,7 +62,7 @@ function render() {
     lastReq = (myReq() || [])[0] || null;
   } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
   if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
-  { const maps = app.querySelectorAll('.skmap'), skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes
+  { const maps = skMount ? app.querySelectorAll(`.skmap[data-cid="${skMount.key}"]`) : [], skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes; uma por vez (a última aberta)
     if (skm && skMount) { MANDALA.mount(skm, skMount); skMount.fresh.forEach(id => MANDALA.learned(id)); } }
   if (editFocus) { editFocus = false; const el = app.querySelector('.edin'); if (el) { el.focus(); el.select(); } }
   if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }

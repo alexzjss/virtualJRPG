@@ -892,6 +892,40 @@ test('regras: save antigo mantém as skills e sempre deixa algo para aprender', 
   assert.deepEqual(h.skills.map(k => S.skills[k].name).sort(), names);
   assert.ok(Object.keys(S.skills).some(k => !h.skills.includes(k) && RU.whyNot(h, S.skills[k], S.skills, S.items, k) === ''));
 });
+test('revisão: atualizar a árvore mantém as skills criadas pelo mestre (e quem as aprendeu)', async () => {
+  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, {}); const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' });
+  const nid = Object.keys(S.skills).find(k => !before.has(k)); H.edSet(gm, { coll: 'skills', id: nid, f: 'name', v: 'Golpe da Casa' }); h.skills = [nid];
+  S.skillsSig = 'antiga'; migrate(false);
+  assert.equal(S.skills[nid]?.name, 'Golpe da Casa'); assert.deepEqual(h.skills, [nid]); delete S.skills[nid];
+});
+const newSkill = (name, extra = {}) => { const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const id = Object.keys(S.skills).find(k => !before.has(k)); Object.assign(S.skills[id], { name, ...extra }); return id; };
+const freeNear = host => { const used = new Set(Object.values(S.skills).map(s => s.gx + ',' + s.gy)), s = S.skills[host]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (!used.has((s.gx + dx) + ',' + (s.gy + dy))) return [s.gx + dx, s.gy + dy]; };
+test('revisão: "Liga a" num nó oficial acrescenta ligações sem cortar as da árvore; vazio tira só as acrescentadas', () => {
+  const gp = sk('Golpe Pesado'), orig = [...S.skills[gp].ln], x = newSkill('Extra Teste');
+  H.edSet(gm, { coll: 'skills', id: gp, f: 'lk', v: 'Extra Teste' });
+  assert.ok(orig.every(j => S.skills[gp].ln.includes(j))); assert.ok(S.skills[gp].ln.includes(x));
+  H.edSet(gm, { coll: 'skills', id: gp, f: 'lk', v: '' });
+  assert.deepEqual([...S.skills[gp].ln].sort(), [...orig].sort()); assert.ok(!(S.skills[x].ln || []).includes(gp)); delete S.skills[x];
+});
+test('revisão: skill solta do mestre continua ligada pela grade mesmo depois de ganhar ou perder "Liga a"', () => {
+  reset(); const h = mk(ana, {}); h.xp = 999; const host = Object.keys(S.skills).find(k => S.skills[k].el === 'fis' && freeNear(k)), [gx, gy] = freeNear(host);
+  const y = newSkill('Solta Y', { gx, gy }), x = newSkill('Solta X', { gx: 0, gy: 0 }); h.skills = [host];
+  H.edSet(gm, { coll: 'skills', id: x, f: 'lk', v: 'Solta Y' }); assert.equal(RU.whyNot(h, S.skills[y], S.skills, S.items, y), '');
+  H.edSet(gm, { coll: 'skills', id: x, f: 'lk', v: '' }); assert.equal(RU.whyNot(h, S.skills[y], S.skills, S.items, y), ''); assert.equal(S.skills[y].ln, undefined);
+  delete S.skills[x]; delete S.skills[y];
+});
+test('revisão: apagar um nó do meio do ramo religa os vizinhos dele', () => {
+  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'susanoo-1'), [a, b, cc] = br.slice(0, 3).map(([k]) => k), saved = structuredClone(S.skills);
+  H.edDel(gm, { coll: 'skills', id: b });
+  assert.ok(S.skills[a].ln.includes(cc) || S.skills[cc].ln.includes(a)); assert.ok(!Object.values(S.skills).some(s => (s.ln || []).includes(b)));
+  S.skills = saved;
+});
+test('revisão: duplicar não copia ligações nem posição; mover X/Y tira a posição da mandala', () => {
+  const id = sk('Brasa Viva'), before = new Set(Object.keys(S.skills)), saved = structuredClone(S.skills[id]); H.edDup(gm, { coll: 'skills', id });
+  const d = S.skills[Object.keys(S.skills).find(k => !before.has(k))]; assert.equal(d.ln, undefined); assert.equal(d.wx, undefined);
+  H.edSet(gm, { coll: 'skills', id, f: 'gx', v: S.skills[id].gx + 40 }); assert.equal(S.skills[id].wx, undefined);
+  delete S.skills[Object.keys(S.skills).find(k => !before.has(k))]; S.skills[id] = saved;
+});
 test('importar pacote com skill de mesmo nome mantém ligações e posição', async () => {
   const { importPack } = await import('../server.js'); const id = sk('Brasa Viva'), s0 = structuredClone(S.skills[id]);
   importPack({ vj: 'conteudo', skills: { a: { name: 'Brasa Viva', kind: 'dmg', el: 'kagutsuchi', power: 99 } } });

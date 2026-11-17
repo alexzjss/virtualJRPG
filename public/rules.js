@@ -85,8 +85,9 @@
   const nenEff = (ch, s) => !s.cat || !ch.nen ? 1 : [1, .8, .6, .4][nenD(ch.nen, s.cat)];
   const xpCost = (ch, s) => !s.cat || !ch.nen ? s.xp : Math.ceil(s.xp * [1, 1.25, 1.5, 2][nenD(ch.nen, s.cat)] / 5) * 5;
   const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
-  // ligados: um está no ln do outro; skill sem ln (criada pelo mestre ou importada) também liga pela vizinhança de grade
-  const linked = (a, b, ida, idb) => !!(a && b) && (!!a.ln?.includes(idb) || !!b.ln?.includes(ida) || ((!a.ln || !b.ln) && near(a, b)));
+  // ligados: um está no ln do outro; skill solta (sem posição na mandala: criada, movida ou importada pelo mestre) também liga pela vizinhança de grade
+  const loose = s => !Number.isFinite(s.wx);
+  const linked = (a, b, ida, idb) => !!(a && b) && (!!a.ln?.includes(idb) || !!b.ln?.includes(ida) || ((loose(a) || loose(b)) && near(a, b)));
   const att = (ch, a, items) => ch.attrs[a] + (items && ch.equip?.acess && items[ch.equip.acess]?.attr === a ? items[ch.equip.acess].power : 0);
   // motivo pelo qual o personagem não pode aprender o nó agora ('' = pode). Inimigos não têm restrição.
   function whyNot(ch, s, sk, items, id, soft) { // soft: ignora XP e atributo mínimo (para pintar a grade)

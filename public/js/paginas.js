@@ -16,7 +16,7 @@ const FUNC = { dmg: ['Dano', s => ['dmg', 'mental'].includes(s.kind)], ctrl: ['C
 let skAdj = null, skAdjS = null; // ligações da árvore em índices, para achar o caminho mais barato
 function skPath(N, own, mineV, xpOf, target) {
   if (!own.size) return null;
-  if (skAdjS !== S.skills || skAdj.length !== N.length) { const ix = new Map(N.map(([id], i) => [id, i])), loose = N.map(([, a]) => !a.ln);
+  if (skAdjS !== S.skills || skAdj.length !== N.length) { const ix = new Map(N.map(([id], i) => [id, i])), loose = N.map(([, a]) => !Number.isFinite(a.wx));
     skAdj = N.map(([id, a], i) => [...new Set([...(a.ln || []).map(j => ix.get(j)).filter(j => j != null), ...N.flatMap(([jd, b], j) => j !== i && (loose[i] || loose[j]) && RULES.linked(a, b, id, jd) && (a.el === b.el || a.el === 'fis' || b.el === 'fis') ? [j] : [])])]);
     skAdjS = S.skills; }
   const idx = new Map(N.map(([id], i) => [id, i])), dist = N.map(() => Infinity), prev = N.map(() => -1), q = [];

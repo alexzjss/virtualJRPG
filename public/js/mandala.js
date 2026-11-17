@@ -9,7 +9,7 @@
   const edges = (skills, visible) => {
     const out = [], seen = new Set(), add = (a, b) => { const k = a < b ? a + '|' + b : b + '|' + a; if (!seen.has(k) && visible.has(a) && visible.has(b)) { seen.add(k); out.push([a, b]); } };
     const loose = [], cell = new Map();
-    for (const id of visible) { const s = skills[id]; if (!s) continue; for (const j of s.ln || []) if (skills[j]) add(id, j); if (!s.ln) loose.push(id); }
+    for (const id of visible) { const s = skills[id]; if (!s) continue; for (const j of s.ln || []) if (skills[j]) add(id, j); if (!Number.isFinite(s.wx)) loose.push(id); }
     if (loose.length) { for (const id of visible) { const s = skills[id]; if (s?.gx != null) cell.set(s.gx + ',' + s.gy, id); }
       for (const id of loose) { const s = skills[id]; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const j = cell.get((s.gx + dx) + ',' + (s.gy + dy)); if (j && j !== id && g.RULES?.linked(s, skills[j], id, j)) add(id, j); } } }
     return out;
@@ -40,7 +40,8 @@
     motes = seals.filter(s => s.el !== 'fis').flatMap(s => Array.from({ length: 14 }, () => [s, Math.random() * TAU, Math.random() * s.r, Math.random() * TAU]));
   }
   const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = devicePixelRatio || 1; W = Math.max(200, r.width); H = Math.max(200, r.height); cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
-  const busy = () => anim.size || o?.route?.length > 1 || o?.ids.some(id => o.state(id) === 'av');
+  let lively = true; // o último quadro tinha algo pulsando na tela (nó disponível, rota ou animação)
+  const busy = () => anim.size || o?.route?.length > 1 || lively;
 
   function draw(now) {
     raf = 0; if (!cv?.isConnected || !o) return;
@@ -73,7 +74,7 @@
     // rota até o nó escolhido
     if (o.route?.length > 1) { cx.strokeStyle = '#ffffff'; cx.lineWidth = 3; cx.setLineDash([10, 8]); cx.lineDashOffset = -T * 30; cx.beginPath(); o.route.forEach((id, i) => { const [x, y] = w2s(...P.get(id)); i ? cx.lineTo(x, y) : cx.moveTo(x, y); }); cx.stroke(); cx.setLineDash([]); }
     // esferas
-    const r0 = Math.max(1.5, R * cam.z);
+    const r0 = Math.max(1.5, R * cam.z); let pulse = false;
     for (const id of o.ids) { const s = o.skills[id], [x, y] = w2s(...P.get(id)); if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
       const st = o.state(id), mk = o.marks(id), c = col(s.el), r = r0 * (s.limit || s.back ? 1.25 : 1);
       if (far) { cx.fillStyle = st === 'own' ? c : hexA(c, st === 'out' || st === 'secret' ? .14 : .45); cx.beginPath(); cx.arc(x, y, Math.max(1.2, r * .7), 0, TAU); cx.fill(); continue; }
@@ -81,7 +82,7 @@
       if (st === 'own') { gr.addColorStop(0, '#ffffff'); gr.addColorStop(.35, c); gr.addColorStop(1, hexA(c, .35)); } else { gr.addColorStop(0, hexA(c, st === 'out' ? .1 : .32)); gr.addColorStop(1, 'rgba(10,10,18,.95)'); }
       cx.globalAlpha = mk.dim ? .25 : 1; cx.fillStyle = gr; cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.fill(); cx.strokeStyle = hexA(c, st === 'out' ? .2 : .85); cx.lineWidth = Math.max(1, 1.6 * cam.z); cx.stroke();
       if (s.kind === 'passive') { cx.strokeStyle = hexA(c, .5); cx.beginPath(); cx.arc(x, y, r * 1.25, 0, TAU); cx.stroke(); }
-      if (st === 'av') { cx.strokeStyle = hexA(c, .5 + .4 * Math.sin(T * 3 + x * .01)); cx.lineWidth = Math.max(1.5, 3 * cam.z); cx.beginPath(); cx.arc(x, y, r * 1.55, 0, TAU); cx.stroke(); }
+      if (st === 'av') { pulse = true; cx.strokeStyle = hexA(c, .5 + .4 * Math.sin(T * 3 + x * .01)); cx.lineWidth = Math.max(1.5, 3 * cam.z); cx.beginPath(); cx.arc(x, y, r * 1.55, 0, TAU); cx.stroke(); }
       if (mk.hit) { cx.strokeStyle = 'rgba(255,240,150,.95)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * 1.9 + Math.sin(T * 4) * 2, 0, TAU); cx.stroke(); }
       if (mk.plan) { cx.fillStyle = '#ffd34d'; cx.font = `${Math.round(r * .8)}px serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('★', x + r, y - r); }
       if (id === hover || mk.sel) { cx.strokeStyle = '#ffffff'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * 1.8, 0, TAU); cx.stroke(); }
@@ -94,6 +95,7 @@
         if (named) lines.forEach((l, i) => cx.fillText(l, x, y + r + fs * (i + .9)));
         if (named && st !== 'own' && st !== 'secret' && mk.xp != null) { cx.fillStyle = mk.poor ? 'rgba(255,120,120,.9)' : hexA(c, .85); cx.font = `${Math.round(Math.min(12, r * .5))}px system-ui,sans-serif`; cx.fillText(mk.xp + ' XP', x, y + r + fs * (lines.length + .9)); } }
       cx.globalAlpha = 1; }
+    lively = pulse;
     // minimapa
     const [mx0, my0, mw] = miniRect(), k = mw / (bound * 2.2); cx.fillStyle = 'rgba(11,11,20,.88)'; cx.fillRect(mx0, my0, mw, mw); cx.strokeStyle = 'rgba(255,255,255,.18)'; cx.strokeRect(mx0, my0, mw, mw);
     for (const id of o.ids) { const [x, y] = P.get(id), st = o.state(id); cx.fillStyle = st === 'own' ? '#ffffff' : hexA(col(o.skills[id].el), st === 'out' || st === 'secret' ? .25 : .6); cx.fillRect(mx0 + mw / 2 + x * k, my0 + mw / 2 + y * k, 1.3, 1.3); }
@@ -116,11 +118,12 @@
   M.zoom = f => zoomAt(VW() / 2, H / 2, cam.z * f);
   M.learned = id => { anim.set(id, performance.now()); kick(); };
 
-  const ptr = new Map(); let drag = null, pinch = null;
+  const ptr = new Map(); let drag = null, pinch = null, wantFocus = false;
   function wire() {
-    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptr.set(e.pointerId, [e.offsetX, e.offsetY]); flying++;
+    cv.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; wantFocus = true; cv.setPointerCapture(e.pointerId); ptr.set(e.pointerId, [e.offsetX, e.offsetY]); flying++;
       if (ptr.size === 2) { const [p, q] = [...ptr.values()]; pinch = { d: Math.hypot(p[0] - q[0], p[1] - q[1]), z: cam.z }; drag = null; } else drag = { x: e.offsetX, y: e.offsetY, cx: cam.x, cy: cam.y, moved: 0 }; });
     cv.addEventListener('pointermove', e => {
+      if (drag && e.pointerType === 'mouse' && !e.buttons) { drag = null; ptr.clear(); } // o botão foi solto fora (o render tirou a captura)
       if (ptr.has(e.pointerId)) ptr.set(e.pointerId, [e.offsetX, e.offsetY]);
       if (pinch && ptr.size === 2) { const [p, q] = [...ptr.values()]; zoomAt((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, pinch.z * Math.hypot(p[0] - q[0], p[1] - q[1]) / pinch.d); return; }
       if (drag) { const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y; drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy)); if (drag.moved > 4) { cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; kick(); } }
@@ -131,6 +134,10 @@
         else { const id = pick(e.offsetX, e.offsetY); if (id) o?.onPick?.(id); else if (cam.z < LOD) { const [wx, wy] = s2w(e.offsetX, e.offsetY), s = seals.find(s => Math.hypot(s.x - wx, s.y - wy) < s.r); if (s) fly(s.x, s.y, .6); } } }
       drag = null; };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    addEventListener('pointerup', e => { if (e.target !== cv && ptr.has(e.pointerId)) { ptr.delete(e.pointerId); if (ptr.size < 2) pinch = null; if (!ptr.size) drag = null; } });
+    // 8. foco do teclado: o canvas volta a ter foco depois de cada render se o jogador estava nele
+    cv.addEventListener('keydown', () => wantFocus = true);
+    document.addEventListener('pointerdown', e => { if (e.target !== cv) wantFocus = false; }, true);
     cv.addEventListener('pointerleave', () => { if (hover) { hover = null; kick(); } o?.onHover?.(null); });
     cv.addEventListener('wheel', e => { e.preventDefault(); flying++; zoomAt(e.offsetX, e.offsetY, cam.z * Math.exp(-Math.max(-120, Math.min(120, e.deltaY * (e.deltaMode ? 33 : 1))) / 400)); }, { passive: false });
     cv.addEventListener('keydown', e => { const s = 80 / cam.z, mv = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[e.key];
@@ -144,7 +151,7 @@
     const rebuild = !o || o.skills !== opts.skills || o.ids.length !== opts.ids.length || o.ids.some((id, i) => id !== opts.ids[i]);
     if (host !== h) { host = h; h.prepend(cv); if (!ro) { ro = new ResizeObserver(resize); wire(); } ro.disconnect(); ro.observe(h); }
     else if (!h.contains(cv)) h.prepend(cv);
-    o = opts; resize(); if (rebuild) build();
+    o = opts; resize(); if (rebuild) build(); if (wantFocus && document.activeElement !== cv) cv.focus({ preventScroll: true });
     if (opts.key !== key) { key = opts.key; const own = o.ids.filter(id => o.state(id) === 'own'); if (own.length) { const xs = own.map(id => P.get(id)); Object.assign(cam, { x: xs.reduce((a, p) => a + p[0], 0) / xs.length, y: xs.reduce((a, p) => a + p[1], 0) / xs.length, z: .9 }); } else { const p = P.get('g0') || [0, 0]; Object.assign(cam, { x: p[0], y: p[1], z: .9 }); } }
     kick();
   };
