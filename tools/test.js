@@ -2,7 +2,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
-const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
+const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, finPlan, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 const { TREE } = await import('../tree.js');
 const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
@@ -1008,6 +1008,40 @@ test('defesa: sem Aura a zona de Aparar vira esquiva (anunciado) e não abre jan
   ({ hs: [h], e } = dfx(['Aparar'])); h.aura = 0; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['esq']); assert.equal(h.aura, 0);
   dfx([]); H.ai(gm); assert.ok(!S.battle.cmd, 'sem nó de Aparar e sem golpe anunciado, sem janela');
 });
+// ---- fintas na janela de defesa ----
+const FIN = (a, hits = 1, tel = false, beat = 1100) => finPlan(a, hits, tel, beat);
+test('fintas: inimigo comum não tem fintas e as batidas ficam a 700 ms', () => {
+  for (let i = 0; i < 50; i++) { const { beats, fin } = FIN({}, 4); assert.deepEqual(beats, [1100, 1800, 2500, 3200]); assert.deepEqual(fin, [{}, {}, {}, {}]); }
+  const { fin } = FIN({ rank: 'comum' }, 2, true); assert.deepEqual(fin, [{}, {}]);
+});
+test('fintas: chefe tem combo irregular e a janela fecha na última batida', () => {
+  for (let i = 0; i < 30; i++) { const { beats } = FIN({ boss: true }, 3), gaps = beats.slice(1).map((b, k) => b - beats[k]); assert.equal(beats[0], 1100); assert.ok(new Set(gaps).size > 1, 'espaçamento não uniforme'); assert.ok(gaps.every(g => g === 450 || g === 900)); }
+  const { hs: [h], e } = dfx(['Aparar']); e.boss = true; e.skills = [sk('Rajada de Aura')]; e.telK = []; fixR(0, () => H.ai(gm)); const C = S.battle.cmd;
+  assert.equal(C.beats.length, 3); assert.equal(C.fin.length, 3); assert.equal(C.w, C.beats[2]); assert.ok(C.beats.every(b => b <= C.w));
+});
+test('fintas: golpe anunciado de chefe dá direção a toda batida', () => {
+  for (let i = 0; i < 30; i++) { const { fin } = FIN({ boss: true }, 3, true); assert.ok(fin.every(f => f.dir === '←' || f.dir === '→')); }
+  const { fin } = FIN({ boss: true }, 3, false); assert.ok(fin.every(f => f.dir === undefined), 'sem anúncio, sem direção');
+  const el = FIN({ rank: 'elite' }, 3, true).fin; assert.ok(el.every(f => f.dir === undefined), 'direção é só de chefe');
+});
+test('fintas: elite faz ~30% das batidas com atraso ou anel falso; o anel falso só onde há espaço', () => {
+  let n = 0, tot = 0; for (let i = 0; i < 300; i++) { const { beats, fin } = FIN({ rank: 'elite' }, 3); fin.forEach((f, k) => { tot++; if (f.ease || f.fake != null) n++; if (f.fake != null) { assert.equal(f.fake, beats[k] - 700); assert.ok(k === 0, 'elite: só a 1ª batida tem espaço'); } }); }
+  const r = n / tot; assert.ok(r > .18 && r < .42, 'proporção ' + r);
+  for (let i = 0; i < 100; i++) { const { beats, fin } = FIN({ boss: true }, 3); fin.forEach((f, k) => { if (f.fake != null) assert.ok((k ? beats[k] - beats[k - 1] : beats[0]) >= 900); assert.ok(!(f.ease && f.fake != null)); }); }
+});
+const tdef = (names = [], boss = false) => { const { hs: [h], e } = dfx(names); e.boss = boss; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); return { h, C: S.battle.cmd }; };
+test('fintas: esquiva exige a direção quando a batida tem dir', () => {
+  let { h, C } = tdef(); C.fin = [{ dir: '→' }]; openAt(450); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['cedo'], 'sem dir');
+  ({ h, C } = tdef()); C.fin = [{ dir: '→' }]; openAt(450); H.def(ana, { id: h.id, dir: '←' }); assert.deepEqual(C.p[h.id], ['cedo'], 'dir trocada');
+  ({ h, C } = tdef()); C.fin = [{ dir: '→' }]; openAt(450); H.def(ana, { id: h.id, dir: '→' }); assert.deepEqual(C.p[h.id], ['esq'], 'dir certa');
+  ({ h, C } = tdef(['Aparar'])); C.fin = [{ dir: '→' }]; openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['par'], 'Aparar não pede direção');
+});
+test('fintas: apertar junto do anel falso é cedo; fora dele vale a zona normal', () => {
+  const par = () => S.skills[sk('Aparar')].par, at = (C, left) => { C.at = Date.now() - C.beats[0] + left; return Date.now() - C.at; }; // devolve ms decorridos desde C.at
+  let { h, C } = tdef(['Aparar']); C.fin = [{}]; at(C, par() + 250); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['esq'], 'sem finta, esse ponto é esquiva');
+  ({ h, C } = tdef(['Aparar'])); C.fin = [{ fake: 0 }]; C.fin[0].fake = at(C, par() + 250) + 60; H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['cedo'], 'no anel falso (+60 ms) o mesmo ponto vira cedo');
+  ({ h, C } = tdef(['Aparar'])); C.fin = [{ fake: 0 }]; C.fin[0].fake = at(C, par() + 250) + 400; H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['esq'], 'longe do anel falso (>120 ms) vale a zona normal');
+});
 test('defesa: janela velha (servidor reiniciado) é descartada e o inimigo age', () => {
   const { hs: [h], e } = dfx(); S.battle.cmd = { foe: e.id, at: Date.now() - 10000, w: 1100, beats: [1100], tgs: [h.id], p: { [h.id]: [] } };
   const hp = h.hp; H.ai(gm); assert.ok(!S.battle.cmd || S.battle.cmd.at > Date.now() - 5000, 'a janela velha saiu');
@@ -1088,7 +1122,7 @@ test('cmd: tempo Perfeito ×1,4, Bom ×1,2 e sem nota = normal', () => {
 });
 test('cmd: janela do tempo cresce com bf (30 + 8·bf ms) e com as passivas', () => {
   assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 0, cw: 0, cp: 0 }).cp, 54); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 7 }, { bf: 0, cw: 0, cp: 0 }).cp, 86);
-  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 2, cw: 0, cp: 10 }).cp, 80); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo' }, { bf: 0, cw: 40, cp: 15 }).cw, 200);
+  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 2, cw: 0, cp: 10 }).cp, 80); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo' }, { bf: 0, cw: 40, cp: 15 }).cw, 180); // Bom fácil = 140 ms + 40
 });
 test('cmd: martelar soma golpes extras acima dos hits', () => {
   withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 4, hits: 2 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: 'bom', n: 3, acc: .7 } }); assert.equal(hitsOf('Tiro Certeiro'), 5); });
@@ -1183,4 +1217,85 @@ test('descrição: nó com comando mostra a linha do comando e o ⚠; bf mostra 
   assert.match(E({ kind: 'dmg', cmd: 'seq', seq: '↑→↓', fin: 20 }, null), /Sequência ↑→↓.*golpe final de 20/); assert.match(E({ kind: 'dmg', tel: 1 }, null), /golpe anunciado ⚠/);
   assert.match(E({ kind: 'util', cmd: 'runa', rn: 'espiral', circ: 4 }, null), /uma espiral.*não cobra a Sanidade/); assert.match(E({ kind: 'dmg', cmd: 'tempo', pf: [{ t: 'st', k: 'bleed', n: 2, ch: 100 }] }, null), /no Perfeito: /);
   assert.match(E({ kind: 'passive', mod: { cw: 60, cp: 15, mx: 1, ctr: 50 } }, null), /\+60 ms na janela Bom.*\+1 golpe extra.*\+50% no contra-ataque/); assert.match(E({ kind: 'dmg', par: 300, cost: 4, power: 3 }, null), /Exposto/);
+});
+
+// ---- comandos cinemáticos: regras puras ----
+test('cinemáticos: nível do nó pelo maior requisito e tabela de graus por contagem', () => {
+  const C = RU.CMD;
+  assert.deepEqual(C.GRADES, ['', 'erro', 'bom', 'otimo', 'perf']); assert.equal(C.GRADE_NAME.otimo, 'ÓTIMO');
+  assert.equal(C.tier({ rq: { FOR: 10 } }), 0); assert.equal(C.tier({ rq: { FOR: 20 } }), 1); assert.equal(C.tier({ rq: { FOR: 49, DES: 12 } }), 1); assert.equal(C.tier({ rq: { FOR: 50 } }), 2); assert.equal(C.tier({}), 0);
+  assert.equal(C.gradeFrac(1, true), 'perf'); assert.equal(C.gradeFrac(.75, true), 'otimo'); assert.equal(C.gradeFrac(.74, true), 'bom'); assert.equal(C.gradeFrac(.35, true), 'bom');
+  assert.equal(C.gradeFrac(.34, true), 'erro'); assert.equal(C.gradeFrac(0, true), 'erro'); assert.equal(C.gradeFrac(0, false), '');
+});
+test('cinemáticos: janelas do tempo por nível, com bf e com os campos da técnica', () => {
+  const C = RU.CMD;
+  assert.deepEqual(C.tempoWin({ cmd: 'tempo', rq: {} }, {}), { cw: 140, co: 80, cp: 50 }); assert.deepEqual(C.tempoWin({ cmd: 'tempo', rq: { FOR: 50 } }, {}), { cw: 100, co: 55, cp: 32 });
+  assert.equal(C.tempoWin({ cmd: 'tempo', bf: 3, rq: {} }, {}).cp, 54); assert.equal(C.tempoWin({ cmd: 'tempo', bf: 3, rq: { FOR: 50 } }, {}).cp, Math.round(54 * .7));
+  assert.equal(C.tempoWin({ cmd: 'tempo', cw: 200 }, { cw: 10 }).cw, 210); assert.equal(C.tune({ cmd: 'tempo', rq: { FOR: 25 } }, {}).martelarMeta, 20); assert.deepEqual(C.tune({ rq: { FOR: 25 } }).segurar, { perf: 6, otimo: 7, bom: 18 });
+  assert.equal(C.tune({ rq: { FOR: 50 }, nt: 6 }).ritmoNotas, 8); assert.equal(C.tune({ mt: 9 }).martelarMeta, 9); assert.equal(C.tune({}, { ma: 3 }).mira, 21);
+});
+test('cinemáticos: clampCmd aceita os 5 graus e deriva o grau da fração nas mecânicas de contagem', () => {
+  const C = RU.CMD, z = { g: '', n: 0, acc: 0 };
+  assert.equal(C.clampCmd({ cmd: 'tempo' }, { g: 'perf' }, {}).g, 'perf'); assert.equal(C.clampCmd({ cmd: 'tempo' }, { g: 'otimo' }, {}).g, 'otimo'); assert.equal(C.clampCmd({ cmd: 'tempo' }, { g: 'xyz' }, {}).g, '');
+  assert.deepEqual(C.clampCmd({}, { g: 'perf' }, {}), z); assert.deepEqual(C.clampCmd({ cmd: 'tempo' }, { g: 'otimo', n: -5, acc: 9 }, {}), { g: 'otimo', n: 0, acc: 1 });
+  const m = n => C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'perf', n }, {}).g; assert.equal(m(2), 'bom'); assert.equal(m(3), 'otimo'); assert.equal(m(4), 'perf');
+  assert.equal(C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'erro', n: 0 }, {}).g, 'erro');
+});
+test('cinemáticos: cmdEffect — erro ×0,85, ótimo sem pf, difícil mais generoso', () => {
+  const C = RU.CMD, T = { cmd: 'tempo', kind: 'dmg', rq: {} }, D = { ...T, rq: { FOR: 50 } };
+  assert.equal(C.cmdEffect(T, { g: 'erro' }).mult, .85); assert.equal(C.cmdEffect(T, { g: 'bom' }).mult, 1.2);
+  let e = C.cmdEffect(T, { g: 'otimo' }); assert.equal(e.mult, 1.3); assert.equal(e.pf, false);
+  e = C.cmdEffect(T, { g: 'perf' }); assert.equal(e.mult, 1.4); assert.equal(e.pf, true); assert.equal(C.cmdEffect(D, { g: 'perf' }).mult, 1.5);
+  const S1 = { cmd: 'segurar', kind: 'dmg', rq: {} }; assert.equal(C.cmdEffect(S1, { g: 'otimo', acc: .5 }).mult, 1.45); assert.equal(C.cmdEffect(S1, { g: 'erro', acc: 0 }).mult, .85);
+  e = C.cmdEffect(S1, { g: 'erro', acc: -1 }); assert.equal(e.estouro, true); assert.equal(e.mult, 1); assert.equal(C.cmdEffect({ ...S1, rq: { FOR: 50 } }, { g: 'perf', acc: 1 }).mult, 1.7);
+  const M = { cmd: 'martelar', kind: 'dmg', mx: 4 }; e = C.cmdEffect(M, { g: 'erro', n: 1 }); assert.equal(e.extra, 0); assert.equal(e.mult, .85);
+  e = C.cmdEffect(M, { g: 'otimo', n: 3 }); assert.equal(e.extra, 3); assert.equal(e.pf, false);
+  assert.equal(C.cmdEffect({ cmd: 'runa', kind: 'dmg', rq: { FOR: 50 } }, { g: 'perf' }).mult, 1.5);
+});
+test('cinemáticos: resultLines diz o que rendeu e o quanto faltou', () => {
+  const C = RU.CMD, D = { cmd: 'tempo', kind: 'dmg', rq: { FOR: 50 } }, r = C.resultLines(D, { g: 'perf', n: 0, acc: 1 }, C.cmdEffect(D, { g: 'perf' }));
+  assert.equal(r.title, 'PERFEITO'); assert.ok(r.lines.includes('×1,5 de dano'), r.lines.join('|'));
+  const M = { cmd: 'martelar', kind: 'dmg', mx: 4 }; assert.ok(C.resultLines(M, { g: 'bom', n: 3, acc: 1 }, C.cmdEffect(M, { g: 'bom', n: 3 })).lines.includes('+3 golpes'));
+  const R = { cmd: 'ritmo', kind: 'util', nt: 6 }; assert.ok(C.resultLines(R, { g: 'bom', n: 2, acc: 1 }, C.cmdEffect(R, { g: 'bom', n: 2 })).lines.includes('+2 turnos'));
+  assert.equal(C.resultLines(R, { g: '', n: 0, acc: 0 }, C.cmdEffect(R, { g: '' })).title, '');
+});
+test('cinemáticos: clampCmd sanea NaN/Infinity, e limita seq e ritmo (nt + nível)', () => {
+  const C = RU.CMD, M = { cmd: 'martelar', mx: 4 };
+  for (const n of [NaN, Infinity, -Infinity, 1e9, '7']) { const r = C.clampCmd(M, { g: 'bom', n, acc: NaN }, {}); assert.ok(Number.isInteger(r.n) && r.n >= 0 && r.n <= 4, `n=${n} -> ${r.n}`); assert.equal(r.acc, 0); }
+  assert.equal(C.clampCmd(M, { g: 'perf', n: Infinity, acc: Infinity }, {}).g, 'perf'); assert.equal(C.clampCmd(M, { g: 'perf', n: NaN }, {}).g, 'erro');
+  assert.equal(C.clampCmd({ cmd: 'seq', seq: '↑→↓←' }, { g: 'perf', n: 3 }, {}).g, 'otimo'); assert.equal(C.clampCmd({ cmd: 'seq', seq: '↑→↓←' }, { g: 'perf', n: 99 }, {}).n, 4);
+  const R = { cmd: 'ritmo', nt: 6, rq: { FOR: 50 } }; assert.equal(C.clampCmd(R, { g: 'perf', n: 99 }, {}).n, 8); assert.equal(C.clampCmd(R, { g: 'perf', n: 7 }, {}).g, 'otimo'); assert.equal(C.clampCmd(R, { g: 'perf', n: 8 }, {}).g, 'perf');
+});
+test('cinemáticos: resultLines usa mods, proximidade e rótulo sem dano', () => {
+  const C = RU.CMD, M = { cmd: 'martelar', kind: 'dmg', mx: 4 };
+  const ml = (s, c, mods) => C.resultLines(s, c, C.cmdEffect(s, c), mods).lines;
+  assert.ok(ml(M, { g: 'bom', n: 2, acc: .5 }).includes('8/16 apertos') && ml(M, { g: 'bom', n: 2, acc: .5 }).includes('+2 golpes'), 'meta 16 no nível fácil; n são golpes extras');
+  assert.ok(ml({ ...M, rq: { FOR: 50 } }, { g: 'bom', n: 2, acc: .5 }).includes('12/24 apertos'), 'meta 24 no difícil'); assert.ok(ml({ ...M, mt: 10 }, { g: 'bom', n: 2, acc: .5 }).includes('5/10 apertos'));
+  assert.ok(!ml(M, { g: 'otimo', n: 5, acc: .8 }, { mx: 1 }).some(l => /^5\/4/.test(l)));
+  assert.match(RU.extra({ kind: 'dmg', cmd: 'tempo', rq: { FOR: 50 } }, null), /Perfeito ×1,5/); assert.match(RU.extra({ kind: 'dmg', cmd: 'tempo' }, null), /Perfeito ×1,4/);
+  assert.match(RU.extra({ kind: 'dmg', cmd: 'martelar', mx: 4, rq: { FOR: 50 } }, null), /meta de 24 apertos/); assert.match(RU.extra({ kind: 'dmg', cmd: 'runa', rn: 'circulo' }, null), /errar rende ×0,85/);
+  assert.equal(C.clampCmd({ cmd: 'ritmo' }, { g: 'perf', n: 99 }, {}).n, 6, 'ritmo sem nt usa o padrão 6');
+  const T = { cmd: 'tempo', kind: 'dmg' }; assert.ok(C.resultLines(T, { g: 'bom', n: 0, acc: .5 }, C.cmdEffect(T, { g: 'bom' }), { cp: 10 }).lines.includes('faltaram 10 ms'), 'bom 140, acc .5 -> 70 ms; perfeito 60');
+  const Ru = { cmd: 'runa', kind: 'util', rn: 'circulo' }; const r = C.resultLines(Ru, { g: 'erro', n: 0, acc: .52 }, C.cmdEffect(Ru, { g: 'erro' }));
+  assert.ok(r.lines.includes('×0,85 no efeito') && r.lines.includes('semelhança 52%'), r.lines.join('|')); assert.ok(!r.lines.some(l => l.includes('de dano')));
+});
+test('cinemáticos: descrição cita Ótimo/Erro e as janelas do nível', () => {
+  const E = RU.extra;
+  assert.match(E({ kind: 'dmg', cmd: 'segurar', rq: { FOR: 50 } }, null), /Ótimo ×1,45 · Perfeito ×1,7/); assert.match(E({ kind: 'dmg', cmd: 'runa', rn: 'circulo', rq: { FOR: 25 } }, null), /≥ 65%.*≥ 78%.*≥ 88%/);
+  assert.match(E({ kind: 'util', cmd: 'ritmo', nt: 6, rq: { FOR: 50 } }, null), /8 notas/); assert.match(E({ kind: 'dmg', cmd: 'mira' }, null), /×0,85/);
+});
+test('cinemáticos: o servidor aplica Erro e Ótimo no ataque e anuncia a nota', () => {
+  const kT = sk('Tempestade Negra'), kPlain = sk('Faísca');
+  const hit = (key, cmd) => { reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h); h.skills = [key]; e.hpMax = e.hp = 9999;
+    H.battle(gm, { on: true }); S.battle.ticks[h.id] = -1; h.limit = 100; h.aura = 99; fixR(.3, () => H.act(ana, { id: h.id, skill: key, target: e.id, ...(cmd ? { cmd } : {}) }));
+    return { dmg: e.hpMax - e.hp, fx: S.log.map(l => l.fx).filter(f => f && f.cg), txt: S.log.map(l => l.text || '').join('\n') }; };
+  const base = hit(kT), erro = hit(kT, { g: 'erro', n: 0, acc: 0 }), ot = hit(kT, { g: 'otimo', n: 0, acc: .5 }), vazio = hit(kT, { g: '', n: 0, acc: 0 });
+  assert.ok(base.dmg > 20, 'dano base mensurável'); assert.equal(vazio.dmg, base.dmg, 'g vazio = sem comando');
+  assert.ok(Math.abs(erro.dmg - base.dmg * .85) <= 1, `erro ×0,85 (${erro.dmg} vs ${base.dmg})`);
+  assert.ok(Math.abs(ot.dmg - base.dmg * 1.3) <= 1, `ótimo ×1,3 (${ot.dmg} vs ${base.dmg})`);
+  assert.match(erro.txt, /ERROU!/); assert.match(ot.txt, /ÓTIMO!/); assert.ok(!/BLACK FLASH/.test(ot.txt), 'Ótimo não dá Black Flash');
+  assert.ok(erro.fx.length && erro.fx.every(f => f.cg === 'erro'), 'fx.cg = erro'); assert.ok(ot.fx.length && ot.fx.every(f => f.cg === 'otimo'), 'fx.cg = otimo');
+  assert.equal(hit(kT, { g: 'bom', n: 0, acc: 0 }).fx[0].cg, 'bom'); assert.equal(hit(kT, { g: 'perf', n: 0, acc: 1 }).fx[0].cg, 'perf');
+  assert.ok(!S.skills[kPlain].cmd, 'Faísca não tem comando'); const p0 = hit(kPlain), p1 = hit(kPlain, { g: 'perf', n: 0, acc: 1 });
+  assert.equal(p1.dmg, p0.dmg, 'sem cmd na técnica a nota é ignorada'); assert.equal(p1.fx.length, 0); assert.ok(!/PERFEITO|ÓTIMO|ERROU/.test(p1.txt));
 });

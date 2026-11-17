@@ -335,6 +335,19 @@ try {
     }
   });
 
+  await section('palco de comando', async () => {
+    const st = await ana.evaluate(() => { window.__st = openStage({ title: 'Teste', tone: 'atk' }); return !!window.__st; });
+    check(st, 'openStage devolve um palco');
+    const box = await ana.evaluate(() => { const r = document.querySelector('.stage-cmd')?.getBoundingClientRect(); return r ? { w: r.width / innerWidth, h: r.height / innerHeight } : null; });
+    check(box && box.w >= .95 && box.h >= .95, 'o palco ocupa a tela toda');
+    check(await ana.evaluate(() => openStage({ title: 'Outro' }) === null), 'um segundo openStage devolve null');
+    check(await ana.evaluate(() => window.__st.result('perf', { title: 'PERFEITO', lines: ['×1,4 de dano'] }, 200).then(() => true)), 'result resolve');
+    await ana.evaluate(() => window.__st.close(50));
+    await until(async () => !(await ana.locator('.stage-cmd').count()), 'o palco some após close()');
+    const w = await ana.evaluate(() => { const s = openStage({ title: 'Celular', tone: 'def' }); const r = document.documentElement.scrollWidth <= innerWidth; s.close(0); return r; });
+    check(w, 'o palco não gera rolagem horizontal');
+  });
+
   // ---------- celular: transbordo, sobreposição e alvos de toque ----------
   async function phoneAudit(p, label) {
     const out = [];
