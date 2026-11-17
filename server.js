@@ -6,7 +6,9 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { startTunnel } from './tunnel.js';
-import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES } from './content.js';
+import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES, SUMMONS } from './content.js';
+import './public/rules.js'; // regras compartilhadas com o navegador (globalThis.RULES)
+const RU = globalThis.RULES;
 
 // __SEA__ só existe no executável gerado por tools/build-exe.mjs: arquivos do jogo vêm embutidos e os dados ficam ao lado do .exe
 const SEA = typeof __SEA__ !== 'undefined', seaMod = SEA ? process.getBuiltinModule('node:sea') : null;
@@ -33,26 +35,26 @@ const R = { hit: 60, dmgDiv: 10, healDiv: 5, hpCon: 2, hpBase: 10, enemyAttr: 50
   grow: { attr: .85, hp: 7, arma: .5, armor: .2 }, // quanto os inimigos gerados acompanham cada ponto de poder do grupo acima de 58 // orçamento do encontro em "inimigos comuns por herói"
   ...JSON.parse(process.env.VJ_RULES || '{}') };
 const ATTRS = ['FOR', 'CON', 'DES', 'AGI', 'INT', 'SAB', 'CAR', 'SOR'];
-const EL = ['fis', 'kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao'];
-const KINDS = ['dmg', 'mental', 'heal', 'passive'];
-const DOT = ['burn', 'bleed', 'poison', 'rad'];
-const CTRL = ['stun', 'sleep', 'para', 'frozen', 'possess', 'confuse']; // chefes só sofrem controle por 1 turno
-const STK = [...DOT, 'possess', 'curse', 'frozen', 'marked', 'down', 'stun', 'sleep', 'para', 'silence', 'atkUp', 'atkDn', 'defUp', 'defDn', 'agiUp', 'agiDn', 'fear', 'fury', 'confuse'];
+const EL = ['fis', 'kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao', 'aura', 'oculto'];
+const KINDS = ['dmg', 'mental', 'heal', 'passive', 'form', 'util']; // form = transformação/postura; util = suporte sem cura (escudo, purificar, invocar)
+const DOT = RU.DOT;
+const CTRL = RU.CTRL; // chefes só sofrem controle por 1 turno
+const STK = Object.keys(RU.ST);
 const VN = { kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', radiacao: 'Hiruko' };
-const STN = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão' };
-const ITYPES = ['cons', 'arma', 'armadura', 'acess', 'mat'], WT = ['', 'lamina', 'lanca', 'fogo', 'punho'], EFF = ['hp', 'aura', 'san', 'cure', 'body', 'rev', 'bomb'];
+const STN = RU.ST, RESN = { hp: 'HP', aura: 'Aura', san: 'Sanidade', limit: 'Limite' };
+const ITYPES = ['cons', 'arma', 'armadura', 'acess', 'mat'], WT = ['', 'lamina', 'lanca', 'fogo', 'punho'], EFF = ['hp', 'aura', 'san', 'cure', 'body', 'rev', 'bomb', 'comp'];
 // partes do corpo: atributos penalizados (−10 cada enquanto crítica), status ao ficar crítica, penalidade para mirar, peso no sorteio
 const BODY = { head: [['INT', 'SAB'], 'stun', 30, 6], torso: [['CON'], 'bleed', 0, 40], armL: [['FOR', 'DES'], 'atkDn', 15, 15], armR: [['FOR', 'DES'], 'atkDn', 15, 15], legL: [['AGI'], 'agiDn', 15, 12], legR: [['AGI'], 'agiDn', 15, 12] };
 const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: 'braço esq.', armR: 'braço dir.', legL: 'perna esq.', legR: 'perna dir.' };
 const BBG = ['rubro', 'noite', 'floresta', 'brasa', 'gelo', 'vazio', 'santuario', 'tempestade'];
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR']); // campos numéricos que só o mestre altera
-const EXTRA = { vinc: [], body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
+const EXTRA = { vinc: [], aw: [], nen: '', body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
 const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', rq: null, ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
 const SCH = {
-  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', ...ATTRS], req: WT, back: ['', ...STK], ex: 't', d: 't' },
+  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', 'vow', 'trig', 'mod', 'amp', 'bon', ...ATTRS], req: WT, back: ['', ...STK], ex: 't', d: 't' },
   items: { name: 's', type: ITYPES, eff: EFF, attr: ATTRS, wt: WT, el: ['', ...EL], power: 'n', price: 'n' },
 };
 // ---------- estado ----------
@@ -149,7 +151,8 @@ const reseat = () => {
     T[ch.id] = (others.length ? Math.min(...others) : 0) + delay(ch);
   }
 };
-const push = () => { prep(); reseat(); pruneReqs(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+const usable = () => { for (const ch of Object.values(S.chars)) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries(ch.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
+const push = () => { prep(); reseat(); pruneReqs(); usable(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -170,94 +173,394 @@ const derive = ch => { for (const k in BASE) { ch[k] = Math.max(1, BASE[k](ch) +
 const evolveCh = ch => { const up = Object.keys(ch.marks).filter(a => d100() > ch.attrs[a] && ch.attrs[a] < 100); up.forEach(a => ch.attrs[a]++); ch.marks = {}; return up; };
 const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
 // CTB: quanto maior a AGI, menor o intervalo entre turnos
-const delay = ch => Math.round(1000 / Math.max(1, at(ch, 'AGI') * (ch.st.agiUp ? 1.25 : 1) * (ch.st.agiDn ? .75 : 1) * (ch.boss ? 2 : 1))); // chefes agem com o dobro da frequência
 // heróis caídos continuam na fila: o "turno" deles conta para a morte
 const nextOf = T => Object.keys(T).filter(k => { const ch = S.chars[k]; return ch && !ch.dead && (ch.hp > 0 || !ch.enemy); }).sort((a, b) => T[a] - T[b] || a.localeCompare(b))[0];
 const current = () => nextOf(S.battle.ticks);
 const order = () => { const T = { ...S.battle.ticks }, out = []; for (let i = 0; i < 8; i++) { const id = nextOf(T); if (!id) break; out.push(id); T[id] += delay(S.chars[id]); } return out; }; // próximos turnos previstos
 const onMap = ch => ch.x != null && ch.scene === S.scene;
 // quem acabou de perder um turno fica 2 turnos imune a novo controle (evita ficar travado para sempre)
-const applySt = (t, k, n = 3) => { if (CTRL.includes(k) && t.imm > 0) return; t.st[k] = t.boss && CTRL.includes(k) ? 1 : n; };
-const tickSt = ch => { for (const k in ch.st) if (--ch.st[k] <= 0) delete ch.st[k]; if (ch.imm > 0) ch.imm--; };
 const addLimit = (ch, v) => ch.limit = Math.min(100, ch.limit + v);
-
-function hurt(t, d) { // dano em HP: enche Limite, acorda, avisa queda
-  const was = t.hp > 0;
+// ---------- sistema de skills: passivas, modificadores, votos, transformações ----------
+const passOf = ch => (ch.skills || []).map(k => S.skills[k]).filter(s => s && s.kind === 'passive');
+const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
+const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!s.req : s.el === sc;
+function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
+  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
+  for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
+  const f = ch.form && ch.st?.form && S.skills[ch.form]; if (f?.form) add(f.form.m);
+  if (vows(ch).includes('tempo')) m.hit += 15;
+  return m;
+}
+const delay = ch => Math.round(1000 / Math.max(1, at(ch, 'AGI') * (ch.st.agiUp ? 1.25 : 1) * (ch.st.agiDn ? .75 : 1) * (ch.boss ? 2 : 1) * Math.max(.5, 1 + modsOf(ch).agi / 100))); // chefes agem com o dobro da frequência
+function vowMult(a, s, t) {
+  let m = 1;
+  for (const v of vows(a)) switch (v) {
+    case 'presa': m *= !a.bt?.prey || a.bt.prey === t.id ? 1.5 : .75; break;
+    case 'corpo': m *= 1.3; break;
+    case 'pureza': m *= (a.vinc || []).includes(s.el) ? 1.3 : s.basic || s.el === 'fis' ? .6 : 1; break;
+    case 'sangue': m *= 1.4; break;
+    case 'chama': m *= a.hp <= a.hpMax * .4 ? 1.6 : .85; break;
+    case 'silencio': m *= s.area ? 1 : 1.35; break;
+    case 'cacador': m *= t.enemy && t.cat !== 'humano' ? 1.4 : .5; break;
+    case 'arma': m *= s.basic || s.req ? 1.35 : 1; break;
+    case 'tempo': m *= 1.25; break;
+  }
+  return m;
+}
+const breakVow = (ch, v, why) => { (ch.bt ??= {}).broken ??= {}; if (ch.bt.broken[v]) return; ch.bt.broken[v] = true; const loss = Math.ceil(ch.sanMax * .2); ch.san = Math.max(0, ch.san - loss); log(ch.name, `rompeu o ${RU.VOW[v][0]} (${why}) e perde ${loss} de Sanidade.`, 'bad'); };
+const compOf = ch => Object.keys(ch.inv || {}).find(k => S.items[k]?.eff === 'comp' && ch.inv[k] > 0);
+// a skill como este personagem a usa: amplificações (versões Discente/Verdadeiro), afinidade de Aura e custos de votos
+function effSkill(a, id) {
+  const s0 = S.skills[id]; if (!s0) return null;
+  const s = { ...s0, id, pay: { ...(s0.pay || {}) }, fx: [...(s0.fx || [])] };
+  for (const p of passOf(a)) if (p.amp === s0.name && p.up) { const u = p.up; s.power += u.p || 0; s.cost += u.c || 0; if (u.san) s.pay.san = (s.pay.san || 0) + u.san; if (u.area) s.area = true; if (u.hits) s.hits = u.hits; if (u.fx) s.fx.push(...u.fx); s.amped = (s.amped || 0) + 1; }
+  const e = RU.nenEff(a, s0); if (e !== 1) s.power = Math.round(s.power * e); s.eff = e;
+  const vs = vows(a);
+  if (vs.includes('sangue') && s.kind !== 'passive') s.pay.hp = (s.pay.hp || 0) + 8;
+  if (s.circ && vs.includes('preco')) { if (s.res === 'aura') s.cost = 0; s.pay.san = (s.pay.san || 0) + 4; }
+  if (s.circ && s.pay.san && compOf(a)) { s.pay.san = Math.ceil(s.pay.san / 2); s.useComp = true; } // componente ritualístico corta o preço em Sanidade
+  return s;
+}
+const basicOf = a => { const wp = eq(a, 'arma'); return { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: (wp?.power ?? a.arma) + modsOf(a, { basic: true }).atkP, cost: 0, res: 'aura', basic: true, ct: 100, fx: [], pay: {} }; };
+const battlers = () => Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead);
+const skipping = o => o.st.stun || o.st.frozen || o.st.sleep || o.chg;
+function partner(a, s) { // técnica em dupla: aliado de pé, que conhece a skill par e pode pagar por ela
+  for (const p of battlers()) {
+    if (p === a || p.enemy !== a.enemy || p.hp <= 0 || skipping(p) || p.st.silence) continue;
+    const k = p.skills.find(k => S.skills[k]?.name === s.duo), ps = k && S.skills[k];
+    if (ps && p[ps.res] >= ps.cost) return { p, ps };
+  }
+  return null;
+}
+// motivo para não poder usar agora ('' = pode)
+function cantUse(a, s) {
+  if (!s || s.kind === 'passive') return 'Passiva';
+  if (s.req && s.req !== wtype(a)) return 'Exige ' + s.req;
+  if (!s.basic && (a.st.silence || a.st.fury)) return a.st.silence ? 'Silenciado' : 'Em fúria: só ataca';
+  if (s.limit && a.limit < 100) return 'Limite incompleto';
+  if (a[s.res] < s.cost) return 'Falta ' + RESN[s.res];
+  for (const [r, v] of Object.entries(s.pay || {})) if (r === 'hp' ? a.hp <= Math.ceil(a.hpMax * v / 100) : a[r] < v) return 'Falta ' + RESN[r];
+  if (s.kind === 'form' && a.st.exaus) return 'Exausto';
+  if (s.nf && !a.st.form) return 'Só transformado';
+  if (s.duo && !partner(a, s)) return 'Sem parceiro para a dupla';
+  const vs = vows(a);
+  if (vs.includes('silencio') && s.area) return 'Voto do Silêncio';
+  if (vs.includes('arma') && !s.basic && !s.req && s.kind !== 'form') return 'Voto da Arma Única';
+  return '';
+}
+const applySt = (t, k, n = 3) => {
+  if (CTRL.includes(k) && t.imm > 0) return;
+  if (CTRL.includes(k) && t.chg) interrupt(t);
+  t.st[k] = t.boss && CTRL.includes(k) ? 1 : DOT.includes(k) ? Math.min(6, (t.st[k] || 0) + n) : n; // dano contínuo acumula até 6 turnos
+};
+const tickSt = ch => { for (const k in ch.st) if (--ch.st[k] <= 0) { delete ch.st[k]; expire(ch, k); } if (ch.imm > 0) ch.imm--; };
+function expire(ch, k) { // condições com efeito ao acabar
+  if (k === 'shield') ch.shield = 0;
+  if (k === 'form') endForm(ch, true);
+  if (k === 'seal') sealBoom(ch, 1);
+  if (k === 'guarded') delete ch.guardBy;
+}
+function endForm(ch, colateral) {
+  const f = ch.form && S.skills[ch.form]; delete ch.form; delete ch.st.form;
+  if (!f) return;
+  let txt = '';
+  if (colateral) for (const e of f.form?.end || []) txt += fx1(ch, f, ch, e, { stat: at(ch, f.attr) });
+  log(ch.name, `deixa a forma ${f.name}${txt ? ': ' + txt.trim() : ''}.`, colateral && txt ? 'bad' : '');
+}
+function sealBoom(t, m) {
+  const sd = t.sealD; delete t.sealD; delete t.st.seal;
+  if (!sd || t.hp <= 0) return '';
+  const d = Math.max(1, Math.round(sd.d * m)), txt = `O selo de ${sd.by} explode: ${d} de dano.${hurt(t, d)}`;
+  log(t.name, txt, 'bad', { fx: { id: t.id, dmg: d, el: sd.el } });
+  return ' [selo detonado]';
+}
+function interrupt(t) { if (!t.chg) return; const s = S.skills[t.chg.s]; delete t.chg; delete t.st.charge; log(t.name, `perde a concentração${s ? ' de ' + s.name : ''}!`, 'bad'); }
+// passivas com gatilho; efeitos que causam dano não disparam por gatilho, para não haver cadeias sem fim
+function trig(ch, ev, o) {
+  if (!ch || !S.battle.active || !(ch.id in S.battle.ticks) || ch.dead) return;
+  for (const p of passOf(ch)) if (p.on === ev && (!p.ch || Math.random() * 100 < p.ch)) {
+    let txt = '';
+    for (const f of p.fx || []) {
+      if (f.t === 'det' || (f.t === 'lose' && f.r === 'hp')) continue;
+      const tg = f.to === 'tgt' ? (o && o !== ch ? [o] : []) : f.to === 'ally' ? battlers().filter(x => x.enemy === ch.enemy && x.hp > 0) : f.to === 'foes' ? battlers().filter(x => x.enemy !== ch.enemy && x.hp > 0) : [ch];
+      for (const t of tg) txt += fx1(ch, p, t, f, { stat: at(ch, p.attr || 'SAB') });
+    }
+    if (txt) log(ch.name, `${p.name}:${txt}`, 'ok');
+  }
+}
+// um efeito da lista aplicado em um alvo; c = { d: dano causado, stat, fallen }
+function fx1(a, s, t, f, c = {}) {
+  if (!t || t.dead) return '';
+  const T = S.battle.ticks;
+  switch (f.t) {
+    case 'st': if ((t.hp > 0 || f.k === 'regen') && Math.random() * 100 < (f.ch ?? 100)) { applySt(t, f.k, f.n + (t === a && current() === a.id ? 1 : 0)); return ` [${STN[f.k]}${t !== a && f.to ? ' em ' + t.name : ''}]`; } return '';
+    case 'det': {
+      if (t.hp <= 0) return '';
+      if (f.k === 'seal') return t.sealD ? sealBoom(t, 1.5) : '';
+      const ks = f.k === 'dot' ? DOT : f.k === 'neg' ? RU.NEG.filter(k => k !== 'seal') : [f.k]; let n = 0;
+      for (const k of ks) if (t.st[k]) { n += t.st[k]; delete t.st[k]; }
+      if (!n) return '';
+      const d = Math.max(1, Math.round(f.m * n * (1 + modsOf(a, s).atk / 100)));
+      return ` Detonação: +${d} de dano.${hurt(t, d, a)}`;
+    }
+    case 'drain': { if (!(c.d > 0) || a.hp <= 0) return ''; const v = Math.max(1, Math.round(c.d * f.p / 100)); a[f.r] = Math.min(a[f.r + 'Max'], a[f.r] + v); if (f.r === 'hp') healBody(a, v); return ` (+${v} ${RESN[f.r]} para ${a.name})`; }
+    case 'strip': { const had = RU.POS.filter(k => t.st[k]).length + (t.shield > 0); for (const k of RU.POS) delete t.st[k]; t.shield = 0; delete t.st.shield; return had ? ' [bônus removidos]' : ''; }
+    case 'steal': { const ks = RU.POS.filter(k => t.st[k]); for (const k of ks) { a.st[k] = Math.max(a.st[k] || 0, t.st[k]); delete t.st[k]; } return ks.length ? ` [roubou ${ks.map(k => STN[k]).join(', ')}]` : ''; }
+    case 'push': if (t.id in T && t.hp > 0) { bump(t.id, Math.round(delay(t) * f.v / 100)); return ' [atrasado]'; } return '';
+    case 'haste': if (t.id in T && t !== a) { T[t.id] = Math.max(T[a.id] ?? 0, T[t.id] - Math.round(delay(t) * f.v / 100)); return ` [${t.name} adiantado]`; } return '';
+    case 'seal': if (t.hp <= 0) return ''; t.sealD = { d: f.p + Math.floor((c.stat || 0) / R.dmgDiv), el: s.el, by: a.name }; t.st.seal = f.n + (t === a ? 1 : 0); return ' [Selo]';
+    case 'shield': { const v = Math.max(1, Math.round((f.p + Math.floor((c.stat || 0) / R.healDiv)) * (s.eff || 1))); t.shield = Math.max(t.shield || 0, v); t.st.shield = Math.max(t.st.shield || 0, 3); return ` [Escudo ${v}${t !== a ? ' em ' + t.name : ''}]`; }
+    case 'cleanse': { const ks = RU.NEG.filter(k => t.st[k]); for (const k of ks) delete t.st[k]; delete t.sealD; return ks.length ? ' [purificado]' : ''; }
+    case 'revive': if (c.fallen || (t.hp <= 0 && !t.dead)) { t.hp = Math.max(t.hp, Math.ceil(t.hpMax * f.p / 100)); delete t.dying; delete t.fell; return ` [${t.name} se reergue]`; } return '';
+    case 'res': if (f.r === 'limit') addLimit(t, f.p); else t[f.r] = Math.min(t[f.r + 'Max'], t[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}${t !== a ? ' em ' + t.name : ''}]`;
+    case 'gain': if (f.r === 'limit') addLimit(a, f.p); else a[f.r] = Math.min(a[f.r + 'Max'], a[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}]`;
+    case 'lose': if (f.r === 'hp') return t.hp > 0 ? ` (−${f.p} HP)${hurt(t, f.p, a)}` : ''; if (f.r === 'limit') t.limit = Math.max(0, t.limit - f.p); else t[f.r] = Math.max(0, t[f.r] - f.p); return ` [−${f.p} ${RESN[f.r]}]`;
+    case 'spread': if (t.st[f.k]) { const o = battlers().filter(x => x.enemy === t.enemy && x !== t && x.hp > 0); o.forEach(x => applySt(x, f.k, t.st[f.k])); return o.length ? ` [${STN[f.k]} se espalha]` : ''; } return '';
+    case 'guard': if (t !== a) { t.st.guarded = f.n; t.guardBy = a.id; return ` [${a.name} protege ${t.name}]`; } return '';
+  }
+  return '';
+}
+// efeitos que valem uma vez por uso (em si, nos aliados, nos inimigos)
+function onceFx(a, s, stat) {
+  let txt = '';
+  for (const f of s.fx || []) {
+    if (!f.to || f.to === 'tgt' || f.t === 'turn' || f.t === 'chain' || f.t === 'haste' && f.to === 'self') continue;
+    const tg = f.to === 'self' ? [a] : battlers().filter(x => x.enemy === (f.to === 'ally' ? a.enemy : !a.enemy) && (x.hp > 0 || f.t === 'revive'));
+    for (const t of tg) txt += fx1(a, s, t, f, { stat });
+  }
+  if (txt) log(a.name, `${s.name}:${txt}`, 'ok');
+}
+const hitFx = (a, s, t, c) => (s.fx || []).filter(f => !f.to || f.to === 'tgt').map(f => fx1(a, s, t, f, c)).join('');
+function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por turno de condição, fúria do ferido
+  let m = 1;
+  for (const f of s.fx || []) {
+    if (f.t === 'exec' && t.hp <= t.hpMax * f.p / 100) m *= f.m;
+    if (f.t === 'vs' && (f.k === 'neg' ? RU.NEG.some(k => t.st[k]) : f.k === 'demon' ? t.enemy && t.cat !== 'humano' : t.st[f.k])) m *= f.m;
+    if (f.t === 'per' && t.st[f.k]) m *= 1 + f.p / 100 * t.st[f.k];
+    if (f.t === 'rage') m *= 1 + f.m * (1 - a.hp / (a.hpMax || 1));
+  }
+  return m;
+}
+function hurt(t, d, src) { // dano em HP: escudo, tenacidade, Limite, acorda, quebra concentração, gatilhos, avisa queda
+  const was = t.hp > 0; let note = ''; t.bt ??= {};
+  if (t.shield > 0 && d > 0) { const ab = Math.min(t.shield, d); t.shield -= ab; d -= ab; note += ` Escudo absorve ${ab}.`; if (!t.shield) delete t.st.shield; }
+  if (was && d >= t.hp) {
+    const fall = !t.bt.fall && passOf(t).find(p => p.on === 'fall');
+    if (t.st.endure || fall) { d = t.hp - 1; if (t.st.endure) delete t.st.endure; else { t.bt.fall = 1; trig(t, 'fall', src); } note += ` ${t.name} resiste com 1 HP!`; }
+  }
   t.hp = Math.max(0, t.hp - d);
   addLimit(t, Math.ceil(100 * d / (t.hpMax || 1)));
-  delete t.st.sleep; delete t.st.frozen;
+  if (d > 0) { delete t.st.sleep; delete t.st.frozen; }
+  if (t.chg && d >= t.hpMax * .2) interrupt(t);
+  if (t.hp > 0 && d > 0) { trig(t, 'hurt', src); if (!t.bt.low && t.hp <= t.hpMax * .3) { t.bt.low = 1; trig(t, 'low', src); } }
   if (t.boss && !t.rage && t.hp > 0 && t.hp <= t.hpMax / 2) { // fúria: buffs, Limite cheio e dois lacaios do mesmo elemento
     t.rage = true; t.st.atkUp = t.st.agiUp = 99; t.limit = 100;
     const el = t.resist.find(e => e !== 'fis') || 'fis', ref = partyRef();
     if (S.battle.active && t.id in S.battle.ticks) for (let i = 0; i < 2; i++) { const mn = spawn(genFoe(el, pick(Object.keys(ROLES)), 'lacaio', ref), 'normal', t.x ?? 0, t.y ?? 0); derive(mn); mn.hp = mn.hpMax; S.battle.ticks[mn.id] = S.battle.ticks[t.id] + delay(mn); }
-    return ` ${t.name} entra em fúria e invoca lacaios!`;
+    return note + ` ${t.name} entra em fúria e invoca lacaios!`;
   }
-  if (!was || t.hp) return '';
+  if (!was || t.hp) return note;
+  if (t.summon) { t.dead = true; delete S.battle.ticks[t.id]; return note + ` ${t.name} se desfaz.`; }
   if (!t.enemy) { t.dying = 3; t.fell = true; }
-  Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && o !== t && o.enemy === t.enemy).forEach(o => addLimit(o, 25));
-  return ` ${t.name} caiu!`;
+  interrupt(t); if (t.form) endForm(t, false);
+  Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && o !== t && o.enemy === t.enemy).forEach(o => { addLimit(o, 25); trig(o, 'ally', t); });
+  if (src && src !== t) trig(src, 'kill', t);
+  return note + ` ${t.name} caiu!`;
 }
+const bump = (id, v) => { if (id in S.battle.ticks) S.battle.ticks[id] += v; }; // empurra na fila só quem ainda está nela (invocação morta sai)
 function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
   const a = S.chars[id];
-  tickSt(a); S.battle.ticks[id] += Math.round(delay(a) * (ct || 100) / 100);
-  for (let i = 0; i < 30; i++) { // início do turno do próximo: regen de Aura, dano contínuo, perda de turno
+  if (a) { tickSt(a); bump(id, Math.round(delay(a) * (ct || 100) / 100)); }
+  for (let i = 0; i < 30; i++) { // início do turno do próximo: regen de Aura, dano contínuo, drenos, perda de turno, concentração e invocações
     const n = S.chars[current()];
     if (!n) return;
+    n.bt ??= {};
     if (n.hp <= 0) { // contagem de morte
       n.dying = (n.dying ?? 3) - 1;
       if (n.dying <= 0) { n.dead = true; n.fell = true; delete n.dying; delete S.battle.ticks[n.id]; log(n.name, 'não resistiu e morreu.', 'bad'); }
-      else { log(n.name, `está caído: ${n.dying} turno(s) até a morte`, 'bad'); S.battle.ticks[n.id] += delay(n); }
+      else { log(n.name, `está caído: ${n.dying} turno(s) até a morte`, 'bad'); bump(n.id, delay(n)); }
       continue;
     }
+    if (n.summon && --n.summon.ttl < 0) { log(n.name, 'se dissipa.', ''); n.dead = true; delete S.battle.ticks[n.id]; continue; }
     n.aura = Math.min(n.auraMax, n.aura + Math.max(1, Math.round(n.auraMax / 10)));
+    if (n.st.regen) { const v = Math.max(1, Math.round(n.hpMax / 20 / (n.boss ? 3 : 1))); /* como o dano contínuo; chefes têm HP inflado e agem duas vezes */ n.hp = Math.min(n.hpMax, n.hp + v); healBody(n, v); log(n.name, `regenera ${v} HP.`, 'ok', { fx: { id: n.id, heal: v } }); }
+    if (n.st.dread) { const v = Math.max(1, Math.round(n.sanMax / 12)); n.san = Math.max(0, n.san - v); log(n.name, `é corroído pelo pavor: −${v} de Sanidade.`, 'bad'); }
+    const f = n.form && S.skills[n.form];
+    if (f?.form?.dr && n.st.form) { // transformação drena a cada turno; sem recurso, ela acaba
+      const dr = f.form.dr, short = Object.entries(dr).find(([r, v]) => r === 'hp' ? n.hp <= Math.ceil(n.hpMax * v / 100) : n[r] < v);
+      if (short) endForm(n, true); else for (const [r, v] of Object.entries(dr)) { if (r === 'hp') n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * v / 100)); else n[r] -= v; }
+    }
+    if (vows(n).includes('tempo')) n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * .04));
     const dots = DOT.filter(k => n.st[k]).length;
     if (dots) {
       const d = dots * Math.max(1, Math.round(n.hpMax / 20));
       log(n.name, `sofre ${d} de dano contínuo.${hurt(n, d)}`, 'bad', { fx: { id: n.id, dmg: d } });
-      if (!n.hp) { S.battle.ticks[n.id] += delay(n); continue; }
+      if (!n.hp) { bump(n.id, delay(n)); continue; }
     }
+    trig(n, 'turn');
     const skip = n.st.stun ? 'atordoado' : n.st.frozen ? 'congelado' : n.st.sleep ? 'dormindo' : n.st.para && d100() <= 50 ? 'paralisado' : '';
-    if (!skip) return;
+    if (!skip) {
+      if (n.chg) { // concentração: espera os turnos e solta sozinha
+        if (--n.chg.n > 0) { log(n.name, `continua concentrando ${S.skills[n.chg.s]?.name || ''}…`, ''); tickSt(n); bump(n.id, delay(n)); continue; }
+        const c = n.chg; delete n.chg; delete n.st.charge;
+        let t = S.chars[c.t]; if (!t || t.dead || !(t.id in S.battle.ticks) || (t.hp <= 0 && t.enemy !== n.enemy)) t = pick(battlers().filter(o => o.enemy !== n.enemy && o.hp > 0));
+        if (t && doAct(n, { skill: c.s, target: t.id, aim: c.aim, release: true })) return;
+        continue;
+      }
+      if (n.summon) { aiAct(n); return; } // invocações agem sozinhas
+      return;
+    }
     log(n.name, `está ${skip} e perde o turno`, 'bad'); n.imm = 3;
-    tickSt(n); S.battle.ticks[n.id] += delay(n);
+    tickSt(n); bump(n.id, delay(n));
   }
 }
 
-function strike(a, s, t, aim, bonus = 0) {
-  const stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${STN[s.st]}]` : '';
-  if (s.kind === 'heal') {
-    const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1)));
-    t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v);
+function redirect(a, t) { // provocar, guarda-costas e furtividade mudam o alvo de golpes únicos
+  if (t.enemy === a.enemy) return t;
+  const side = battlers().filter(o => o.enemy === t.enemy && o.hp > 0);
+  const tz = side.filter(o => o.st.taunt); if (tz.length && !tz.includes(t)) t = tz[0];
+  if (t.st.stealth && !a.st.focus) { const vis = side.filter(o => !o.st.stealth); if (vis.length) t = pick(vis); }
+  const g = t.st.guarded && S.chars[t.guardBy]; if (g && g.hp > 0 && g.id in S.battle.ticks && g.enemy === t.enemy) t = g;
+  return t;
+}
+function strike(a, s, t, aim, bonus = 0, o = {}) {
+  const ma = modsOf(a, s), stat = at(a, s.attr) - sanPen(a), stTxt = s.st ? ` [${STN[s.st]}]` : '';
+  if (s.kind === 'heal' || s.kind === 'util') {
+    const fallen = t.hp <= 0; let txt = '';
+    if (s.kind === 'heal') {
+      const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1) * (1 + ma.heal / 100)));
+      t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v); txt = `cura ${v} HP`;
+      if (t === a && vows(a).includes('corpo')) breakVow(a, 'corpo', 'curou a si mesmo');
+    }
     if (s.st) applySt(t, s.st);
-    log(a.name, `${s.name} → ${t.name}: cura ${v} HP${stTxt}`, 'ok', { fx: { id: t.id, heal: v, a: a.id, s: s.name, el: s.el } });
+    txt += hitFx(a, s, t, { d: 0, stat, fallen });
+    log(a.name, `${s.name} → ${t.name}${txt ? ': ' + txt.trim() : ''}${stTxt}`, 'ok', { fx: { id: t.id, heal: s.kind === 'heal' ? 1 : 0, a: a.id, s: s.name, el: s.el } });
+    if (s.kind === 'heal' && t !== a) trig(a, 'heal', t);
     return false;
   }
-  const chance = int(stat + R.hit - Math.floor(at(t, 'AGI') / 2) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
+  const sure = s.fx?.some(f => f.t === 'sure');
+  if (t.st.evade && !s.area && !sure && !o.counter) { delete t.st.evade; log(a.name, `${s.name} → ${t.name}: esquivou!`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } }); return false; }
+  const chance = sure ? 95 : int(stat + R.hit - (t.st.root ? 0 : Math.floor(at(t, 'AGI') / 2)) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) - (a.st.blind ? 25 : 0) - (a.st.exaus ? 15 : 0) + (a.st.focus ? 15 : 0) + (a.st.stealth ? 25 : 0) + ma.hit + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
   if (r > chance) {
     if (r >= 96) addLimit(a, 20);
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } });
+    trig(a, 'miss', t);
     return false;
   }
+  a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
-  const crit = r <= Math.max(1, Math.floor(chance / 10)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
-  const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1);
-  const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv) - (mental ? 0 : t.armor + (eq(t, 'armadura')?.power || 0))) * mult));
+  const crit = r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
+  const mt = modsOf(t), pierce = s.fx?.find(f => f.t === 'pierce')?.p || 0;
+  const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
+    * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1);
+  const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0)) * (1 - pierce / 100);
+  const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv / (s.hits || 1)) + (o.plus || 0) - armor) * mult)); // multi-golpe divide o bônus do atributo; a armadura conta em cada golpe
   a.marks[s.attr] = true;
-  let extra = '';
-  let part = '';
+  let extra = '', part = '';
+  const was = t.hp > 0;
   if (mental) t.san = Math.max(0, t.san - d);
   else { // localiza o golpe: parte mirada ou sorteio ponderado
     let roll = Math.random() * 100;
     part = aim || PARTS.find(k => (roll -= BODY[k][3]) < 0) || 'torso';
-    const was = lvl(t, part);
+    const lv = lvl(t, part);
     t.body[part] = (t.body[part] || 0) + d;
-    extra = hurt(t, d);
-    if (t.hp > 0 && was < 2 && lvl(t, part) === 2) { applySt(t, BODY[part][1]); extra += ` ${PL[part]} em estado crítico!`; }
+    extra = hurt(t, d, a);
+    if (t.hp > 0 && lv < 2 && lvl(t, part) === 2) { applySt(t, BODY[part][1]); extra += ` ${PL[part]} em estado crítico!`; }
   }
   if (wk) extra = ' PONTO FRACO!' + extra;
   if (t.hp > 0) { if (s.st) applySt(t, s.st); if (down) t.st.down = 1; }
+  extra += hitFx(a, s, t, { d, stat });
+  if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
   log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w } });
-  return down;
+  if (crit) trig(a, 'crit', t);
+  if (w) trig(a, 'weak', t);
+  if (t.st.counter && t.hp > 0 && !mental && !s.area && !o.counter && a.hp > 0 && t !== a && t.enemy !== a.enemy && !skipping(t)) { log(t.name, 'contra-ataca!', 'ok'); strike(t, basicOf(t), a, null, 0, { counter: true }); }
+  return down && was;
+}
+// ---------- ação de combate (jogador aprovado, mestre, IA, concentração liberada) ----------
+function doAct(a, m, bonus = 0) {
+  const s = m.skill === 'atk' ? basicOf(a) : a.skills.includes(m.skill) && effSkill(a, m.skill);
+  if (!s || (!m.release && cantUse(a, s))) return false;
+  let t0 = s.tg === 'self' || s.kind === 'form' ? a : S.chars[m.target];
+  if (!t0 || !(t0.id in S.battle.ticks)) return false;
+  if (!m.release) {
+    a[s.res] -= s.cost;
+    if (s.limit) a.limit = 0;
+    for (const [r, v] of Object.entries(s.pay || {})) { if (r === 'hp') a.hp = Math.max(1, a.hp - Math.ceil(a.hpMax * v / 100)); else a[r] = Math.max(0, a[r] - v); }
+    if (s.useComp) { const k = compOf(a); if (k && --a.inv[k] <= 0) delete a.inv[k]; }
+    if (s.chg) { a.chg = { s: m.skill, t: t0.id, aim: m.aim, n: s.chg }; a.st.charge = 99; log(a.name, `começa a concentrar ${s.name}…`, 'ok'); endTurn(a.id, 100); return true; }
+  }
+  const stat = at(a, s.attr) - sanPen(a);
+  if (s.kind === 'form') {
+    if (a.form) endForm(a, false);
+    a.form = m.skill; a.st.form = s.form.dur + 1;
+    log(a.name, `assume a forma ${s.name}!`, 'ok', { fx: { id: a.id, a: a.id, s: s.name, el: s.el, heal: 0 } });
+    const t = hitFx(a, s, a, { stat }); if (t) log(a.name, t.trim(), 'ok');
+    onceFx(a, s, stat);
+    endTurn(a.id, s.ct); return true;
+  }
+  const inB = battlers(), heal = s.kind === 'heal', util = s.kind === 'util', off = !heal && !util;
+  const mates = inB.filter(o => o.hp > 0 && o.enemy === a.enemy && o !== a);
+  const ts = off && (a.st.possess || a.san <= 0) && mates.length ? [pick(mates)] // possuído, ou em colapso de Sanidade, ataca os próprios aliados
+    : s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : off ? redirect(a, t0) : t0];
+  const pr = s.duo ? partner(a, s) : null, plus = pr ? Math.floor(at(pr.p, pr.ps.attr) / R.dmgDiv) : 0;
+  if (pr) { pr.p[pr.ps.res] -= pr.ps.cost; bump(pr.p.id, delay(pr.p)); log(a.name, `e ${pr.p.name} executam juntos ${s.name}!`, 'ok'); }
+  let more = false;
+  const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : null;
+  for (const t of ts) for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus }) || more; }
+  const ch = s.fx?.find(f => f.t === 'chain');
+  if (ch && off && ts.length === 1) inB.filter(o => o.enemy === ts[0].enemy && o !== ts[0] && o.hp > 0).sort(() => Math.random() - .5).slice(0, ch.n).forEach((o, i) => strike(a, s, o, null, bonus, { mult: ch.m ** (i + 1), plus }));
+  onceFx(a, s, stat);
+  if (s.summon) summonOf(a, s);
+  if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }
+  if (off && a.st.stealth) delete a.st.stealth;
+  if (s.fx?.some(f => f.t === 'turn') && a.hp > 0) more = true;
+  const haste = s.fx?.find(f => f.t === 'haste' && f.to === 'self');
+  if (more && a.hp > 0) log(a.name, 'MAIS UM turno!', 'ok'); else endTurn(a.id, Math.round((s.ct || 100) * (haste ? 1 - haste.v / 100 : 1)));
+  return true;
+}
+function summonOf(a, s) { // invocação: aliado temporário que age sozinho, com atributos tirados do invocador
+  const d = SUMMONS[s.summon]; if (!d) return;
+  for (const o of Object.values(S.chars)) if (o.summon?.by === a.id && o.summon.k === s.summon) { o.dead = true; delete S.battle.ticks[o.id]; }
+  const id = rid(), base = at(a, s.attr), ch = S.chars[id] = { ...newChar(id, a.enemy, a.owner), name: s.summon, color: d.c, x: a.x, y: a.y, scene: a.scene, summon: { by: a.id, ttl: d.ttl, k: s.summon }, xpR: 0, goldR: 0 };
+  for (const k of ATTRS) ch.attrs[k] = int(base * .6, 10, 95);
+  for (const k of d.a) ch.attrs[k] = int(base * .9 + 5, 10, 95);
+  ch.skills = d.sk.map(n => Object.keys(S.skills).find(k => S.skills[k].name === n)).filter(Boolean);
+  Object.assign(ch, { resist: d.el ? [d.el] : [], arma: d.arma ?? 8, armor: d.armor || 0, bt: {} });
+  derive(ch); ch.bon.hpMax = Math.round(a.hpMax * d.hp) - ch.hpMax; derive(ch); ch.hp = ch.hpMax; ch.aura = ch.auraMax; ch.san = ch.sanMax;
+  S.battle.ticks[id] = S.battle.ticks[a.id] + Math.round(delay(ch) / 2);
+  log(a.name, `invoca ${s.summon}!`, 'ok');
+}
+// IA: Limite, transformação, reerguer caído, curar, purificar, invocar, buffs, dano; serve para inimigos e invocações
+function aiAct(a) {
+  const all = battlers(), alive = all.filter(o => o.hp > 0), foesAll = alive.filter(o => o.enemy !== a.enemy), mates = alive.filter(o => o.enemy === a.enemy);
+  if (!foesAll.length) return endTurn(a.id);
+  const foes = foesAll.filter(o => !o.st.stealth || a.st.focus).length ? foesAll.filter(o => !o.st.stealth || a.st.focus) : foesAll;
+  const K = k => S.skills[k], has = (k, t) => K(k).fx?.some(f => f.t === t), pw = k => K(k).power * (K(k).hits || 1) * (K(k).area ? 1.5 : 1);
+  const strong = l => { const o = [...l].sort((x, y) => pw(y) - pw(x)); return Math.random() < .6 ? pick(o.slice(0, 3)) : pick(o); }; // repertório grande: prefere os golpes mais fortes
+  const usable = a.skills.filter(k => K(k) && K(k).kind !== 'passive' && !cantUse(a, effSkill(a, k)));
+  const lim = usable.find(k => K(k).limit); // Limite carregado tem prioridade
+  const hurt0 = [...mates].sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0], fallen = all.filter(o => o.enemy === a.enemy && o.hp <= 0 && !o.dead);
+  const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => (K(k).kind === 'heal' && !K(k).power || K(k).kind === 'util') && !K(k).summon && !has(k, 'revive'));
+  const hits = usable.filter(k => K(k).kind === 'dmg' && !K(k).limit), mental = usable.filter(k => K(k).kind === 'mental' && !K(k).limit);
+  const forms = usable.filter(k => K(k).kind === 'form'), revs = usable.filter(k => has(k, 'revive')), sums = usable.filter(k => K(k).summon), cl = usable.filter(k => has(k, 'cleanse'));
+  const sick = mates.find(o => RU.NEG.filter(k => o.st[k]).length >= 2);
+  const tgt = Math.random() < R.aiFocus ? [...foes].sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
+  if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
+  let skill = 'atk', t = tgt;
+  if (lim) skill = lim;
+  else if (forms.length && !a.form && (a.rage || Math.random() < .2)) { skill = pick(forms); t = a; }
+  else if (revs.length && fallen.length && !a.hcd && Math.random() < .5) { skill = pick(revs); t = fallen[0]; a.hcd = 4; } // reerguer divide o intervalo das curas, senão dois curandeiros se revezam para sempre
+  else if (heals.length && !a.hcd && hurt0.hp < hurt0.hpMax * .5 && Math.random() < .6) { skill = pick(heals); t = hurt0; a.hcd = 4; }
+  else if (cl.length && sick && Math.random() < .5) { skill = pick(cl); t = sick; }
+  else if (sums.length && !alive.some(o => o.summon?.by === a.id) && Math.random() < .25) { skill = pick(sums); t = a; }
+  else if (buffs.length && Math.random() < .12) { skill = pick(buffs); t = pick(mates); }
+  else if (hits.length && Math.random() < (mOk ? .45 : .7)) skill = strong(hits);
+  else if (mOk && Math.random() < .6) skill = pick(mental); // dano mental continua sorteado: escolher sempre o mais forte leva o grupo ao colapso de Sanidade
+  const ks = K(skill);
+  if (ks && ['heal', 'util'].includes(ks.kind) && t?.enemy !== a.enemy) t = has(skill, 'revive') && fallen.length ? fallen[0] : ks.power ? hurt0 : pick(mates); // cura e suporte (inclusive o Limite) vão para o próprio lado
+  if (ks && (ks.tg === 'self' || ks.kind === 'form')) t = a;
+  if (!t || !doAct(a, { skill, target: t.id })) { if (!doAct(a, { skill: 'atk', target: tgt.id })) endTurn(a.id); }
 }
 
 const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet']);
@@ -275,8 +578,12 @@ if (fresh) loadScenes();
 const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => { const id = rid(); return [id, { ...ch, id }]; })); };
 // o mestre também edita os modelos do bestiário com as mesmas ações de ficha
 // passivas aplicam o bônus de forma permanente; sg = -1 desfaz (quando o mestre tira a skill)
+const bonus = (ch, k, v) => { if (ATTRS.includes(k)) ch.attrs[k] = int(ch.attrs[k] + v, 1, 100); else if (Object.hasOwn(BASE, k)) { ch.bon[k] += v; ch[k.slice(0, -3)] = Math.max(0, ch[k.slice(0, -3)] + v); } };
 const passive = (ch, s, sg) => {
   if (s.kind !== 'passive') return;
+  const e = RU.nenEff(ch, s);
+  if (s.bon) for (const [k, v] of Object.entries(s.bon)) bonus(ch, k, sg * Math.round(v * e));
+  if (!['hpMax', 'auraMax', 'sanMax', 'res', ...ATTRS].includes(s.pas)) return; // voto, gatilho, modificador, amplificação: o motor lê na hora
   if (s.pas === 'res') { if (sg > 0) { if (!ch.resist.includes(s.el)) ch.resist.push(s.el); ch.weak = ch.weak.filter(e => e !== s.el); } else ch.resist = ch.resist.filter(e => e !== s.el); }
   else if (ATTRS.includes(s.pas)) ch.attrs[s.pas] = int(ch.attrs[s.pas] + sg * s.power, 1, 100);
   else { ch.bon[s.pas] += sg * s.power; ch[s.pas.slice(0, -3)] = Math.max(0, ch[s.pas.slice(0, -3)] + sg * s.power); }
@@ -306,7 +613,7 @@ const partyRef = () => {
   return { n: pcs.length || 4, p: pcs.length ? Math.round(pcs.reduce((a, c) => a + top3(c), 0) / pcs.length) : 58 };
 };
 function genFoe(el, role, rank, ref = partyRef()) {
-  const K = R.rank[rank], [m1, m2] = ROLES[role], ch = newChar('', true, ''), up = Math.max(0, ref.p - 58) * (rank === 'chefe' ? R.rank.chefe.g : 1), P = ref.p + up * R.grow.attr, pool = Object.entries(S.skills).filter(([, s]) => s.el === el && s.kind !== 'passive' && !s.req && !s.back && (!s.limit || rank === 'chefe'));
+  const K = R.rank[rank], [m1, m2] = ROLES[role], ch = newChar('', true, ''), up = Math.max(0, ref.p - 58) * (rank === 'chefe' ? R.rank.chefe.g : 1), P = ref.p + up * R.grow.attr, pool = Object.entries(S.skills).filter(([, s]) => s.el === el && s.kind !== 'passive' && !s.req && !s.back && !s.duo && !s.circ && !s.aw && !s.summon && !s.form?.m?.heal && (+String(s.br).split('-')[1] < 6 || ['dmg', 'mental', 'form'].includes(s.kind)) && (!s.limit || rank === 'chefe'));
   const use = {}; pool.forEach(([, s]) => use[s.attr] = (use[s.attr] || 0) + 1);
   const elAttr = Object.keys(use).sort((a, b) => use[b] - use[a])[0]; // atributo que as skills do elemento mais usam
   for (const a of ATTRS) ch.attrs[a] = int(P + K.d - (a === m1 ? 0 : a === m2 ? 6 : a === elAttr ? (role === 'bruto' || role === 'agil' ? 10 : 2) : 18), 15, 95);
@@ -367,6 +674,7 @@ const H = {
     else if (f === 'owner' && c.role === 'gm') ch.owner = String(m.v).trim().slice(0, 30);
     else if (f === 'bio') ch.bio = String(m.v).slice(0, 3000);
     else if (f === 'gmNote' && c.role === 'gm') ch.gmNote = String(m.v).slice(0, 3000);
+    else if (f === 'nen' && c.role === 'gm') ch.nen = RU.NEN.includes(m.v) ? m.v : '';
 
   },
   move(c, m) { const ch = S.chars[m.id]; if (can(c, ch)) { ch.x = int(m.x, 0, Math.ceil(scene().cols) - 1); ch.y = int(m.y, 0, Math.ceil(scene().rows) - 1); } },
@@ -391,6 +699,12 @@ const H = {
     const target = int(at(ch, 'SAB') - sanPen(ch), 1, 95), r = d100(), loss = int(m.loss, 1, 99);
     if (r > target) ch.san = Math.max(0, ch.san - loss);
     log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok', { d: r, rr: { l: 'Horror · SAB', t: target, res: r > target ? 'Falha' : 'Sucesso', c: ch.id } });
+  },
+  aw(c, m) { // mestre concede ou retira um Despertar (selo narrativo que libera nós)
+    const ch = getCh(c, m.id);
+    if (c.role !== 'gm' || !ch || !Object.hasOwn(RU.AW, m.k)) return;
+    ch.aw = (ch.aw || []).includes(m.k) ? ch.aw.filter(k => k !== m.k) : [...(ch.aw || []), m.k];
+    if (ch.aw.includes(m.k)) log(ch.name, `recebeu o Despertar: ${RU.AW[m.k]}.`, 'ok');
   },
   vinc(c, m) { // mestre concede ou remove um Vínculo; ao ganhar, o personagem já aprende a skill raiz dele
     const ch = getCh(c, m.id);
@@ -465,7 +779,8 @@ const H = {
   battle(c, m) {
     if (c.role !== 'gm') return;
     const all = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(Boolean), dead = all.filter(o => o.enemy && o.hp <= 0), pcs = all.filter(o => !o.enemy);
-    all.forEach(o => { o.st = {}; delete o.dying; });
+    all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; o.shield = 0; });
+    for (const [k, o] of Object.entries(S.chars)) if (o.summon) delete S.chars[k]; // invocações somem com o fim da luta
     if (!m.on && m.win && pcs.length && dead.length) { // recompensas divididas entre os heróis
       const sum = f => Math.floor(dead.reduce((a, o) => a + o[f], 0) / pcs.length), xp = sum('xpR'), gold = sum('goldR'), drops = [];
       pcs.forEach(p => { p.xp += xp; p.gold += gold; });
@@ -484,30 +799,15 @@ const H = {
       }
     }
     S.battle = { active: !!m.on, ticks: {} };
-    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => S.battle.ticks[ch.id] = delay(ch));
+    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; S.battle.ticks[ch.id] = delay(ch); });
+    if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
     log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
   },
-  ai(c) { // IA simples: 70% usa uma skill disponível; cura o aliado mais ferido, ataca um oponente aleatório
-    const a = S.chars[current()];
-    if (c.role !== 'gm' || !S.battle.active || !a?.enemy) return;
-    const alive = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o?.hp > 0), foes = alive.filter(o => o.enemy !== a.enemy);
-    const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && s.kind !== 'passive' && (!s.req || s.req === wtype(a)) && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
-    const lim = usable.find(k => S.skills[k].limit); // Limite carregado tem prioridade
-    const mates = alive.filter(o => o.enemy === a.enemy), hurt = mates.sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0], K = k => S.skills[k];
-    // só cura quem está abaixo de metade; buffs puros são raros; dano mental não serve contra quem já está sem Sanidade
-    const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => K(k).kind === 'heal' && !K(k).power), hits = usable.filter(k => K(k).kind === 'dmg' && !K(k).limit), mental = usable.filter(k => K(k).kind === 'mental' && !K(k).limit);
-    const tgt = Math.random() < R.aiFocus ? foes.sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
-    if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
-    const skill = lim || (heals.length && !a.hcd && hurt.hp < hurt.hpMax * .5 && Math.random() < .6 ? pick(heals) : buffs.length && Math.random() < .12 ? pick(buffs)
-      : hits.length && Math.random() < (mOk ? .45 : .7) ? pick(hits) : mOk && Math.random() < .6 ? pick(mental) : 'atk'), heal = S.skills[skill]?.kind === 'heal';
-    const t = heal ? (K(skill).power ? hurt : pick(mates)) : tgt;
-    if (heal && K(skill).power) a.hcd = 4;
-    if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
-  },
+  ai(c) { const a = S.chars[current()]; if (c.role === 'gm' && S.battle.active && a?.enemy) aiAct(a); }, // IA do inimigo da vez
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
     const ch = S.chars[m.id], T = S.battle.ticks;
     if (c.role !== 'gm' || !S.battle.active || !ch) return;
-    if (m.k === 'in') { if (!(ch.id in T) && ch.hp > 0) T[ch.id] = Math.max(0, ...Object.values(T)) + 1; }
+    if (m.k === 'in') { if (!(ch.id in T) && ch.hp > 0) { T[ch.id] = Math.max(0, ...Object.values(T)) + 1; ch.bt = {}; } }
     else if (!(ch.id in T)) return;
     else if (m.k === 'out') delete T[ch.id];
     else if (m.k === 'set') T[ch.id] = int(m.v, 0, 999999);
@@ -515,33 +815,16 @@ const H = {
   },
   next(c) { const id = current(); if (S.battle.active && id && can(c, S.chars[id])) endTurn(id, 50); }, // passar custa metade do tempo
   act(c, m) {
-    const a = S.chars[current()], t0 = S.chars[m.target];
-    if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || !t0 || !(t0.id in S.battle.ticks)) return;
-    const basic = m.skill === 'atk';
-    const wp = eq(a, 'arma');
-    const s = basic ? { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: wp?.power ?? a.arma, cost: 0, res: 'aura' } : a.skills.includes(m.skill) && S.skills[m.skill];
-    if (!s || s.kind === 'passive' || (s.req && s.req !== wtype(a)) || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
-    a[s.res] -= s.cost;
-    if (s.limit) a.limit = 0;
-    const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
-    const mates = inB.filter(o => o.hp > 0 && o.enemy === a.enemy && o !== a);
-    const ts = !heal && (a.st.possess || a.san <= 0) && mates.length ? [pick(mates)] // possuído, ou em colapso de Sanidade, ataca os próprios aliados
-      : s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : t0];
-    let more = false;
-    const aim = !s.area && !heal && PARTS.includes(m.aim) ? m.aim : null;
-    const bonus = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0; // bônus ou penalidade dado pelo mestre ao aprovar
-    for (const t of ts) if (!t.dead) more = strike(a, s, t, aim, bonus) || more;
-    if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }
-    if (more && a.hp > 0) log(a.name, 'acertou a fraqueza — MAIS UM turno!', 'ok'); else endTurn(a.id, s.ct);
+    const a = S.chars[current()];
+    if (!S.battle.active || !a || a.id !== m.id || !can(c, a)) return;
+    doAct(a, m, c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0); // bônus ou penalidade dado pelo mestre ao aprovar
   },
   learn(c, m) {
     const ch = S.chars[m.id], s = S.skills[m.skill];
-    if (!can(c, ch) || !s || ch.skills.includes(m.skill) || ch.xp < s.xp) return;
-    if (s.el !== 'fis' && !ch.vinc.includes(s.el)) return; // só o tronco marcial e os próprios Vínculos
-    if (s.ex && ch.skills.some(k => S.skills[k]?.ex === s.ex)) return; // escolha excludente já feita
-    if (s.rq && Object.entries(s.rq).some(([a, v]) => at0(ch, a) < v)) return; // requisito de atributo
-    if (ch.skills.length && !ch.skills.some(k => S.skills[k] && Math.max(Math.abs(S.skills[k].gx - s.gx), Math.abs(S.skills[k].gy - s.gy)) <= 1)) return;
-    ch.xp -= s.xp; ch.skills.push(m.skill);
+    if (!can(c, ch) || !s || RU.whyNot(ch, s, S.skills, S.items, m.skill)) return;
+    ch.xp -= RU.xpCost(ch, s);
+    if (s.cat && !ch.nen) { ch.nen = s.cat; log(ch.name, `descobre sua natureza de Aura: ${RU.NENN[s.cat]}.`, 'ok'); }
+    ch.skills.push(m.skill);
     passive(ch, s, 1);
     log(ch.name, `aprendeu ${s.name}`, 'ok');
   },
@@ -568,10 +851,11 @@ const H = {
     if (i.eff === 'bomb') { // bomba: dano fixo do elemento, sem rolagem
       const d = Math.max(1, Math.round(i.power * (t.weak.includes(i.el) ? 1.5 : 1) * (t.resist.includes(i.el) ? .5 : 1)));
       txt = `${d} de dano${hurt(t, d)}`; fx = { fx: { id: t.id, dmg: d, el: i.el } };
-    } else if (i.eff === 'cure') { for (const k of Object.keys(t.st)) if (!k.endsWith('Up')) delete t.st[k]; txt = 'condições removidas'; }
+    } else if (i.eff === 'cure') { for (const k of RU.NEG) delete t.st[k]; delete t.sealD; txt = 'condições removidas'; }
     else if (i.eff === 'body') { healBody(t, i.power); txt = 'ferimentos tratados'; }
     else if (i.eff === 'rev') { t.hp = Math.min(t.hpMax, i.power); delete t.dying; txt = 'de volta à luta'; }
     else { const v = Math.round(i.power * (i.eff === 'hp' && t.st.curse ? .5 : 1)); if (i.eff === 'hp') { delete t.dying; healBody(t, v); } t[i.eff] = Math.min(t[i.eff + 'Max'], t[i.eff] + v); }
+    if (inB && t === ch && ['hp', 'rev'].includes(i.eff) && vows(ch).includes('corpo')) breakVow(ch, 'corpo', 'curou a si mesmo');
     H.drop(c, m);
     log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (${txt})`, 'ok', fx);
     if (inB) endTurn(ch.id);

@@ -50,12 +50,19 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
 
 ## Conteúdo padrão
-`content.js` gera a grade de skills (128 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
+`content.js` gera a grade de skills (1187 nós), o catálogo de itens (66, com materiais de forja), o bestiário (22 inimigos + 9 chefes), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
 Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.
 
 ## Vínculos e personagens base
 Cada caçador tem um ou mais **Vínculos** (Kagutsuchi, Susanoo, Atlas, Indra, Fuhaku, Amaterasu, Tsukuyomi, Shukketsu, Hiruko). Ele só aprende o tronco Marcial e as skills dos próprios Vínculos, e resiste ao elemento deles. O mestre concede Vínculos na aba **Mestre** da ficha.
-A árvore (581 nós: 60 por Vínculo em 6 ramos + 41 marciais; veja `REVISAO-ARVORE.md`) fica em `tree.js`; `content.js` só a distribui na grade.
+A árvore (1187 nós: 90 por Vínculo em 9 ramos, 157 marciais, 110 de Aura e 110 de Ocultismo; veja `REVISAO-ARVORE.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
+
+## Árvore expandida: transformações, rituais, votos e mais
+Além de dano, cura e condições, os nós agora têm efeitos compostos e sistemas próprios: transformações (uma por vez, com dreno por turno e efeito colateral), golpes concentrados, multi-golpe e ricochete, roubo de vida, detonar condições, execução, escudo, regeneração, purificar, reerguer caídos, contra-ataque, reflexo, esquiva, provocar, guarda-costas, selos que explodem depois, invocações que agem sozinhas, técnicas em dupla, votos e restrições, rituais em círculos com versões Discente e Verdadeiro, e passivas com gatilho. A descrição mecânica de cada nó aparece na grade.
+- Todos aprendem o tronco **Aura** (seis categorias em hexágono: a primeira aprendida vira a natureza do personagem; as outras rendem menos e custam mais XP).
+- O tronco **Ocultismo** e os nós mais fortes pedem um **Despertar**, que o mestre concede na aba Mestre da ficha (lá também dá para trocar a natureza de Aura).
+- Rituais gastam Aura e Sanidade; um **Componente Ritualístico** no inventário corta a Sanidade pela metade.
+- Referência completa das mecânicas e da notação dos nós: `ARVORE-SISTEMAS.md`.
 Campanha nova começa com Shinkai (Indra), Mikhail (Fuhaku) e Thomas (Hiruko), sem dono: o mestre liga cada um a uma conta na janela **Sessão**.
 
 ## Mapas

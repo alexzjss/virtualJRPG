@@ -336,6 +336,7 @@ body[data-role=player] h1{display:none}body[data-role=player] #app{padding:0}
 .nd.out{opacity:.16}.nd.out circle,.nd.out rect{stroke-dasharray:none}.nd.out:hover,.nd.out.sel{opacity:.7}
 .ln line.out{opacity:.05}.vout .halo{opacity:.05}.vout .hname{opacity:.3}.vmine .halo{opacity:.2}.vmine .hname{opacity:1}
 .flav{margin:0;font-style:italic;color:var(--dim)}.exw{color:var(--gold)}
+.mech{margin:.2em 0 .6em;font-size:.85em;line-height:1.45;color:var(--e,inherit)}
 .legend .lx{border-radius:50%;opacity:.25}
 .gridl path{fill:none;stroke:#fff;stroke-opacity:.28;stroke-width:1}
 .cropper{background:#050506}.cropbox img{opacity:1}
