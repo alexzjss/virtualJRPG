@@ -171,7 +171,8 @@ function unit(c, cur) {
   const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
     : `<div class="hpn"><span>${c.hp}</span><small>/${c.hpMax}</small><em>HP</em></div>${bar('hp', c, true)}<div class="duo"><div>${bar('aura', c, true)}<small>Aura ${c.aura}/${c.auraMax}</small></div><div>${bar('san', c, true)}<small>Sanidade ${c.san}/${c.sanMax}</small></div></div>
       <div class="lim ${c.limit >= 100 ? 'full' : ''}">${bar('limit', c, true)}<small>${c.limit >= 100 ? 'Limite!' : 'Limite ' + c.limit + '%'}</small></div>`;
-  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${stats}</div></div>`;
+  const brk = c.brk && c.hp > 0 ? `<div class="brk" title="Barra de Quebra: fraquezas e pontos fracos a esvaziam">Quebra ${'◆'.repeat(c.brk.cur)}${'◇'.repeat(c.brk.max - c.brk.cur)}</div>` : '', rit = !foe && (c.brv || c.ten) ? `<div class="rit">${c.brv ? `Coragem ${c.brv}` : ''}${c.brv && c.ten ? ' · ' : ''}${c.ten ? `Tensão ×${[1, 1.5, 2, 3][c.ten]}` : ''}</div>` : '';
+  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${brk}${rit}${stats}</div></div>`;
 }
 const BBG = { rubro: 'Rubro', noite: 'Noite', floresta: 'Floresta', brasa: 'Brasa', gelo: 'Gelo', vazio: 'Vazio', santuario: 'Santuário', tempestade: 'Tempestade' }; // fundos prontos da batalha
 function battle() {
@@ -412,7 +413,10 @@ function itemsPage(c) {
 const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat'];
 
 // tela do jogador em batalha: 1) alvo, 2) ação, 3) pedir ao mestre
-let pick = { k: 'atk', id: 'atk' }, aimOpen = false;
+let pick = { k: 'atk', id: 'atk' }, aimOpen = false, braveOn = false, passTo = '';
+// faixa do campo de batalha: clima, barra de Cadeia, Domínio aberto
+const fieldBar = () => { const B = S.battle, wx = RULES.CLIMA[B.wx?.k], ch = B.chain || { h: 0, e: 0 }, D = B.dom;
+  return `<div class="fbar">${wx ? `<span class="wx" title="${esc(Object.entries(wx[1]).map(([k, v]) => k === 'hit' ? `acerto ${v}` : `${PATRON[k] || k} ×${v}`).join(' · '))}">${wx[0]}</span>` : ''}<span class="chain" title="Fraquezas, críticos e golpes enchem a barra; cheia, o grupo ataca em sequência">Cadeia <b style="--p:${ch.h}%"></b>${ch.h}%</span>${D ? `<span class="dom">Domínio: ${esc(D.name)} (${D.ttl})</span>` : ''}</div>`; };
 const blockWhy = (c, s, k) => k && c.cant?.[k] ? c.cant[k] : c.st.silence ? 'Silenciado' : c.st.fury ? 'Em fúria: só ataca' : s.limit && c.limit < 100 ? 'Limite incompleto' : c[s.res] < s.cost ? `Falta ${RES[s.res]}` : s.req && s.req !== wtype(c) ? `Exige ${WT[s.req]}` : '';
 function command(c, cur) {
   const my = cur === c, inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead).sort((x, y) => y.enemy - x.enemy), t = inB.find(o => o.id === tgt), [rqId, rq] = myReq() || [], wait = rq && rq.ch === c.id;
@@ -427,12 +431,15 @@ function command(c, cur) {
     : tab === 'it' ? cons.map(([k, q]) => opt('it', k, S.items[k].name, '×' + q, idesc(S.items[k]))).join('') || '<p class="none">Nenhum consumível no inventário.</p>'
     : opt('atk', 'atk', 'Ataque', 'sem custo', `${wp ? wp.name : 'Punhos'} · poder ${wp?.power ?? c.arma} · ${wp?.wt === 'fogo' ? 'DES' : 'FOR'}`);
   const tl = timeline(6).slice(1).map(id => `<i class="${S.chars[id].enemy ? 'foe' : ''}">${esc(S.chars[id].name)}</i>`).join('');
+  const allies = inB.filter(o => !o.enemy && o.id !== c.id && o.hp > 0), downAll = inB.filter(o => o.enemy && o.hp > 0).length > 0 && inB.filter(o => o.enemy && o.hp > 0).every(o => o.st.down || o.st.broken);
+  const rhythm = `<div class="rhythm"><button class="ghost" data-a="defend" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)">Defender${c.brv > 0 ? ' ' + c.brv : ''}</button><button class="ghost" data-a="focus" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3">Concentrar${c.ten ? ' ×' + [1, 1.5, 2, 3][c.ten] : ''}</button><button class="ghost ${braveOn ? 'on' : ''}" data-a="braveT" ${c.brv > -2 ? '' : 'disabled'} aria-pressed="${braveOn}" title="Gasta 1 ponto de Coragem para agir de novo; sem pontos, fica devendo tempo">Coragem ${c.brv || 0}</button><select data-a="passSel" aria-label="Passar a vez depois de acertar uma fraqueza"><option value="">Passar a vez: ninguém</option>${allies.map(o => `<option value="${o.id}" ${passTo === o.id ? 'selected' : ''}>Passar a vez: ${esc(o.name)}</option>`).join('')}</select><button class="ghost allout" data-a="allOut" data-id="${c.id}" ${my && !wait && downAll ? '' : 'disabled'} title="Todo inimigo Derrubado ou Quebrado: o grupo inteiro ataca">Ataque Total</button></div>`;
   return `<section class="cmd ${my ? 'mine' : ''}" style="--c:${esc(c.color)}"><div class="cmd-h"><div class="turn ${my ? 'me' : ''}">${my ? 'Seu turno' : 'Turno de ' + esc(cur?.name || '—')}</div><div class="nextup"><small>Depois:</small>${tl}</div></div>
     <div class="cmd-g"><div class="cmd-me"><h2>${esc(c.name)}</h2>${['hp', 'aura', 'san', 'limit'].map(k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${c[k]}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`).join('')}
         <div class="sts">${c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(x => `<i>${x}</i>`).join('') || '<small>Sem condições.</small>' : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}</div></div>
       <div class="cmd-step"><h4><i>1</i>Alvo</h4><div class="tgs">${inB.map(tg).join('')}</div></div>
       <div class="cmd-step"><h4><i>2</i>Ação</h4><div class="seg" role="tablist">${[['atk', 'Atacar'], ['sk', `Skills <i>${sks.length}</i>`], ['it', `Itens <i>${cons.length}</i>`]].map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-sub="${k}">${l}</button>`).join('')}</div><div class="alist">${list}</div>
         ${canAim ? `<button class="ghost aimb ${aim ? 'on' : ''}" data-a="aimT" aria-expanded="${aimOpen}">${aim ? `Mira: ${PL[aim]} (−${AIMP[aim]}%)` : 'Mirar numa parte do corpo'}</button>${aimOpen ? aimBox() : ''}` : ''}</div></div>
+    ${fieldBar()}${rhythm}
     <div class="cmd-go ${wait ? 'wait' : ''}"><div class="sum"><small>${wait ? 'Aguardando o mestre' : 'Sua ação'}</small><b>${wait ? esc(rq.text) : `${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim && aim ? ` · ${PL[aim]}` : ''}`}</b></div>
       ${wait ? `<button data-a="reqNo" data-id="${rqId}">Cancelar pedido</button>` : `<button class="ghost" data-a="next" ${my ? '' : 'disabled'} title="Passa a vez gastando metade do tempo">Passar</button><button class="go" data-a="go" data-id="${c.id}" ${why ? 'disabled' : ''}>${why || askL('act', 'Agir')}</button>`}</div></section>`;
 }
@@ -468,6 +475,7 @@ function render() {
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
       <div class="row"><label>Casas na largura <input type="number" step="0.25" min="4" max="80" data-map="cols" value="${sc.cols}"></label><small>${Math.round(sc.rows * 10) / 10} de altura</small></div>
       <div class="row"><label>Grade → <input type="range" min="0" max="0.95" step="0.05" data-map="ox" value="${sc.ox}" aria-label="Deslocar grade na horizontal"></label><label>↓ <input type="range" min="0" max="0.95" step="0.05" data-map="oy" value="${sc.oy}" aria-label="Deslocar grade na vertical"></label></div>
+      <div class="row chips">Clima: <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
       <div class="row chips">Fundo da batalha: <span class="${sc.bbg ? '' : 'weak'}" data-a="map" data-f="bbg" data-v="" title="Usa a imagem do mapa desta cena">Mapa da cena</span>${chips(BBG, (k, l) => `<span class="${sc.bbg === k ? 'weak' : ''}" data-a="map" data-f="bbg" data-v="${k}">${l}</span>`)}</div>
       <div class="row"><input aria-label="Imagem própria para o fundo da batalha" data-map="bbg" placeholder="Ou cole o link de uma imagem" value="${esc(sc.bbg && !BBG[sc.bbg] ? sc.bbg : '')}"><label class="up">Enviar fundo<input type="file" accept="image/*" data-up="bbg"></label></div>
       <div class="row"><button data-a="camFix" title="Todos passam a ver o mapa com o seu zoom e posição atuais">Fixar minha vista para todos</button>${sc.cam ? '<button data-a="camFree" class="own">Liberar vista</button>' : ''}</div>
@@ -578,6 +586,7 @@ function fx() {
 app.addEventListener('change', e => {
   const el = e.target, d = el.dataset, v = el.type === 'number' || el.type === 'range' ? +el.value : el.type === 'checkbox' ? el.checked : el.value;
   if (el.tagName === 'SELECT' || el.type === 'file') el.blur();
+  if (d.a === 'passSel') { passTo = v; return; }
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
@@ -658,7 +667,8 @@ app.addEventListener('click', e => {
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
   if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
-  if (d.a === 'go') { if (pick.k === 'sk' && selfSk(S.skills[pick.id])) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.'); send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim }); aim = null; aimOpen = false; return; }
+  if (d.a === 'braveT') { braveOn = !braveOn; return render(); }
+  if (d.a === 'go') { if (pick.k === 'sk' && selfSk(S.skills[pick.id])) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.'); send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }); aim = null; aimOpen = false; braveOn = false; passTo = ''; return; }
   if (d.a === 'rollAsk') { rollDlg = { id: d.id, attr: d.attr }; return render(); }
   if (d.a === 'rollX') { rollDlg = null; return render(); }
   if (d.a === 'rollMod') { mods[rollDlg.id] = +d.v; return render(); }

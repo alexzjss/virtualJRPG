@@ -579,3 +579,14 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
 }
 @media(max-width:999px){.pl.pg-mesa .stage{min-height:0}.pl.pg-mesa .stage .field{padding-top:1cqw}.pl.pg-mesa main{gap:8px}}
 .tin{width:64px}
+
+/* sistemas de batalha: clima, Cadeia, Domínio, Quebra, Coragem e Tensão */
+.fbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.4rem 0;font-size:.8rem}
+.fbar span{padding:.15rem .55rem;border:1px solid currentColor;border-radius:99px;opacity:.9}
+.fbar .chain b{display:inline-block;vertical-align:middle;width:5.5rem;height:.5rem;margin:0 .35rem;border-radius:99px;background:linear-gradient(90deg,#f5c518 var(--p),rgba(255,255,255,.18) var(--p))}
+.fbar .dom{color:#ff7a59;font-weight:600}
+.brk,.rit{font-size:.7rem;letter-spacing:.04em;opacity:.9}
+.brk{color:#ffd24a}
+.rhythm{display:flex;flex-wrap:wrap;gap:.4rem;margin:.4rem 0}
+.rhythm button.on{outline:2px solid #f5c518}
+.rhythm .allout:not(:disabled){background:#e4002b;color:#fff}
