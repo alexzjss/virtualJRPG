@@ -139,7 +139,7 @@ const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.k
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 const sendState = c => c.role && c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
 // recalcula máximos de personagens e modelos antes de enviar o estado
-const prep = () => { Object.values(S.chars).forEach(derive); const hs = Object.values(S.chars).filter(c => !c.enemy && !c.summon); for (const c of hs) c.bondMax = Math.max(0, ...hs.filter(o => o !== c).map(o => bondLv(c, o))); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
+const prep = () => { Object.values(S.chars).forEach(derive); Object.values(S.chars).forEach(normSlots); const hs = Object.values(S.chars).filter(c => !c.enemy && !c.summon); for (const c of hs) c.bondMax = Math.max(0, ...hs.filter(o => o !== c).map(o => bondLv(c, o))); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
 // herói que caiu e voltou (cura, item, mestre) é reencaixado na fila logo após o tempo atual, sem tempo velho ou ausente
 const reseat = () => {
   const T = S.battle.ticks;
@@ -197,7 +197,17 @@ function breakCheck(ch) { // Sanidade em zero: teste de SAB. Falha = Aflição, 
   else { const k = pick(Object.keys(RU.AFL)); ch.afl = { t: 'a', k }; log(ch.name, `chega ao limite da mente (SAB ${target}% → ${r}): Aflição: ${RU.AFL[k][0]}. ${RU.AFL[k][1]}`, 'bad', { d: r, rr: { l: 'SAB', t: target, res: 'Falha', c: ch.id } }); }
 }
 // ---------- sistema de skills: passivas, modificadores, votos, transformações ----------
-const passOf = ch => (ch.skills || []).map(k => S.skills[k]).filter(s => s && s.kind === 'passive');
+// passivas lidas pelo motor (modificador, gatilho, voto, amplificação) ocupam slots: 4, mais 1 a cada 100 XP gasto em skills; as trocas são feitas no acampamento
+const slotted = s => s && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
+const spentXp = ch => (ch.skills || []).reduce((a, k) => a + (S.skills[k]?.xp || 0), 0);
+const slotMax = ch => 4 + Math.floor(spentXp(ch) / 100);
+function normSlots(ch) { // mantém só passivas aprendidas, respeita o limite e ocupa vagas livres na ordem em que foram aprendidas
+  if (ch.enemy || ch.summon) return;
+  const legacy = !Array.isArray(ch.pslots), max = slotMax(ch), own = (ch.skills || []).filter(k => slotted(S.skills[k]));
+  const keep = (ch.pslots || []).filter((k, i, l) => own.includes(k) && l.indexOf(k) === i).slice(0, max);
+  ch.pslots = [...keep, ...own.filter(k => !keep.includes(k) && (legacy || !(ch.pslotOff || []).includes(k)))].slice(0, max);
+}
+const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; return s && s.kind === 'passive' && (!slotted(s) || ch.enemy || ch.summon || !Array.isArray(ch.pslots) || ch.pslots.includes(k)); }).map(k => S.skills[k]);
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
 const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!s.req : s.el === sc;
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
@@ -320,8 +330,9 @@ function brkHit(t, n, by) { // barra de Quebra de chefes e elites: fraquezas a e
 function addChain(a, v) { if (!S.battle.active) return; const B = S.battle.chain ??= { h: 0, e: 0 }; B[sideOf(a)] = Math.min(100, B[sideOf(a)] + v); }
 function chainBurst(a) { // barra de Cadeia cheia: cada aliado ataca em seguida, com bônus crescente
   const B = S.battle.chain; if (!B || B[sideOf(a)] < 100) return;
-  B[sideOf(a)] = 0;
   const mates = battlers().filter(o => o.enemy === a.enemy && o.hp > 0 && !skipping(o) && !o.summon);
+  if (mates.length < 2) return; // sozinho não há sequência: a barra espera um aliado
+  B[sideOf(a)] = 0;
   log(a.name, 'CADEIA! O grupo ataca em sequência.', 'ok');
   mates.forEach((o, i) => { const f = battlers().filter(x => x.enemy !== a.enemy && x.hp > 0); if (f.length) strike(o, basicOf(o), pick(f), null, 0, { mult: 1 + .25 * i, nochain: true }); });
 }
@@ -937,14 +948,22 @@ const H = {
     if (!S.battle.active || !a || a.id !== m.id || !can(c, a)) return;
     doAct(a, m, c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0); // bônus ou penalidade dado pelo mestre ao aprovar
   },
+  pslot(c, m) { // liga ou desliga uma passiva ativa (só no acampamento ou pelo mestre, fora de batalha)
+    const ch = S.chars[m.id];
+    if (!can(c, ch) || ch.enemy || S.battle.active || !(c.role === 'gm' || S.camp.open) || !slotted(S.skills[m.skill]) || !ch.skills.includes(m.skill)) return;
+    normSlots(ch); ch.pslotOff ??= [];
+    if (ch.pslots.includes(m.skill)) { ch.pslots = ch.pslots.filter(k => k !== m.skill); ch.pslotOff.push(m.skill); log(ch.name, `desativa ${S.skills[m.skill].name}.`, ''); }
+    else if (ch.pslots.length < slotMax(ch)) { ch.pslots.push(m.skill); ch.pslotOff = ch.pslotOff.filter(k => k !== m.skill); log(ch.name, `ativa ${S.skills[m.skill].name} (${ch.pslots.length}/${slotMax(ch)}).`, 'ok'); }
+    normSlots(ch); // a vaga que sobrou é ocupada pela próxima passiva aprendida (desligue-a também para deixar vaga)
+  },
   learn(c, m) {
     const ch = S.chars[m.id], s = S.skills[m.skill];
     if (!can(c, ch) || !s || RU.whyNot(ch, s, S.skills, S.items, m.skill)) return;
     ch.xp -= RU.xpCost(ch, s);
     if (s.cat && !ch.nen) { ch.nen = s.cat; log(ch.name, `descobre sua natureza de Aura: ${RU.NENN[s.cat]}.`, 'ok'); }
     ch.skills.push(m.skill);
-    passive(ch, s, 1);
-    log(ch.name, `aprendeu ${s.name}`, 'ok');
+    passive(ch, s, 1); normSlots(ch);
+    log(ch.name, `aprendeu ${s.name}${slotted(s) && !ch.pslots.includes(m.skill) ? ' (sem slot livre: troque no acampamento)' : ''}`, 'ok');
   },
   // ----- itens -----
   give(c, m) { const ch = getCh(c, m.id); if (c.role === 'gm' && ch && Object.hasOwn(S.items, m.item)) ch.inv[m.item] = (ch.inv[m.item] || 0) + 1; },
@@ -1227,7 +1246,7 @@ wss.on('connection', c => {
 });
 prep();
 export { genFoe, partyRef, fitBoss, spawn };
-export { H, S, R, current, derive, modsOf };
+export { H, S, R, current, derive, modsOf, slotMax };
 export { view, order, handle };
 const isMain = SEA || process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {

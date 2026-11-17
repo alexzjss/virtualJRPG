@@ -590,3 +590,9 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
 .rhythm{display:flex;flex-wrap:wrap;gap:.4rem;margin:.4rem 0}
 .rhythm button.on{outline:2px solid #f5c518}
 .rhythm .allout:not(:disabled){background:#e4002b;color:#fff}
+
+.nd.plan>circle,.nd.plan>rect{stroke:#f5c518!important;stroke-width:3}
+.nd.hit>circle,.nd.hit>rect{stroke:#00e0ff!important;stroke-width:4;filter:drop-shadow(0 0 6px #00e0ff)}
+.route{display:block;margin:.4rem 0;color:#f5c518}
+.skreach a{cursor:pointer;text-decoration:underline}
+.skslots .tog:disabled{opacity:.6}
