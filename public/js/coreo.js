@@ -27,9 +27,15 @@ const SFXC = {
   perfect: () => [1319, 1568, 2093].forEach((f, i) => tone(f, .2, { type: 'triangle', g: .1, delay: i * .06 })),
   bf: () => { thud(.3, 90, .85); thud(.16, 3200, .4, 'highpass'); tone(120, .45, { type: 'sawtooth', to: 38, g: .12 }); },
   chq: () => { thud(.25, 140, .7); tone(220, .35, { type: 'square', to: 880, g: .07 }); },
+  tick: () => tone(1800, .03, { type: 'triangle', g: .12 }),
+  hit: () => { thud(.12, 900, .6); tone(220, .14, { type: 'square', to: 90, g: .1 }); },
+  miss: () => tone(180, .3, { type: 'sawtooth', to: 60, g: .09 }),
+  whoosh: () => { const c = actxGet(), s = noise(c), fl = c.createBiquadFilter(), g = c.createGain(), t = c.currentTime; fl.type = 'highpass'; fl.Q.value = .8; fl.frequency.setValueAtTime(500, t); fl.frequency.exponentialRampToValueAtTime(5500, t + .24); g.gain.setValueAtTime(.0002, t); g.gain.linearRampToValueAtTime(Math.max(.0002, .3 * level()), t + .07); g.gain.exponentialRampToValueAtTime(.0001, t + .28); s.connect(fl).connect(g).connect(c.destination); s.start(t); s.stop(t + .32); },
+  charge: v => tone(180 + 720 * Math.min(1, Math.max(0, v || 0)), .12, { type: 'sawtooth', g: .06 }),
+  boom: () => { thud(.5, 120, .9); tone(70, .5, { to: 35, g: .3 }); },
   win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i > 4 ? .7 : .16, { type: 'square', g: .07, delay: i * .11 })),
 };
-const sfxc = k => { if (snd.mute || !SFXC[k]) return; try { SFXC[k](); } catch {} };
+const sfxc = (k, v) => { if (snd.mute || !SFXC[k]) return; try { SFXC[k](v); } catch {} };
 const hitSfx = f => { if (typeof playSfx === 'function') playSfx(f.miss ? 'miss' : f.heal ? 'heal' : f.crit ? 'crit' : 'hit'); };
 
 function applyCine(fresh) { // foco da ação: o palco aproxima em quem age e nos alvos; o resto escurece
