@@ -64,12 +64,10 @@ export function buildItems(it) {
   add('Frasco de Ácido', 'cons', 22, { eff: 'bomb', el: 'radiacao', price: 35 }); add('Bomba de Sal Sagrado', 'cons', 24, { eff: 'bomb', el: 'amaterasu', price: 35 });
   // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)
   add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + n[el], 'mat', 0, { el, price: 20 }));
-  // armas em três níveis por tipo
-  [['lamina', 'Sabre de Cavalaria', 'Katana de Caçador', 'Lâmina Consagrada'], ['lanca', 'Baioneta', 'Lança de Caça', 'Alabarda Rúnica'], ['fogo', 'Revólver .38', 'Rifle de Ferrolho', 'Carabina Selada'], ['punho', 'Soqueira', 'Manoplas de Aço', 'Punhos de Talismã']]
-    .forEach(([wt, ...names]) => names.forEach((name, i) => add(name, 'arma', [10, 14, 19][i] + (wt === 'fogo') - (wt === 'punho'), { wt, price: [40, 120, 320][i] })));
-  // armas elementais: o ataque básico passa a ter o elemento
-  [['kagutsuchi', 'Sabre Flamejante', 'lamina'], ['susanoo', 'Arpão da Maré', 'lanca'], ['atlas', 'Manoplas de Atlas', 'punho'], ['indra', 'Rifle Tesla', 'fogo'], ['fuhaku', 'Leque de Lâminas', 'lamina'],
-    ['amaterasu', 'Lança Solar', 'lanca'], ['tsukuyomi', 'Adaga Lunar', 'lamina'], ['shukketsu', 'Bisturi Rubro', 'lamina'], ['radiacao', 'Pistola de Rádio', 'fogo']].forEach(([el, name, wt]) => add(name, 'arma', 15, { wt, el, price: 250 }));
+  // armas: catálogo enxuto. pierce = fração da armadura do alvo ignorada; reqFor = FOR mínima para equipar; grant = habilidade especial enquanto equipada (usada como skill 'wpn')
+  add('Florete', 'arma', 12, { wt: 'lamina', price: 60, pierce: .25 });
+  add('Perfuradora de Montanhas', 'arma', 24, { wt: 'lanca', price: 400, pierce: .5, reqFor: 70,
+    grant: { name: 'Perfurar Montanha', kind: 'dmg', attr: 'FOR', el: 'fis', power: 36, cost: 20, res: 'aura', st: '', area: false, ct: 150, limit: false, req: 'lanca', pierce: 1, reqFor: 85, d: 'Uma estocada que atravessa rocha e armadura como se não existissem.' } });
   // armaduras
   [['Casaco de Couro', 2, 40], ['Colete Reforçado', 4, 120], ['Sobretudo Selado', 5, 260], ['Couraça de Trincheira', 6, 300]].forEach(([name, p, price]) => add(name, 'armadura', p, { price }));
   // acessórios: amuletos (+10 no atributo) e relíquias dos patronos (+8 no atributo e resistência ao elemento)
@@ -119,7 +117,7 @@ export function buildBestiary(make) {
 
 // cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local
 export const SCENES = [
-  { name: 'Beco do Mercado Negro', bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura'],
+  { name: 'Beco do Mercado Negro', bg: '/maps/beco.svg', stock: ['Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura'],
     note: 'Encontros: 3 Bandidos + 1 Capanga da Máfia (emboscada); à noite, 2 Diabretes de Cinzas nos telhados. Armeiro vende sem perguntas; a botica é fachada de um Cultista.' },
   { name: 'Santuário Profanado', bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo'],
     note: 'Encontros: 2 Yurei + 1 Espectro da Trincheira; chefe opcional: Serafim Caído no altar. A fonte restaura Sanidade uma vez (mestre concede). Teste de horror ao entrar (perda 5).' },

@@ -2,13 +2,13 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
-const { H, S, current, derive, view, handle } = await import('../server.js');
+const { H, S, current, derive, view, handle, migrateItems } = await import('../server.js');
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
 const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, c.role === 'player' ? { ...m, owner: c.name } : m); /* só o mestre cria; o de jogador nasce com dono */ const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 
-test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, 581); assert.ok(Object.keys(S.items).length >= 50); });
+test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, 581); assert.ok(Object.keys(S.items).length >= 30); });
 test('grade: sem sobreposição; cada Vínculo alcança todos os seus nós passando só por ele e pelo tronco Marcial', () => {
   const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
   for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'radiacao']) {
@@ -23,7 +23,7 @@ test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e re
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), it = n => Object.keys(S.items).find(k => S.items[k].name === n);
   h.attrs.AGI = 95; e.attrs.AGI = 1; h.skills = [sk('Tiro Duplo')]; h.aura = 20; H.battle(gm, { on: true });
   H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.equal(h.aura, 20); // sem arma de fogo: recusado
-  h.inv[it('Revólver .38')] = 1; H.equip(ana, { id: h.id, item: it('Revólver .38') }); H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.ok(h.aura < 20);
+  S.items.tgun = { name: 'Revólver de Teste', type: 'arma', power: 10, wt: 'fogo', el: '', price: 1, eff: 'hp', attr: 'SOR', pierce: 0, reqFor: 0 }; h.inv.tgun = 1; H.equip(ana, { id: h.id, item: 'tgun' }); H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.ok(h.aura < 20);
   while (current() !== h.id) H.next(gm);
   h.inv[it('Granada')] = 1; const hp = e.hp; H.use(ana, { id: h.id, item: it('Granada'), target: e.id }); assert.equal(e.hp, hp - 28);
   reset(); const a = mk(ana, {}), b2 = mk(ana, {}); b2.hp = 0; a.inv[it('Sais Aromáticos')] = 1; H.battle(gm, { on: true }); b2.dying = 3; S.battle.ticks[b2.id] = 9999;
@@ -47,7 +47,7 @@ test('economia: loja por cena, contrato pago na vitória, forja com essências',
   const bid = Object.keys(S.bestiary).find(k => S.bestiary[k].name === 'Kappa'); H.ctAdd(gm, { id: bid, gold: 100, xp: 7 }); H.bSpawn(gm, { id: bid, tier: 'elite' });
   const foe = Object.values(S.chars).find(c => c.enemy); derive(foe); H.battle(gm, { on: true }); foe.hp = 0; h.gold = 0; h.xp = 0; H.battle(gm, { on: false, win: true });
   assert.ok(h.gold >= 100); assert.ok(h.xp >= 7); assert.equal(Object.values(S.contracts)[0].done, true);
-  const ess = it('Essência de Kagutsuchi'); h.inv[ess] = 3; h.gold = 125; H.forge(ana, { id: h.id, item: it('Sabre Flamejante') }); assert.equal(h.inv[it('Sabre Flamejante')], 1); assert.equal(h.inv[ess], undefined); assert.equal(h.gold, 0);
+  S.items.tfire = { name: 'Sabre de Teste', type: 'arma', power: 15, wt: 'lamina', el: 'kagutsuchi', price: 250, eff: 'hp', attr: 'SOR', pierce: 0, reqFor: 0 }; const ess = it('Essência de Kagutsuchi'); h.inv[ess] = 3; h.gold = 125; H.forge(ana, { id: h.id, item: 'tfire' }); assert.equal(h.inv.tfire, 1); assert.equal(h.inv[ess], undefined); assert.equal(h.gold, 0);
 });
 test('cenas de exemplo com loja própria e perseguição que termina', () => {
   reset(); assert.ok(Object.values(S.scenes).some(s => s.name === 'Estação Central' && s.shop.stock.length && s.bg === '/maps/estacao.svg'));
@@ -184,3 +184,39 @@ test('heróis acompanham a troca de cena; inimigos ficam', () => {
   assert.equal(h.scene, S.scene); assert.equal(e.scene, a); assert.notEqual(a, S.scene);
 });
 test.after(() => setTimeout(() => process.exit(0), 50));
+
+const itemKey = n => Object.keys(S.items).find(k => S.items[k].name === n);
+const duel = (wpn, armor = 10) => { // ataque básico determinístico: devolve o dano causado
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 95; h.attrs.FOR = 90; e.attrs.AGI = 1; e.armor = armor; e.hp = e.hpMax = 500;
+  S.items.tw = { name: 'Arma de Teste', type: 'arma', power: 20, wt: 'lamina', el: '', price: 1, eff: 'hp', attr: 'SOR', pierce: 0, reqFor: 0, ...wpn }; h.inv.tw = 1; H.equip(ana, { id: h.id, item: 'tw' });
+  H.battle(gm, { on: true }); while (current() !== h.id) H.next(gm);
+  const rnd = Math.random; Math.random = () => .5; try { H.act(ana, { id: h.id, skill: 'atk', target: e.id }); } finally { Math.random = rnd; }
+  return 500 - e.hp;
+};
+test('perfuração: a arma ignora a fração da armadura do alvo, e o dano nunca cai abaixo de 1', () => {
+  const base = duel({}), meio = duel({ pierce: .5 }), todo = duel({ pierce: 1 });
+  assert.ok(base > 0); assert.equal(meio - base, 5); assert.equal(todo - base, 10);
+  assert.ok(duel({ pierce: 1, power: 1 }, 99) >= 1);
+});
+test('Perfuradora de Montanhas: FOR 70 para equipar; "Perfurar Montanha" só equipada e com FOR 85', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), k = itemKey('Perfuradora de Montanhas'); assert.ok(k);
+  const p = S.items[k]; assert.equal(p.wt, 'lanca'); assert.equal(p.power, 24); assert.equal(p.price, 400); assert.equal(p.pierce, .5); assert.equal(p.reqFor, 70); assert.equal(p.grant.pierce, 1);
+  h.inv[k] = 1; h.attrs.FOR = 69; H.equip(ana, { id: h.id, item: k }); assert.equal(h.equip.arma, undefined);
+  h.attrs.FOR = 70; H.equip(ana, { id: h.id, item: k }); assert.equal(h.equip.arma, k);
+  h.attrs.AGI = 95; e.attrs.AGI = 1; e.armor = 10; e.hp = e.hpMax = 500; h.aura = h.auraMax = 100; H.battle(gm, { on: true }); while (current() !== h.id) H.next(gm);
+  h.attrs.FOR = 84; H.act(ana, { id: h.id, skill: 'wpn', target: e.id }); assert.equal(h.aura, 100); // FOR insuficiente
+  h.attrs.FOR = 85; H.act(ana, { id: h.id, skill: 'wpn', target: e.id }); assert.ok(h.aura < 100); // gastou aura
+  while (current() !== h.id) H.next(gm);
+  H.equip(ana, { id: h.id, item: k }); const aura = h.aura; H.act(ana, { id: h.id, skill: 'wpn', target: e.id }); assert.equal(h.aura, aura); // desequipada: some
+});
+test('catálogo: só Florete e Perfuradora; migração troca armas antigas por Florete', () => {
+  const armas = Object.values(S.items).filter(i => i.type === 'arma').map(i => i.name).filter(n => !/de Teste$/.test(n));
+  assert.deepEqual(armas.sort(), ['Florete', 'Perfuradora de Montanhas']);
+  const f = S.items[itemKey('Florete')]; assert.equal(f.wt, 'lamina'); assert.equal(f.power, 12); assert.equal(f.price, 60); assert.equal(f.pierce, .25); assert.equal(f.reqFor, 0);
+  reset(); const h = mk(ana, {}); S.items.velha = { name: 'Velha', type: 'arma', power: 10, wt: 'lamina', price: 1 }; const tk = itemKey('Tônico'); h.inv.velha = 2; h.inv.fantasma = 1; h.inv[tk] = 3; h.equip.arma = 'velha'; S.itemsV = 1;
+  S.items = { velha: S.items.velha, oldT: { ...S.items[tk] } }; delete h.inv[tk]; h.inv.oldT = 3; Object.values(S.scenes)[0].shop.stock = ['velha', 'oldT'];
+  migrateItems(); const fk = itemKey('Florete'); assert.equal(h.inv[itemKey('Tônico')], 3); assert.deepEqual(Object.values(S.scenes)[0].shop.stock, [itemKey('Tônico')]);
+  assert.equal(S.itemsV, 2); assert.equal(h.equip.arma, fk); assert.equal(h.inv[fk], 2); assert.equal(h.inv.velha, undefined); assert.equal(S.items.velha, undefined);
+  for (const sc of Object.values(S.scenes)) for (const k of sc.shop.stock) assert.ok(S.items[k], 'loja com item inexistente: ' + k);
+  const heroes = Object.values(S.chars); assert.ok(heroes.every(c => !c.equip.arma || S.items[c.equip.arma]));
+});
