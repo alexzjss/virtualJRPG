@@ -5,21 +5,18 @@ Os jogadores não instalam nada: recebem um link, digitam login e senha e jogam 
 Tudo o que um faz aparece na hora para os outros e para o mestre.
 
 ```
-Jogador ──link──▶ página de entrada (GitHub Pages, fixa)
-                    │ código da sessão
-                    ▼
+Jogador ──link do convite──▶
           https://<código>.trycloudflare.com  ◀── túnel gratuito ── programa do mestre (seu PC, pasta data/)
 ```
 
-> O túnel gratuito do Cloudflare (`trycloudflare.com`) não tem conta, nem garantia de funcionamento, e muda de endereço a cada vez. Por isso existe o código da sessão.
+> O túnel gratuito do Cloudflare (`trycloudflare.com`) não tem conta, nem garantia de funcionamento, e muda de endereço a cada vez. Por isso o convite é copiado de novo a cada sessão.
 
 ## Mestre: preparar uma vez
 
 1. **Baixe o programa.** No GitHub do projeto, abra **Releases** e baixe o `.zip` do seu sistema (`windows-x64`, `linux-x64` ou `macos-arm64`). Extraia numa pasta sua.
    - Windows: se aparecer "PC protegido", clique em **Mais informações → Executar assim mesmo** (o programa não é assinado).
    - macOS: na primeira vez, botão direito → **Abrir**. Macs com processador Intel não têm programa pronto: use `npm start` (abaixo).
-2. **Ative a página de entrada** (só quem mantém o repositório, uma vez): no GitHub, **Settings → Pages → Build and deployment → Deploy from a branch**, escolha `main` e a pasta `/docs`, e salve. Em alguns minutos a página fica em `https://alexzjss.github.io/virtualJRPG/`.
-   Se usar outro endereço (um fork, por exemplo), defina a variável `VJ_PORTAL` com ele ao abrir o programa.
+2. **Página de entrada (opcional).** Não é preciso publicar nada: o convite da janela Sessão já leva direto ao link do túnel. Quem quiser um endereço fixo pode publicar a pasta `/docs` no GitHub Pages e abrir o programa com a variável `VJ_PORTAL` apontando para ela; aí o convite passa a usar o código da sessão.
 3. **Abra o programa** (dois cliques em `virtualJRPG`). A janela mostra a **chave do mestre** (também em `data/gm-key.txt`). Na primeira vez ele baixa o `cloudflared` (cerca de 30 MB) para a pasta `data/`.
 4. Abra `http://localhost:3000/gm` e entre com a chave.
 5. Na janela **Sessão**, crie **uma conta para cada jogador**: login (sem espaços), senha (vazia = o jogo sorteia uma) e o personagem dela. Clique em **Copiar acesso** e mande **só para aquele jogador**, em particular.

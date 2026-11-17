@@ -32,5 +32,7 @@ if not exist data\gm-key.txt node -e "console.log(require('crypto').randomBytes(
 set /p GM_KEY=<data\gm-key.txt
 
 :subir
+rem "iniciar.bat offline" (ou o arquivo iniciar-sem-internet.bat) nao abre o tunel: so este computador e a rede Wi-Fi entram.
+if /i "%~1"=="offline" set VJ_TUNNEL=0
 node server.js
 pause

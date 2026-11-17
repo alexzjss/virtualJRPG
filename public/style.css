@@ -578,3 +578,14 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
 }
 @media(max-width:999px){.pl.pg-mesa .stage{min-height:0}.pl.pg-mesa .stage .field{padding-top:1cqw}.pl.pg-mesa main{gap:8px}}
 .tin{width:64px}
+
+/* extras: marcadores do mapa, medição de área, som e janela Campanha */
+.pin{position:absolute;left:calc((var(--x) + .5)*100%/var(--cols));top:calc((var(--y) + .5)*100%/var(--rows));width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--gold);border:2px solid var(--ink);z-index:3;cursor:default}
+.pin b{position:absolute;left:14px;top:-16px;transform:rotate(45deg);transform-origin:0 100%;background:var(--ink);color:var(--paper);border:1px solid var(--gold);padding:1px 6px;white-space:nowrap;font:600 12px var(--cond)}
+.pin.gmo{background:var(--red)}.pin.gmo b{border-color:var(--red);border-style:dashed}body[data-role=gm] .pin{cursor:pointer}
+.rul rect{fill:#ffc93c22;stroke:var(--gold);stroke-width:2}
+.sndbox{position:fixed;right:8px;bottom:8px;z-index:300;display:flex;gap:4px;align-items:center;background:var(--ink);border:1px solid var(--line);padding:4px;opacity:.55;transition:opacity .15s}.sndbox:hover,.sndbox:focus-within{opacity:1}
+.sndbox button{min-height:28px;padding:2px 8px;font-size:12px}.sndbox input{width:70px}
+body[data-role=player] .sndbox{bottom:auto;top:58px}
+.xrow{justify-content:space-between;align-items:center}.xrow b,.xrow small{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.bklist{max-height:220px;overflow:auto}
+body[data-role=gm] .sndbox{bottom:64px}

@@ -5,15 +5,38 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 
 **Jeito rápido, sem executável:** dê dois cliques em `iniciar.bat` (Windows) ou rode `./iniciar.sh` (Linux/macOS). Os scripts instalam as dependências na primeira vez, criam a chave do mestre em `data/gm-key.txt` e sobem o servidor com o túnel do Cloudflare. Precisam do Node.js 22 ou mais novo.
 
-- `/gm` — painel do mestre (chave padrão `mestre`; troque com `GM_KEY`). A janela **Sessão** cria as contas e copia o convite.
+- `/gm` — painel do mestre (a chave é sorteada na primeira vez e fica em `data/gm-key.txt`; para usar a sua, defina `GM_KEY`). A janela **Sessão** cria as contas e copia o convite.
 - `/player` — fichas do jogador (login e senha criados pelo mestre)
 - `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura; entra com a conta de um jogador ou login `mestre` + chave
-- `docs/index.html` — página fixa de entrada (GitHub Pages): o jogador digita o código da sessão, o login e a senha
+- `docs/index.html` — página de entrada opcional (GitHub Pages). Só é usada se você definir `VJ_PORTAL`; sem isso o convite já leva direto ao link do túnel e nada precisa ser publicado
 
 Ao iniciar, o servidor abre sozinho um túnel gratuito do Cloudflare (baixa o `cloudflared` na primeira vez) e mostra o **código da sessão**. Veja `GUIA-RODAR.md`.
 
 Chat: texto livre, `/r 2d6+1` para rolar, `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
+
+## Uso pessoal, direto do seu computador
+Nada precisa ser publicado no GitHub: baixe (ou clone) a pasta e rode dela.
+- **Com internet para os jogadores:** dois cliques em `iniciar.bat` (ou `./iniciar.sh`). O painel do mestre abre sozinho no navegador, já com a chave. Na janela **Sessão**, "Copiar convite" entrega o link direto do túnel.
+- **Só neste computador e na rede Wi-Fi:** dois cliques em `iniciar-sem-internet.bat` (ou `./iniciar.sh offline`, ou `npm run offline`). Não baixa nem abre túnel.
+- `VJ_OPEN=0` não abre o navegador sozinho. `npm run exe` gera o executável único em `dist/`, se quiser um.
+
+## Campanhas, diário e cópias de segurança
+Janela **Campanha** do mestre:
+- **Guardar**, **Nova campanha** e **Abrir** trocam de campanha sem fechar o programa (ficam em `data/campanhas/`). As contas dos jogadores valem para todas.
+- **Exportar / Importar arquivo** leva uma campanha inteira para outro computador (as senhas não vão no arquivo).
+- **Diário**: tudo o que é público no histórico fica em `data/diario/`, sem o limite de linhas do chat. "Marcar início de sessão" separa as sessões.
+- **Pacote de conteúdo**: skills, itens, bestiário e encontros num arquivo. Ao importar, o que tem o mesmo nome é atualizado e o resto é somado.
+- **Cópias de segurança**: ao iniciar, a cada 10 minutos (se algo mudou), antes de trocar de campanha e no botão "Copiar agora". Guarda as 30 mais recentes; "Restaurar" volta a qualquer uma.
+
+## Mapa e som
+- Janela **Cena**: névoa com "Revelar tudo" / "Esconder tudo" e pincel de 1×1 a 7×7, grade visível ou oculta, metros por casa.
+- Régua: Alt+arrastar; com Shift mede área. Marcador: Ctrl+clique no mapa (Ctrl+Shift+clique cria um que só o mestre vê).
+- Janela **Som**: trilha por link ou arquivo enviado (MP3, OGG, WAV, M4A até 40 MB), lista de faixas, trilha própria por cena, ambiências e efeitos prontos (sintetizados, sem arquivos). Todos ouvem em sincronia; cada pessoa ajusta ou silencia o próprio volume no canto da tela. Golpes, críticos, erros e curas também têm som.
+
+## Organização do código
+- `server.js` é só a entrada. `src/config.js` (caminhos, chave), `consts.js` (tabelas de regras), `state.js` (estado, migrações, gravação), `rules.js` (combate, inimigos, fila), `handlers.js` (ações dos clientes), `net.js` (HTTP e WebSocket), `auth.js`, `seed.js`, `campaign.js` (campanhas, cópias, diário, pacotes) e `media.js` (som e extras do mapa).
+- `public/js/`: `nucleo.js` (constantes, login, conexão), `sessao.js`, `palco.js` (batalha e mapa), `mestre.js` (janelas do mestre), `paginas.js` (telas do jogador), `tela.js` (desenho e efeitos), `extras.js` (Campanha, Som, marcadores) e `eventos.js`. São scripts comuns carregados nessa ordem.
 
 ## Pedidos e aprovação do mestre
 Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, itens fora de combate (usar, equipar, comprar, vender, forjar, descartar) e ações de acampamento do jogador viram **pedidos**. Mover o token e passar a vez não pedem aprovação.

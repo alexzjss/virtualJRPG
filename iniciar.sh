@@ -25,4 +25,7 @@ if [ -z "$GM_KEY" ]; then
   export GM_KEY
 fi
 
+# ./iniciar.sh offline: sem túnel, só este computador e a rede Wi-Fi
+[ "$1" = "offline" ] && export VJ_TUNNEL=0
+
 exec node server.js

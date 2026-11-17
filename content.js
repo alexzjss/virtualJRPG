@@ -53,28 +53,51 @@ export function buildSkills(sk) {
   return G;
 }
 
+// versão do catálogo; saves em versão menor passam por migrateItems (state.js)
+export const ITEMS_V = 3;
+// nomes do catálogo v2 → v3, para a migração manter inventários e lojas (relíquias entram logo abaixo)
+export const RENAME = { 'Tônico': 'Poção', 'Tônico Forte': 'Líquido Dourado do Sanatório', 'Elixir Vital': 'Elixir de Flamel', 'Éter de Aura': 'Cubo de Shinkai', 'Éter Concentrado': 'Cristal de Mikhail',
+  'Calmante': 'Pedra de Sal Purificado', 'Láudano': 'Remédio do Sanatório', 'Antídoto': 'Antídoto do TN-1', 'Atadura': 'Bálsamo de Hermione', 'Sais Aromáticos': 'Pena de Fênix',
+  'Granada': 'Bomba do Feiticeiro', 'Coquetel Incendiário': 'Frasco de Chamas Carmesim', 'Frasco de Ácido': 'Veneno TN-1', 'Bomba de Sal Sagrado': 'Bomba de Sal Purificado',
+  'Casaco de Couro': 'Mantos Negros do Esquadrão', 'Colete Reforçado': 'Trajes de Rangers', 'Sobretudo Selado': 'Armadura de Atena', 'Couraça de Trincheira': 'Armadura de Micael',
+  'Bracelete do Touro': 'Bracelete de Meteoro Branco', 'Cinto do Urso': 'Runas de Hermione', 'Luvas do Relojoeiro': 'Medalhão dos Kodama', 'Botas do Mensageiro': 'Runa de Viagem', 'Monóculo do Erudito': 'Codex da Antiga Realidade',
+  'Rosário Antigo': 'Medalhão do Mentor', 'Broche de Prata': 'Medalhão dos Kodama', 'Amuleto da Sorte': 'Amuleto de EXP' };
+const RELIC = { kagutsuchi: ['Dino-Pedra Vermelha', 'FOR'], susanoo: ['Dino-Pedra Azul', 'AGI'], atlas: ['Dino-Pedra Amarela', 'CON'], indra: ['Dino-Pedra Dourada', 'DES'], fuhaku: ['Dino-Pedra Verde', 'AGI'],
+  amaterasu: ['Dino-Pedra Branca', 'SAB'], tsukuyomi: ['Dino-Pedra Preta', 'INT'], shukketsu: ['Dino-Pedra Carmesim', 'CON'], radiacao: ['Pedra Filosofal', 'SOR'] };
+EL9.forEach(el => { RENAME['Relíquia de ' + PATRON[el]] = RELIC[el][0]; });
+
 export function buildItems(it) {
-  const L = [], add = (...a) => L.push(it(...a)), n = PATRON;
-  // consumíveis
-  add('Tônico', 'cons', 20, { price: 10 }); add('Tônico Forte', 'cons', 45, { price: 30 }); add('Elixir Vital', 'cons', 90, { price: 80 });
-  add('Éter de Aura', 'cons', 15, { eff: 'aura', price: 12 }); add('Éter Concentrado', 'cons', 35, { eff: 'aura', price: 40 });
-  add('Calmante', 'cons', 10, { eff: 'san', price: 15 }); add('Láudano', 'cons', 25, { eff: 'san', price: 50 });
-  add('Antídoto', 'cons', 0, { eff: 'cure', price: 15 }); add('Atadura', 'cons', 30, { eff: 'body', price: 12 }); add('Sais Aromáticos', 'cons', 20, { eff: 'rev', price: 60 });
-  add('Granada', 'cons', 28, { eff: 'bomb', el: 'fis', price: 35 }); add('Coquetel Incendiário', 'cons', 25, { eff: 'bomb', el: 'kagutsuchi', price: 35 });
-  add('Frasco de Ácido', 'cons', 22, { eff: 'bomb', el: 'radiacao', price: 35 }); add('Bomba de Sal Sagrado', 'cons', 24, { eff: 'bomb', el: 'amaterasu', price: 35 });
+  const L = [], add = (...a) => L.push(it(...a));
+  // consumíveis (um de cada efeito: hp, aura, san, cure, body, rev e bombas por elemento)
+  add('Poção', 'cons', 20, { price: 10 }); add('Líquido Dourado do Sanatório', 'cons', 45, { price: 30 }); add('Elixir de Flamel', 'cons', 90, { price: 80 });
+  add('Cubo de Shinkai', 'cons', 15, { eff: 'aura', price: 12 }); add('Cristal de Mikhail', 'cons', 35, { eff: 'aura', price: 40 });
+  add('Pedra de Sal Purificado', 'cons', 10, { eff: 'san', price: 15 }); add('Remédio do Sanatório', 'cons', 25, { eff: 'san', price: 50 });
+  add('Antídoto do TN-1', 'cons', 0, { eff: 'cure', price: 15 }); add('Bálsamo de Hermione', 'cons', 30, { eff: 'body', price: 12 }); add('Pena de Fênix', 'cons', 20, { eff: 'rev', price: 60 });
+  add('Bomba do Feiticeiro', 'cons', 28, { eff: 'bomb', el: 'fis', price: 35 }); add('Frasco de Chamas Carmesim', 'cons', 25, { eff: 'bomb', el: 'kagutsuchi', price: 35 });
+  add('Veneno TN-1', 'cons', 22, { eff: 'bomb', el: 'radiacao', price: 35 }); add('Bomba de Sal Purificado', 'cons', 24, { eff: 'bomb', el: 'amaterasu', price: 35 });
+  add('Frasco Roxo', 'cons', 25, { eff: 'bomb', el: 'indra', price: 35 });
   // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)
-  add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + n[el], 'mat', 0, { el, price: 20 }));
-  // armas: catálogo enxuto. pierce = fração da armadura do alvo ignorada; reqFor = FOR mínima para equipar; grant = habilidade especial enquanto equipada (usada como skill 'wpn')
+  add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + PATRON[el], 'mat', 0, { el, price: 20 }));
+  // armas. pierce = fração da armadura do alvo ignorada; reqFor = FOR mínima para equipar; grant = habilidade especial enquanto equipada (usada como skill 'wpn')
   add('Florete', 'arma', 12, { wt: 'lamina', price: 60, pierce: .25 });
   add('Perfuradora de Montanhas', 'arma', 24, { wt: 'lanca', price: 400, pierce: .5, reqFor: 70,
     grant: { name: 'Perfurar Montanha', kind: 'dmg', attr: 'FOR', el: 'fis', power: 36, cost: 20, res: 'aura', st: '', area: false, ct: 150, limit: false, req: 'lanca', pierce: 1, reqFor: 85, d: 'Uma estocada que atravessa rocha e armadura como se não existissem.' } });
+  [['lamina', [['Katana de Madeira', 6, 15], ['Faca de Osso', 8, 30], ['Adaga de Osso', 8, 30], ['Adaga dos Black', 9, 40], ['Katana Enferrujada', 10, 50], ['Sai Gêmeos', 12, 90, .15], ['Sabre Verde do Mestre Tolko', 13, 110],
+      ['Cortadora de Mares', 14, 120], ['Retalhadora de Nuvens', 14, 120], ['Espada das Rosas', 15, 150], ['Katana de Ekklai', 15, 150], ['Lâmina dos Caídos', 15, 150], ['Martelo', 15, 140], ['Espada Celeste do Trovão', 16, 180],
+      ['Katana de Azrael', 16, 180], ['Katana Branca', 16, 180], ['Sabre de Aura', 16, 200], ['Machado', 16, 200], ['Espada Branca do Trovão', 17, 220], ['Lâmina Duo da Tempestade', 17, 220], ['Espada Rubra', 17, 280, .3],
+      ['Katana de Musashi', 18, 260], ['Espada de Iffrit', 18, 300], ['Espada do Sangue Negro', 18, 300], ['Espada que Corta as Estrelas', 21, 480], ['Lágrima de Raijin', 22, 500, .25]]],
+    ['lanca', [['Alabarda Dourada', 17, 260], ['Lança de Raijin', 19, 380], ['Lança da Criação', 20, 400], ['Lança do Empalador do Abismo', 20, 420, .35]]],
+    ['fogo', [['Varinha', 10, 100], ['Web-shooter de Sangue', 9, 120], ['Revólver', 11, 100], ['Cajado Solarie', 12, 150], ['Revólver de Cano Duplo', 13, 160], ['Colt de Samuel Colt', 14, 220], ['Espingarda de Cano Curto', 15, 180],
+      ['Rifle de Precisão', 16, 240, .2], ['Arco de Ra', 17, 300], ['Canhão de Vento Gélido', 17, 300], ['Canhão de Aura', 18, 320]]],
+    ['punho', [['Luvas de Absorção Elétrica', 11, 120], ['Manopla Melhorada', 12, 120], ['Manoplas de Kagutsuchi', 16, 260]]]]
+    .forEach(([wt, ws]) => ws.forEach(([name, p, price, pierce = 0]) => add(name, 'arma', p, { wt, price, pierce })));
   // armaduras
-  [['Casaco de Couro', 2, 40], ['Colete Reforçado', 4, 120], ['Sobretudo Selado', 5, 260], ['Couraça de Trincheira', 6, 300]].forEach(([name, p, price]) => add(name, 'armadura', p, { price }));
-  // acessórios: amuletos (+10 no atributo) e relíquias dos patronos (+8 no atributo e resistência ao elemento)
-  [['FOR', 'Bracelete do Touro'], ['CON', 'Cinto do Urso'], ['DES', 'Luvas do Relojoeiro'], ['AGI', 'Botas do Mensageiro'], ['INT', 'Monóculo do Erudito'], ['SAB', 'Rosário Antigo'], ['CAR', 'Broche de Prata'], ['SOR', 'Amuleto da Sorte']]
+  [['Mantos Negros do Esquadrão', 2, 40], ['Trajes Negros de Jack', 3, 90], ['Trajes de Rangers', 4, 120], ['Manto Trovejante', 4, 200], ['Asa-Branca', 5, 260], ['Armadura de Atena', 5, 280], ['Armadura de Micael', 6, 320], ['Armadura Castiel', 6, 340]]
+    .forEach(([name, p, price]) => add(name, 'armadura', p, { price }));
+  // acessórios: talismãs (+10 no atributo) e as pedras dos patronos (+8 no atributo e resistência ao elemento)
+  [['SOR', 'Amuleto de EXP'], ['CON', 'Runas de Hermione'], ['SAB', 'Medalhão do Mentor'], ['INT', 'Codex da Antiga Realidade'], ['AGI', 'Runa de Viagem'], ['FOR', 'Bracelete de Meteoro Branco'], ['CAR', 'Medalhão dos Kodama'], ['INT', 'Chave de Salomão']]
     .forEach(([attr, name]) => add(name, 'acess', 10, { attr, price: 60 }));
-  [['kagutsuchi', 'FOR'], ['susanoo', 'AGI'], ['atlas', 'CON'], ['indra', 'DES'], ['fuhaku', 'AGI'], ['amaterasu', 'SAB'], ['tsukuyomi', 'INT'], ['shukketsu', 'CON'], ['radiacao', 'SOR']]
-    .forEach(([el, attr]) => add('Relíquia de ' + n[el], 'acess', 8, { attr, el, price: 400 }));
+  EL9.forEach(el => add(RELIC[el][0], 'acess', 8, { attr: RELIC[el][1], el, price: 400 }));
   return Object.fromEntries(L.map((x, i) => ['i' + i, x]));
 }
 
@@ -117,11 +140,11 @@ export function buildBestiary(make) {
 
 // cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local
 export const SCENES = [
-  { name: 'Beco do Mercado Negro', bg: '/maps/beco.svg', stock: ['Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura'],
+  { name: 'Beco do Mercado Negro', bg: '/maps/beco.svg', stock: ['Mantos Negros do Esquadrão', 'Bomba do Feiticeiro', 'Frasco de Chamas Carmesim', 'Poção', 'Antídoto do TN-1', 'Bálsamo de Hermione'],
     note: 'Encontros: 3 Bandidos + 1 Capanga da Máfia (emboscada); à noite, 2 Diabretes de Cinzas nos telhados. Armeiro vende sem perguntas; a botica é fachada de um Cultista.' },
-  { name: 'Santuário Profanado', bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo'],
+  { name: 'Santuário Profanado', bg: '/maps/santuario.svg', stock: ['Pedra de Sal Purificado', 'Bomba de Sal Purificado', 'Medalhão do Mentor'],
     note: 'Encontros: 2 Yurei + 1 Espectro da Trincheira; chefe opcional: Serafim Caído no altar. A fonte restaura Sanidade uma vez (mestre concede). Teste de horror ao entrar (perda 5).' },
-  { name: 'Estação Central', bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Colete Reforçado'],
+  { name: 'Estação Central', bg: '/maps/estacao.svg', stock: ['Poção', 'Líquido Dourado do Sanatório', 'Cubo de Shinkai', 'Antídoto do TN-1', 'Trajes de Rangers'],
     note: 'Encontros: 2 Soldados Desertores + 1 Autômato Possuído no depósito; Golem de Sucata na locomotiva. Boa cena para iniciar uma perseguição (automóvel contra motocicleta).' },
   { name: 'Mansão Ashworth', bg: '/maps/mansao.svg', stock: [],
     note: 'Encontros: Cultistas (3) na capela + Ocultista na biblioteca; Súcubo no salão. Chefe: Condessa Escarlate (ponto fraco: torso). Use névoa de guerra e revele cômodo a cômodo.' },

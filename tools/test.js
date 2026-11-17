@@ -25,9 +25,9 @@ test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e re
   H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.equal(h.aura, 20); // sem arma de fogo: recusado
   S.items.tgun = { name: 'Revólver de Teste', type: 'arma', power: 10, wt: 'fogo', el: '', price: 1, eff: 'hp', attr: 'SOR', pierce: 0, reqFor: 0 }; h.inv.tgun = 1; H.equip(ana, { id: h.id, item: 'tgun' }); H.act(ana, { id: h.id, skill: sk('Tiro Duplo'), target: e.id }); assert.ok(h.aura < 20);
   while (current() !== h.id) H.next(gm);
-  h.inv[it('Granada')] = 1; const hp = e.hp; H.use(ana, { id: h.id, item: it('Granada'), target: e.id }); assert.equal(e.hp, hp - 28);
-  reset(); const a = mk(ana, {}), b2 = mk(ana, {}); b2.hp = 0; a.inv[it('Sais Aromáticos')] = 1; H.battle(gm, { on: true }); b2.dying = 3; S.battle.ticks[b2.id] = 9999;
-  H.use(ana, { id: a.id, item: it('Sais Aromáticos'), target: b2.id }); assert.equal(b2.hp, 20);
+  h.inv[it('Bomba do Feiticeiro')] = 1; const hp = e.hp; H.use(ana, { id: h.id, item: it('Bomba do Feiticeiro'), target: e.id }); assert.equal(e.hp, hp - 28);
+  reset(); const a = mk(ana, {}), b2 = mk(ana, {}); b2.hp = 0; a.inv[it('Pena de Fênix')] = 1; H.battle(gm, { on: true }); b2.dying = 3; S.battle.ticks[b2.id] = 9999;
+  H.use(ana, { id: a.id, item: it('Pena de Fênix'), target: b2.id }); assert.equal(b2.hp, 20);
 });
 test('chefe: ponto fraco dobra o dano, controle dura 1 turno, fúria invoca lacaios', () => {
   reset(); const h = mk(ana, {}), bid = Object.keys(S.bestiary).find(k => S.bestiary[k].boss); H.bSpawn(gm, { id: bid });
@@ -42,8 +42,8 @@ test('chefe: ponto fraco dobra o dano, controle dura 1 turno, fúria invoca laca
 });
 test('economia: loja por cena, contrato pago na vitória, forja com essências', () => {
   reset(); S.contracts = {}; const h = mk(ana, {}), it = n => Object.keys(S.items).find(k => S.items[k].name === n), a = S.scene;
-  H.shop(gm, { f: 'open', v: 1 }); H.shop(gm, { item: it('Tônico') }); h.gold = 10; H.buy(ana, { id: h.id, item: it('Tônico') }); assert.equal(h.inv[it('Tônico')], 1);
-  H.sceneAdd(gm); h.gold = 10; H.buy(ana, { id: h.id, item: it('Tônico') }); assert.equal(h.inv[it('Tônico')], 1); H.sceneGo(gm, { id: a }); // outra cena: loja fechada
+  H.shop(gm, { f: 'open', v: 1 }); H.shop(gm, { item: it('Poção') }); h.gold = 10; H.buy(ana, { id: h.id, item: it('Poção') }); assert.equal(h.inv[it('Poção')], 1);
+  H.sceneAdd(gm); h.gold = 10; H.buy(ana, { id: h.id, item: it('Poção') }); assert.equal(h.inv[it('Poção')], 1); H.sceneGo(gm, { id: a }); // outra cena: loja fechada
   const bid = Object.keys(S.bestiary).find(k => S.bestiary[k].name === 'Kappa'); H.ctAdd(gm, { id: bid, gold: 100, xp: 7 }); H.bSpawn(gm, { id: bid, tier: 'elite' });
   const foe = Object.values(S.chars).find(c => c.enemy); derive(foe); H.battle(gm, { on: true }); foe.hp = 0; h.gold = 0; h.xp = 0; H.battle(gm, { on: false, win: true });
   assert.ok(h.gold >= 100); assert.ok(h.xp >= 7); assert.equal(Object.values(S.contracts)[0].done, true);
@@ -209,14 +209,54 @@ test('Perfuradora de Montanhas: FOR 70 para equipar; "Perfurar Montanha" só equ
   while (current() !== h.id) H.next(gm);
   H.equip(ana, { id: h.id, item: k }); const aura = h.aura; H.act(ana, { id: h.id, skill: 'wpn', target: e.id }); assert.equal(h.aura, aura); // desequipada: some
 });
-test('catálogo: só Florete e Perfuradora; migração troca armas antigas por Florete', () => {
+test('catálogo v3: armas da campanha, Florete e Perfuradora; migração troca armas antigas por Florete', () => {
   const armas = Object.values(S.items).filter(i => i.type === 'arma').map(i => i.name).filter(n => !/de Teste$/.test(n));
-  assert.deepEqual(armas.sort(), ['Florete', 'Perfuradora de Montanhas']);
+  assert.ok(armas.includes('Florete') && armas.includes('Perfuradora de Montanhas') && armas.includes('Lágrima de Raijin') && !armas.includes('Espada Longa')); assert.equal(new Set(armas).size, armas.length, 'arma duplicada');
   const f = S.items[itemKey('Florete')]; assert.equal(f.wt, 'lamina'); assert.equal(f.power, 12); assert.equal(f.price, 60); assert.equal(f.pierce, .25); assert.equal(f.reqFor, 0);
-  reset(); const h = mk(ana, {}); S.items.velha = { name: 'Velha', type: 'arma', power: 10, wt: 'lamina', price: 1 }; const tk = itemKey('Tônico'); h.inv.velha = 2; h.inv.fantasma = 1; h.inv[tk] = 3; h.equip.arma = 'velha'; S.itemsV = 1;
+  reset(); const h = mk(ana, {}); S.items.velha = { name: 'Velha', type: 'arma', power: 10, wt: 'lamina', price: 1 }; const tk = itemKey('Poção'); h.inv.velha = 2; h.inv.fantasma = 1; h.inv[tk] = 3; h.equip.arma = 'velha'; S.itemsV = 1;
   S.items = { velha: S.items.velha, oldT: { ...S.items[tk] } }; delete h.inv[tk]; h.inv.oldT = 3; Object.values(S.scenes)[0].shop.stock = ['velha', 'oldT'];
-  migrateItems(); const fk = itemKey('Florete'); assert.equal(h.inv[itemKey('Tônico')], 3); assert.deepEqual(Object.values(S.scenes)[0].shop.stock, [itemKey('Tônico')]);
-  assert.equal(S.itemsV, 2); assert.equal(h.equip.arma, fk); assert.equal(h.inv[fk], 2); assert.equal(h.inv.velha, undefined); assert.equal(S.items.velha, undefined);
+  migrateItems(); const fk = itemKey('Florete'); assert.equal(h.inv[itemKey('Poção')], 3); assert.deepEqual(Object.values(S.scenes)[0].shop.stock, [itemKey('Poção')]);
+  assert.equal(S.itemsV, 3); assert.equal(h.equip.arma, fk); assert.equal(h.inv[fk], 2); assert.equal(h.inv.velha, undefined); assert.equal(S.items.velha, undefined);
   for (const sc of Object.values(S.scenes)) for (const k of sc.shop.stock) assert.ok(S.items[k], 'loja com item inexistente: ' + k);
   const heroes = Object.values(S.chars); assert.ok(heroes.every(c => !c.equip.arma || S.items[c.equip.arma]));
+});
+
+test('conteúdo padrão: toda skill do bestiário e todo item das lojas de exemplo existem pelo nome', async () => {
+  const { buildBestiary, SCENES } = await import('../content.js');
+  const sn = new Set(Object.values(S.skills).map(s => s.name)), inn = new Set(Object.values(S.items).map(i => i.name)), miss = [];
+  buildBestiary((name, color, attrs, weak, resist, skills) => { if (Array.isArray(skills)) skills.forEach(n => sn.has(n) || miss.push(`${name}: ${n}`)); return {}; });
+  SCENES.forEach(sc => sc.stock.forEach(n => inn.has(n) || miss.push(`${sc.name}: ${n}`)));
+  assert.deepEqual(miss, []);
+});
+
+// ----- campanhas, pacote de conteúdo, mapa e som -----
+const { importPack } = await import('../server.js');
+test('campanhas: nova, guardar e abrir outra mantêm as contas; jogador não troca', () => {
+  reset(); S.users.zed = 'x:y'; S.title = 'Alfa'; mk(ana, {}).name = 'Marca';
+  H.campSave(gm, {}); H.campNew(gm, { v: 'Beta' });
+  assert.equal(S.title, 'Beta'); assert.ok(!Object.values(S.chars).some(c => c.name === 'Marca')); assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(S.users.zed, 'x:y');
+  H.campLoad(gm, { id: 'alfa' }); assert.equal(S.title, 'Alfa'); assert.ok(Object.values(S.chars).some(c => c.name === 'Marca'));
+  const st = view(gm).store; assert.ok(st.backups.length >= 2); assert.deepEqual([...st.camps].sort(), ['alfa', 'beta']);
+  H.campLoad(ana, { id: 'beta' }); assert.equal(S.title, 'Alfa'); assert.equal(view(ana).store, undefined);
+  H.bkRestore(gm, { id: st.backups[0] }); assert.equal(S.users.zed, 'x:y'); assert.ok(S.scenes[S.scene].pins);
+});
+test('pacote de conteúdo: importa pelo nome, saneia os campos e não apaga nada', () => {
+  const n0 = Object.keys(S.items).length, flo = Object.keys(S.items).find(k => S.items[k].name === 'Florete');
+  importPack({ vj: 'conteudo', skills: { a: { name: 'Corte Teste', kind: 'dmg', power: '12', el: 'xx', gx: 150, gy: 150, pierce: .5 } }, items: { i: { name: 'Florete', type: 'arma', power: 99, price: '<b>' }, j: { name: 'Elmo Teste', type: 'armadura', power: 3 } },
+    bestiary: { b: { name: 'Cobaia', color: 'javascript:1', attrs: { FOR: 999 }, skills: ['a', 'nada'], inv: { j: 2 } } }, encounters: { e: { name: 'Par', list: [{ b: 'b', n: 2 }] } } });
+  assert.equal(Object.keys(S.items).length, n0 + 1); assert.equal(S.items[flo].power, 99); assert.equal(S.items[flo].price, 0);
+  const s = Object.values(S.skills).find(x => x.name === 'Corte Teste'); assert.equal(s.power, 12); assert.equal(s.el, 'fis'); assert.equal(s.pierce, .5);
+  const b = Object.values(S.bestiary).find(x => x.name === 'Cobaia'); assert.equal(b.attrs.FOR, 100); assert.match(b.color, /^#/); assert.equal(b.skills.length, 1); assert.equal(Object.values(b.inv)[0], 2);
+  assert.ok(Object.values(S.encounters).some(e => e.name === 'Par')); assert.throws(() => importPack({ vj: 'outro' }));
+});
+test('mapa e som: névoa inteira, pincel, marcadores só do mestre, escala e trilha', () => {
+  const sc = S.scenes[S.scene]; H.map(gm, { f: 'fogOn', v: 1 }); H.fogAll(gm, { v: 1 }); assert.equal(Object.keys(sc.seen).length, Math.ceil(sc.cols) * Math.ceil(sc.rows));
+  H.fogAll(gm, { v: '' }); H.fog(gm, { x: 5, y: 5, r: 2 }); assert.equal(Object.keys(sc.seen).length, 25); H.fog(ana, { x: 0, y: 0 }); assert.equal(Object.keys(sc.seen).length, 25);
+  H.pinAdd(gm, { x: 1, y: 1, v: 'Porta' }); H.pinAdd(gm, { x: 2, y: 2, v: 'Armadilha', k: 1 }); H.pinAdd(ana, { x: 3, y: 3, v: 'x' });
+  assert.equal(Object.keys(view(gm).scenes[S.scene].pins).length, 2); assert.deepEqual(Object.values(view(ana).scenes[S.scene].pins).map(p => p.text), ['Porta']);
+  H.map(gm, { f: 'unit', v: 1.5 }); assert.equal(sc.unit, 1.5); H.map(gm, { f: 'cols', v: 24 }); assert.equal(sc.cols, 24);
+  H.audio(gm, { f: 'url', v: 'javascript:alert(1)' }); assert.equal(S.audio.url, ''); H.audio(gm, { f: 'url', v: '/uploads/a.mp3' }); assert.ok(S.audio.on && S.audio.t0 > 0);
+  H.audio(ana, { f: 'on', v: '' }); assert.ok(S.audio.on); H.audio(gm, { f: 'amb', v: 'chuva' }); assert.equal(S.audio.amb, 'chuva');
+  const k = Object.keys(S.items)[0]; H.edSet(gm, { coll: 'items', id: k, f: 'pierce', v: .35 }); assert.equal(S.items[k].pierce, .35);
+  H.sceneAdd(gm, {}); assert.ok(S.scenes[S.scene].pins);
 });
