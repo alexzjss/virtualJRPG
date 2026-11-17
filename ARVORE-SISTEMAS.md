@@ -110,3 +110,42 @@ rituais, Despertares e invocações ficam só com os heróis.
 - **Técnicas em trio** (`trio: 'Nome B|Nome C'`): dois aliados distintos com as skills pares pagam e perdem o próximo turno.
 - Requisito `v2: 'indra'`: exige também esse Vínculo (fusões e sinergias de Aura).
 - Condições novas: Molhado, Oleado, Quebrado.
+
+## Cartas do Canva (`arvore/cartas.js`)
+Dois designs de cartas foram agregados (sem repetir) e viraram ramos novos no fim de cada setor: **Marcial** (cartas básicas: Força, Esquiva,
+Bloqueio, Cólera, Kai, Clareza, duplas e trio), **Aura** (Shukoudan, Canhão de Aura, versão gélida com `v2: fuhaku`), **Indra** e **Fuhaku**
+(2 ramos cada: ataques, e reforços/reações/forma), **Kagutsuchi** (Forma Carmesim), **Tsukuyomi** (Mundo do Tsukuyomi como Domínio, Verdade) e
+**Hiruko** (A Doença). Versões da mesma carta em níveis diferentes viraram um nó base + um nó de evolução (`amp`, ex.: "Wakaze: Nível 2").
+Conversão: custo da carta → Aura (`c`); dano da carta × 0,85 → poder (`p`); Reforço e Forma → `fm`. Não portadas: Evolução, Desejo, Nova Carta
+(progressão, que já é o XP da árvore) e as cartas só citadas nas Formas sem descrição (Pressão Interna, Kaiser, Sobrecarga).
+
+Mecânicas novas no motor:
+- `stack doenca N` (efeito, em si): acumula 1 estágio da **Doença** (máx. N). Cada estágio dá +8% de dano às técnicas que têm o efeito; do 3º em diante
+  o corpo perde 1,5% do HP máx. × (estágio − 2) por turno. Zera ao começar a batalha ou ao ser purificado (`cleanse`). Aparece no palco como "Doença ●●".
+- `ret N` (campo de `fm`): quem erra um ataque contra o transformado perde N% do tempo do próprio turno (a "Rosa dos Ventos" da Forma Prateada).
+
+## Leva 2 (`arvore/leva2a.js`, `leva2b.js`, `leva2c.js`)
+Dois ramos novos em **cada** setor (9 Vínculos, Aura, Ocultismo e Marcial), 240 nós: um **Ofensivo** (técnicas nomeadas, evolução
+"Nível 2", combos; os nós 7 e 10 são **Limites**) e um de **Reações e Reforços** (reações automáticas, forma, cargas; o nó 10 é um
+**Limite** de suporte). São 3 Limites por setor (36 no total) e mais 5 nós completam o ramo da Doença (com o Limite Pandemia).
+Vínculos seguem o estilo das cartas; Ocultismo e Marcial, o tom da campanha (caçadores, trincheira, anos 1910-20).
+A grade passou de 91×91 para **111×111** para caber tudo; as fichas são remapeadas pelo nome, como sempre.
+
+### Mecânicas novas
+- **Reações** (`rea: 'evade 40'`, `block 35`, `absorb 35`, `counter 15`): o nó continua usável no próprio turno (pela `fx`), e além disso
+  dispara **sozinho no turno do inimigo**, uma vez por rodada do personagem, pagando o custo da técnica. Esquivas são testadas antes do
+  acerto (não valem contra `sure`); bloqueio, absorção (o dano segurado vira Aura) e revide só quando o golpe acerta. Golpes em área,
+  contra-ataques e personagens atordoados/congelados/dormindo/silenciados não disparam reação. Se o personagem tiver várias, usa a
+  melhor que puder pagar: esquiva > bloqueio > absorção > revide.
+- **Cargas** (`stack K N` em si; `burst K M`): cada Vínculo tem a sua: `brasa`, `mare`, `rocha`, `carga`, `vento`, `luz`, `sombra`,
+  `sangue`, `mutacao`; e `ressonancia` (Aura), `pavor` (Ocultismo), `impeto` (Marcial), `doenca` (Hiruko). Técnicas com `stack K` ganham
+  +6% de dano por carga (Doença: +8%). `burst K M` consome todas e multiplica o dano por (1 + M × cargas). Zeram no início da batalha.
+  Aparecem no palco como "Brasa ●●●".
+- **Combos** (`combo: 'A|B'`, `cm: 1.5`, padrão 1,4): se a última técnica usada pelo personagem foi A ou B, o golpe sai ×cm e o log
+  avisa "COMBO!".
+
+## Segredo da árvore
+Jogadores (e a mesa) recebem do servidor os nós que ainda não alcançam como **silhueta**: nome "???", sem descrição, poder nem efeito
+(`src/net.js`, `hiddenSkills`/`defsFor`). Fica à vista o que algum herói já aprendeu, os vizinhos do que os personagens do jogador já
+têm (respeitando Vínculo, Despertar e o Vínculo extra `v2`) e, para quem não aprendeu nada, o centro Marcial. O mestre vê tudo.
+As versões com silhueta são cacheadas por conjunto de nós escondidos, então o custo por atualização é pequeno.

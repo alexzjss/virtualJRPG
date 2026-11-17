@@ -3,6 +3,10 @@
 import { VINC } from './arvore/vinculos.js';
 import { AURA } from './arvore/aura.js';
 import { OCULTO } from './arvore/oculto.js';
+import { CARTAS } from './arvore/cartas.js';
+import { LEVA2A } from './arvore/leva2a.js';
+import { LEVA2B, DOENCA_MAIS } from './arvore/leva2b.js';
+import { LEVA2C } from './arvore/leva2c.js';
 import { ARMAS, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
 import { SISTEMAS, AURA_SIN, OCULTO_PONTE, MARCIAL_SIST, MARCIAL_LACOS } from './arvore/sistemas.js';
 // Em cada ramo de 10 nós: 1-4 tronco, 5-7 caminho A (atributo principal), 8-9 caminho B (atributo secundário), 10 nó final.
@@ -742,3 +746,8 @@ TREE.aura.branches.push(AURA_SIN);
 TREE.oculto.branches.push(OCULTO_PONTE);
 TREE.marcial.branches.push(MARCIAL_SIST, MARCIAL_LACOS);
 TREE.marcial.branches.push(...Object.values(ARMAS_NOVAS)); // estilos de arma novos: pesada, foco, corrente, arremesso, arco
+// cartas portadas do Canva (ramos finais de cada setor)
+for (const [el, br] of Object.entries(CARTAS)) TREE[el].branches.push(...br);
+TREE.hiruko.branches.at(-1).push(...DOENCA_MAIS); // ramo da Doença completo
+// leva 2: dois ramos por setor (ofensivo e reações/reforços), com 3 Limites por setor
+for (const L of [LEVA2A, LEVA2B, LEVA2C]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);

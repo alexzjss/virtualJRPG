@@ -333,6 +333,7 @@ body[data-role=player] h1{display:none}body[data-role=player] #app{padding:0}
 .skhint{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:10px;background:#000c;padding:5px 10px 5px 5px}
 .skmap.far .nd .lb{display:none}.skmap.far .nd.own .lb,.skmap.far .nd.sel .lb,.skmap.far .nd:hover .lb{display:block;font-size:22px}
 .skmap.near .nd .lb,.nd.av .lb{display:block}.skmap.far .nd.av .lb{display:none}.skmap.far .nd.av:hover .lb{display:block}
+.nd.secret,.nd.out.secret{opacity:.5}.nd.secret circle,.nd.secret rect{fill:#0b0b0d;stroke:#8a8aa0;stroke-width:2;stroke-dasharray:5 4}.nd.secret .mk{fill:#a0a0b8}.nd.secret .lb{fill:#8a8aa0;font-style:italic}.nd.secret:hover,.nd.secret.sel{opacity:.85}.ndcard.secret h2{letter-spacing:.3em;color:#777}
 .nd.out{opacity:.16}.nd.out circle,.nd.out rect{stroke-dasharray:none}.nd.out:hover,.nd.out.sel{opacity:.7}
 .ln line.out{opacity:.05}.vout .halo{opacity:.05}.vout .hname{opacity:.3}.vmine .halo{opacity:.2}.vmine .hname{opacity:1}
 .flav{margin:0;font-style:italic;color:var(--dim)}.exw{color:var(--gold)}

@@ -11,6 +11,11 @@
     wet: 'conduz raio e vento (reações elementais)', oil: 'queima e explode com fogo e raio', broken: 'perdeu o turno, sofre +50% de dano e não age até se recompor',
     evade: 'o próximo golpe erra', stealth: 'não pode ser alvo direto; o próximo ataque tem +25% e crítico dobrado', focus: '+15% de acerto e enxerga quem está Furtivo', exposed: 'armadura não conta', exaus: '−15% de acerto, −15% de dano e não pode se transformar', seal: 'explode quando acaba ou ao ser detonado',
     blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental' };
+  // cargas que se acumulam no próprio personagem durante a batalha (efeitos stack/burst): nome e bônus de dano por carga
+  const STK = { doenca: ['Doença', 8], carga: ['Carga Elétrica', 6], brasa: ['Brasa', 6], mare: ['Maré', 6], rocha: ['Rocha', 6], vento: ['Vento', 6], luz: ['Luz', 6], sombra: ['Sombra', 6], sangue: ['Sangue', 6], mutacao: ['Mutação', 6], ressonancia: ['Ressonância', 6], impeto: ['Ímpeto', 6], pavor: ['Pavor', 6] };
+  // reações: disparam sozinhas no turno do inimigo (1 por rodada, pagando o custo da técnica)
+  const REA = { evade: 'esquiva', block: 'bloqueia', absorb: 'absorve', counter: 'revida' };
+  const reaText = s => { const r = s.rea; return `reação automática (1×/rodada, paga o custo): ${r.t === 'evade' ? `${r.v}% de esquivar do golpe` : r.t === 'block' ? `bloqueia ${r.v}% do dano` : r.t === 'absorb' ? `absorve ${r.v}% do dano como Aura` : `revida com poder ${r.v}`}`; };
   const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal'];
   const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt'];
   // Aflições (Sanidade zerada e teste de SAB falho) e Virtudes (crítico): valem até o descanso longo
@@ -107,9 +112,9 @@
   // fx: 'st burn 3 60%; drain hp 30; shield 12 self' → lista de efeitos. Alvo opcional: self | ally | foes | tgt (padrão: o alvo da skill).
   // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
   const FXTO = new Set(['self', 'ally', 'foes', 'tgt']);
-  const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'],
+  const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'], stack: ['k', 'n'], burst: ['k', 'm'],
     push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
-  const FXDEF = { st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 } };
+  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 } };
   const FXTXT = new Set(['k', 'r']);
   function parseFx(str, where = '') {
     if (!str) return undefined;
@@ -120,6 +125,7 @@
       keys.forEach((k, i) => { if (pos[i] == null) return; o[k] = FXTXT.has(k) ? pos[i] : +pos[i]; if (!FXTXT.has(k) && Number.isNaN(o[k])) throw new Error(`número inválido em "${item}" (${where})`); });
       if (keys.some(k => o[k] == null)) throw new Error(`faltam argumentos em "${item}" (${where})`);
       const ch = w.find(x => x.endsWith('%')), to = w.find(x => FXTO.has(x));
+      if ((t === 'stack' || t === 'burst') && !STK[o.k]) throw new Error(`carga desconhecida "${o.k}" em ${where}`);
       if (t === 'st') { o.ch = ch ? parseInt(ch) : 100; if (!ST[o.k]) throw new Error(`condição desconhecida "${o.k}" em ${where}`); }
       if (to) o.to = to;
       return o;
@@ -132,6 +138,7 @@
       if (k === 'end') f.end.push(...parseFx(r.join(' '), where));
       else if (k === 'dr') f.dr[r[0]] = +r[1];
       else if (k === 'dur') f.dur = +r[0];
+      else if (k === 'ret') f.ret = +r[0];
       else if (['atk', 'def', 'agi', 'hit', 'crit', 'atkP', 'heal'].includes(k)) f.m[k] = +r[0];
       else throw new Error(`campo de forma desconhecido "${item}" em ${where}`);
     }
@@ -139,7 +146,7 @@
   }
   // caminho inverso: efeitos lidos → texto na notação (o criador de armas copia técnicas da árvore assim)
   const fxSrc = l => (l || []).map(f => [f.t, ...FXARGS[f.t].map(k => f[k]), ...(f.t === 'st' && f.ch != null && f.ch < 100 ? [f.ch + '%'] : []), ...(f.to ? [f.to] : [])].join(' ')).join('; ');
-  const formSrc = f => !f ? '' : [`dur ${f.dur}`, ...Object.entries(f.m || {}).map(([k, v]) => `${k} ${v}`), ...Object.entries(f.dr || {}).map(([k, v]) => `dr ${k} ${v}`), ...(f.end || []).map(e => 'end ' + fxSrc([e]))].join('; ');
+  const formSrc = f => !f ? '' : [`dur ${f.dur}`, ...Object.entries(f.m || {}).map(([k, v]) => `${k} ${v}`), ...Object.entries(f.dr || {}).map(([k, v]) => `dr ${k} ${v}`), ...(f.ret ? [`ret ${f.ret}`] : []), ...(f.end || []).map(e => 'end ' + fxSrc([e]))].join('; ');
   // ----- descrição mecânica gerada dos campos da skill -----
   const TO = { self: 'em si', ally: 'nos aliados', foes: 'nos inimigos', tgt: '' };
   const pct = v => (v > 0 ? '+' : '') + v + '%';
@@ -152,6 +159,8 @@
       case 'exec': return `×${f.m} se o alvo tiver até ${f.p}% de HP`;
       case 'vs': return f.k === 'demon' ? `×${f.m} contra demônios` : `×${f.m} se o alvo tiver ${f.k === 'neg' ? 'condição ruim' : ST[f.k] || f.k}`;
       case 'per': return `${pct(f.p)} de dano por turno de ${ST[f.k] || f.k} no alvo`;
+      case 'stack': return f.k === 'doenca' ? `acumula 1 estágio da Doença em você (máx. ${f.n}): +8% de dano por estágio e, do 3º em diante, o corpo definha a cada turno` : `acumula 1 ${STK[f.k][0]} em você (máx. ${f.n}): +${STK[f.k][1]}% de dano por carga nas técnicas que a usam`;
+      case 'burst': return `consome todas as cargas de ${STK[f.k][0]}: ×(1 + ${f.m} por carga)`;
       case 'rage': return `dano cresce com o HP que falta (até ×${1 + f.m})`;
       case 'pierce': return `ignora ${f.p}% da armadura`;
       case 'sure': return 'não pode ser esquivado';
@@ -178,7 +187,7 @@
   const fxText = l => (l || []).map(fxOne).join(' · ');
   const FM = { atk: 'dano', def: 'redução de dano', agi: 'velocidade', hit: 'acerto', crit: 'crítico', atkP: 'poder do ataque básico', heal: 'cura' };
   const modText = m => Object.entries(m || {}).map(([k, v]) => k === 'atkP' ? `+${v} ${FM[k]}` : `${pct(v)} ${FM[k] || k}`).join(', ');
-  const formText = f => `por ${f.dur} turnos: ${modText(f.m)}${Object.keys(f.dr || {}).length ? ' · drena ' + Object.entries(f.dr).map(([r, v]) => `${v}${r === 'hp' ? '% ' : ' '}${RESN[r]}`).join(' e ') + ' por turno' : ''}${f.end?.length ? ' · ao acabar: ' + fxText(f.end).replace(/o alvo perde/g, 'perde') : ''}`;
+  const formText = f => `por ${f.dur} turnos: ${modText(f.m)}${Object.keys(f.dr || {}).length ? ' · drena ' + Object.entries(f.dr).map(([r, v]) => `${v}${r === 'hp' ? '% ' : ' '}${RESN[r]}`).join(' e ') + ' por turno' : ''}${f.ret ? ` · quem erra você perde ${f.ret}% do tempo` : ''}${f.end?.length ? ' · ao acabar: ' + fxText(f.end).replace(/o alvo perde/g, 'perde') : ''}`;
   const ON = { start: 'No início da batalha', turn: 'No início do seu turno', low: 'Ao cair para 30% de HP (1× por batalha)', kill: 'Ao derrubar um inimigo', crit: 'Ao acertar um crítico', weak: 'Ao acertar uma fraqueza', hurt: 'Ao ser ferido', fall: 'Ao receber um golpe fatal (1× por batalha)', heal: 'Ao curar alguém', miss: 'Ao errar', ally: 'Quando um aliado cai' };
   const SCN = { atk: 'no ataque básico', mental: 'em dano mental', heal: 'em curas', area: 'em área', req: 'nas técnicas de arma', form: 'transformado', circ: 'em rituais' };
   // linhas extras da descrição (o resto — poder, custo, elemento — a interface já mostra)
@@ -195,6 +204,8 @@
     if (s.kind === 'form' && s.form) o.push(formText(s.form));
     if (s.fx?.length && s.kind !== 'passive') o.push((s.kind === 'form' ? 'ao assumir: ' : '') + fxText(s.fx));
     if (s.summon) o.push(`invoca ${s.summon}`);
+    if (s.rea) o.push(reaText(s));
+    if (s.combo) o.push(`combo: ×${s.cm || 1.4} logo depois de ${s.combo.split('|').join(' ou ')}`);
     if (s.trio) o.push(`técnica em trio: dois aliados com "${s.trio.join('" e "')}" gastam o próximo turno junto`);
     if (s.dom) o.push(`Expansão de Domínio por ${s.dom.dur} turnos (gasta toda a Aura, exige metade dela; Exausto ao fim): aliados ${modText(s.dom.ally) || '—'} · inimigos ${modText(s.dom.foe) || '—'}${s.dom.tick ? ' · inimigos ganham ' + (ST[s.dom.tick] || s.dom.tick) + ' a cada turno' : ''}`);
     if (s.duo) o.push(`técnica em dupla: um aliado com "${s.duo}" gasta o próximo turno junto`);
@@ -206,5 +217,5 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

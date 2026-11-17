@@ -114,10 +114,43 @@ const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.k
 // não tem a versão atual. O resto ("state") segue a cada mudança, bem mais leve pelo túnel.
 let defs = { v: 0, json: '' }, defsDirty = true;
 const curDefs = () => { if (defsDirty) { defsDirty = false; const json = JSON.stringify({ skills: S.skills, items: S.items }); if (json !== defs.json) defs = { v: defs.v + 1, json }; } return defs; };
+// Segredo da árvore: jogador e mesa recebem como silhueta "???" os nós que os personagens deles ainda não alcançam (não é vizinho do
+// que já aprenderam, ou exige um Vínculo/Despertar que não têm). Nós que algum herói já tem e técnicas fora da grade ficam à vista.
+const RUL = globalThis.RULES;
+const reachable = (ch, s) => {
+  if (ch.enemy) return false;
+  const vinc = ch.vinc || [], aw = ch.aw || [];
+  if (!['fis', 'aura', 'oculto'].includes(s.el) && !vinc.includes(s.el)) return false;
+  if (s.el === 'oculto' && !aw.includes('outro')) return false;
+  if (s.aw && !aw.includes(s.aw)) return false;
+  if (s.v2 && !vinc.includes(s.v2)) return false;
+  const own = ch.skills.map(k => S.skills[k]).filter(o => o && o.gx != null);
+  return own.length ? own.some(o => RUL.near(o, s) && (o.el === s.el || o.el === 'fis' || s.el === 'fis')) : s.el === 'fis' && !!S.skills.g0 && Math.max(Math.abs(s.gx - S.skills.g0.gx), Math.abs(s.gy - S.skills.g0.gy)) <= 1; // sem nada aprendido: só o centro Marcial
+};
+const hiddenSkills = c => {
+  if (c.role === 'gm' || !c.role) return [];
+  const heroes = Object.values(S.chars).filter(ch => !ch.enemy), owned = new Set(heroes.flatMap(ch => ch.skills || []));
+  const mine = c.role === 'table' ? heroes : heroes.filter(ch => ch.owner === c.name);
+  return Object.keys(S.skills).filter(id => { const s = S.skills[id]; return s.gx != null && !owned.has(id) && !mine.some(ch => reachable(ch, s)); });
+};
+const silhouette = s => ({ name: '???', d: '', kind: s.kind === 'passive' ? 'passive' : s.kind === 'form' ? 'form' : 'dmg', attr: '', el: s.el, power: 0, cost: 0, res: s.res, gx: s.gx, gy: s.gy, br: s.br, root: s.root, xp: s.xp, secret: 1 });
+let secCache = { v: -1, m: new Map() };
+const defsFor = (c, d) => { // versão das definições com os nós secretos trocados pela silhueta; cacheada por conjunto de nós escondidos
+  const hid = hiddenSkills(c);
+  if (!hid.length) return { v: d.v, json: d.json };
+  if (secCache.v !== d.v) secCache = { v: d.v, m: new Map() };
+  const key = crypto.createHash('sha1').update(hid.join(',')).digest('hex').slice(0, 12);
+  if (!secCache.m.has(key)) {
+    if (secCache.m.size > 64) secCache.m.clear();
+    const sk = { ...S.skills }; for (const id of hid) sk[id] = silhouette(S.skills[id]);
+    secCache.m.set(key, JSON.stringify({ skills: sk, items: S.items }));
+  }
+  return { v: d.v + '.' + key, json: secCache.m.get(key) };
+};
 const sendState = c => {
   if (!c.role || c.readyState !== 1) return;
-  const d = curDefs();
-  if (c.defsV !== d.v) { c.defsV = d.v; c.send(`{"t":"defs","v":${d.v},"d":${d.json}}`); }
+  const d = defsFor(c, curDefs());
+  if (c.defsV !== d.v) { c.defsV = d.v; c.send(`{"t":"defs","v":${JSON.stringify(d.v)},"d":${d.json}}`); }
   c.send(JSON.stringify({ t: 'state', dv: d.v, s: { ...view(c), skills: undefined, items: undefined } }));
 };
 // avisos automáticos de fim de combate, só para o mestre (ele decide quando declarar a vitória)
@@ -237,4 +270,4 @@ function start() {
   });
 }
 
-export { GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };
+export { hiddenSkills, defsFor, curDefs, GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };

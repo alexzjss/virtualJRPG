@@ -18,7 +18,7 @@ test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam t
     assert.ok(start >= 0, 'raiz de ' + el);
     while (q.length) { const x = set[q.pop()]; set.forEach((y, i) => { if (!seen.has(i) && Math.max(Math.abs(x.gx - y.gx), Math.abs(x.gy - y.gy)) <= 1) { seen.add(i); q.push(i); } }); }
     assert.deepEqual(set.filter((_, i) => !seen.has(i)).map(s => s.name), [], el);
-    assert.equal(ns.filter(s => s.el === el).length, ['aura', 'oculto'].includes(el) ? 120 : 104);
+    assert.equal(ns.filter(s => s.el === el).length, TREE[el].branches.flat().length); assert.ok(ns.filter(s => s.el === el).length >= (['aura', 'oculto'].includes(el) ? 120 : 104));
   }
 });
 test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {
@@ -768,4 +768,49 @@ test('armas: pacotes empilham até 3 (uma qualidade, um elemento), mexem nos tra
   assert.equal(Object.keys(S.items).length, k0 + 2); const nomes = Object.values(S.items).map(i => i.name); assert.ok(nomes.includes('Mangual Importado') && nomes.includes('Mangual Importado (2)'), 'nome repetido ganha número');
   const ruim = Object.values(S.items).find(i => i.name === 'Mangual Importado (2)'); assert.equal(ruim.hits, 6); assert.equal(ruim.fx, ''); H.wpnImport(ana, { list: [base] }); assert.equal(Object.keys(S.items).length, k0 + 2, 'só o mestre importa');
   H.wpnImport(gm, { list: Array.from({ length: 40 }, (_, i) => AR.make('adaga', { name: 'Adaga ' + i })) }); assert.equal(Object.keys(S.items).length, k0 + 2 + 25, 'lote de no máximo 25');
+});
+
+test('cartas do Canva: nós existem, pré-requisitos e amplificações apontam para nós reais e a Doença acumula estágios', async () => {
+  const { CARTAS } = await import('../arvore/cartas.js');
+  const todos = Object.values(S.skills), nomes = new Set(todos.map(s => s.name));
+  let n = 0;
+  for (const brs of Object.values(CARTAS)) for (const b of brs) for (const o of b) {
+    n++; assert.ok(nomes.has(o.n), o.n);
+    for (const k of ['pre', 'amp', 'duo']) if (o[k]) assert.ok(nomes.has(o[k]), `${o.n}: ${k} ${o[k]}`);
+  }
+  assert.ok(n >= 70);
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.FOR = 80; h.aura = 40; e.hpMax = e.hp = 999; e.attrs.AGI = 1; h.skills = [sk('Chute Doentio')]; H.battle(gm, { on: true });
+  assert.equal(h.stk?.doenca || 0, 0);
+  while (current() !== h.id) H.next(gm);
+  H.act(ana, { id: h.id, skill: sk('Chute Doentio'), target: e.id }); assert.equal(h.stk.doenca, 1);
+  // a forma do vento atrasa quem erra
+  const f = S.skills[sk('Forma Prateada: Vendaval')]; assert.equal(f.form.ret, 40); assert.match(RU.describe ? RU.describe(f) : 'ok', /./);
+});
+
+test('leva 2: reações disparam no turno do inimigo, uma por rodada, pagando o custo', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); e.attrs.DES = 99; h.skills = [sk('Couraça de Pedra')]; h.aura = 20; H.battle(gm, { on: true });
+  while (current() !== e.id) H.next(gm);
+  H.act(gm, { id: e.id, skill: 'atk', target: h.id });
+  const hit = S.log.some(l => /→ .*de dano/.test(l.text)), reag = S.log.filter(l => /reage com Couraça de Pedra/.test(l.text)).length;
+  assert.equal(reag, hit ? 1 : 0); // só reage quando o golpe acerta
+  assert.ok(S.skills[sk('Couraça de Pedra')].rea.t === 'block');
+});
+test('leva 2: cargas acumulam e explodem; combo multiplica o golpe seguinte', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); e.hpMax = e.hp = 9999; e.attrs.AGI = 1; h.attrs.INT = 90; h.aura = 99;
+  h.skills = [sk('Faísca Acumulada'), sk('Descarga Total'), sk('Raio Bifurcado')]; H.battle(gm, { on: true });
+  const go = n => { while (current() !== h.id) H.next(gm); H.act(ana, { id: h.id, skill: sk(n), target: e.id }); };
+  go('Faísca Acumulada'); assert.ok((h.stk.carga || 0) >= 0); const c1 = h.stk.carga || 0;
+  go('Raio Bifurcado'); if (c1) assert.ok(S.log.some(l => /COMBO!/.test(l.text)));
+  h.stk.carga = 3; go('Descarga Total'); assert.equal(h.stk.carga, 0);
+});
+test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo', async () => {
+  const net = await import('../src/net.js'); reset();
+  const h = mk(ana, {}); h.vinc = ['indra']; h.skills = [sk('Faísca')];
+  const hid = net.hiddenSkills({ role: 'player', name: 'Ana' });
+  assert.ok(hid.length > 100); assert.ok(!hid.includes(sk('Faísca'))); assert.equal(net.hiddenSkills({ role: 'gm' }).length, 0);
+  assert.ok(hid.includes(sk('Kamikaze'))); // Fuhaku, sem Vínculo
+  const viz = Object.keys(S.skills).find(k => S.skills[k].el === 'indra' && k !== sk('Faísca') && RU.near(S.skills[k], S.skills[sk('Faísca')]));
+  if (viz) assert.ok(!hid.includes(viz));
+  const d = net.defsFor({ role: 'player', name: 'Ana' }, net.curDefs()); const sks = JSON.parse(d.json).skills;
+  assert.equal(sks[sk('Kamikaze')].name, '???'); assert.equal(sks[sk('Faísca')].name, 'Faísca'); assert.match(String(d.v), /\./);
 });

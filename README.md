@@ -103,12 +103,12 @@ Os números ficam em `R` no topo de `src/consts.js`. `node tools/sim.js 500` sim
 - Uma mensagem malformada ou um erro numa ação não derruba o servidor: o erro vai para o console e a mesa continua.
 
 ## Conteúdo padrão
-`content.js` gera a grade de skills (1411 nós), o catálogo de itens (189, com 108 armas, flechas e materiais de forja), o bestiário (22 inimigos + 9 chefes + o trio da Tempestade Ígnea), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
+`content.js` gera a grade de skills (1727 nós, numa grade de 111×111), o catálogo de itens (189, com 108 armas, flechas e materiais de forja), o bestiário (22 inimigos + 9 chefes + o trio da Tempestade Ígnea), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
 Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.
 
 ## Vínculos e personagens base
 Cada caçador tem um ou mais **Vínculos** (Kagutsuchi, Susanoo, Atlas, Indra, Fuhaku, Amaterasu, Tsukuyomi, Shukketsu, Hiruko). Ele só aprende o tronco Marcial e as skills dos próprios Vínculos, e resiste ao elemento deles. O mestre concede Vínculos na aba **Mestre** da ficha.
-A árvore (1411 nós: 90 por Vínculo em 9 ramos, 227 marciais, 110 de Aura e 110 de Ocultismo; veja `REVISAO-ARVORE.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
+A árvore (1727 nós, contando as cartas do Canva e a leva 2; veja `REVISAO-ARVORE.md` e `ARVORE-SISTEMAS.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
 
 ## Árvore expandida: transformações, rituais, votos e mais
 Além de dano, cura e condições, os nós agora têm efeitos compostos e sistemas próprios: transformações (uma por vez, com dreno por turno e efeito colateral), golpes concentrados, multi-golpe e ricochete, roubo de vida, detonar condições, execução, escudo, regeneração, purificar, reerguer caídos, contra-ataque, reflexo, esquiva, provocar, guarda-costas, selos que explodem depois, invocações que agem sozinhas, técnicas em dupla, votos e restrições, rituais em círculos com versões Discente e Verdadeiro, e passivas com gatilho. A descrição mecânica de cada nó aparece na grade.

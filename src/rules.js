@@ -285,13 +285,15 @@ function fx1(a, s, t, f, c = {}) {
     case 'haste': if (t.id in T && t !== a) { T[t.id] = Math.max(T[a.id] ?? 0, T[t.id] - Math.round(delay(t) * f.v / 100)); return ` [${t.name} adiantado]`; } return '';
     case 'seal': if (t.hp <= 0) return ''; t.sealD = { d: f.p + Math.floor((c.stat || 0) / R.dmgDiv), el: s.el, by: a.name }; t.st.seal = f.n + (t === a ? 1 : 0); return ' [Selo]';
     case 'shield': { const v = Math.max(1, Math.round((f.p + Math.floor((c.stat || 0) / R.healDiv)) * (s.eff || 1))); t.shield = Math.max(t.shield || 0, v); t.st.shield = Math.max(t.st.shield || 0, 3); return ` [Escudo ${v}${t !== a ? ' em ' + t.name : ''}]`; }
-    case 'cleanse': { const ks = RU.NEG.filter(k => t.st[k]); for (const k of ks) delete t.st[k]; delete t.sealD; return ks.length ? ' [purificado]' : ''; }
+    case 'cleanse': { const ks = RU.NEG.filter(k => t.st[k]); for (const k of ks) delete t.st[k]; delete t.sealD; if (t.stk?.doenca) { t.stk.doenca = 0; return ' [purificado; a Doença recua]'; } return ks.length ? ' [purificado]' : ''; }
     case 'revive': if (c.fallen || (t.hp <= 0 && !t.dead)) { t.hp = Math.max(t.hp, Math.ceil(t.hpMax * f.p / 100)); delete t.dying; delete t.fell; return ` [${t.name} se reergue]`; } return '';
     case 'res': if (f.r === 'limit') addLimit(t, f.p); else t[f.r] = Math.min(t[f.r + 'Max'], t[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}${t !== a ? ' em ' + t.name : ''}]`;
     case 'gain': if (f.r === 'limit') addLimit(a, f.p); else a[f.r] = Math.min(a[f.r + 'Max'], a[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}]`;
     case 'lose': if (f.r === 'hp') return t.hp > 0 ? ` (−${f.p} HP)${hurt(t, f.p, a)}` : ''; if (f.r === 'limit') t.limit = Math.max(0, t.limit - f.p); else t[f.r] = Math.max(0, t[f.r] - f.p); return ` [−${f.p} ${RESN[f.r]}]`;
     case 'spread': if (t.st[f.k]) { const o = battlers().filter(x => x.enemy === t.enemy && x !== t && x.hp > 0); o.forEach(x => applySt(x, f.k, t.st[f.k])); return o.length ? ` [${STN[f.k]} se espalha]` : ''; } return '';
     case 'clima': { const wx = S.battle.wx ??= { k: '', ttl: 0 }; wx.k = f.k; wx.ttl = f.n * Math.max(2, battlers().length); log(a.name, `o clima muda: ${RU.CLIMA[f.k]?.[0] || f.k}.`, 'ok'); return ` [${RU.CLIMA[f.k]?.[0] || f.k}]`; }
+    case 'stack': { a.stk ??= {}; a.stk[f.k] = Math.min(f.n, (a.stk[f.k] || 0) + 1); return ` [${RU.STK[f.k][0]} ${a.stk[f.k]}]`; }
+    case 'burst': { const n = a.stk?.[f.k] || 0; if (!n) return ''; a.stk[f.k] = 0; return ` [${n} ${RU.STK[f.k][0]} consumida${n > 1 ? 's' : ''}]`; }
     case 'brk': return brkHit(t, f.n, a);
     case 'guard': if (t !== a) { t.st.guarded = f.n; t.guardBy = a.id; return ` [${a.name} protege ${t.name}]`; } return '';
   }
@@ -315,7 +317,10 @@ function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por
     if (f.t === 'vs' && (f.k === 'neg' ? RU.NEG.some(k => t.st[k]) : f.k === 'demon' ? t.enemy && t.cat !== 'humano' : t.st[f.k])) m *= f.m;
     if (f.t === 'per' && t.st[f.k]) m *= 1 + f.p / 100 * t.st[f.k];
     if (f.t === 'rage') m *= 1 + f.m * (1 - a.hp / (a.hpMax || 1));
+    if (f.t === 'stack') m *= 1 + RU.STK[f.k][1] / 100 * (a.stk?.[f.k] || 0);
+    if (f.t === 'burst') m *= 1 + f.m * (a.stk?.[f.k] || 0);
   }
+  if (s.combo && a.lastSk && s.combo.split('|').includes(a.lastSk)) { m *= s.cm || 1.4; a.bt ??= {}; a.bt.combo = 1; }
   return m;
 }
 function hurt(t, d, src) { // dano em HP: escudo, tenacidade, Limite, acorda, quebra concentração, gatilhos, avisa queda
@@ -374,6 +379,8 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
       const dr = f.form.dr, short = Object.entries(dr).find(([r, v]) => r === 'hp' ? n.hp <= Math.ceil(n.hpMax * v / 100) : n[r] < v);
       if (short) endForm(n, true); else for (const [r, v] of Object.entries(dr)) { if (r === 'hp') n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * v / 100)); else n[r] -= v; }
     }
+    n.rxT = 0; // reação disponível de novo
+    const dz = n.stk?.doenca || 0; if (dz >= 3) { const v = Math.max(1, Math.ceil(n.hpMax * .015 * (dz - 2))); n.hp = Math.max(1, n.hp - v); log(n.name, `a Doença (estágio ${dz}) consome ${v} HP.`, 'bad', { fx: { id: n.id, dmg: v } }); }
     if (vows(n).includes('tempo')) n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * .04));
     const dots = DOT.filter(k => n.st[k]).length;
     if (dots) {
@@ -431,14 +438,21 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     return false;
   }
   const sure = s.fx?.some(f => f.t === 'sure');
+  let rea = pickRea(a, s, t, o, sure, true);
+  if (rea) {
+    if (Math.random() * 100 < rea.rea.v) { log(t.name, `reage com ${rea.name} e esquiva de ${s.name}!`, 'ok', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } }); return false; }
+    log(t.name, `tenta ${rea.name}, mas não escapa.`, 'bad');
+  }
   if (t.st.evade && !s.area && !sure && !o.counter) { delete t.st.evade; log(a.name, `${s.name} → ${t.name}: esquivou!`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } }); return false; }
   const chance = sure ? 95 : int(stat + R.hit - (t.st.root ? 0 : Math.floor(at(t, 'AGI') / 2)) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) - (a.st.blind ? 25 : 0) - (a.st.exaus ? 15 : 0) + (a.st.focus ? 15 : 0) + (a.st.stealth ? 25 : 0) + ma.hit + (climaOf()?.[1].hit || 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
   if (r > chance) {
     if (r >= 96) addLimit(a, 20);
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } });
     trig(a, 'miss', t);
+    const rf = t.form && t.st.form && SK(t.form)?.form?.ret; if (rf && a.id in S.battle.ticks && t.enemy !== a.enemy) { bump(a.id, Math.round(delay(a) * rf / 100)); log(t.name, `${a.name} perde o ritmo e tem o turno adiado.`, 'ok'); }
     return false;
   }
+  if (!rea) rea = pickRea(a, s, t, o, sure, false); // bloqueio, absorção e revide só quando o golpe acerta
   a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
   const crit = r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
@@ -448,7 +462,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   const blkP = !mental && !s.area && !o.counter && t.enemy !== a.enemy ? AR.prof(eq(t, 'arma')).block : 0, blk = blkP > 0 && Math.random() * 100 < blkP; // escudo: bloqueia golpe físico único de inimigo
   const mult = (blk ? .4 : 1) * (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
     * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1)
-    * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]);
+    * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]) * (rea && (rea.rea.t === 'block' || rea.rea.t === 'absorb') ? 1 - rea.rea.v / 100 : 1);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv / (s.hits || 1)) + (o.plus || 0) - armor) * mult)); // multi-golpe divide o bônus do atributo; a armadura conta em cada golpe
   a.marks[s.attr] = true; if (s.attr2) a.marks[s.attr2] = true; tally(a, 'dmg', mental ? Math.min(d, t.san) : Math.min(d, t.hp)); if (crit) tally(a, 'crit', 1);
@@ -481,7 +495,20 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (crit) trig(a, 'crit', t);
   if (w) trig(a, 'weak', t);
   if (t.st.counter && t.hp > 0 && !mental && !s.area && !o.counter && !((s.basic || s.req || s.wpn) && AR.DIST(wtype(a))) /* arma de distância não sofre contra-ataque */ && a.hp > 0 && t !== a && t.enemy !== a.enemy && !skipping(t)) { log(t.name, 'contra-ataca!', 'ok'); strike(t, basicOf(t), a, null, 0, { counter: true }); }
+  if (rea && rea.rea.t !== 'evade') {
+    if (rea.rea.t === 'absorb' && t.hp > 0) { const v = Math.max(1, Math.round(d * rea.rea.v / (100 - rea.rea.v))); t.aura = Math.min(t.auraMax, t.aura + v); log(t.name, `reage com ${rea.name}: absorve o golpe (+${v} Aura).`, 'ok'); }
+    else if (rea.rea.t === 'block') log(t.name, `reage com ${rea.name} e segura ${rea.rea.v}% do golpe.`, 'ok');
+    else if (rea.rea.t === 'counter' && t.hp > 0 && a.hp > 0) { log(t.name, `reage com ${rea.name}!`, 'ok'); strike(t, { ...basicOf(t), name: rea.name, power: rea.rea.v, el: rea.el, attr: rea.attr }, a, null, 0, { counter: true, nochain: true }); }
+  }
   return down && was;
+}
+// reação automática do alvo: a melhor que ele puder pagar, uma por rodada (esquiva > bloqueio > absorção > revide)
+const REA_ORD = { evade: 0, block: 1, absorb: 2, counter: 3 };
+function pickRea(a, s, t, o, sure, pre) {
+  if (o.counter || s.area || !t || t === a || t.enemy === a.enemy || t.hp <= 0 || t.rxT || skipping(t) || t.st.silence || !S.battle.active) return null;
+  const r = (t.skills || []).map(k => S.skills[k]).filter(x => x?.rea && (pre ? x.rea.t === 'evade' && !sure : x.rea.t !== 'evade' && !(x.rea.t === 'counter' && s.kind === 'mental')) && (t[x.res] ?? 0) >= x.cost && (!x.nf || t.form)).sort((x, y) => REA_ORD[x.rea.t] - REA_ORD[y.rea.t])[0];
+  if (!r) return null;
+  t[r.res] -= r.cost; t.rxT = 1; return r;
 }
 // ---------- ação de combate (jogador aprovado, mestre, IA, concentração liberada) ----------
 function doAct(a, m, bonus = 0) {
@@ -505,7 +532,7 @@ function doAct(a, m, bonus = 0) {
     a.form = m.skill; a.st.form = s.form.dur + 1;
     log(a.name, `assume a forma ${s.name}!`, 'ok', { fx: { id: a.id, a: a.id, s: s.name, el: s.el, heal: 0 } });
     const t = hitFx(a, s, a, { stat }); if (t) log(a.name, t.trim(), 'ok');
-    onceFx(a, s, stat);
+    onceFx(a, s, stat); a.lastSk = s.name;
     endTurn(a.id, s.ct); return true;
   }
   const inB = battlers(), heal = s.kind === 'heal', util = s.kind === 'util', off = !heal && !util;
@@ -524,6 +551,8 @@ function doAct(a, m, bonus = 0) {
   const ch = s.fx?.find(f => f.t === 'chain');
   if (ch && off && ts.length === 1) inB.filter(o => o.enemy === ts[0].enemy && o !== ts[0] && o.hp > 0).sort(() => Math.random() - .5).slice(0, ch.n).forEach((o, i) => strike(a, s, o, null, bonus, { mult: ch.m ** (i + 1), plus }));
   onceFx(a, s, stat);
+  if (a.bt.combo) { delete a.bt.combo; log(a.name, `COMBO! ${s.name} logo depois de ${a.lastSk}.`, 'ok'); }
+  a.lastSk = s.name;
   if (s.summon) summonOf(a, s);
   if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }
   if (off && a.st.stealth) delete a.st.stealth;

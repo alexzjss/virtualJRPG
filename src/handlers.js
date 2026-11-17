@@ -171,7 +171,7 @@ const H = {
     }
     if (!m.on && S.battle.active) { if (S.meal && --S.meal.left <= 0) delete S.meal; Object.values(S.chars).forEach(o => { delete o.sharp; }); } // refeição e arma afiada valem por uma batalha
     S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
-    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
+    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
     if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
     if (m.on) { // ganchos de ofício: emboscada, canção, armadilha e companheiros
       const hs = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.enemy), emb = Math.max(0, ...hs.map(h => OF.hook(h, 'emb'))), T = S.battle.ticks;
@@ -273,7 +273,7 @@ const H = {
   },
   // ----- descanso e acampamento -----
   camp(c, m) { if (c.role === 'gm') S.camp = { open: !!m.on, acts: {} }; },
-  pause(c, m) { if (c.role === 'gm') S.paused = !!m.on; }, // mesa em pausa: jogadores e TV veem a tela de titulo
+  pause(c, m) { if (c.role === 'gm') S.paused = !!m.on; }, // mesa em pausa: jogadores e TV veem a tela de título
   campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && (CAMP.includes(m.k) || hasNode(ch, n => n.camp === m.k))) { S.camp.acts[m.id] = m.k; (S.camp.with ??= {})[m.id] = S.chars[m.w] && !S.chars[m.w].enemy && m.w !== m.id ? m.w : ''; } },
   rest(c, m) { // Sanidade não volta com descanso: só itens, skills, "conversar" no acampamento ou o mestre
     if (c.role !== 'gm' || S.battle.active) return;

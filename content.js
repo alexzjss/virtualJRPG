@@ -31,6 +31,7 @@ export function expand(o) {
   if (fm) out.form = parseForm(fm, w);
   if (dom) out.dom = parseDom(dom, w);
   if (trio) out.trio = String(trio).split('|');
+  if (o.rea) { const [t, v] = String(o.rea).split(/\s+/); if (!globalThis.RULES.REA[t] || Number.isNaN(+v)) throw new Error(`reação inválida "${o.rea}" em ${w}`); out.rea = { t, v: +v }; }
   if (mod) out.mod = kv(mod, w);
   if (bon) out.bon = kv(bon, w);
   if (up) out.up = { ...up, ...(up.fx ? { fx: parseFx(up.fx, w) } : {}) };
@@ -44,7 +45,7 @@ export function expand(o) {
 // Cada ramo é uma corrente de casas vizinhas, então sempre dá para percorrê-lo.
 export const ORDER = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'aura', 'amaterasu', 'tsukuyomi', 'oculto', 'shukketsu', 'hiruko'];
 export function buildSkills(sk) {
-  const N = 91, C = 45, G = {}, used = new Map(); // casa "x,y" → elemento
+  const N = 111, C = 55, G = {}, used = new Map(); // casa "x,y" → elemento
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !used.has(x + ',' + y);
   const node = (o, el, extra = {}) => { const { n, k, a, p, c, ...rest } = expand(o); return sk(n, k, a || 'FOR', el, p || 0, c || 0, 0, 0, { ...rest, ...extra }); };
   const put = (x, y, s) => { used.set(x + ',' + y, s.el); G['g' + Object.keys(G).length] = { ...s, gx: x, gy: y }; return [x, y]; };
