@@ -162,7 +162,8 @@ const H = {
       }
       const best = pcs.map(p => [p, S.battle.stats?.[p.id]]).filter(([, st]) => st?.dmg > 0).sort((x, y) => y[1].dmg - x[1].dmg)[0]; // quem mais causou dano
       const mvp = best ? ` Destaque: ${best[0].name} (${best[1].dmg} de dano${best[1].crit ? `, ${best[1].crit} crítico${best[1].crit > 1 ? 's' : ''}` : ''}).` : '';
-      log('Mestre', `Vitória! +${xp} XP e +${gold} de ouro para cada herói.${drops.length ? ' Espólios: ' + drops.join(', ') + '.' : ''}${mvp}`, 'ok');
+      const res = { xp, gold, drops, mvp: best?.[0].id || '', st: pcs.map(p => ({ id: p.id, name: p.name, color: p.color, img: p.img || '', dmg: 0, heal: 0, crit: 0, ko: 0, ...S.battle.stats?.[p.id] })) }; // tela de resultado do cliente
+      log('Mestre', `Vitória! +${xp} XP e +${gold} de ouro para cada herói.${drops.length ? ' Espólios: ' + drops.join(', ') + '.' : ''}${mvp}`, 'ok', { res });
       for (const ct of Object.values(S.contracts)) if (!ct.done && dead.some(d => (d.tpl || d.name) === ct.target)) { // contratos de caça cumpridos
         ct.done = true; pcs.forEach(p => { p.gold += Math.floor(ct.gold / pcs.length); p.xp += ct.xp; });
         log('Mestre', `Contrato cumprido: ${ct.target}! +${Math.floor(ct.gold / pcs.length)} de ouro e +${ct.xp} XP para cada herói.`, 'ok');

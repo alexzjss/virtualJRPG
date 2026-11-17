@@ -41,15 +41,19 @@ Na janela **Cena**, "Mostrar a todos" abre um texto e/ou uma imagem (carta, retr
 ## Interface
 - Perguntas e confirmações aparecem em janelas do próprio jogo (nada de caixas do navegador); exclusões pedem confirmação.
 - Barra de ferramentas no mapa: zoom, enquadrar, régua, área, sinal e, para o mestre, marcador e névoa. Funciona no toque.
-- **Ctrl+K** (mestre): busca rápida de janelas, cenas, fichas, ações, sons e inimigos. Tecla **?**: lista de atalhos.
+- **Ctrl+K** (mestre): busca rápida de painéis, cenas, fichas, ações, sons e inimigos; "Restaurar os painéis" volta ao arranjo padrão. Tecla **?**: lista de atalhos.
 - Histórico com filtro (tudo, conversa, rolagens) e hora de cada linha ao passar o mouse.
 - O jogador é avisado quando chega a vez dele (aviso, som, vibração e título da aba); o mestre vê na aba quantos pedidos esperam.
 - Mudança de cena mostra o nome da cena em destaque para jogadores e mesa.
-- Mestre: duplo clique no título recolhe a janela; arrastar uma imagem para a tela troca o mapa (ou o retrato, se soltar sobre uma ficha) e um áudio vira trilha.
+- **Mestre em painéis fixos:** as janelas viraram abas em quatro docas (duas à esquerda, duas à direita). Arraste uma aba para outra doca; arraste a borda de uma lateral para mudar a largura. O arranjo fica salvo no navegador. Bestiário, Skills, Itens, Catálogo, Forja e as fichas abertas se abrem por cima do centro (⇤ encolhe para a doca; Esc fecha a ficha). Em batalha o centro mostra o palco em cima, a barra de ações do turno (mesma lista do jogador, teclas 1–9) e o mapa embaixo, com divisor arrastável.
+- **Menos botões:** a Cena deixa à mostra a batalha (botão principal), personagens, descanso, cenas, clima e névoa; mapa, grade, recursos e fundo da batalha ficam em seções **Mais…** (a que estiver aberta é lembrada). Nos cartões de Fichas, **⋯** (ou botão direito) abre Ver como, Assumir, Tirar do mapa, Salvar no bestiário e condições; as ações em lote só aparecem com fichas selecionadas.
+- **Combate encenado** (cerca de 1,5 s por ação, igual para mestre, jogadores e mesa): o dado vira um número que gira; Crítico e Fraqueza ganham um corte com o retrato; Limite e Expansão de Domínio, uma cena curta com o retrato (ou a letra e o kanji do Vínculo); Quebra estilhaça, o nocaute derruba o cartão; o turno inimigo escurece o palco com a faixa vermelha; a batalha abre com uma entrada e termina numa tela de resultado (XP, ouro, espólios, dano, críticos e nocautes de cada herói). Condições viram ícones animados e a ordem de turnos traz mini retratos.
+- **Comando do jogador** em lista inclinada: `1`–`9` escolhem o comando, ↑/↓ andam na lista de skills ou itens, ←/→ trocam o alvo (seta sobre o cartão no palco) e Enter age. Fora do combate, XP, ouro, skill e item ganhos aparecem num selo animado.
+- Mestre: arrastar uma imagem para a tela troca o mapa (ou o retrato, se soltar sobre uma ficha) e um áudio vira trilha.
 
 ## Organização do código
 - `server.js` é só a entrada. `src/config.js` (caminhos, chave), `consts.js` (tabelas de regras), `state.js` (estado, migrações, gravação), `rules.js` (combate, inimigos, fila), `handlers.js` (ações dos clientes), `net.js` (HTTP e WebSocket), `auth.js`, `seed.js`, `campaign.js` (campanhas, cópias, diário, pacotes) e `media.js` (som e extras do mapa).
-- `public/js/`: `nucleo.js` (constantes, login, conexão), `sessao.js`, `palco.js` (batalha e mapa), `mestre.js` (janelas do mestre), `paginas.js` (telas do jogador), `tela.js` (desenho e efeitos), `extras.js` (Campanha, Som, marcadores), `ux.js` (diálogos, ferramentas do mapa, busca rápida, ajuda) e `eventos.js`. São scripts comuns carregados nessa ordem.
+- `public/js/`: `nucleo.js` (constantes, login, conexão), `sessao.js`, `palco.js` (batalha e mapa), `mestre.js` (painéis do mestre), `paginas.js` (telas do jogador), `tela.js` (desenho), `coreo.js` (coreografia do combate: dados, cortes, cutscenes, resultado), `docas.js` (painéis fixos do mestre, só em `gm.html`), `extras.js` (Campanha, Som, marcadores), `ux.js` (diálogos, ferramentas do mapa, busca rápida, ajuda) e `eventos.js`. São scripts comuns carregados nessa ordem.
 
 ## Pedidos e aprovação do mestre
 Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, itens fora de combate (usar, equipar, comprar, vender, forjar, descartar) e ações de acampamento do jogador viram **pedidos**. Mover o token e passar a vez não pedem aprovação.
@@ -59,7 +63,7 @@ Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, it
 - HP, Aura, Sanidade e Limite só o mestre altera.
 
 ## Ferramentas do mestre
-- Na janela **Fichas**, clique em qualquer número para editar (aceita `+5` ou `-12`). Clique nas fichas para selecionar e aplique dano, cura, Aura, Sanidade, XP, ouro, condição ou item a todas de uma vez.
+- No painel **Fichas**, clique em qualquer número para editar (aceita `+5` ou `-12`). Clique nas fichas para selecionar e aplique dano, cura, Aura, Sanidade, XP, ouro, condição ou item a todas de uma vez.
 - Na ficha aberta: clique no número do atributo para editar e na sigla para rolar; busca por nome para entregar itens e dar ou tirar skills sem custo.
 - **Ver como** abre a tela de um jogador em outra aba, só para olhar.
 
@@ -70,14 +74,14 @@ Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, it
 - Na vez do jogador, o primeiro inimigo de pé já vem escolhido como alvo. Ninguém gasta o turno golpeando quem já caiu.
 - Quando o último inimigo cai, o mestre recebe um aviso e o botão **Vitória** pisca. A mensagem de vitória aponta o destaque da batalha (quem causou mais dano e quantos críticos).
 - Passe o mouse sobre uma condição (Queimadura, Medo, ATQ↑…) para ver o que ela faz.
-- **Assumir** (janelas Fichas e Sessão) abre a tela de um jogador para o mestre jogar por ele, sem fila de pedidos. Personagens sem dono o mestre controla pela janela Batalha e pela ficha.
+- **Assumir** (janelas Fichas e Sessão) abre a tela de um jogador para o mestre jogar por ele, sem fila de pedidos. Personagens sem dono o mestre controla pela barra de ações sob o palco e pela ficha.
 
 ## Atalhos no PC
 - Mapa: roda do mouse = zoom, botão do meio ou Espaço+arrastar = mover, `0` = recentrar
 - Alt+arrastar = régua em casas; duplo clique no mapa = ping para todos
 - Clique direito no token = menu; duplo clique no token = abrir a ficha
 - Batalha: `1`–`9` = comandos, Tab = trocar alvo, Enter = chat, Esc = fechar/cancelar
-- Mestre: Shift+clique em Exploração/Batalha/Preparo salva o arranjo de janelas atual
+- Mestre: arrastar as abas entre as docas monta o arranjo, salvo no navegador
 
 ## Balanceamento
 Os números ficam em `R` no topo de `src/consts.js`. `node tools/sim.js 500` simula batalhas 4x4 com as regras reais;

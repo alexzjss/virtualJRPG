@@ -61,7 +61,7 @@ app.addEventListener('click', e => {
   if (sl) { selCh = sl.dataset.sel; return render(); }
   if (!d && u) { if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
-  if (d.a === 'openSheet') { if (gm) wins['f_' + d.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200 + 24 * (zc % 8))), y: 50 + 20 * (zc % 6), open: true, z: ++zc }; else { pg = 'pers'; selCh = d.id; } return render(); }
+  if (d.a === 'openSheet') { if (gm) gOpen('f_' + d.id); else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
     if (e.shiftKey) { saved[d.k] = wins; localStorage.vj_lay = JSON.stringify(saved); return toast(`Arranjo "${d.k}" salvo.`, 'ok'); }
@@ -214,7 +214,7 @@ app.addEventListener('mousedown', e => { if (e.button === 1 && e.target.closest(
 app.addEventListener('contextmenu', e => { const t = e.target.closest('.tok'); if (t) { e.preventDefault(); ctx = { id: t.dataset.id, x: e.clientX, y: e.clientY }; render(); } });
 app.addEventListener('dblclick', e => {
   const t = e.target.closest('.tok'), m = e.target.closest('.map');
-  if (t && mine(S.chars[t.dataset.id])) { if (gm) wins['f_' + t.dataset.id] = { x: Math.max(8, Math.min(innerWidth - 1090, 200)), y: 50, open: true, z: ++zc }; else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
+  if (t && mine(S.chars[t.dataset.id])) { if (gm) gOpen('f_' + t.dataset.id); else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
   if (m && role !== 'table' && !fogMode) send({ t: 'ping', ...cell(e, m) });
 });
 const drawRuler = e => {
@@ -248,11 +248,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();
     else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (aim) aim = null;
-    else if (gm) { const top = Object.keys(wins).filter(k => wins[k].open).sort((x, y) => (wins[y].z || 0) - (wins[x].z || 0))[0]; if (top) { wins[top].open = false; localStorage.vj_wins = JSON.stringify(wins); } }
+    else if (gm) { const f = DOCKS.map(d => dock.act[d]).find(k => k && isWide(k)); if (f) { if (f.startsWith('f_')) gClose(f); else { dock.nar[f] = 1; saveDock(); } } } // fecha a ficha aberta ou encolhe a aba larga
     return render();
   }
   if (e.target.matches('input,textarea,select')) return;
   if (gm && (e.key === 'Enter' || e.key === 'Delete')) { const first = Object.entries(S.reqs).sort((a, b) => a[1].n - b[1].n)[0]; if (first) { e.preventDefault(); return send(e.key === 'Enter' ? { t: 'reqOk', id: first[0], ...reqUi[first[0]] } : { t: 'reqNo', id: first[0] }); } }
+  if (e.key === 'Enter' && !gm && S.battle.active) { const go = app.querySelector('.cmd.mine .cmd-go .go:not(:disabled)'); if (go && !e.target.matches('button')) { e.preventDefault(); go.click(); return; } } // na sua vez, Enter age
   if (e.key === 'Enter') { const c = app.querySelector('.chat'); if (c) { e.preventDefault(); c.focus(); } return; }
   if (e.key === '0') { Object.assign(view, { z: 1, x: 0, y: 0 }); return applyView(); }
   if (!S.battle.active) return;
@@ -260,7 +261,15 @@ document.addEventListener('keydown', e => {
     const ids = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0).sort((x, y) => y.enemy - x.enemy).map(c => c.id);
     e.preventDefault(); tgt = ids[(ids.indexOf(tgt) + (e.shiftKey ? ids.length - 1 : 1)) % ids.length]; aim = null; return render();
   }
-  if (e.key >= '1' && e.key <= '9') app.querySelectorAll(gm ? '.battle .row button' : '.cmd .alist button')[e.key - 1]?.click();
+  if (!gm && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { // seta do alvo: pula entre os cartões
+    const ids = [...app.querySelectorAll('.cmd .tgs .tg:not(.ko)')].map(b => b.dataset.tgt); if (!ids.length) return;
+    e.preventDefault(); tgt = ids[(Math.max(0, ids.indexOf(tgt)) + (e.key === 'ArrowLeft' ? ids.length - 1 : ids.indexOf(tgt) < 0 ? 0 : 1)) % ids.length]; aim = null; return render();
+  }
+  if (!gm && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { // anda na lista de skills/itens
+    const os = [...app.querySelectorAll('.cmd .alist .opt:not(:disabled)')]; if (!os.length) return;
+    e.preventDefault(); const i = os.findIndex(o => o.classList.contains('on')); os[(i + (e.key === 'ArrowUp' ? os.length - 1 : 1) + (i < 0 && e.key === 'ArrowDown' ? os.length - 1 : 0)) % os.length].click(); return;
+  }
+  if (e.key >= '1' && e.key <= '9') app.querySelectorAll(gm ? '.gcmd .p5i' : '.cmd .p5m .p5i')[e.key - 1]?.click();
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => S && render(), 150); });

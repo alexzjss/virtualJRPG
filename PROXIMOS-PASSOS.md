@@ -4,7 +4,7 @@ Leia primeiro: `README.md`, `ARVORE-SISTEMAS.md` (mecânicas e notação dos nó
 O usuário escreve em português; responda e comente o código em português, no estilo existente. Decisões já tomadas não se perguntam de novo: use `AskUserQuestion` só para decisões novas.
 
 ## Como trabalhar
-- `npm install && npm test` (71 testes devem passar) · `npm run audit` (0 erros; 6 avisos conhecidos: 3 de nomes metafóricos, 2 de poder alto nas Pinças do Marcial e 1 na Postura do Falcão) · `npm run ui` (teste de fumaça da interface com Chromium/Playwright; `UI_SHOTS=pasta` guarda capturas, `UI_ONLY=celular` roda só um bloco) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio; `node tools/sim.js 300 armas` para o ataque básico de cada arma.
+- `npm install && npm test` (87 testes devem passar) · `npm run audit` (0 erros; 6 avisos conhecidos: 3 de nomes metafóricos, 2 de poder alto nas Pinças do Marcial e 1 na Postura do Falcão) · `npm run ui` (teste de fumaça da interface com Chromium/Playwright; `UI_SHOTS=pasta` guarda capturas, `UI_ONLY=celular` roda só um bloco) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio; `node tools/sim.js 300 armas` para o ataque básico de cada arma.
 - Compare sempre com a base: encontros (nível 0/1/2, fácil→mortal) estavam em ~90/77/93/73/42/23 e chefes entre 46% e 89%. Variação de ±10 pontos é ruído.
 - Toda mecânica nova ganha teste em `tools/test.js`; as de combate passam pelo simulador antes de entrar.
 - Mudou `tree.js` ou `arvore/`: a grade é refeita ao iniciar (skills ficam pelo nome). Nomes de nós precisam ser únicos (`npm run audit` confere).
@@ -38,6 +38,11 @@ A divisão de `app.js`/`server.js` em módulos (`acedabf`) foi feita a partir de
 - A Cadeia é só dos heróis (`addChain`); dar Cadeia aos inimigos deixou os encontros bem mais difíceis.
 - `normSlots` roda a cada `push()`: passivas lidas na hora (mod, gatilho, voto, amplificação) só valem se estiverem nos slots; passivas de atributo e de `bon` valem sempre.
 - O id do Vínculo de Hiruko é `hiruko`; estados salvos com `radiacao` são convertidos ao iniciar.
+
+## Revisão da interface (branch `revisao-ui`)
+Decisões do dono, para não perguntar de novo: jogo online, cada um no seu PC; combate estilo Persona, ~1,5 s por ação, o mestre vê as mesmas animações; sem opção de reduzir movimento; cartões do palco ficam como estão; dado 3D só fora do combate; menu de comando em lista inclinada com 1–9; ordem de turnos no topo com mini retratos; mestre em painéis laterais fixos com abas arrastáveis (salvas no navegador), palco em cima e mapa embaixo na batalha, faixa de pedidos no topo, barra de ações do inimigo sob o palco; resolução mínima do mestre 1366×768; `/painel` não é usado.
+Feito: `coreo.js` (coreografia, sons novos sintetizados, tela de resultado com `res` no log da vitória e `S.battle.stats[id].ko`), menu do jogador, `docas.js` (painéis do mestre), seções Mais… e ⋯ nos cartões, selos de ganho do jogador.
+Falta olhar com gente de verdade: a Expansão de Domínio só foi vista no teste de regras; o `npm run ui` precisa do Playwright e não rodou nesta revisão (seletores da Forja já atualizados para as abas).
 
 ## Interface testada (sessão `interface-mesa`)
 `npm run ui` sobe o jogo no mesmo processo (usa `server`/`push` exportados por `server.js`), abre mestre, Ana (celular), Bia e a mesa no Chromium e confere, com ~60 verificações e zero erro de console: tela de batalha do jogador (Defender, Concentrar, Coragem, Passar a Vez, Ataque Total), faixa de clima/Cadeia/Domínio, barra de Quebra, aprovação de rolagem com Vantagem/Desvantagem e negar com motivo, "Conversar com" no acampamento (até o laço subir no descanso longo), aba Ofícios (Iniciação, aprender nó, usar ação), sons e animações, e uma auditoria de celular (transbordo lateral, botões de toque < 34 px, barra de navegação, fim da página atrás da barra). Não faz parte de `npm test` (precisa de navegador); sem Playwright ele avisa e sai com 0.

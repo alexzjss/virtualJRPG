@@ -107,7 +107,7 @@ const HELP = [
   ['Mapa', [['Roda do mouse', 'aproximar e afastar'], ['Espaço + arrastar', 'mover o mapa (ou botão do meio)'], ['0', 'enquadrar o mapa'], ['Alt + arrastar', 'régua; com Shift mede área'], ['Duplo clique', 'sinalizar um ponto para todos'], ['Duplo clique no token', 'abrir a ficha'], ['Botão direito no token', 'menu de ações']]],
   ['Batalha', [['Tab', 'próximo alvo (Shift volta)'], ['1 a 9', 'escolher a ação'], ['Esc', 'cancelar mira ou menu']]],
   ['Geral', [['Enter', 'escrever no chat'], ['/r 2d6+1', 'rolar dados no chat'], ['/w nome texto', 'sussurrar'], ['Esc', 'fechar o que estiver aberto'], ['?', 'esta ajuda']]],
-  ['Mestre', [['Ctrl + K', 'busca rápida: janelas, cenas, fichas, ações'], ['Enter / Delete', 'aprovar / negar o primeiro pedido'], ['Ctrl + clique no mapa', 'marcador (com Shift, só seu)'], ['Clique num número da ficha', 'editar; aceita +5 ou -12'], ['Duplo clique no título', 'recolher a janela'], ['Shift + clique num arranjo', 'salvar o arranjo atual'], ['Arrastar um arquivo', 'imagem vira mapa ou retrato; áudio vira trilha']]],
+  ['Mestre', [['Ctrl + K', 'busca rápida: painéis, cenas, fichas, ações'], ['Enter / Delete', 'aprovar / negar o primeiro pedido'], ['Ctrl + clique no mapa', 'marcador (com Shift, só seu)'], ['Clique num número da ficha', 'editar; aceita +5 ou -12'], ['Arrastar uma aba', 'levar o painel para outra doca'], ['Botão do meio na aba', 'fechar a ficha'], ['Shift + clique num arranjo', 'salvar o arranjo atual'], ['Arrastar um arquivo', 'imagem vira mapa ou retrato; áudio vira trilha']]],
 ];
 const showHelp = () => overlay(`<div class="dlg card help" role="dialog" aria-modal="true" aria-label="Atalhos"><h3>Atalhos e gestos</h3><div class="helpg">${HELP.filter(([t]) => t !== 'Mestre' || gm).map(([t, rows]) =>
   `<section><h4>${t}</h4>${rows.map(([k, d]) => `<p><kbd>${esc(k)}</kbd><span>${esc(d)}</span></p>`).join('')}</section>`).join('')}</div><div class="row dlg-bt"><button class="own" data-cancel="1">Fechar</button></div></div>`);
@@ -117,14 +117,14 @@ const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase
 function palette() {
   if (!gm || !S || document.querySelector('.pal')) return;
   const items = [], add = (label, hint, run) => items.push({ label, hint, run, k: norm(label + ' ' + hint) });
-  const openWin = id => { wins[id] = { x: 200, y: 60, ...wins[id], open: true, min: false, z: ++zc }; saveWins(); render(); };
-  for (const [id, [t]] of Object.entries(WIN)) add(t, 'janela', () => openWin(id));
+  const openWin = id => { gOpen(id); render(); };
+  for (const [id, [t]] of Object.entries(WIN)) if (id !== 'batalha') add(t, 'painel', () => openWin(id));
   add(S.battle.active ? 'Encerrar batalha' : 'Iniciar batalha', 'ação', () => send({ t: 'battle', on: !S.battle.active }));
   add('Descanso curto', 'ação', () => send({ t: 'rest' })); add('Descanso longo', 'ação', () => send({ t: 'rest', long: true })); add('Desfazer a última ação', 'ação', () => send({ t: 'undo' }));
   add('Cópia de segurança agora', 'ação', () => send({ t: 'bkNow' })); add('Atalhos e gestos', 'ajuda', showHelp);
   for (const [id, s] of Object.entries(S.scenes)) if (id !== S.scene) add(s.name, 'ir para a cena', () => send({ t: 'sceneGo', id }));
   for (const c of Object.values(S.chars)) add(c.name, c.enemy ? 'ficha de inimigo' : 'ficha', () => openWin('f_' + c.id));
-  for (const k of Object.keys(LAYD)) add(k, 'arranjo de janelas', () => app.querySelector(`[data-a="lay"][data-k="${k}"]`)?.click());
+  add('Restaurar os painéis', 'arranjo', () => { dock = structuredClone(DOCK0); saveDock(); render(); });
   for (const [k, l] of Object.entries(SFXL)) add(l, 'efeito sonoro', () => send({ t: 'sfx', k }));
   for (const [k, l] of Object.entries(AMBL)) add(l, S.audio?.amb === k ? 'parar ambiência' : 'ambiência', () => send({ t: 'audio', f: 'amb', v: S.audio?.amb === k ? '' : k }));
   for (const [id, t] of Object.entries(S.tracks || {})) add(t.name, 'tocar faixa', () => send({ t: 'audio', f: 'url', v: t.url }));
