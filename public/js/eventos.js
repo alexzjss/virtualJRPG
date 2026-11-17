@@ -253,6 +253,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.target.matches('input,textarea,select')) return;
   if (gm && (e.key === 'Enter' || e.key === 'Delete')) { const first = Object.entries(S.reqs).sort((a, b) => a[1].n - b[1].n)[0]; if (first) { e.preventDefault(); return send(e.key === 'Enter' ? { t: 'reqOk', id: first[0], ...reqUi[first[0]] } : { t: 'reqNo', id: first[0] }); } }
+  if (e.key === 'Enter' && !gm && S.battle.active) { const go = app.querySelector('.cmd.mine .cmd-go .go:not(:disabled)'); if (go && !e.target.matches('button')) { e.preventDefault(); go.click(); return; } } // na sua vez, Enter age
   if (e.key === 'Enter') { const c = app.querySelector('.chat'); if (c) { e.preventDefault(); c.focus(); } return; }
   if (e.key === '0') { Object.assign(view, { z: 1, x: 0, y: 0 }); return applyView(); }
   if (!S.battle.active) return;
@@ -260,7 +261,15 @@ document.addEventListener('keydown', e => {
     const ids = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0).sort((x, y) => y.enemy - x.enemy).map(c => c.id);
     e.preventDefault(); tgt = ids[(ids.indexOf(tgt) + (e.shiftKey ? ids.length - 1 : 1)) % ids.length]; aim = null; return render();
   }
-  if (e.key >= '1' && e.key <= '9') app.querySelectorAll(gm ? '.battle .row button' : '.cmd .alist button')[e.key - 1]?.click();
+  if (!gm && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { // seta do alvo: pula entre os cartões
+    const ids = [...app.querySelectorAll('.cmd .tgs .tg:not(.ko)')].map(b => b.dataset.tgt); if (!ids.length) return;
+    e.preventDefault(); tgt = ids[(Math.max(0, ids.indexOf(tgt)) + (e.key === 'ArrowLeft' ? ids.length - 1 : ids.indexOf(tgt) < 0 ? 0 : 1)) % ids.length]; aim = null; return render();
+  }
+  if (!gm && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { // anda na lista de skills/itens
+    const os = [...app.querySelectorAll('.cmd .alist .opt:not(:disabled)')]; if (!os.length) return;
+    e.preventDefault(); const i = os.findIndex(o => o.classList.contains('on')); os[(i + (e.key === 'ArrowUp' ? os.length - 1 : 1) + (i < 0 && e.key === 'ArrowDown' ? os.length - 1 : 0)) % os.length].click(); return;
+  }
+  if (e.key >= '1' && e.key <= '9') app.querySelectorAll(gm ? '.gcmd .p5i' : '.cmd .p5m .p5i')[e.key - 1]?.click();
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => S && render(), 150); });

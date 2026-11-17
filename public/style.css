@@ -877,3 +877,54 @@ button.wpn{border-bottom-color:var(--gold)}
 .fxl .threat{justify-content:flex-start;animation-name:threatl}.fxl .threat div{padding:.4vw 3vw .6vw 8vw}
 @keyframes threatl{0%{clip-path:inset(0 100% 0 0)}16%,76%{clip-path:inset(0)}100%{clip-path:inset(0 0 0 100%)}}
 .rs-in{overflow-x:hidden;padding:8px 16px 8px 8px}
+
+/* ================= COMANDO DO JOGADOR: menu estilo Persona (lista inclinada + lista branca ao lado) ================= */
+.cmd.p5 .cmd-g{grid-template-columns:minmax(200px,.7fr) minmax(170px,.48fr) minmax(0,1.5fr);gap:18px}
+.p5m{list-style:none;margin:0;padding:4px 0 0 6px;display:flex;flex-direction:column;gap:4px}
+.p5i{position:relative;width:100%;display:flex;align-items:center;gap:10px;min-height:38px;padding:4px 14px 4px 10px;text-align:left;background:var(--ink3);border:0;border-left:5px solid var(--red);transform:skewX(-12deg);transition:transform .12s,background .12s,width .12s;font:400 19px/1 var(--disp);letter-spacing:1px;text-transform:uppercase;color:var(--paper)}
+.p5i>*{transform:skewX(12deg)}.p5i kbd{min-width:20px;padding:1px 5px;font-size:11px;color:var(--dim);background:transparent;border-color:#ffffff22}
+.p5i span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.p5i i{font:600 12px var(--cond);font-style:normal;color:var(--dim)}
+.p5i:hover:not(:disabled),.p5i:focus-visible{background:var(--red);color:#fff;transform:skewX(-12deg) translateX(8px)}
+.p5i.on{background:var(--red);color:#fff;border-left-color:var(--gold);transform:skewX(-12deg) translateX(14px);box-shadow:5px 5px 0 #000}
+.p5i.on i,.p5i.on kbd{color:#fff}.p5i.act{background:var(--ink2);border-left-color:var(--line);font-size:16px;min-height:32px}
+.p5i.act.on{background:var(--gold);color:var(--ink);border-left-color:var(--ink)}.p5i.debt{border-left-color:var(--bad);color:var(--bad)}
+.p5i.allout{background:var(--red);border-left-color:var(--gold);animation:pulse 1s infinite alternate}
+.p5i:disabled{opacity:.35}
+.p5s{gap:10px}
+.cmd.p5 .alist{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:5px;max-height:232px;padding:2px 8px 6px 2px}
+.cmd.p5 .opt{transform:skewX(-8deg);min-height:50px;background:var(--paper);color:var(--ink);border:0;border-left:5px solid var(--ink);box-shadow:3px 3px 0 #000;animation:optin .22s cubic-bezier(.2,1.2,.4,1) both}
+.cmd.p5 .opt>*{transform:skewX(8deg)}.cmd.p5 .opt i{color:#17508f}.cmd.p5 .opt small{color:#444}
+.cmd.p5 .opt:nth-child(2){animation-delay:.03s}.cmd.p5 .opt:nth-child(3){animation-delay:.06s}.cmd.p5 .opt:nth-child(4){animation-delay:.09s}.cmd.p5 .opt:nth-child(n+5){animation-delay:.12s}
+.cmd.p5 .opt:hover:not(.on):not(:disabled){background:#fff;border-left-color:var(--red)}
+.cmd.p5 .opt.on{background:var(--gold);color:var(--ink);border-left-color:var(--red);box-shadow:4px 4px 0 var(--red)}
+.cmd.p5 .opt:disabled{background:#cfcac0;opacity:.7}.cmd.p5 .opt:disabled small{color:#a0001a}
+@keyframes optin{from{opacity:0;translate:-14px 0}}
+.p5t{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.p5t>small{font:600 11px var(--cond);letter-spacing:1.5px;text-transform:uppercase;display:flex;gap:4px;align-items:center}
+.p5t kbd{padding:0 5px;font-size:11px}
+.cmd.p5 .tgs{flex:1;display:flex;flex-wrap:wrap;gap:5px;max-height:none}
+.cmd.p5 .tg{flex:0 1 150px;min-height:44px;padding:5px 9px;transform:skewX(-8deg)}.cmd.p5 .tg>*{transform:skewX(8deg)}
+.cmd.p5 .tg.on{box-shadow:0 0 0 2px var(--gold),3px 3px 0 var(--red)}
+.p5x{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.p5x select{max-width:260px;min-height:34px}
+.cmd-go .go kbd{margin-left:8px;font-size:11px;padding:0 5px;background:#0003;border-color:#0004;color:inherit}
+@media(max-width:1250px){.cmd.p5 .cmd-g{grid-template-columns:minmax(150px,.5fr) minmax(0,1.5fr)}}
+@media(max-width:700px){.cmd.p5 .cmd-g{grid-template-columns:1fr}.p5m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:0}.p5i{font-size:15px;min-height:40px;padding:4px 8px}.p5i kbd{display:none}.p5i.on{transform:skewX(-12deg)}.cmd-go .go kbd,.p5t kbd{display:none}}
+/* seta sobre o alvo no palco (substitui a etiqueta "ALVO") */
+.unit.tgt::after{content:"▼";left:50%;top:-3.4cqw;translate:-50% 0;padding:0;background:none;font:400 2.6cqw/1 var(--disp);color:var(--red);-webkit-text-stroke:.15cqw #000;filter:drop-shadow(.2cqw .3cqw 0 #000);animation:tgarrow .5s ease-in-out infinite alternate;z-index:5}
+.unit.cur.tgt::before{display:none}
+@keyframes tgarrow{to{transform:translateY(.7cqw)}}
+/* compacto: os 4 comandos principais em lista; as ações de turno numa grade 2×2 logo abaixo */
+.p5m{display:grid;grid-template-columns:1fr 1fr;gap:4px 6px;align-content:start}.p5m li{grid-column:1/-1}.p5m li:has(.act){grid-column:auto}
+.p5i{min-height:34px;font-size:18px}.p5i.act{min-height:28px;font-size:13px;padding:2px 8px 2px 6px;gap:6px;border-left-width:3px}.p5i.act kbd{min-width:0;padding:0 3px;font-size:10px}
+.p5i.act:hover:not(:disabled),.p5i.act:focus-visible{transform:skewX(-12deg)}
+.cmd.p5 .tg{flex:0 1 132px;min-height:34px;padding:4px 8px;gap:3px}.cmd.p5 .tg small{display:none}.cmd.p5 .tg b{font-size:13px}.cmd.p5 .tg .bar{height:5px}
+.cmd.p5 .opt{min-height:44px;padding:6px 10px}.cmd.p5 .opt small{font-size:11.5px;line-height:1.25}
+@media(min-width:1000px){.pl.pg-mesa .cmd.p5 .alist{max-height:150px}.pl.pg-mesa .stage{height:clamp(215px,calc(100vh - 430px),540px)}}
+.cmd.p5 .p5s{padding-left:14px;position:relative;z-index:1}
+@media(min-width:1000px){.pl.pg-mesa .stage{height:clamp(215px,calc(100vh - 575px),540px)}}
+.p5m li,.p5m li:has(.act){grid-column:auto}.p5i.on{transform:skewX(-12deg) translateX(6px)}.p5i:hover:not(:disabled):not(.on){transform:skewX(-12deg) translateX(4px)}
+.p5i,.p5i.act{min-height:34px;font-size:16px;padding:3px 10px 3px 8px;gap:8px}.p5i.act{font-size:14px}
+.cmd.p5 .cmd-g{grid-template-columns:minmax(190px,.62fr) minmax(250px,.62fr) minmax(0,1.5fr)}
+@media(min-width:1000px){.pl.pg-mesa .stage{height:clamp(240px,calc(100vh - 470px),560px)}}
+.cmd.p5 .cmd-h .fbar{margin:0 0 0 auto}.cmd.p5{gap:10px}.cmd.p5 .cmd-go{padding:6px 10px}
+.cmd.p5 .tg{flex:0 1 118px}.p5t{align-items:flex-start}.p5t>small{padding-top:8px}
+@media(min-width:1000px){.pl.pg-mesa .stage{height:clamp(240px,calc(100vh - 520px),560px)}}
