@@ -4,7 +4,9 @@ import { S, log, newScene } from './state.js';
 import { ATTRS, BBG, CAMP, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TIER, VN, it, sk } from './consts.js';
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
-import { kick, tell, tell0 } from './net.js';
+import { kick, push, tell, tell0 } from './net.js';
+import { derive, parriers, parNode } from './rules.js';
+const PARRY_W = 1600; // duração da janela de Aparar (ms)
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
@@ -204,7 +206,19 @@ const H = {
     scene().wx = k; if (S.battle.active) S.battle.wx = { k, ttl: 0 };
     log('Mestre', k ? `Clima: ${RU.CLIMA[k][0]}.` : 'O clima volta ao normal.');
   },
-  ai(c) { const a = S.chars[current()]; if (c.role === 'gm' && S.battle.active && a?.enemy) aiAct(a); }, // IA do inimigo da vez
+  ai(c) { // IA do inimigo da vez; se algum herói pode Aparar, abre antes a janela do botão e o golpe sai quando ela fecha
+    const a = S.chars[current()]; if (S.battle.parry && Date.now() > S.battle.parry.at + S.battle.parry.w + 3000) S.battle.parry = null; // janela velha (servidor reiniciado)
+    if (c.role !== 'gm' || !S.battle.active || !a?.enemy || S.battle.parry) return;
+    if (!parriers(a).length) return aiAct(a);
+    S.battle.parry = { foe: a.id, at: Date.now(), w: PARRY_W, p: {} };
+    setTimeout(() => { const P = S.battle.parry; if (P?.foe !== a.id) return; try { if (S.battle.active && current() === a.id) aiAct(a); } catch (e) { console.error(e); } if (S.battle.parry === P) S.battle.parry = null; push(); }, PARRY_W + 200);
+  },
+  parry(c, m) { // o jogador aperta Aparar: paga a Aura na hora; vale se cair nos últimos `par` ms da janela
+    const ch = S.chars[m.id], P = S.battle.parry, n = ch && parNode(ch);
+    if (!P || !n || !can(c, ch) || ch.enemy || P.p[ch.id] || ch.parT || ch.hp <= 0 || ch.aura < (n.cost || 0)) return;
+    ch.aura -= n.cost || 0; ch.parT = 1;
+    const left = P.at + P.w - Date.now(); P.p[ch.id] = left <= n.par && left >= -200 ? 'ok' : 'bad';
+  },
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
     const ch = S.chars[m.id], T = S.battle.ticks;
     if (c.role !== 'gm' || !S.battle.active || !ch) return;
@@ -279,6 +293,7 @@ const H = {
     if (c.role !== 'gm' || S.battle.active) return;
     const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), long = !!m.long, notes = [], curto = Math.max(0, ...pcs.map(p => OF.hook(p, 'curto')));
     for (const p of pcs) {
+      if (long && p.scar) { delete p.scar; derive(p); } // cicatrizes (Marca, Técnica Reversa) somem no descanso longo
       p.aura = p.auraMax; p.hp = long ? p.hpMax : Math.min(p.hpMax, p.hp + Math.ceil(p.hpMax * (.5 + curto / 100))); delete p.dying;
       for (const k of PARTS) p.body[k] = long ? 0 : Math.floor((p.body[k] || 0) / 2);
       if (long) { p.st = {}; delete p.afl; p.san = Math.min(p.sanMax, p.san + OF.hook(p, 'sonoSan')); const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }

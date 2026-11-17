@@ -5,19 +5,19 @@
   const DOT = ['burn', 'bleed', 'poison', 'rad'];
   const CTRL = ['stun', 'sleep', 'para', 'frozen', 'possess', 'confuse'];
   const ST = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão',
-    shield: 'Escudo', wet: 'Molhado', oil: 'Oleado', broken: 'Quebrado', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor' };
+    shield: 'Escudo', wet: 'Molhado', oil: 'Oleado', broken: 'Quebrado', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor', mark: 'Marca' };
   // o que cada condição nova faz (as antigas já são conhecidas na mesa)
   const STD = { shield: 'absorve dano antes do HP', regen: 'recupera HP no início do turno', taunt: 'inimigos só conseguem mirar nele', guarded: 'um guarda-costas recebe os golpes no lugar', counter: 'revida golpes corpo a corpo com um ataque', reflect: 'devolve 30% do dano recebido',
     wet: 'conduz raio e vento (reações elementais)', oil: 'queima e explode com fogo e raio', broken: 'perdeu o turno, sofre +50% de dano e não age até se recompor',
     evade: 'o próximo golpe erra', stealth: 'não pode ser alvo direto; o próximo ataque tem +25% e crítico dobrado', focus: '+15% de acerto e enxerga quem está Furtivo', exposed: 'armadura não conta', exaus: '−15% de acerto, −15% de dano e não pode se transformar', seal: 'explode quando acaba ou ao ser detonado',
-    blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental' };
+    blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental', mark: 'Marca do Caçador desperta: +30% de dano, +20% de velocidade e +10% de crítico' };
   // cargas que se acumulam no próprio personagem durante a batalha (efeitos stack/burst): nome e bônus de dano por carga
   const STK = { doenca: ['Doença', 8], carga: ['Carga Elétrica', 6], brasa: ['Brasa', 6], mare: ['Maré', 6], rocha: ['Rocha', 6], vento: ['Vento', 6], luz: ['Luz', 6], sombra: ['Sombra', 6], sangue: ['Sangue', 6], mutacao: ['Mutação', 6], ressonancia: ['Ressonância', 6], impeto: ['Ímpeto', 6], pavor: ['Pavor', 6] };
   // reações: disparam sozinhas no turno do inimigo (1 por rodada, pagando o custo da técnica)
   const REA = { evade: 'esquiva', block: 'bloqueia', absorb: 'absorve', counter: 'revida' };
   const reaText = s => { const r = s.rea; return `reação automática (1×/rodada, paga o custo): ${r.t === 'evade' ? `${r.v}% de esquivar do golpe` : r.t === 'block' ? `bloqueia ${r.v}% do dano` : r.t === 'absorb' ? `absorve ${r.v}% do dano como Aura` : `revida com poder ${r.v}`}`; };
   const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal'];
-  const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt'];
+  const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt', 'mark'];
   // Aflições (Sanidade zerada e teste de SAB falho) e Virtudes (crítico): valem até o descanso longo
   const AFL = {
     paranoia: ['Paranoia', 'Desconfia de todos: −10% de acerto e −10% de defesa.', { hit: -10, def: -10 }],
@@ -113,8 +113,8 @@
   // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
   const FXTO = new Set(['self', 'ally', 'foes', 'tgt']);
   const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'], stack: ['k', 'n'], burst: ['k', 'm'],
-    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
-  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 } };
+    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], scar: ['r', 'p'], clone: ['n', 'p'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
+  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 }, clone: { n: 1, p: 20 } };
   const FXTXT = new Set(['k', 'r']);
   function parseFx(str, where = '') {
     if (!str) return undefined;
@@ -181,11 +181,13 @@
       case 'turn': return 'você age de novo';
       case 'clima': return `muda o clima para ${CLIMA[f.k]?.[0] || f.k} por ${f.n} rodadas`;
       case 'brk': return `abala a barra de Quebra do alvo em ${f.n}`;
+      case 'scar': return `cicatriz: −${f.p}% de ${RESN[f.r]} máx.${to} até o descanso longo`;
+      case 'clone': return `cria ${f.n} clone${f.n > 1 ? 's' : ''} (cada um leva ${f.p}% do seu HP atual e causa metade do dano)`;
       default: return f.t;
     }
   }
   const fxText = l => (l || []).map(fxOne).join(' · ');
-  const FM = { atk: 'dano', def: 'redução de dano', agi: 'velocidade', hit: 'acerto', crit: 'crítico', atkP: 'poder do ataque básico', heal: 'cura' };
+  const FM = { atk: 'dano', def: 'redução de dano', agi: 'velocidade', hit: 'acerto', crit: 'crítico', bf: 'chance de Black Flash', atkP: 'poder do ataque básico', heal: 'cura' };
   const modText = m => Object.entries(m || {}).map(([k, v]) => k === 'atkP' ? `+${v} ${FM[k]}` : `${pct(v)} ${FM[k] || k}`).join(', ');
   const formText = f => `por ${f.dur} turnos: ${modText(f.m)}${Object.keys(f.dr || {}).length ? ' · drena ' + Object.entries(f.dr).map(([r, v]) => `${v}${r === 'hp' ? '% ' : ' '}${RESN[r]}`).join(' e ') + ' por turno' : ''}${f.ret ? ` · quem erra você perde ${f.ret}% do tempo` : ''}${f.end?.length ? ' · ao acabar: ' + fxText(f.end).replace(/o alvo perde/g, 'perde') : ''}`;
   const ON = { start: 'No início da batalha', turn: 'No início do seu turno', low: 'Ao cair para 30% de HP (1× por batalha)', kill: 'Ao derrubar um inimigo', crit: 'Ao acertar um crítico', weak: 'Ao acertar uma fraqueza', hurt: 'Ao ser ferido', fall: 'Ao receber um golpe fatal (1× por batalha)', heal: 'Ao curar alguém', miss: 'Ao errar', ally: 'Quando um aliado cai' };
@@ -205,6 +207,8 @@
     if (s.fx?.length && s.kind !== 'passive') o.push((s.kind === 'form' ? 'ao assumir: ' : '') + fxText(s.fx));
     if (s.summon) o.push(`invoca ${s.summon}`);
     if (s.rea) o.push(reaText(s));
+    if (s.bf) o.push(`Black Flash: 01-${s.bf} no d100 (+bônus de Black Flash) vira ×2,5 e devolve 25% da Aura`);
+    if (s.par) o.push(`Aparar: no turno do inimigo aparece o botão; aperte nos últimos ${s.par} ms. Só golpe de alvo único e não mental; custa ${s.cost ?? s.c ?? 0} de Aura por tentativa, 1×/rodada. Certo: anula o golpe, +${s.power || 0} Aura, +10 de Limite e abala a Quebra do atacante. Fora do tempo: +50% de dano e Exposto`);
     if (s.combo) o.push(`combo: ×${s.cm || 1.4} logo depois de ${s.combo.split('|').join(' ou ')}`);
     if (s.trio) o.push(`técnica em trio: dois aliados com "${s.trio.join('" e "')}" gastam o próximo turno junto`);
     if (s.dom) o.push(`Expansão de Domínio por ${s.dom.dur} turnos (gasta toda a Aura, exige metade dela; Exausto ao fim): aliados ${modText(s.dom.ally) || '—'} · inimigos ${modText(s.dom.foe) || '—'}${s.dom.tick ? ' · inimigos ganham ' + (ST[s.dom.tick] || s.dom.tick) + ' a cada turno' : ''}`);

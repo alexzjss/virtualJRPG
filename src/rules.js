@@ -40,7 +40,7 @@ const at = (ch, a) => at0(ch, a) - 10 * PARTS.filter(k => BODY[k][0].includes(a)
 const healBody = (ch, v) => { while (v > 0) { const k = PARTS.filter(p => ch.body[p] > 0).sort((x, y) => ch.body[y] - ch.body[x])[0]; if (!k) break; const d = Math.min(v, ch.body[k]); ch.body[k] -= d; v -= d; } };
 // máximos derivados dos atributos (+ bônus de passivas/mestre); valores atuais nunca passam do máximo
 const BASE = { hpMax: ch => Math.floor(at0(ch, 'CON') * R.hpCon) + R.hpBase, auraMax: ch => Math.floor((at0(ch, 'INT') + at0(ch, 'SAB')) / 4), sanMax: ch => Math.floor(at0(ch, 'SAB') / 2) + Math.floor(at0(ch, 'CAR') / 4) };
-const derive = ch => { for (const k in BASE) { ch[k] = Math.max(1, BASE[k](ch) + (ch.bon[k] || 0)); const c = k.slice(0, -3); ch[c] = Math.min(ch[c], ch[k]); } };
+const derive = ch => { for (const k in BASE) { ch[k] = Math.max(1, BASE[k](ch) + (ch.bon[k] || 0) - (ch.scar?.[k] || 0)); const c = k.slice(0, -3); ch[c] = Math.min(ch[c], ch[k]); } };
 const evolveCh = ch => { const up = Object.keys(ch.marks).filter(a => d100() > ch.attrs[a] && ch.attrs[a] < 100); up.forEach(a => ch.attrs[a]++); ch.marks = {}; return up; };
 const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
 // CTB: quanto maior a AGI, menor o intervalo entre turnos
@@ -81,10 +81,11 @@ const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; retu
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
 const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : sc.startsWith('wt:') ? !!(s.basic || s.req || s.wpn) && wtype(ch) === sc.slice(3) : s.el === sc; // wt:<tipo> = maestria de um tipo de arma
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
-  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
+  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0, bf: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
   const f = ch.form && ch.st?.form && SK(ch.form); if (f?.form) add(f.form.m);
   if (vows(ch).includes('tempo')) m.hit += 15;
+  if (ch.st?.mark) add({ atk: 30, agi: 20, crit: 10 }); // Marca do Caçador
   const D = S.battle?.dom; if (D) add(ch.enemy === D.side ? D.ally : D.foe); // Expansão de Domínio aberta
   const af = ch.afl && (ch.afl.t === 'v' ? RU.VIR : RU.AFL)[ch.afl.k]; if (af) add(af[2]); // Aflição ou Virtude
   const wu = ch.up?.[ch.equip?.arma]; // assinatura, runas e arma viva
@@ -295,6 +296,8 @@ function fx1(a, s, t, f, c = {}) {
     case 'stack': { a.stk ??= {}; a.stk[f.k] = Math.min(f.n, (a.stk[f.k] || 0) + 1); return ` [${RU.STK[f.k][0]} ${a.stk[f.k]}]`; }
     case 'burst': { const n = a.stk?.[f.k] || 0; if (!n) return ''; a.stk[f.k] = 0; return ` [${n} ${RU.STK[f.k][0]} consumida${n > 1 ? 's' : ''}]`; }
     case 'brk': return brkHit(t, f.n, a);
+    case 'scar': { const k = f.r === 'san' ? 'sanMax' : f.r === 'aura' ? 'auraMax' : 'hpMax', v = Math.max(1, Math.ceil(t[k] * f.p / 100)); (t.scar ??= {})[k] = (t.scar[k] || 0) + v; derive(t); return ` [cicatriz: −${v} ${RESN[k.slice(0, -3)]} máx.]`; }
+    case 'clone': return cloneOf(a, s, f);
     case 'guard': if (t !== a) { t.st.guarded = f.n; t.guardBy = a.id; return ` [${a.name} protege ${t.name}]`; } return '';
   }
   return '';
@@ -379,7 +382,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
       const dr = f.form.dr, short = Object.entries(dr).find(([r, v]) => r === 'hp' ? n.hp <= Math.ceil(n.hpMax * v / 100) : n[r] < v);
       if (short) endForm(n, true); else for (const [r, v] of Object.entries(dr)) { if (r === 'hp') n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * v / 100)); else n[r] -= v; }
     }
-    n.rxT = 0; // reação disponível de novo
+    n.rxT = 0; n.parT = 0; // reação e aparar disponíveis de novo
     const dz = n.stk?.doenca || 0; if (dz >= 3) { const v = Math.max(1, Math.ceil(n.hpMax * .015 * (dz - 2))); n.hp = Math.max(1, n.hp - v); log(n.name, `a Doença (estágio ${dz}) consome ${v} HP.`, 'bad', { fx: { id: n.id, dmg: v } }); }
     if (vows(n).includes('tempo')) n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * .04));
     const dots = DOT.filter(k => n.st[k]).length;
@@ -438,6 +441,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     return false;
   }
   const sure = s.fx?.some(f => f.t === 'sure');
+  const pr = parryCheck(a, s, t, o, sure); if (pr === 'ok') return false; if (pr === 'bad') o = { ...o, mult: (o.mult || 1) * 1.5 };
   let rea = pickRea(a, s, t, o, sure, true);
   if (rea) {
     if (Math.random() * 100 < rea.rea.v) { log(t.name, `reage com ${rea.name} e esquiva de ${s.name}!`, 'ok', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } }); return false; }
@@ -455,12 +459,12 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (!rea) rea = pickRea(a, s, t, o, sure, false); // bloqueio, absorção e revide só quando o golpe acerta
   a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
-  const crit = r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down;
+  const crit = r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down, bf = !mental && s.bf > 0 && r <= s.bf + ma.bf;
   a.bt ??= {}; const wu = (s.basic || s.req || s.wpn) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
   if (olho) a.bt.olho = 1;
   const blkP = !mental && !s.area && !o.counter && t.enemy !== a.enemy ? AR.prof(eq(t, 'arma')).block : 0, blk = blkP > 0 && Math.random() * 100 < blkP; // escudo: bloqueia golpe físico único de inimigo
-  const mult = (blk ? .4 : 1) * (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
+  const mult = (blk ? .4 : 1) * (bf ? 2.5 : crit ? 2 : 1) * (a.clone ? .5 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
     * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1)
     * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]) * (rea && (rea.rea.t === 'block' || rea.rea.t === 'absorb') ? 1 - rea.rea.v / 100 : 1);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);
@@ -478,6 +482,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     if (t.hp > 0 && lv < 2 && lvl(t, part) === 2) { applySt(t, BODY[part][1]); extra += ` ${PL[part]} em estado crítico!`; }
   }
   if (wk) extra = ' PONTO FRACO!' + extra;
+  if (bf && a.hp > 0) { const v = Math.round(a.auraMax / 4); a.aura = Math.min(a.auraMax, a.aura + v); extra = ` BLACK FLASH! (+${v} Aura)` + extra; }
   if (rx) { rx.on.forEach(k => delete t.st[k]); if (t.hp > 0 && rx.a) applySt(t, rx.a[0], rx.a[1]); extra += ` [Reação: ${rx.n}]`; }
   if (blk) extra += ' [bloqueado]';
   if (t.hp > 0 && !blk) { if (s.st) applySt(t, s.st); if (down) t.st.down = 1; }
@@ -501,6 +506,39 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     else if (rea.rea.t === 'counter' && t.hp > 0 && a.hp > 0) { log(t.name, `reage com ${rea.name}!`, 'ok'); strike(t, { ...basicOf(t), name: rea.name, power: rea.rea.v, el: rea.el, attr: rea.attr }, a, null, 0, { counter: true, nochain: true }); }
   }
   return down && was;
+}
+// Aparar: golpe de alvo único e não mental. Jogadores apertam o botão na janela (S.battle.parry); chefes e elites aparam por chance.
+const parryable = (a, s, t, o, sure) => s.kind === 'dmg' && !s.area && !o.counter && t && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure;
+const parNode = ch => (ch.skills || []).map(k => S.skills[k]).filter(x => x?.par).sort((x, y) => y.par - x.par)[0];
+const parriers = foe => battlers().filter(p => !p.enemy && p.enemy !== foe.enemy && p.hp > 0 && !p.parT && !skipping(p) && !p.st.silence && (p => { const n = parNode(p); return n && p.aura >= (n.cost || 0); })(p));
+function parryCheck(a, s, t, o, sure) {
+  if (!parryable(a, s, t, o, sure)) return '';
+  const P = S.battle.parry, v = P && P.foe === a.id && P.p?.[t.id];
+  if (v) {
+    delete P.p[t.id];
+    if (v === 'ok') { const n = parNode(t), g = n?.power || 0; t.aura = Math.min(t.auraMax, t.aura + g); addLimit(t, 10); log(t.name, `APARA ${s.name} de ${a.name}!${g ? ` (+${g} Aura)` : ''}${a.brk ? brkHit(a, 1, t) : ''}`, 'ok', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok'; }
+    applySt(t, 'exposed', 1); log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad';
+  }
+  if (t.enemy && !a.enemy && (t.boss || t.rank === 'elite') && !t.parT && !skipping(t) && Math.random() < (t.boss ? .15 : .1)) {
+    t.parT = 1; applySt(a, 'exposed', 1); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok';
+  }
+  return '';
+}
+// clones: combatentes reais na fila; cada um leva uma fração do HP atual do dono e causa metade do dano
+const CLONE_N = { tsukuyomi: 'Sombra', fuhaku: 'Imagem Residual', hiruko: 'Broto', aura: 'Clone de Aura' };
+function cloneOf(a, s, f) {
+  if (!S.battle.active || !(a.id in S.battle.ticks)) return '';
+  const mine = () => battlers().filter(o => o.clone === a.id && !o.dead && o.hp > 0); let n = 0;
+  for (let i = 0; i < f.n && mine().length < 3; i++) {
+    const v = Math.floor(a.hp * f.p / 100); if (v < 1 || a.hp - v < 1) break;
+    a.hp -= v; n++;
+    const id = rid(), ch = S.chars[id] = { ...newChar(id, a.enemy, a.owner), name: `${CLONE_N[s.el] || 'Clone'} de ${a.name}`, color: a.color, img: a.img, x: a.x, y: a.y, scene: a.scene, clone: a.id, summon: { by: a.id, ttl: 3, k: 'clone' }, xpR: 0, goldR: 0 };
+    ch.attrs = { ...a.attrs }; ch.vinc = [...(a.vinc || [])]; ch.arma = a.arma; ch.armor = 0; ch.bt = {};
+    ch.skills = (a.skills || []).filter(k => { const x = S.skills[k]; return x && ['dmg', 'mental'].includes(x.kind) && !x.limit && !x.duo && !x.trio && !x.circ && !x.chg && !x.req && !x.fx?.some(g => g.t === 'clone'); }).slice(0, 4);
+    derive(ch); ch.bon.hpMax = v - ch.hpMax; derive(ch); ch.hp = v; ch.aura = ch.auraMax; ch.san = ch.sanMax;
+    S.battle.ticks[id] = S.battle.ticks[a.id] + Math.round(delay(ch) / 2) + i;
+  }
+  return n ? ` [${n} clone${n > 1 ? 's' : ''}]` : '';
 }
 // reação automática do alvo: a melhor que ele puder pagar, uma por rodada (esquiva > bloqueio > absorção > revide)
 const REA_ORD = { evade: 0, block: 1, absorb: 2, counter: 3 };
@@ -700,4 +738,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { BASE, SK, addLimit, aiAct, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { parriers, parNode, BASE, SK, addLimit, aiAct, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

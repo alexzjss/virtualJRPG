@@ -153,3 +153,22 @@ Jogadores (e a mesa) recebem do servidor os nós que ainda não alcançam como *
 (`src/net.js`, `hiddenSkills`/`defsFor`). Fica à vista o que algum herói já aprendeu, os vizinhos do que os personagens do jogador já
 têm (respeitando Vínculo, Despertar e o Vínculo extra `v2`) e, para quem não aprendeu nada, o centro Marcial. O mestre vê tudo.
 As versões com silhueta são cacheadas por conjunto de nós escondidos, então o custo por atualização é pequeno.
+
+## Leva 3 (`arvore/leva3.js`, 116 nós)
+Ramos novos: **Marcial** Aparar e Marcas do Caçador · **Aura** Black Flash, Técnica Reversa e Clones de Aura (Conjuração) ·
+**Tsukuyomi** Sombras · **Fuhaku** Imagens Residuais · **Hiruko** Brotos de Carne · **Kagutsuchi, Susanoo, Atlas, Indra, Amaterasu, Shukketsu**
+um ramo de 7 nós cada (Aparar temático, revide, Marca ou Técnica Reversa e um golpe com Black Flash).
+
+### Mecânicas novas
+- **Aparar** (`pas: 'par'`, `par` = ms da janela boa, `c` = Aura por tentativa, `p` = Aura de volta ao acertar). Quando o mestre manda o
+  inimigo agir (botão IA) e algum herói tem um nó de Aparar com Aura, o servidor abre `S.battle.parry` por 1,6 s e o golpe sai quando
+  ela fecha. O jogador vê um anel fechando (`public/js/aparar.js`) e aperta o botão ou Espaço. Nos últimos `par` ms (+200 ms de folga),
+  o golpe é anulado (sem dano nem condição), dá +`p` Aura, +10 de Limite e tira 1 da Quebra do atacante. Cedo demais: +50% de dano e Exposto.
+  Vale só contra golpe de alvo único e não mental (nem área, nem contra-ataque, nem `sure`). Uma tentativa por rodada, paga mesmo errando.
+  O nó de maior janela vale. **Chefes (15%) e elites (10%)** aparam golpes de alvo único dos heróis, uma vez por rodada, deixando o atacante Exposto.
+  Ações de inimigo lançadas à mão pelo mestre (sem o botão IA) não abrem a janela.
+- **Black Flash** (`bf: N` na técnica; `mod: 'bf N'` alarga): rolagem de acerto de 01 a N + bônus vira ×2,5 (no lugar do crítico) e devolve 25% da Aura máx.
+- **Cicatriz** (`scar hp|san|aura P`): tira P% do máximo até o **descanso longo**. É o preço da Técnica Reversa e das Marcas.
+- **Marca** (condição `mark`): +30% de dano, +20% de velocidade e +10% de crítico. Os nós de Marca são gatilhos `on: 'low'` (30% do HP, 1×/batalha).
+- **Clones** (`clone N P`, normalmente `self`): N combatentes reais na fila, cada um com P% do HP atual do dono (que perde esse HP).
+  Copiam atributos e até 4 técnicas de dano simples, causam 50% do dano, agem sozinhos, duram 3 turnos e somem ao cair. No máximo 3 por dono.

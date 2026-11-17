@@ -828,3 +828,30 @@ test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo'
   const d = net.defsFor({ role: 'player', name: 'Ana' }, net.curDefs()); const sks = JSON.parse(d.json).skills;
   assert.equal(sks[sk('Kamikaze')].name, '???'); assert.equal(sks[sk('Faísca')].name, 'Faísca'); assert.match(String(d.v), /\./);
 });
+test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e clones', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h);
+  h.skills = [sk('Tempestade Negra')]; H.battle(gm, { on: true }); assert.ok(S.skills[sk('Tempestade Negra')].bf === 10);
+  let bf = false; for (let i = 0; i < 200 && !bf; i++) { S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; H.act(ana, { id: h.id, skill: sk('Tempestade Negra'), target: e.id }); bf = S.log.some(l => /BLACK FLASH/.test(l.text || '')); }
+  assert.ok(bf, 'Black Flash sai na faixa do d100'); assert.ok(h.aura > 0, 'devolve Aura');
+  reset(); const m = mk(ana, {}), f = mk(gm, { enemy: true }); m.skills = [sk('Marca Rubra')]; m.pslots = [...m.skills]; derive(m); const hp0 = m.hpMax, san0 = m.sanMax;
+  H.battle(gm, { on: true }); m.hp = m.hpMax; f.attrs.FOR = 95; S.battle.ticks[f.id] = -1;
+  for (let i = 0; i < 50 && !m.st.mark; i++) { if (m.hp > m.hpMax * .35) m.hp = Math.ceil(m.hpMax * .35); S.battle.ticks[f.id] = -1; H.act(gm, { id: f.id, skill: 'atk', target: m.id }); m.hp = Math.max(m.hp, 1); }
+  assert.ok(m.st.mark, 'Marca desperta'); assert.ok(m.hpMax < hp0 && m.sanMax < san0, 'cicatriz no HP e Sanidade máx.');
+  assert.ok(modsOf(m).atk >= 30);
+  H.battle(gm, { on: false }); H.rest(gm, { long: true }); assert.equal(m.hpMax, hp0); assert.equal(m.sanMax, san0);
+  reset(); const c = mk(ana, {}), g = mk(gm, { enemy: true }); c.attrs.AGI = 99; g.attrs.AGI = 1; c.skills = [sk('Fábrica de Cópias'), sk('Fagulha Negra')]; derive(c);
+  H.battle(gm, { on: true }); c.hp = c.hpMax; c.aura = 99; const hpC = c.hp; S.battle.ticks[c.id] = -1; H.act(ana, { id: c.id, skill: sk('Fábrica de Cópias'), target: c.id });
+  const cl = Object.values(S.chars).filter(o => o.clone === c.id); assert.equal(cl.length, 2); assert.ok(c.hp < hpC); assert.ok(cl.every(o => o.hp > 0 && o.id in S.battle.ticks && o.skills.includes(sk('Fagulha Negra'))));
+});
+test('leva 3: Aparar — janela aberta pela IA, acerto anula o golpe e dá Aura; erro pune; só golpe único não mental', async () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.skills = [sk('Aparar')]; derive(h); e.attrs.AGI = 99; h.attrs.AGI = 1; e.skills = [];
+  H.battle(gm, { on: true }); h.aura = 20; while (current() !== e.id) H.next(gm);
+  H.ai(gm); assert.ok(S.battle.parry && S.battle.parry.foe === e.id, 'janela aberta'); const hp = h.hp;
+  S.battle.parry.at = Date.now() - S.battle.parry.w + 100; H.parry(ana, { id: h.id }); assert.equal(S.battle.parry.p[h.id], 'ok'); assert.equal(h.aura, 16);
+  H.parry(ana, { id: h.id }); assert.equal(h.aura, 16, '1× por rodada');
+  await new Promise(r => setTimeout(r, 1900)); assert.equal(S.battle.parry, null); assert.equal(h.hp, hp, 'golpe aparado'); assert.ok(S.log.some(l => /APARA/.test(l.text || ''))); assert.equal(h.aura, 18);
+  reset(); const h2 = mk(ana, {}), e2 = mk(gm, { enemy: true }); h2.skills = [sk('Aparar')]; derive(h2); e2.attrs.AGI = 99; h2.attrs.AGI = 1;
+  H.battle(gm, { on: true }); h2.aura = 20; while (current() !== e2.id) H.next(gm); H.ai(gm); H.parry(ana, { id: h2.id }); assert.equal(S.battle.parry.p[h2.id], 'bad', 'cedo demais');
+  await new Promise(r => setTimeout(r, 1900)); assert.ok(S.log.some(l => /fora do tempo|errou/.test(l.text || '')));
+  reset(); const h3 = mk(ana, {}), e3 = mk(gm, { enemy: true }); derive(h3); H.battle(gm, { on: true }); while (current() !== e3.id) H.next(gm); H.ai(gm); assert.ok(!S.battle.parry, 'sem nó de Aparar, sem janela');
+});

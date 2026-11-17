@@ -73,3 +73,18 @@ Tudo acima foi implementado nesta sessão. Detalhes e arquivos: `ARVORE-SISTEMAS
 - **Instrumento:** arma de foco com buffs de grupo (sem regra de "canto contínuo"); CAR, e SAB nos sopros.
 - **Criar a partir das básicas:** duplicar e editar, variantes elementais com 1 clique (os 9 elementos), **pacotes de traços** (elemento, status e qualidade; empilham até 3), exportar/importar `.json` e colar texto. Tudo dentro da Forja de armas, na lista lateral.
 - Bestiário com armas: fora do escopo.
+
+## Leva 3 (questionário de 2026-11-17) — implementada (116 nós, ver ARVORE-SISTEMAS.md)
+Revisão antes: `tools/revisao-efeitos.js` (estática) e `tools/revisao-uso.js` (usa cada uma das 1390 ativas em batalha real):
+0 erros, 0 recusas, 0 nós sem efeito; os 7 apontamentos estáticos são custos intencionais (Exposto/Enraizado em si, Pavor no reerguido).
+- **Tamanho:** ~120 nós.
+- **Fora:** Haki, Bankai/formas em 2 estágios. Sem preferência (não entram por ora): Estresse, Fabula, Zero, BP, Postura, Magia Azul, Manifestações, ampliações de horror.
+- **Aparar (Expedition 33):** botão com janela curta na tela do jogador alvo. Só contra golpe **físico** de alvo único (não área nem mental);
+  só quem tem um nó de Aparar vê o botão (nós melhores alargam a janela); cada tentativa custa Aura; limite de tentativas por rodada;
+  errar o tempo = golpe +50% e Exposto. Acertar: anula dano e condição, dá recurso (Aura/Limite/carga) e tira ponto da Barra de Quebra.
+  **Chefes e elites** também aparam golpes físicos dos jogadores por chance (log avisa; quem foi aparado fica Exposto).
+- **Black Flash (JJK):** crítico especial raro só em técnicas marcadas: faixa no d100 (01-05, cresce com nós) → ×2,5 e devolve Aura.
+- **Técnica Reversa (JJK):** converter Aura em cura de si. **Marcas (Caçador):** despertam sozinhas ao cair abaixo de 30% de HP (1×/batalha).
+  Preço dos dois: HP máximo e Sanidade, que voltam no **descanso longo**.
+- **Clones:** fichas reais na fila (como invocações), nascem com uma fração do HP atual do dono (que perde esse HP) e causam 50% do dano.
+  Ramos: Tsukuyomi (sombras), Fuhaku (imagens residuais), Hiruko (brotos de carne) e Aura/Conjuração (aberto a todos).
