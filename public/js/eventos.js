@@ -83,6 +83,8 @@ app.addEventListener('click', e => {
   if (d.a === 'camFix') { const w = mapEl().offsetWidth; return send({ t: 'map', f: 'cam', v: { z: view.z, fx: view.x / w, fy: view.y / w } }); }
   if (d.a === 'camFree') return send({ t: 'map', f: 'cam', v: null });
   if (d.a === 'skReset') { gvFor = null; return render(); }
+  if (d.a === 'skCore') { const m = app.querySelector('.skmap'), n = m?.querySelector('.nd[data-node="g0"]'); if (!n) return; const r = m.getBoundingClientRect(), q = n.getBoundingClientRect(), z = Math.max(gv.z, 95 / gvCell(m)) / gv.z;
+    gv.x = r.width / 2 - (q.left + q.width / 2 - r.left - gv.x) * z; gv.y = r.height / 2 - (q.top + q.height / 2 - r.top - gv.y) * z; gv.z *= z; return applyGv(); } // centraliza no núcleo Marcial
   if (d.a === 'skAll') { Object.assign(gv, { z: 1, x: 0, y: 0 }); return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'chatSend') return sayChat(e.target.closest('.chatin').querySelector('input'));
@@ -173,14 +175,17 @@ app.addEventListener('wheel', e => {
   const r = m.getBoundingClientRect(), z = Math.min(4, Math.max(.4, view.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
   view.x += (e.clientX - r.left) / view.z * (view.z - z); view.y += (e.clientY - r.top) / view.z * (view.z - z); view.z = z; applyView();
 }, { passive: false });
-const applyGv = () => { const s = app.querySelector('.skmap svg'); if (s) { s.style.transform = `translate(${gv.x}px,${gv.y}px) scale(${gv.z})`; s.parentElement.classList.toggle('far', gv.z < 1.7); s.parentElement.classList.toggle('near', gv.z >= 1.7); } };
+// gvCell: quantos pixels de tela tem uma casa da grade com zoom 1 (o SVG quadrado cabe no menor lado da área)
+const gvCell = m => { const r = m.getBoundingClientRect(); return Math.min(r.width, r.height) / (+m.dataset.g || 1) || 1; };
+const applyGv = () => { const s = app.querySelector('.skmap svg'); if (s) { s.style.transform = `translate(${gv.x}px,${gv.y}px) scale(${gv.z})`; gv.far = gvCell(s.parentElement) * gv.z < 46; s.parentElement.classList.toggle('far', gv.far); s.parentElement.classList.toggle('near', !gv.far); } };
 // zoom da grade em torno de um ponto (px, py) da própria área; usado pela roda, pelos botões e pela pinça
-const zoomGv = (px, py, z0) => { const z = Math.min(8, Math.max(1, z0)); gv.x = px - (px - gv.x) * z / gv.z; gv.y = py - (py - gv.y) * z / gv.z; gv.z = z; if (z === 1) gv.x = gv.y = 0; applyGv(); };
+// zoom máximo: ~220 px por casa, seja qual for o tamanho da grade
+const zoomGv = (px, py, z0) => { const m = app.querySelector('.skmap'), z = Math.min(m ? 220 / gvCell(m) : 8, Math.max(1, z0)); gv.x = px - (px - gv.x) * z / gv.z; gv.y = py - (py - gv.y) * z / gv.z; gv.z = z; if (z === 1) gv.x = gv.y = 0; applyGv(); };
 app.addEventListener('wheel', e => {
   const m = e.target.closest?.('.skmap');
   if (!m) return;
   e.preventDefault();
-  const r = m.getBoundingClientRect(); zoomGv(e.clientX - r.left, e.clientY - r.top, gv.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+  const r = m.getBoundingClientRect(); zoomGv(e.clientX - r.left, e.clientY - r.top, gv.z * Math.exp(-Math.max(-120, Math.min(120, e.deltaY * (e.deltaMode ? 33 : 1))) / 400)); // suave no touchpad, ~1.35× por clique da roda
 }, { passive: false });
 // toque: um dedo move, dois dedos dão zoom, na grade de habilidades e no mapa
 const pts = new Map(); let pinch = null, tpan = null;

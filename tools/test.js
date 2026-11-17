@@ -799,9 +799,23 @@ test('leva 2: cargas acumulam e explodem; combo multiplica o golpe seguinte', ()
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); e.hpMax = e.hp = 9999; e.attrs.AGI = 1; h.attrs.INT = 90; h.aura = 99;
   h.skills = [sk('Faísca Acumulada'), sk('Descarga Total'), sk('Raio Bifurcado')]; H.battle(gm, { on: true });
   const go = n => { while (current() !== h.id) H.next(gm); H.act(ana, { id: h.id, skill: sk(n), target: e.id }); };
-  go('Faísca Acumulada'); assert.ok((h.stk.carga || 0) >= 0); const c1 = h.stk.carga || 0;
-  go('Raio Bifurcado'); if (c1) assert.ok(S.log.some(l => /COMBO!/.test(l.text)));
+  // o combo só conta num golpe que acerta: repete o par até sair (a chance de errar seis vezes seguidas é desprezível)
+  for (let i = 0; i < 6 && !S.log.some(l => /COMBO!/.test(l.text)); i++) { go('Faísca Acumulada'); go('Raio Bifurcado'); }
+  assert.ok(S.log.some(l => /COMBO!/.test(l.text)));
   h.stk.carga = 3; go('Descarga Total'); assert.equal(h.stk.carga, 0);
+});
+test('núcleo Marcial e raízes dos setores: abertos sem exigir vizinho aprendido', async () => {
+  const net = await import('../src/net.js'); reset();
+  const h = mk(ana, {}); h.vinc = ['indra']; h.skills = [sk('Faísca')]; h.xp = 9999;
+  const core = Object.keys(S.skills).filter(k => S.skills[k].open && S.skills[k].el === 'fis');
+  assert.ok(core.length >= 5); assert.ok(core.includes('g0'));
+  for (const k of core) assert.equal(RU.whyNot(h, S.skills[k], S.skills, S.items, k, true), '', S.skills[k].name);
+  const hid = net.hiddenSkills({ role: 'player', name: 'Ana' });
+  for (const k of core) assert.ok(!hid.includes(k), S.skills[k].name);
+  const auraRoot = Object.keys(S.skills).find(k => S.skills[k].el === 'aura' && S.skills[k].root);
+  assert.equal(RU.whyNot(h, S.skills[auraRoot], S.skills, S.items, auraRoot, true), '');
+  const susRoot = Object.keys(S.skills).find(k => S.skills[k].el === 'susanoo' && S.skills[k].root);
+  assert.match(RU.whyNot(h, S.skills[susRoot], S.skills, S.items, susRoot, true), /Vínculo/);
 });
 test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo', async () => {
   const net = await import('../src/net.js'); reset();

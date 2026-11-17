@@ -97,7 +97,7 @@
     if (s.cat === 'esp' && !(ch.aw || []).includes('esp') && ch.nen !== 'esp') return `Especialização exige o Despertar "${AW.esp}".`;
     if (s.v2 && !(ch.vinc || []).includes(s.v2)) return `Exige também o Vínculo com ${PN[s.v2] || s.v2}.`;
     if (s.ex && own.some(o => o.ex === s.ex && o !== s)) return 'Trancada: você escolheu o outro caminho.';
-    if (own.length && !own.some(o => near(o, s))) return 'Precisa de um nó vizinho já aprendido.';
+    if (own.length && !s.open && !own.some(o => near(o, s))) return 'Precisa de um nó vizinho já aprendido.';
     const pre = (s.pre || '').split('|').filter(Boolean).filter(n => !byName(n));
     if (pre.length) return `Precisa aprender antes: ${pre.join(', ')}.`;
     if (s.nb && own.filter(o => o.br === s.br).length < s.nb) return `Precisa de ${s.nb} nós deste ramo (tem ${own.filter(o => o.br === s.br).length}).`;

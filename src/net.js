@@ -124,6 +124,7 @@ const reachable = (ch, s) => {
   if (s.el === 'oculto' && !aw.includes('outro')) return false;
   if (s.aw && !aw.includes(s.aw)) return false;
   if (s.v2 && !vinc.includes(s.v2)) return false;
+  if (s.open) return true; // núcleo Marcial: sempre à vista
   const own = ch.skills.map(k => S.skills[k]).filter(o => o && o.gx != null);
   return own.length ? own.some(o => RUL.near(o, s) && (o.el === s.el || o.el === 'fis' || s.el === 'fis')) : s.el === 'fis' && !!S.skills.g0 && Math.max(Math.abs(s.gx - S.skills.g0.gx), Math.abs(s.gy - S.skills.g0.gy)) <= 1; // sem nada aprendido: só o centro Marcial
 };

@@ -72,17 +72,18 @@ export function buildSkills(sk) {
   };
   const M = TREE.marcial.branches, fis = k => used.get(k) === 'fis';
   // tronco Marcial: ramo 0 no centro, estilos de arma e ramos novos em raios, treinos nas casas livres junto ao centro
-  put(C, C, node(M[0][0], 'fis'));
-  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis')));
+  // núcleo Marcial (centro e o anel em volta): aberto a todos, sem exigir vizinho aprendido; dele se anda para o resto do tronco
+  put(C, C, node(M[0][0], 'fis', { open: 1 }));
+  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 })));
   const rays = M.slice(1).filter((_, i) => i !== 4);
   rays.forEach((br, i) => chain(i * 360 / rays.length + 360 / ORDER.length / 2, 2, br.map(o => node(o, 'fis')), fis));
   const train = M[5].map(o => node(o, 'fis'));
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
     if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
-  // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó); depois um ramo de cada setor por vez,
+  // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó, aberta a quem tem o Vínculo, sem exigir vizinho); depois um ramo de cada setor por vez,
   // para nenhum setor cercar o vizinho. Um ramo em que todo nó exige arma vira uma trilha por tipo de arma.
   const SEC = 360 / ORDER.length, R0 = 13, RING = 10, SLOT = [0, -1, 1, -2, 2], W = SEC / 5.2, cells = {};
-  ORDER.forEach((el, i) => { cells[el] = [forked(i * SEC, R0, TREE[el].branches[0].map((o, n) => node(o, el, { br: el + '-0', ...(n ? {} : { root: true }) })), fis, false)]; });
+  ORDER.forEach((el, i) => { cells[el] = [forked(i * SEC, R0, TREE[el].branches[0].map((o, n) => node(o, el, { br: el + '-0', ...(n ? {} : { root: true, open: 1 }) })), fis, false)]; });
   const most = Math.max(...ORDER.map(el => TREE[el].branches.length));
   for (let b = 1; b < most; b++) ORDER.forEach((el, i) => {
     const br = TREE[el].branches[b];

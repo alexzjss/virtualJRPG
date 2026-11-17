@@ -354,7 +354,7 @@ body[data-role=player] h1{display:none}body[data-role=player] #app{padding:0}
 .bstats{display:flex;gap:10px;flex-wrap:wrap;font:600 12px var(--cond);letter-spacing:.5px;text-transform:uppercase;color:var(--dim)}.bstats b{color:var(--paper);font-size:14px}
 .bsk{color:var(--paper)}.bcard .row{margin:4px 0 0;gap:4px}.bcard button{min-height:28px;padding:3px 8px;font-size:12px}
 .benc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.benc .card{padding:10px}.benc h3{font-size:15px}
-.nd .lb{font-size:10px}
+.nd .lb{font-size:13px;letter-spacing:.1px}
 .nd .rq{font:600 8px var(--cond);fill:var(--gold);text-anchor:start;pointer-events:none;paint-order:stroke;stroke:#000;stroke-width:2.5px}
 .nd.rqno .rq{fill:var(--bad)}.nd.rqno.av circle,.nd.rqno.av rect{stroke:var(--bad)}.skmap.far .nd .rq{display:none}
 .gen{padding:10px}.gen h3{font-size:15px}.gen .row{margin:6px 0}
@@ -1009,3 +1009,8 @@ details.mais>.row{margin:8px 10px}
 .icard{border-left:4px solid var(--line)}
 .icard.t-arma{border-left-color:var(--red)}.icard.t-armadura{border-left-color:#3d7bd9}.icard.t-acess{border-left-color:var(--gold)}
 .icard.t-cons{border-left-color:var(--hp)}.icard.t-mat{border-left-color:#8a8378}.icard.t-mun{border-left-color:#c77dff}
+
+/* barra da grade de habilidades: uma linha só, compacta, para não cobrir os nós */
+.skhint{flex-wrap:nowrap;overflow-x:auto;gap:4px;padding:4px;max-width:calc(100% - 20px)}.skhint button{padding:6px 9px;font-size:12px;white-space:nowrap;min-height:34px}.skhint small{flex:none;max-width:16em;font-size:11px;line-height:1.2}
+@container (max-width:560px){.skhint small{display:none}}
+.skmap{container-type:size}

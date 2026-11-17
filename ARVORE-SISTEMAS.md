@@ -144,6 +144,10 @@ A grade passou de 91×91 para **111×111** para caber tudo; as fichas são remap
 - **Combos** (`combo: 'A|B'`, `cm: 1.5`, padrão 1,4): se a última técnica usada pelo personagem foi A ou B, o golpe sai ×cm e o log
   avisa "COMBO!".
 
+## Núcleo aberto
+
+O centro Marcial e o anel em volta dele, e a raiz de cada setor (para quem tem o Vínculo, ou o Despertar no caso do Ocultismo), têm `open`: dá para aprender sem ter um nó vizinho. Assim todo personagem chega à linha básica Marcial e à Aura, mesmo começando só com a raiz do Vínculo, longe do centro. No mapa, o botão "Marcial" leva até o núcleo.
+
 ## Segredo da árvore
 Jogadores (e a mesa) recebem do servidor os nós que ainda não alcançam como **silhueta**: nome "???", sem descrição, poder nem efeito
 (`src/net.js`, `hiddenSkills`/`defsFor`). Fica à vista o que algum herói já aprendeu, os vizinhos do que os personagens do jogador já
