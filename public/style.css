@@ -1002,3 +1002,16 @@ details.mais>.row{margin:8px 10px}
 .sktip[hidden]{display:none}.sktip small:first-child{font:600 11px var(--cond);letter-spacing:1.2px;text-transform:uppercase;color:var(--e)}.sktip b{font:400 22px/1.1 var(--disp)}.sktip small{color:var(--dim)}.sktip em{font:600 12px var(--cond);color:var(--gold);font-style:normal}
 .modal .skp{height:calc(100vh - 80px)}.fbody .skp{height:min(66vh,720px);min-height:420px}
 @media(max-width:999px){.skp{height:auto}.skp .skmap{position:relative;height:58vh;min-height:320px}.skp .skside{position:static;width:auto;border-left:0}.skp:not(.closed) .skzoom,.skp:not(.closed) .skhint{right:10px}}
+
+/* ----- comandos de ação: selo PERFEITO / BOM / CONTRA / CHOQUE / BLACK FLASH na mesa ----- */
+.fxl .seal{position:absolute;left:0;right:0;top:32%;display:flex;justify-content:center;pointer-events:none;animation:sealIn 1.1s cubic-bezier(.2,.9,.3,1) forwards}
+.fxl .seal b{font:900 clamp(34px,9vw,92px)/1 'Barlow Condensed','Barlow',sans-serif;letter-spacing:5px;transform:skewX(-8deg);color:#fff;text-shadow:3px 3px 0 #111,0 0 26px var(--sc,#ffb84a)}
+.fxl .seal.perf{--sc:#ffb84a}.fxl .seal.perf b{color:#ffd24a}
+.fxl .seal.bom{--sc:#3ddc84}.fxl .seal.bom b{font-size:clamp(24px,6vw,56px);color:#7dffa3}
+.fxl .seal.ctr{--sc:#5fb8ff}.fxl .seal.ctr b{color:#9fd8ff}
+.fxl .seal.chq{--sc:#ff9f1a}.fxl .seal.chq b{color:#ffcf6e}
+.fxl .seal.bf{--sc:#e4002b}.fxl .seal.bf b{color:#fff;text-shadow:4px 4px 0 #e4002b,0 0 34px #000,0 0 60px #e4002b}
+.fxl .flash{position:absolute;inset:0;background:#fff;opacity:0;animation:sealFlash .26s ease-out forwards}.fxl .flash.dark{background:#000}
+@keyframes sealIn{0%{opacity:0;scale:2.2}14%{opacity:1;scale:1}78%{opacity:1}100%{opacity:0;scale:.96}}
+@keyframes sealFlash{0%{opacity:.55}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.fxl .seal{animation:sealFade 1.1s linear forwards}.fxl .flash{animation:sealFlashLow .4s linear forwards;opacity:0}@keyframes sealFade{0%,80%{opacity:1}100%{opacity:0}}@keyframes sealFlashLow{0%{opacity:.15}100%{opacity:0}}}

@@ -5,8 +5,11 @@ import { ATTRS, BBG, CAMP, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TI
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
 import { kick, push, tell, tell0 } from './net.js';
-import { derive, parriers, parNode } from './rules.js';
-const PARRY_W = 1600; // duração da janela de Aparar (ms)
+import { derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun } from './rules.js';
+function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo executa o plano guardado
+  const plan = cmdPlan; if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) { if (C.chq) chqResolve(a, plan, C); else aiRun(a, plan); } } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
+}
+let cmdPlan = null, cmdTimer = null; // plano do inimigo que espera a janela de defesa fechar (fica fora do estado enviado aos clientes)
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
@@ -206,18 +209,37 @@ const H = {
     scene().wx = k; if (S.battle.active) S.battle.wx = { k, ttl: 0 };
     log('Mestre', k ? `Clima: ${RU.CLIMA[k][0]}.` : 'O clima volta ao normal.');
   },
-  ai(c) { // IA do inimigo da vez; se algum herói pode Aparar, abre antes a janela do botão e o golpe sai quando ela fecha
-    const a = S.chars[current()]; if (S.battle.parry && Date.now() > S.battle.parry.at + S.battle.parry.w + 3000) S.battle.parry = null; // janela velha (servidor reiniciado)
-    if (c.role !== 'gm' || !S.battle.active || !a?.enemy || S.battle.parry) return;
-    if (!parriers(a).length) return aiAct(a);
-    S.battle.parry = { foe: a.id, at: Date.now(), w: PARRY_W, p: {} };
-    setTimeout(() => { const P = S.battle.parry; if (P?.foe !== a.id) return; try { if (S.battle.active && current() === a.id) aiAct(a); } catch (e) { console.error(e); } if (S.battle.parry === P) S.battle.parry = null; push(); }, PARRY_W + 200);
+  ai(c) { // IA do inimigo da vez; se alguém pode se defender, abre antes a janela (S.battle.cmd) e o golpe sai quando ela fecha
+    const a = S.chars[current()]; if (S.battle.cmd && Date.now() > S.battle.cmd.at + S.battle.cmd.w + 3000) S.battle.cmd = null; // janela velha (servidor reiniciado)
+    if (c.role !== 'gm' || !S.battle.active || !a?.enemy || S.battle.cmd) return;
+    const plan = aiPlan(a); if (plan?.ia && iaExtra(a, plan.ia)) return; // Defender, Concentrar e Domínio agem na hora (não são golpes)
+    if (plan) plan.ia = null; const C = plan && defWindow(a, plan);
+    if (!C) return aiRun(a, plan);
+    S.battle.cmd = C; cmdPlan = plan;
+    cmdTimer = setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }, C.w + RU.CMD.DEF.grace + 50);
   },
-  parry(c, m) { // o jogador aperta Aparar: paga a Aura na hora; vale se cair nos últimos `par` ms da janela
-    const ch = S.chars[m.id], P = S.battle.parry, n = ch && parNode(ch);
-    if (!P || !n || !can(c, ch) || ch.enemy || P.p[ch.id] || ch.parT || ch.hp <= 0 || ch.aura < (n.cost || 0)) return;
-    ch.aura -= n.cost || 0; ch.parT = 1;
-    const left = P.at + P.w - Date.now(); P.p[ch.id] = left <= n.par && left >= -200 ? 'ok' : 'bad';
+  cmdSkip(c) { const C = S.battle.cmd; if (c.role === 'gm' && C && S.chars[C.foe]) fireCmd(C, S.chars[C.foe]); }, // o mestre não quer esperar a janela: o golpe sai já
+  tel(c, m) { // o mestre liga ou desliga um golpe anunciado na ficha do inimigo (ou do bestiário)
+    const ch = getCh(c, m.id); if (c.role !== 'gm' || !ch?.enemy || !(ch.skills || []).includes(m.skill)) return;
+    ch.telK ??= autoTel(ch); ch.telK = ch.telK.filter(k => k !== m.skill); if (m.on) ch.telK.push(m.skill);
+  },
+  chq(c, m) { // Choque de poderes: o 1º envio (com skill) abre o cabo de guerra e paga a técnica; os seguintes somam apertos (no máximo 20 por segundo)
+    const C = S.battle.cmd, ch = S.chars[m.id], now = Date.now(); if (!C || !ch || ch.enemy || ch.hp <= 0 || !can(c, ch) || !C.chqOk?.includes(ch.id)) return;
+    if (!C.chq) {
+      const key = m.skill, s = (ch.skills || []).includes(key) && S.skills[key]; if (!s || s.cmd !== 'choque' || ch.chqT || cantUse(ch, effSkill(ch, key))) return;
+      ch[s.res] -= s.cost; ch.chqT = 1; C.p[ch.id] = []; C.chq = { id: ch.id, skill: key, at: now, w: 3000, meta: chqMeta(S.chars[C.foe], cmdPlan, ch, key), n: 0, last: now };
+      C.w = now - C.at + 3000; clearTimeout(cmdTimer); cmdTimer = setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, S.chars[C.foe]); push(); } }, C.w + RU.CMD.DEF.grace + 50); return;
+    }
+    if (C.chq.id !== ch.id || now > C.chq.at + C.chq.w + RU.CMD.DEF.grace) return;
+    const add = Math.min(Math.max(0, Math.floor(+m.n) || 0), Math.ceil(20 * (now - C.chq.last) / 1000)); C.chq.n += add; C.chq.last = now;
+  },
+  def(c, m) { // o jogador aperta o botão da defesa: a zona (Aparar, Esquiva, cedo) vem de quanto falta para o impacto da próxima batida
+    const ch = S.chars[m.id], C = S.battle.cmd, D = RU.CMD.DEF; if (!C || !ch || ch.enemy || ch.hp <= 0 || !can(c, ch) || !C.tgs.includes(ch.id) || C.chq?.id === ch.id) return;
+    const notes = C.p[ch.id], now = Date.now(), i = C.beats.findIndex((b, k) => notes[k] === undefined && now <= C.at + b + D.grace); if (i < 0) return;
+    const n = parNode(ch), mods = modsOf(ch, null), canP = !!n && (C.paid[ch.id] || canPar(ch)), left = C.at + C.beats[i] - now;
+    const g = RU.CMD.gradeDef(left, (n?.par || 0) + mods.par, C.tel ? D.esq + mods.esq : 0, canP); if (g === 'late') return;
+    if (canP && !C.paid[ch.id] && (g === 'par' || (g === 'cedo' && !C.tel))) { ch.aura -= n.cost || 0; ch.parT = 1; C.paid[ch.id] = true; } // paga a Aura na hora, uma vez por golpe
+    notes[i] = g;
   },
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
     const ch = S.chars[m.id], T = S.battle.ticks;

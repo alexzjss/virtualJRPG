@@ -81,7 +81,7 @@ const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; retu
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
 const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : sc.startsWith('wt:') ? !!(s.basic || s.req || s.wpn) && wtype(ch) === sc.slice(3) : s.el === sc; // wt:<tipo> = maestria de um tipo de arma
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
-  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0, bf: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
+  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0, bf: 0, cw: 0, cp: 0, mx: 0, cz: 0, ma: 0, esq: 0, par: 0, chq: 0, rit: 0, ctr: 0, rn: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
   const f = ch.form && ch.st?.form && SK(ch.form); if (f?.form) add(f.form.m);
   if (vows(ch).includes('tempo')) m.hit += 15;
@@ -382,7 +382,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
       const dr = f.form.dr, short = Object.entries(dr).find(([r, v]) => r === 'hp' ? n.hp <= Math.ceil(n.hpMax * v / 100) : n[r] < v);
       if (short) endForm(n, true); else for (const [r, v] of Object.entries(dr)) { if (r === 'hp') n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * v / 100)); else n[r] -= v; }
     }
-    n.rxT = 0; n.parT = 0; // reação e aparar disponíveis de novo
+    n.rxT = 0; n.parT = 0; n.chqT = 0; // reação e aparar disponíveis de novo
     const dz = n.stk?.doenca || 0; if (dz >= 3) { const v = Math.max(1, Math.ceil(n.hpMax * .015 * (dz - 2))); n.hp = Math.max(1, n.hp - v); log(n.name, `a Doença (estágio ${dz}) consome ${v} HP.`, 'bad', { fx: { id: n.id, dmg: v } }); }
     if (vows(n).includes('tempo')) n.hp = Math.max(1, n.hp - Math.ceil(n.hpMax * .04));
     const dots = DOT.filter(k => n.st[k]).length;
@@ -425,12 +425,13 @@ function ammoFor(a, s) { // munição equipada: balas (armas de fogo) ou flechas
   a.shots[id]--; return am;
 }
 function strike(a, s, t, aim, bonus = 0, o = {}) {
+  { const CW = S.battle.cmd, mw = CW && o.beat != null && CW.foe === a.id ? (CW.perf ? 1.25 : 1) * (CW.xmult || 1) : 1; if (mw !== 1) o = { ...o, mult: (o.mult || 1) * mw }; } // Perfeito de chefe ×1,25; Choque perdido ×1,3
   const am = ammoFor(a, s); if (am) { const pi = Math.max(am.pierce || 0, s.fx?.find(f => f.t === 'pierce')?.p || 0); s = { ...s, el: am.el || s.el, fx: [...(s.fx || []).filter(f => f.t !== 'pierce'), ...(pi ? [{ t: 'pierce', p: pi }] : []), ...(am.st ? [{ t: 'st', k: am.st, n: am.stn || 2, ch: am.stc ?? 100 }] : [])] }; }
   const ma = modsOf(a, s), stat = statOf(a, s), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal' || s.kind === 'util') {
     const fallen = t.hp <= 0; let txt = '';
     if (s.kind === 'heal') {
-      const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1) * (1 + ma.heal / 100)));
+      const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1) * (1 + ma.heal / 100) * (o.cx?.healMult || 1)));
       const before = t.hp; t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v); tally(a, 'heal', t.hp - before); txt = `cura ${v} HP`;
       if (t === a && vows(a).includes('corpo')) breakVow(a, 'corpo', 'curou a si mesmo');
     }
@@ -459,13 +460,13 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (!rea) rea = pickRea(a, s, t, o, sure, false); // bloqueio, absorção e revide só quando o golpe acerta
   a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
-  const crit = r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down, bf = !mental && s.bf > 0 && r <= s.bf + ma.bf;
+  const crit = !!o.cx?.crit || r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down, bf = !mental && s.bf > 0 && !!o.cx?.bf; // Black Flash: só no Perfeito do Golpe no tempo
   a.bt ??= {}; const wu = (s.basic || s.req || s.wpn) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
   if (olho) a.bt.olho = 1;
   const blkP = !mental && !s.area && !o.counter && t.enemy !== a.enemy ? AR.prof(eq(t, 'arma')).block : 0, blk = blkP > 0 && Math.random() * 100 < blkP; // escudo: bloqueia golpe físico único de inimigo
   const mult = (blk ? .4 : 1) * (bf ? 2.5 : crit ? 2 : 1) * (a.clone ? .5 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
-    * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1)
+    * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (o.cx?.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1)
     * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]) * (rea && (rea.rea.t === 'block' || rea.rea.t === 'absorb') ? 1 - rea.rea.v / 100 : 1);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv / (s.hits || 1)) + (o.plus || 0) - armor) * mult)); // multi-golpe divide o bônus do atributo; a armadura conta em cada golpe
@@ -494,7 +495,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
   extra += hitFx(a, s, t, { d, stat, blk });
   if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
-  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}) } });
+  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}) } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
   if (w) a.bt.wkNow = true;
   if (crit) trig(a, 'crit', t);
@@ -507,20 +508,56 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   }
   return down && was;
 }
-// Aparar: golpe de alvo único e não mental. Jogadores apertam o botão na janela (S.battle.parry); chefes e elites aparam por chance.
+// Defesa: janela S.battle.cmd (Aparar e Esquiva numa tecla só, medida no servidor). Golpe anunciado (tel) abre Esquiva para todo alvo;
+// golpe físico de alvo único não anunciado abre só Aparar, para quem tem o nó e Aura. Chefes e elites também aparam golpes dos heróis por chance.
 const parryable = (a, s, t, o, sure) => s.kind === 'dmg' && !s.area && !o.counter && t && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure;
 const parNode = ch => (ch.skills || []).map(k => S.skills[k]).filter(x => x?.par).sort((x, y) => y.par - x.par)[0];
-const parriers = foe => battlers().filter(p => !p.enemy && p.enemy !== foe.enemy && p.hp > 0 && !p.parT && !skipping(p) && !p.st.silence && (p => { const n = parNode(p); return n && p.aura >= (n.cost || 0); })(p));
-function parryCheck(a, s, t, o, sure) {
-  if (!parryable(a, s, t, o, sure)) return '';
-  const P = S.battle.parry, v = P && P.foe === a.id && P.p?.[t.id];
-  if (v) {
-    delete P.p[t.id];
-    if (v === 'ok') { const n = parNode(t), g = n?.power || 0; t.aura = Math.min(t.auraMax, t.aura + g); addLimit(t, 10); log(t.name, `APARA ${s.name} de ${a.name}!${g ? ` (+${g} Aura)` : ''}${a.brk ? brkHit(a, 1, t) : ''}`, 'ok', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok'; }
-    applySt(t, 'exposed', 1); log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad';
+const canPar = p => { const n = parNode(p); return !!n && !p.parT && !p.st.silence && p.aura >= (n.cost || 0); };
+// golpe anunciado: o nó (tel: 1) ou a lista da ficha do inimigo (telK). A lista nasce sozinha na primeira consulta (chefe: 2 mais fortes, elite: 1) e daí o mestre manda
+const autoTel = ch => { const n = ch.boss ? 2 : ch.rank === 'elite' ? 1 : 0, pw = k => SK(k).power * (SK(k).hits || 1) * (SK(k).area ? 1.5 : 1);
+  return (ch.skills || []).filter(k => SK(k) && ['dmg', 'mental'].includes(SK(k).kind) && !SK(k).limit).sort((x, y) => pw(y) - pw(x)).slice(0, n); };
+const telOf = (a, k) => { if (k === 'atk') return false; if (a.enemy && a.telK === undefined) a.telK = autoTel(a); return SK(k)?.tel === 1 || a.telK?.includes(k); };
+function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devolve null se ninguém pode se defender
+  const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), D = RU.CMD.DEF;
+  if (!s || !plan.tgs.length || !['dmg', 'mental'].includes(s.kind) || s.fx?.some(f => f.t === 'sure')) return null;
+  const tel = telOf(a, plan.skill), ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (tel || (parryable(a, s, t, {}, false) && canPar(t))));
+  if (!ts.length) return null;
+  const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, beats = Array.from({ length: hits }, (_, i) => beat + i * D.gap);
+  const z = Object.fromEntries(ts.map(t => { const n = parNode(t), mo = modsOf(t, null); return [t.id, { par: n ? n.par + mo.par : 0, esq: tel ? D.esq + mo.esq : 0, cost: n?.cost || 0, canP: canPar(t) }]; })); // zonas de cada alvo, para a tela desenhar
+  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  if (tel && !s.area && ts.length === 1 && chqSkill(ts[0])) C.chqOk = [ts[0].id]; // Choque de poderes: só golpe anunciado de alvo único
+  return C;
+}
+const chqSkill = h => (h.chqT || h.enemy || skipping(h)) ? '' : (h.skills || []).find(k => SK(k)?.cmd === 'choque' && !cantUse(h, effSkill(h, k))) || '';
+function chqMeta(a, plan, hero, key) { // meta de apertos: força do golpe do inimigo contra a da técnica (spec §4.5)
+  const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), pw = (s.power || 1) * (s.hits || 1), mine = SK(key).power || 1;
+  const m = Math.max(10, Math.min(40, Math.round(18 * pw / mine))) * (a.boss ? 1.2 : 1) * Math.max(.25, 1 - modsOf(hero, null).chq / 100);
+  return Math.max(5, Math.round(m));
+}
+function chqResolve(a, plan, C) { // o cabo de guerra fechou: quem apertou mais decide o golpe
+  const hero = S.chars[C.chq.id], key = C.chq.skill, won = C.chq.n >= C.chq.meta;
+  if (!hero || hero.hp <= 0) return aiRun(a, plan);
+  if (won) {
+    log(hero.name, `CHOQUE! ${hero.name} vence o duelo de poderes e devolve o golpe de ${a.name}!`, 'ok', { fx: { id: hero.id, a: a.id, s: SK(key).name, el: SK(key).el, chq: 1 } });
+    strike(hero, effSkill(hero, key), a, null, 0, { mult: 1.3 }); applySt(a, 'exposed', 2); endTurn(a.id, 100);
+  } else { log(hero.name, `CHOQUE perdido: o golpe de ${a.name} passa por cima!`, 'bad', { fx: { id: hero.id, chq: 1 } }); C.xmult = 1.3; aiRun(a, plan); }
+}
+function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'bad' (golpe sai +50%) ou ''
+  const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
+  if (inWin) {
+    const v = C.p[t.id][o.beat], fx = { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 };
+    if (v === 'par') {
+      if (!C.done[t.id]) { C.done[t.id] = 1; const g = parNode(t)?.power || 0; t.aura = Math.min(t.auraMax, t.aura + g); addLimit(t, 10); log(t.name, `APARA ${s.name} de ${a.name}!${g ? ` (+${g} Aura)` : ''}${a.brk ? brkHit(a, 1, t) : ''}`, 'ok', { fx }); }
+      else log(t.name, `apara mais uma batida de ${s.name}!`, 'ok', { fx });
+      applySt(a, 'exposed', 2); return 'ok'; // 2: o atacante gasta 1 no próprio fim de turno
+    }
+    if (v === 'esq') { log(t.name, `ESQUIVA ${s.name} de ${a.name}!`, 'ok', { fx: { ...fx, par: undefined, esq: 1 } }); return 'ok'; }
+    if (v === 'cedo') { applySt(t, 'exposed', 1); if (!C.tel) { log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad'; } log(t.name, `erra o tempo da esquiva e fica exposto!`, 'bad'); }
+    return '';
   }
+  if (!parryable(a, s, t, o, sure)) return '';
   if (t.enemy && !a.enemy && (t.boss || t.rank === 'elite') && !t.parT && !skipping(t) && Math.random() < (t.boss ? .15 : .1)) {
-    t.parT = 1; applySt(a, 'exposed', 1); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok';
+    t.parT = 1; applySt(a, 'exposed', 2); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok';
   }
   return '';
 }
@@ -554,12 +591,13 @@ function doAct(a, m, bonus = 0) {
   if (!s || (!m.release && cantUse(a, s))) return false;
   let t0 = s.tg === 'self' || s.kind === 'form' ? a : S.chars[m.target];
   if (!t0 || !(t0.id in S.battle.ticks)) return false;
+  const cx = !m.release && !a.enemy && s.cmd && m.cmd ? RU.CMD.cmdEffect(s, RU.CMD.clampCmd(s, m.cmd, modsOf(a, s))) : null; // nota do comando de ataque (medida no navegador)
   if (!m.release && !['heal', 'util', 'form'].includes(s.kind) && !s.area && t0.hp <= 0) return false; // não se gasta o turno golpeando quem já caiu
   if (!m.release) {
     a[s.res] -= s.cost;
     if (s.limit) a.limit = 0;
     if (s.uses) { a.bt ??= {}; a.bt.wu ??= {}; a.bt.wu[m.skill] = (a.bt.wu[m.skill] || 0) + 1; } // golpe com usos por batalha
-    for (const [r, v] of Object.entries(s.pay || {})) { if (r === 'hp') a.hp = Math.max(1, a.hp - Math.ceil(a.hpMax * v / 100)); else a[r] = Math.max(0, a[r] - v); }
+    for (const [r, v] of Object.entries(s.pay || {})) { if (r === 'san' && cx?.noSan) continue; if (r === 'hp') a.hp = Math.max(1, a.hp - Math.ceil(a.hpMax * v / 100)); else a[r] = Math.max(0, a[r] - v); }
     if (s.useComp) { const k = compOf(a); if (k && --a.inv[k] <= 0) delete a.inv[k]; }
     if (s.dom) { openDomain(a, s); endTurn(a.id, s.ct); return true; }
     if (s.chg) { a.chg = { s: m.skill, t: t0.id, aim: m.aim, n: s.chg }; a.st.charge = 99; log(a.name, `começa a concentrar ${s.name}…`, 'ok'); endTurn(a.id, 100); return true; }
@@ -581,10 +619,23 @@ function doAct(a, m, bonus = 0) {
   for (const pr of prs) { pr.p[pr.ps.res] -= pr.ps.cost; bump(pr.p.id, delay(pr.p)); }
   if (prs.length) log(a.name, `e ${prs.map(pr => pr.p.name).join(' e ')} executam juntos ${s.name}!`, 'ok');
   let more = false; a.bt ??= {}; a.bt.wkNow = false;
-  const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : null;
+  if (cx?.g) log(a.name, `${s.name}: ${cx.g === 'perf' ? 'PERFEITO' : 'BOM'}!`, 'ok');
+  const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : (cx?.crit && !s.area && off && ts.length === 1 && ts[0].weakPart) || null; // a Mira certa pega o ponto fraco do chefe
+  if (cx?.brk) for (const t of ts) { const bt = brkHit(t, cx.brk, a); if (bt) log(a.name, bt.trim(), 'ok'); }
+  const hitsN = s.hits || 1, total = hitsN + (cx?.extra || 0), withCx = (last) => { // turnos a mais nos efeitos bons e o efeito extra (pf) no último golpe
+    let fx = s.fx; if (cx?.turns) fx = (fx || []).map(f => f.t === 'st' && RU.POS.includes(f.k) ? { ...f, n: (f.n || 3) + cx.turns } : f);
+    if (last && cx?.pf && s.pf) fx = [...(fx || []), ...s.pf]; return fx === s.fx ? s : { ...s, fx }; };
   for (const t of ts) {
-    for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus }) || more; }
+    for (let h = 0; h < total; h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, withCx(h === total - 1 && !cx?.fin), t, aim, bonus, { plus, cx, ...(h < hitsN ? { beat: h } : { mult: cx.extraMult }) }) || more; }
+    if (cx?.fin && !t.dead && t.hp > 0) more = strike(a, { ...withCx(true), power: cx.fin, hits: 1, name: s.name + ' (final)' }, t, aim, bonus, { plus, cx }) || more; // sequência perfeita: golpe final
     if (s.dupla && off && !t.dead && t.hp > 0) more = strike(a, { ...s, name: s.name + ' (2ª mão)' }, t, aim, bonus, { plus, mult: .5 }) || more; // arma em par: segundo golpe a 50%
+  }
+  if (cx?.estouro) { applySt(a, 'exposed', 2); log(a.name, `${s.name}: a carga estoura! Fica exposto.`, 'bad'); }
+  const CW = S.battle.cmd; // aparou todas as batidas de um golpe de vários golpes: contra-ataque automático (básico da arma ×1,5)
+  if (CW && CW.foe === a.id && (s.hits || 1) > 1) for (const t of ts) {
+    const nt = CW.p?.[t.id]; if (!nt || t.hp <= 0 || a.hp <= 0 || nt.length !== (s.hits || 1) || !nt.every(v => v === 'par')) continue;
+    log(t.name, `CONTRA! Aparou tudo e devolve o golpe em ${a.name}.`, 'ok', { fx: { id: t.id, a: a.id, s: 'Contra-ataque', el: s.el, ctr: 1 } });
+    strike(t, { ...basicOf(t), name: 'Contra-ataque' }, a, null, 0, { counter: true, nochain: true, mult: 1.5 + modsOf(t, null).ctr / 100 });
   }
   const ch = s.fx?.find(f => f.t === 'chain');
   if (ch && off && ts.length === 1) inB.filter(o => o.enemy === ts[0].enemy && o !== ts[0] && o.hp > 0).sort(() => Math.random() - .5).slice(0, ch.n).forEach((o, i) => strike(a, s, o, null, bonus, { mult: ch.m ** (i + 1), plus }));
@@ -630,9 +681,10 @@ function iaExtra(a, usable) {
   return false;
 }
 // IA: Limite, transformação, reerguer caído, curar, purificar, invocar, buffs, dano; serve para inimigos e invocações
-function aiAct(a) {
+// IA do inimigo em duas fases: aiPlan decide (sem efeito visível) e aiRun age; a janela de defesa abre entre as duas
+function aiPlan(a) {
   const all = battlers(), alive = all.filter(o => o.hp > 0), foesAll = alive.filter(o => o.enemy !== a.enemy), mates = alive.filter(o => o.enemy === a.enemy);
-  if (!foesAll.length) return endTurn(a.id);
+  if (!foesAll.length) return null;
   const foes = foesAll.filter(o => !o.st.stealth || a.st.focus).length ? foesAll.filter(o => !o.st.stealth || a.st.focus) : foesAll;
   const K = SK, has = (k, t) => K(k).fx?.some(f => f.t === t), pw = k => K(k).power * (K(k).hits || 1) * (K(k).area ? 1.5 : 1);
   const strong = l => { const o = [...l].sort((x, y) => pw(y) - pw(x)); return Math.random() < .6 ? pick(o.slice(0, 3)) : pick(o); }; // repertório grande: prefere os golpes mais fortes
@@ -645,7 +697,7 @@ function aiAct(a) {
   const sick = mates.find(o => RU.NEG.filter(k => o.st[k]).length >= 2);
   const tgt = Math.random() < R.aiFocus ? [...foes].sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
   if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
-  if (!lim && R.iaExtra && a.ia && iaExtra(a, usable)) return;
+  const ia = !lim && R.iaExtra && a.ia ? usable : null;
   let skill = 'atk', t = tgt;
   if (lim) skill = lim;
   else if (forms.length && !a.form && (a.rage || Math.random() < .2)) { skill = pick(forms); t = a; }
@@ -659,8 +711,19 @@ function aiAct(a) {
   const ks = K(skill);
   if (ks && ['heal', 'util'].includes(ks.kind) && t?.enemy !== a.enemy) t = has(skill, 'revive') && fallen.length ? fallen[0] : ks.power ? hurt0 : pick(mates); // cura e suporte (inclusive o Limite) vão para o próprio lado
   if (ks && (ks.tg === 'self' || ks.kind === 'form')) t = a;
-  if (!t || !doAct(a, { skill, target: t.id })) { if (!doAct(a, { skill: 'atk', target: tgt.id })) endTurn(a.id); }
+  if (!t) { skill = 'atk'; t = tgt; }
+  const sk0 = skill === 'atk' ? basicOf(a) : K(skill), self = t === a || sk0?.tg === 'self' || sk0?.kind === 'form';
+  const tgs = self || !sk0 || ['heal', 'util'].includes(sk0.kind) ? [] : sk0.area ? foesAll.map(o => o.id) : [t.id];
+  return { skill, target: t.id, tgt: tgt.id, tgs, ia };
 }
+function aiRun(a, plan) {
+  if (!plan) return endTurn(a.id);
+  const T = S.battle.ticks, dead = id => !S.chars[id] || !(id in T) || (S.chars[id].hp <= 0 && S.chars[id].enemy !== a.enemy);
+  if (plan.target !== a.id && dead(plan.target)) { plan = aiPlan(a); if (!plan) return endTurn(a.id); } // o alvo caiu durante a janela: escolhe de novo
+  if (plan.ia && iaExtra(a, plan.ia)) return;
+  if (!doAct(a, { skill: plan.skill, target: plan.target })) { if (!doAct(a, { skill: 'atk', target: plan.tgt })) endTurn(a.id); }
+}
+const aiAct = a => aiRun(a, aiPlan(a));
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
   color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
@@ -738,4 +801,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { parriers, parNode, BASE, SK, addLimit, aiAct, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

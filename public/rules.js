@@ -191,10 +191,27 @@
   }
   const fxText = l => (l || []).map(fxOne).join(' · ');
   const FM = { atk: 'dano', def: 'redução de dano', agi: 'velocidade', hit: 'acerto', crit: 'crítico', bf: 'chance de Black Flash', atkP: 'poder do ataque básico', heal: 'cura' };
-  const modText = m => Object.entries(m || {}).map(([k, v]) => k === 'atkP' ? `+${v} ${FM[k]}` : `${pct(v)} ${FM[k] || k}`).join(', ');
+  // chaves de `mod` dos comandos de ação: cada uma com a sua unidade
+  const FMX = { cw: v => `${v > 0 ? '+' : ''}${v} ms na janela Bom do golpe no tempo`, cp: v => `${v > 0 ? '+' : ''}${v} ms na janela Perfeita do golpe no tempo`, mx: v => `+${v} golpe extra ao martelar`, cz: v => `+${v}% na faixa Perfeita ao segurar`,
+    ma: v => `+${v}% no ponto fraco da mira`, esq: v => `+${v} ms na zona de esquiva`, par: v => `+${v} ms na zona de aparar`, chq: v => `−${v}% nos apertos do Choque`, rit: v => `+${v} ms de tolerância nas setas e notas`,
+    ctr: v => `+${v}% no contra-ataque de várias batidas`, rn: v => `+${v} pontos de semelhança nas runas` };
+  const modText = m => Object.entries(m || {}).map(([k, v]) => FMX[k] ? FMX[k](v) : k === 'atkP' ? `+${v} ${FM[k]}` : `${pct(v)} ${FM[k] || k}`).join(', ');
   const formText = f => `por ${f.dur} turnos: ${modText(f.m)}${Object.keys(f.dr || {}).length ? ' · drena ' + Object.entries(f.dr).map(([r, v]) => `${v}${r === 'hp' ? '% ' : ' '}${RESN[r]}`).join(' e ') + ' por turno' : ''}${f.ret ? ` · quem erra você perde ${f.ret}% do tempo` : ''}${f.end?.length ? ' · ao acabar: ' + fxText(f.end).replace(/o alvo perde/g, 'perde') : ''}`;
   const ON = { start: 'No início da batalha', turn: 'No início do seu turno', low: 'Ao cair para 30% de HP (1× por batalha)', kill: 'Ao derrubar um inimigo', crit: 'Ao acertar um crítico', weak: 'Ao acertar uma fraqueza', hurt: 'Ao ser ferido', fall: 'Ao receber um golpe fatal (1× por batalha)', heal: 'Ao curar alguém', miss: 'Ao errar', ally: 'Quando um aliado cai' };
   const SCN = { atk: 'no ataque básico', mental: 'em dano mental', heal: 'em curas', area: 'em área', req: 'nas técnicas de arma', form: 'transformado', circ: 'em rituais' };
+  const RUNA_N = { circulo: 'um círculo', triangulo: 'um triângulo', estrela: 'uma estrela', espiral: 'uma espiral', raio: 'um raio', onda: 'uma onda' };
+  const cmdText = s => { // o que o comando de ataque da técnica pede e rende
+    const dmg = s.kind === 'dmg' || s.kind === 'mental';
+    if (s.cmd === 'tempo') { const w = g.RULES.CMD.tempoWin(s, {}); return `Golpe no tempo: aperte quando o anel fechar (Bom ×1,2 · Perfeito ×1,4, janela de ${w.cp} ms)${s.bf ? `. Só o Perfeito dispara o Black Flash: ×2,5 e devolve 25% da Aura` : ''}`; }
+    if (s.cmd === 'martelar') return `Martelar: aperte o máximo de vezes em 2 s e ganhe até +${s.mx || 0} golpe${s.mx > 1 ? 's' : ''}`;
+    if (s.cmd === 'segurar') return 'Segurar e soltar: segure e solte na faixa (Bom ×1,3 · Perfeito ×1,6); passar do topo estoura e deixa você Exposto';
+    if (s.cmd === 'seq') return `Sequência ${s.seq}: uma seta por batida; ${s.hits > 1 ? 'os golpes normais são o mínimo' : 'cada seta certa soma um golpe de 50%'}; todas certas: golpe final${s.fin ? ` de ${s.fin} de poder` : ''}`;
+    if (s.cmd === 'ritmo') return `Ritmo: ${s.nt || 6} notas; cada nota certa soma ${dmg ? '+10% de dano' : s.kind === 'heal' && s.power > 0 ? '+10% de cura e +1 turno' : '+1 turno'}; todas: Perfeito`;
+    if (s.cmd === 'mira') return 'Mira: clique no ponto fraco; acertou = crítico e −2 na Quebra';
+    if (s.cmd === 'runa') return `Runa: desenhe ${RUNA_N[s.rn] || 'o símbolo'} em 4 s; ≥ 60% de semelhança é Bom, ≥ 85% é Perfeito${dmg ? ' (×1,2 e ×1,4)' : '; Bom: +1 turno e ×1,2 em cura e escudo; Perfeito: não cobra a Sanidade'}`;
+    if (s.cmd === 'choque') return 'Choque: contra golpe anunciado de alvo único, aperte C e martele; vencer devolve o golpe ×1,3 e deixa o inimigo Exposto, perder leva ×1,3';
+    return '';
+  };
   // linhas extras da descrição (o resto — poder, custo, elemento — a interface já mostra)
   function extra(s, sk) {
     const o = [];
@@ -210,8 +227,11 @@
     if (s.fx?.length && s.kind !== 'passive') o.push((s.kind === 'form' ? 'ao assumir: ' : '') + fxText(s.fx));
     if (s.summon) o.push(`invoca ${s.summon}`);
     if (s.rea) o.push(reaText(s));
-    if (s.bf) o.push(`Black Flash: 01-${s.bf} no d100 (+bônus de Black Flash) vira ×2,5 e devolve 25% da Aura`);
-    if (s.par) o.push(`Aparar: no turno do inimigo aparece o botão; aperte nos últimos ${s.par} ms. Só golpe de alvo único e não mental; custa ${s.cost ?? s.c ?? 0} de Aura por tentativa, 1×/rodada. Certo: anula o golpe, +${s.power || 0} Aura, +10 de Limite e abala a Quebra do atacante. Fora do tempo: +50% de dano e Exposto`);
+    if (s.tel) o.push('golpe anunciado ⚠: abre a janela de Esquiva em quem for o alvo');
+    if (s.cmd) o.push(cmdText(s));
+    if (s.pf?.length && s.cmd) o.push('no Perfeito: ' + fxText(s.pf));
+    if (s.bf && !s.cmd) o.push(`Black Flash: 01-${s.bf} no d100 (+bônus de Black Flash) vira ×2,5 e devolve 25% da Aura`);
+    if (s.par) o.push(`Aparar: quando um golpe vem em você aparece o anel; Espaço nos últimos ${s.par} ms apara (golpe de alvo único e não mental; custa ${s.cost ?? s.c ?? 0} de Aura, 1×/rodada). Certo: anula o golpe, +${s.power || 0} Aura, +10 de Limite, abala a Quebra e deixa o atacante Exposto. Cedo demais: você fica Exposto. Aparar todas as batidas de um golpe múltiplo devolve um contra-ataque`);
     if (s.combo) o.push(`combo: ×${s.cm || 1.4} logo depois de ${s.combo.split('|').join(' ou ')}`);
     if (s.trio) o.push(`técnica em trio: dois aliados com "${s.trio.join('" e "')}" gastam o próximo turno junto`);
     if (s.dom) o.push(`Expansão de Domínio por ${s.dom.dur} turnos (gasta toda a Aura, exige metade dela; Exausto ao fim): aliados ${modText(s.dom.ally) || '—'} · inimigos ${modText(s.dom.foe) || '—'}${s.dom.tick ? ' · inimigos ganham ' + (ST[s.dom.tick] || s.dom.tick) + ' a cada turno' : ''}`);
@@ -224,5 +244,71 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  // ----- comandos de ação (Aparar, Esquiva e minigames de ataque): regras puras usadas pelo servidor e pela tela -----
+  const resample = (pts, n) => { // n pontos igualmente espaçados ao longo do traço
+    const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const tot = L[L.length - 1] || 1e-6, out = []; let j = 1;
+    for (let k = 0; k < n; k++) { const d = tot * k / (n - 1); while (j < pts.length - 1 && L[j] < d) j++; const seg = L[j] - L[j - 1] || 1e-6, f = Math.min(1, Math.max(0, (d - L[j - 1]) / seg)); out.push([pts[j - 1][0] + (pts[j][0] - pts[j - 1][0]) * f, pts[j - 1][1] + (pts[j][1] - pts[j - 1][1]) * f]); }
+    return out;
+  };
+  const poly = (v, close) => close ? [...v, v[0]] : v, ang = (i, n, r, off = -Math.PI / 2) => [.5 + r * Math.cos(off + 2 * Math.PI * i / n), .5 + r * Math.sin(off + 2 * Math.PI * i / n)];
+  const RUNE_T = {
+    circulo: { closed: true, pts: Array.from({ length: 65 }, (_, i) => ang(i, 64, .4)) },
+    triangulo: { closed: true, pts: poly([ang(0, 3, .45), ang(1, 3, .45), ang(2, 3, .45)], true) },
+    estrela: { closed: true, pts: poly([0, 2, 4, 1, 3].map(i => ang(i, 5, .45)), true) },
+    raio: { closed: false, pts: [[.6, .05], [.3, .45], [.65, .5], [.35, .95]] },
+    espiral: { closed: false, pts: Array.from({ length: 80 }, (_, i) => { const t = i / 79, a = t * 3 * Math.PI, r = .05 + .4 * t; return [.5 + r * Math.cos(a), .5 + r * Math.sin(a)]; }) },
+    onda: { closed: false, pts: Array.from({ length: 60 }, (_, i) => [i / 59, .5 + .25 * Math.sin(i / 59 * 3 * Math.PI)]) },
+  };
+  const CMD = {
+    RUNE_T,
+    KINDS: ['tempo', 'martelar', 'segurar', 'seq', 'ritmo', 'mira', 'runa', 'choque'],
+    RUNES: ['circulo', 'triangulo', 'raio', 'espiral', 'estrela', 'onda'],
+    DEF: { beat: 1100, esq: 450, grace: 200, gap: 700 },
+    // zona do aperto na janela de defesa; left = ms até o impacto (negativo = depois dele)
+    gradeDef(left, par, esq, canParry) {
+      if (left < -CMD.DEF.grace) return 'late';
+      if (left <= par) return canParry ? 'par' : esq > 0 ? 'esq' : 'late';
+      return esq > 0 && left <= par + esq ? 'esq' : 'cedo';
+    },
+    // janelas do Golpe no tempo (ms): o Perfeito de técnica com Black Flash fica mais fácil quanto maior o bf
+    tempoWin(s, mods = {}) { return { cw: (s.cw || 160) + (mods.cw || 0), cp: (s.bf ? 30 + 8 * (s.bf + (mods.bf || 0)) : s.cp || 60) + (mods.cp || 0) }; },
+    // reconhecedor de runa: reamostra o traço em 32 pontos, normaliza escala e centro e compara com o modelo (testando giros de ±30° e,
+    // nos símbolos fechados, qualquer ponto de partida e as duas direções). Devolve 0..100
+    runeScore(points, rune) {
+      const T = CMD.RUNE_T[rune]; if (!T || !Array.isArray(points) || points.length < 4) return 0;
+      const norm = pts => { const r = resample(pts, 32), cx = r.reduce((a, p) => a + p[0], 0) / 32, cy = r.reduce((a, p) => a + p[1], 0) / 32, q = r.map(p => [p[0] - cx, p[1] - cy]);
+        const w = Math.max(...q.map(p => Math.abs(p[0]))) * 2, h = Math.max(...q.map(p => Math.abs(p[1]))) * 2, k = Math.max(w, h, 1e-6); return q.map(p => [p[0] / k, p[1] / k]); };
+      const tpl = norm(T.pts), me = norm(points); let best = Infinity;
+      for (const dir of [1, -1]) { const m0 = dir === 1 ? me : [...me].reverse();
+        for (let deg = -30; deg <= 30; deg += 10) { const a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), m = m0.map(p => [p[0] * c - p[1] * sn, p[0] * sn + p[1] * c]);
+          for (let sh = 0; sh < (T.closed ? 32 : 1); sh++) { let d = 0; for (let i = 0; i < 32; i++) { const q = m[(i + sh) % 32], t = tpl[i]; d += Math.hypot(q[0] - t[0], q[1] - t[1]); } d /= 32; if (d < best) best = d; } } }
+      return Math.max(0, Math.min(100, Math.round(100 * (1 - best / .35))));
+    },
+    // a nota que o navegador mandou, limitada pelo que a técnica permite; sem comando na técnica a nota não vale nada
+    clampCmd(s, cmd, mods = {}) {
+      const z = { g: '', n: 0, acc: 0 };
+      if (!s?.cmd || s.cmd === 'choque' || !cmd || typeof cmd !== 'object') return z;
+      const cnt = { martelar: (s.mx || 0) + (mods.mx || 0), seq: s.seq?.length || 0, ritmo: s.nt || 0 }[s.cmd] ?? 0;
+      let g = cmd.g === 'bom' || cmd.g === 'perf' ? cmd.g : '';
+      const n = Math.max(0, Math.min(cnt, Math.floor(+cmd.n) || 0)); let acc = +cmd.acc; acc = !Number.isFinite(acc) ? 0 : s.cmd === 'segurar' && acc < 0 ? -1 : Math.max(0, Math.min(1, acc));
+      if (g === 'perf' && cnt && n < cnt) g = 'bom'; // nos comandos de contagem o Perfeito pede a nota cheia
+      return { g, n, acc };
+    },
+    // o que a nota vale (spec §5.3): multiplicador, golpes extras, golpe final, efeito extra (pf), Black Flash, crítico, Quebra, estouro, turnos, cura
+    cmdEffect(s, c) {
+      const e = { g: c?.g || '', mult: 1, extra: 0, extraMult: 1, fin: 0, pf: false, bf: false, crit: false, brk: 0, estouro: false, turns: 0, healMult: 1, noSan: false };
+      if (!s?.cmd || !c) return e;
+      const bom = c.g === 'bom', perf = c.g === 'perf', dmg = s.kind === 'dmg' || s.kind === 'mental';
+      if (s.cmd === 'tempo') { if (bom) e.mult = 1.2; if (perf) { e.mult = 1.4; e.pf = true; e.bf = s.bf > 0; } }
+      else if (s.cmd === 'martelar') { e.extra = c.n; e.pf = perf; }
+      else if (s.cmd === 'segurar') { if (c.acc < 0) e.estouro = true; else if (bom) e.mult = 1.3; else if (perf) { e.mult = 1.6; e.pf = true; } }
+      else if (s.cmd === 'seq') { if (!(s.hits > 1)) { e.extra = c.n; e.extraMult = .5; } if (perf) { e.fin = s.fin || Math.round(s.power * 1.5); e.pf = true; } }
+      else if (s.cmd === 'ritmo') { e.pf = perf; if (dmg) e.mult = 1 + .1 * c.n; else { e.turns = c.n; if (s.kind === 'heal' && s.power > 0) e.healMult = 1 + .1 * c.n; } }
+      else if (s.cmd === 'mira') { if (bom || perf) { e.crit = true; e.brk = 2; } e.pf = perf; }
+      else if (s.cmd === 'runa') { if (dmg) { if (bom) e.mult = 1.2; if (perf) { e.mult = 1.4; e.pf = true; } } else { if (bom || perf) { e.turns = 1; e.healMult = 1.2; } e.noSan = perf; } }
+      return e;
+    },
+  };
+  g.RULES = { CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

@@ -160,18 +160,45 @@ Ramos novos: **Marcial** Aparar e Marcas do Caçador · **Aura** Black Flash, T�
 um ramo de 7 nós cada (Aparar temático, revide, Marca ou Técnica Reversa e um golpe com Black Flash).
 
 ### Mecânicas novas
-- **Aparar** (`pas: 'par'`, `par` = ms da janela boa, `c` = Aura por tentativa, `p` = Aura de volta ao acertar). Quando o mestre manda o
+- **Aparar** (substituído pela janela `S.battle.cmd` da Leva 4, ver abaixo; `pas: 'par'`, `par` = ms da janela boa, `c` = Aura por tentativa, `p` = Aura de volta ao acertar). Quando o mestre manda o
   inimigo agir (botão IA) e algum herói tem um nó de Aparar com Aura, o servidor abre `S.battle.parry` por 1,6 s e o golpe sai quando
   ela fecha. O jogador vê um anel fechando (`public/js/aparar.js`) e aperta o botão ou Espaço. Nos últimos `par` ms (+200 ms de folga),
   o golpe é anulado (sem dano nem condição), dá +`p` Aura, +10 de Limite e tira 1 da Quebra do atacante. Cedo demais: +50% de dano e Exposto.
   Vale só contra golpe de alvo único e não mental (nem área, nem contra-ataque, nem `sure`). Uma tentativa por rodada, paga mesmo errando.
   O nó de maior janela vale. **Chefes (15%) e elites (10%)** aparam golpes de alvo único dos heróis, uma vez por rodada, deixando o atacante Exposto.
   Ações de inimigo lançadas à mão pelo mestre (sem o botão IA) não abrem a janela.
-- **Black Flash** (`bf: N` na técnica; `mod: 'bf N'` alarga): rolagem de acerto de 01 a N + bônus vira ×2,5 (no lugar do crítico) e devolve 25% da Aura máx.
+- **Black Flash** (`bf: N` na técnica; `mod: 'bf N'` alarga): desde a Leva 4 só sai no Perfeito do Golpe no tempo (×2,5, devolve 25% da Aura máx.).
 - **Cicatriz** (`scar hp|san|aura P`): tira P% do máximo até o **descanso longo**. É o preço da Técnica Reversa e das Marcas.
 - **Marca** (condição `mark`): +30% de dano, +20% de velocidade e +10% de crítico. Os nós de Marca são gatilhos `on: 'low'` (30% do HP, 1×/batalha).
 - **Clones** (`clone N P`, normalmente `self`): N combatentes reais na fila, cada um com P% do HP atual do dono (que perde esse HP).
   Copiam atributos e até 4 técnicas de dano simples, causam 50% do dano, agem sozinhos, duram 3 turnos e somem ao cair. No máximo 3 por dono.
+
+## Comandos de ação (Leva 4, `arvore/leva4.js`, 45 nós)
+Spec: `docs/superpowers/specs/2026-11-17-comandos-de-acao-design.md`. Substitui o Aparar e o Black Flash descritos na Leva 3.
+
+### Defesa (janela `S.battle.cmd`, medida no servidor)
+- Quando o inimigo age (botão IA), o servidor escolhe antes a técnica e o alvo (`aiPlan`) e abre a janela **só para o alvo**:
+  golpe anunciado (`tel: 1` no nó ou na lista `telK` da ficha) abre Esquiva para todo alvo; golpe físico de alvo único não anunciado abre só
+  Aparar, para quem tem o nó e Aura. O golpe sai quando a janela fecha (`aiRun`). O mestre pode pular a espera (`cmdSkip`).
+- Uma tecla só. Anel de 1100 ms. Nos últimos `par` ms (+200 de folga) **apara**; nos 450 ms antes disso **esquiva** (grátis, sem limite, só em golpe anunciado);
+  mais cedo: errou (herói Exposto; sem golpe anunciado ainda leva +50%). Aparar certo: anula o golpe, +Aura, +10 de Limite, −1 de Quebra e **o inimigo fica Exposto**.
+- Golpe de várias batidas: uma batida por golpe (700 ms de intervalo), nota por batida, Aura cobrada uma vez. Todas aparadas: **contra-ataque** (básico ×1,5).
+- Chefes: 20% de chance de golpe anunciado Perfeito (×1,25, batida 20% menor). `telK` nasce na primeira consulta: chefe = 2 técnicas mais fortes, elite = 1.
+- **Choque de poderes** (`cmd: 'choque'`): só em golpe anunciado de alvo único; tecla C abre um cabo de guerra de 3 s (até 20 apertos/s). Vencer devolve o golpe ×1,3 e expõe o inimigo.
+
+### Ataque (nota medida no navegador, enviada no `act` como `cmd: { g, n, acc }`; o servidor limita)
+Campos do nó: `cmd`, `pf` (efeito extra do Perfeito, notação de `fx`), `mx`/`mt` (martelar), `seq` e `fin` (sequência), `nt` (ritmo), `rn` (runa), `cw`/`cp`/`cz`/`ma`.
+| `cmd` | Bom | Perfeito |
+|---|---|---|
+| `tempo` | ×1,2 | ×1,4 + `pf`; com `bf`, só o Perfeito dispara o Black Flash (janela 30 + 8·bf ms) |
+| `martelar` | + golpes extras pela barra (até `mx`) | barra cheia: + `pf` |
+| `segurar` | ×1,3 | ×1,6 + `pf`; passar do topo estoura (sai normal e Exposto) |
+| `seq` | nó novo: +1 golpe de 50% por seta; nó antigo: os `hits` são o piso | tudo certo: golpe final `fin` + `pf` |
+| `ritmo` | +1 turno nos buffs, +10% de cura ou dano por nota | todas as notas: `pf` |
+| `mira` | crítico e −2 na Quebra | + `pf` |
+| `runa` | ×1,2 (≥ 60% de semelhança); ritual sem dano: +1 turno | ×1,4 (≥ 85%); ritual: não cobra Sanidade |
+Todo nó com `bf` vira `tempo`; todo ritual com `circ` vira `runa` (1º círculo = círculo, 2º = triângulo, 3º = estrela, 4º = espiral).
+Ignorar o comando nunca tira dano. Chaves novas de `mod`: `cw cp mx cz ma esq par chq rit ctr rn`.
 
 ## Ligações e mandala
 

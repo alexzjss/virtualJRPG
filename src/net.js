@@ -12,7 +12,7 @@ import { AUD, DATA, GM, IMG, KEY, MIME, OF, PORT, PORTAL, PUB, SEA, UP, VEND, se
 import { UPMAX, blocked, checkUser, clean, dirSize, flood, ipOf, magic, penalize, same } from './auth.js';
 import { ATTRS, PARTS, PL } from './consts.js';
 import { S, log, save } from './state.js';
-import { SK, breakCheck, can, current, int, ofiSync, order, prep, reseat, rid, scene, usable } from './rules.js';
+import { SK, modsOf, breakCheck, can, current, int, ofiSync, order, prep, reseat, rid, scene, usable } from './rules.js';
 import { H, NOUNDO, undoStack } from './handlers.js';
 import { nodeOf } from './oficios.js';
 
@@ -104,10 +104,12 @@ const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ..
 const scrub = ch => { const k = 100 / (ch.hpMax || 1); return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, brk: ch.brk, hp: Math.ceil(ch.hp * k), hpMax: 100,
   body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: ch.known >= 1 ? ch.weak : [], resist: ch.known >= 2 ? ch.resist : [], weakPart: ch.known >= 3 ? ch.weakPart : undefined, known: ch.known || 0, marks: {}, bon: {} }; };
 const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
-const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined }]));
+// `cm`: os modificadores dos comandos de ataque de cada técnica com comando (janelas, golpes extras…), para a tela desenhar o minigame certo
+const cmOf = ch => Object.fromEntries((ch.skills || []).filter(k => S.skills[k]?.cmd).map(k => { const m = modsOf(ch, S.skills[k]); return [k, { cw: m.cw, cp: m.cp, mx: m.mx, cz: m.cz, ma: m.ma, rit: m.rit, rn: m.rn, bf: m.bf }]; }));
+const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined, cm: cmOf(ch) }]));
 let net = { status: 'off', url: '', code: '', msg: 'Túnel desligado.' }; // situação do túnel, só para o mestre (não é salva)
 const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => `http://${i.address}:${PORT}`);
-const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.keys(S.users).sort(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
+const view = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...ch, cm: cmOf(ch) }])), users: undefined, accounts: Object.keys(S.users).sort(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
    { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 // As definições de skills e itens são ~85% do estado e quase nunca mudam: vão numa mensagem à parte ("defs"), só para quem ainda

@@ -25,9 +25,14 @@ export function parseDom(str, where = '') {
 const kv = (str, where) => Object.fromEntries(String(str).split(';').map(x => x.trim()).filter(Boolean).map(x => { const [k, v] = x.split(/\s+/); if (Number.isNaN(+v)) throw new Error(`valor inválido "${x}" em ${where}`); return [k, +v]; }));
 // converte um nó dos dados para os campos que o servidor usa
 export function expand(o) {
-  const { fx, fm, mod, bon, up, dom, trio, ...rest } = o, w = o.n;
+  const { fx, fm, mod, bon, up, dom, trio, pf, ...rest } = o, w = o.n, C = globalThis.RULES.CMD;
   const out = { ...rest };
   if (fx) out.fx = parseFx(fx, w);
+  if (pf) out.pf = parseFx(pf, w);
+  if (o.cmd != null && !C.KINDS.includes(o.cmd)) throw new Error(`cmd inválido "${o.cmd}" em ${w}`);
+  if (o.seq != null && !/^[↑↓←→]{3,7}$/.test(o.seq)) throw new Error(`seq inválida "${o.seq}" em ${w}`);
+  if (o.rn != null && !C.RUNES.includes(o.rn)) throw new Error(`rn inválido "${o.rn}" em ${w}`);
+  if (o.nt != null && !(o.nt >= 4 && o.nt <= 8)) throw new Error(`nt inválido "${o.nt}" em ${w}`);
   if (fm) out.form = parseForm(fm, w);
   if (dom) out.dom = parseDom(dom, w);
   if (trio) out.trio = String(trio).split('|');

@@ -4,6 +4,7 @@ import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
 const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 const { TREE } = await import('../tree.js');
+const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
 const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
@@ -649,7 +650,7 @@ test('bestiário: Domínio só em 3 chefes (Leviatã, Condessa, Filho de Hiruko)
   reset(); for (let i = 0; i < 10; i++) { H.foeGen(gm, { el: ['kagutsuchi', 'susanoo', 'amaterasu'][i % 3], role: 'conjurador', rank: 'chefe' }); }
   assert.ok(Object.values(S.chars).every(c => c.skills.every(k => !S.skills[k].dom && !S.skills[k].trio)));
 });
-const foeTurn = (e, f) => { turn(e); return fixR(.3, () => H.ai(gm)); };
+const foeTurn = (e, f) => { turn(e); return fixR(.3, () => { H.ai(gm); H.cmdSkip(gm); }); }; // cmdSkip: chefe com golpe anunciado abre a janela; o teste não espera
 test('IA: o chefe abre o Domínio uma única vez, com Aura cheia e vida < 75%, e o Choque vale contra herói', () => {
   reset(); const h = mk(ana, {}); H.bSpawn(gm, { id: bst('Condessa Escarlate'), fit: false }); const b = Object.values(S.chars).find(c => c.boss); derive(b); b.hp = b.hpMax; b.aura = b.auraMax;
   H.battle(gm, { on: true }); foeTurn(b); assert.ok(!S.battle.dom && !b.domUsed); // vida cheia: não abre
@@ -754,7 +755,7 @@ test('armas (expansão): distância não sofre contra-ataque, flechas no slot de
   assert.ok(AR.make('sabresg').dupla && AR.make('tonfas').dupla && AR.make('sai').dupla && AR.make('pistolas').dupla);
   // trilhas novas: 10 nós por tipo, com req, postura, reação, maestria e golpe final com requisito 55
   for (const wt of ['pesada', 'foco', 'corrente', 'arremesso', 'arco', 'escudo', 'instrumento']) {
-    const ns = Object.values(S.skills).filter(x => x.req === wt); assert.equal(ns.length, 10, wt);
+    const ns = Object.values(S.skills).filter(x => x.req === wt && !L4N.has(x.name)); assert.equal(ns.length, 10, wt); // as técnicas de comando da Leva 4 não contam na trilha de 10
     assert.ok(ns.some(x => x.kind === 'form') && ns.some(x => x.kind === 'util') && ns.some(x => x.rq && Object.values(x.rq)[0] === 55), wt);
     assert.ok(ns.some(x => x.kind === 'passive' && x.sc === 'wt:' + wt), wt + ': maestria');
   }
@@ -960,8 +961,10 @@ test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo'
 test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e clones', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h);
   h.skills = [sk('Tempestade Negra')]; H.battle(gm, { on: true }); assert.ok(S.skills[sk('Tempestade Negra')].bf === 10);
-  let bf = false; for (let i = 0; i < 200 && !bf; i++) { S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; H.act(ana, { id: h.id, skill: sk('Tempestade Negra'), target: e.id }); bf = S.log.some(l => /BLACK FLASH/.test(l.text || '')); }
-  assert.ok(bf, 'Black Flash sai na faixa do d100'); assert.ok(h.aura > 0, 'devolve Aura');
+  const kT = sk('Tempestade Negra'); assert.equal(S.skills[kT].cmd, 'tempo', 'todo bf nasce como Golpe no tempo');
+  for (let i = 0; i < 6; i++) { S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; fixR(.3, () => H.act(ana, { id: h.id, skill: kT, target: e.id })); assert.ok(!S.log.some(l => /BLACK FLASH/.test(l.text || '')), 'sem Perfeito não há Black Flash'); }
+  S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; fixR(.3, () => H.act(ana, { id: h.id, skill: kT, target: e.id, cmd: { g: 'perf', n: 0, acc: 1 } })); const bf = S.log.some(l => /BLACK FLASH/.test(l.text || ''));
+  assert.ok(bf, 'Black Flash sai no Perfeito'); assert.ok(h.aura > 0, 'devolve Aura');
   reset(); const m = mk(ana, {}), f = mk(gm, { enemy: true }); m.skills = [sk('Marca Rubra')]; m.pslots = [...m.skills]; derive(m); const hp0 = m.hpMax, san0 = m.sanMax;
   H.battle(gm, { on: true }); m.hp = m.hpMax; f.attrs.FOR = 95; S.battle.ticks[f.id] = -1;
   for (let i = 0; i < 50 && !m.st.mark; i++) { if (m.hp > m.hpMax * .35) m.hp = Math.ceil(m.hpMax * .35); S.battle.ticks[f.id] = -1; H.act(gm, { id: f.id, skill: 'atk', target: m.id }); m.hp = Math.max(m.hp, 1); }
@@ -972,15 +975,212 @@ test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e c
   H.battle(gm, { on: true }); c.hp = c.hpMax; c.aura = 99; const hpC = c.hp; S.battle.ticks[c.id] = -1; H.act(ana, { id: c.id, skill: sk('Fábrica de Cópias'), target: c.id });
   const cl = Object.values(S.chars).filter(o => o.clone === c.id); assert.equal(cl.length, 2); assert.ok(c.hp < hpC); assert.ok(cl.every(o => o.hp > 0 && o.id in S.battle.ticks && o.skills.includes(sk('Fagulha Negra'))));
 });
-test('leva 3: Aparar — janela aberta pela IA, acerto anula o golpe e dá Aura; erro pune; só golpe único não mental', async () => {
-  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.skills = [sk('Aparar')]; derive(h); e.attrs.AGI = 99; h.attrs.AGI = 1; e.skills = [];
-  H.battle(gm, { on: true }); h.aura = 20; while (current() !== e.id) H.next(gm);
-  H.ai(gm); assert.ok(S.battle.parry && S.battle.parry.foe === e.id, 'janela aberta'); const hp = h.hp;
-  S.battle.parry.at = Date.now() - S.battle.parry.w + 100; H.parry(ana, { id: h.id }); assert.equal(S.battle.parry.p[h.id], 'ok'); assert.equal(h.aura, 16);
-  H.parry(ana, { id: h.id }); assert.equal(h.aura, 16, '1× por rodada');
-  await new Promise(r => setTimeout(r, 1900)); assert.equal(S.battle.parry, null); assert.equal(h.hp, hp, 'golpe aparado'); assert.ok(S.log.some(l => /APARA/.test(l.text || ''))); assert.equal(h.aura, 18);
-  reset(); const h2 = mk(ana, {}), e2 = mk(gm, { enemy: true }); h2.skills = [sk('Aparar')]; derive(h2); e2.attrs.AGI = 99; h2.attrs.AGI = 1;
-  H.battle(gm, { on: true }); h2.aura = 20; while (current() !== e2.id) H.next(gm); H.ai(gm); H.parry(ana, { id: h2.id }); assert.equal(S.battle.parry.p[h2.id], 'bad', 'cedo demais');
-  await new Promise(r => setTimeout(r, 1900)); assert.ok(S.log.some(l => /fora do tempo|errou/.test(l.text || '')));
-  reset(); const h3 = mk(ana, {}), e3 = mk(gm, { enemy: true }); derive(h3); H.battle(gm, { on: true }); while (current() !== e3.id) H.next(gm); H.ai(gm); assert.ok(!S.battle.parry, 'sem nó de Aparar, sem janela');
+// ---- comandos de ação: janela de defesa (Aparar e Esquiva) ----
+const dfx = (names = ['Aparar'], heroes = 1) => { // um inimigo rápido e `heroes` heróis; o inimigo só tem o ataque básico
+  reset(); const hs = Array.from({ length: heroes }, (_, i) => { const h = mk(i ? bia : ana, {}); h.skills = names.map(sk).filter(Boolean); derive(h); h.attrs.AGI = 1; h.aura = 20; return h; });
+  const e = mk(gm, { enemy: true }); e.skills = []; e.attrs.AGI = 99; derive(e); H.battle(gm, { on: true }); while (current() !== e.id) H.next(gm); return { hs, e };
+};
+const openAt = left => { const C = S.battle.cmd; C.at = Date.now() - C.beats[0] + left; return C; }; // põe o impacto da 1ª batida daqui a `left` ms
+const waitCmd = () => fixR(.3, () => H.cmdSkip(gm)); // fecha a janela já, com dados fixos (acerta sem crítico)
+test('defesa: golpe não anunciado abre só Aparar e só para o alvo', () => {
+  const { hs, e } = dfx(['Aparar'], 2); H.ai(gm); const C = S.battle.cmd;
+  assert.ok(C && C.foe === e.id && C.tel === false); assert.equal(C.tgs.length, 1);
+  const other = hs.find(h => !C.tgs.includes(h.id)), aura = other.aura; H.def(other.owner === 'Ana' ? ana : bia, { id: other.id });
+  assert.equal(other.aura, aura, 'quem não é o alvo não paga Aura'); assert.deepEqual(C.p[other.id] ?? [], []);
+});
+test('defesa: Aparar certo anula o golpe, dá Aura e deixa o inimigo Exposto', async () => {
+  const { hs: [h], e } = dfx(); H.ai(gm); const hp = h.hp; openAt(100); H.def(ana, { id: h.id });
+  assert.deepEqual(S.battle.cmd.p[h.id], ['par']); await waitCmd();
+  assert.equal(S.battle.cmd, null); assert.equal(h.hp, hp, 'golpe aparado'); assert.ok(e.st.exposed > 0, 'inimigo Exposto');
+  assert.equal(h.aura, 20 - S.skills[sk('Aparar')].cost + S.skills[sk('Aparar')].power); assert.ok(S.log.some(l => /APARA/.test(l.text || '')));
+});
+test('defesa: cedo demais em Aparar fica Exposto e leva +50%; só uma vez por rodada', async () => {
+  const { hs: [h] } = dfx(); H.ai(gm); openAt(1000); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['cedo']);
+  const aura = h.aura; H.def(ana, { id: h.id }); assert.equal(h.aura, aura, '1× por rodada'); await waitCmd(); assert.ok(h.st.exposed > 0);
+});
+test('defesa: golpe anunciado — esquiva de graça, sem precisar de nó', async () => {
+  const { hs: [h], e } = dfx([]); e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; // técnica anunciada
+  fixR(0, () => H.ai(gm)); const C = S.battle.cmd; assert.ok(C && C.tel, 'janela com esquiva'); const hp = h.hp, aura = h.aura; openAt(450); H.def(ana, { id: h.id });
+  assert.deepEqual(C.p[h.id], ['esq']); await waitCmd(); assert.equal(h.hp, hp); assert.equal(h.aura, aura); assert.ok(!e.st.exposed);
+});
+test('defesa: sem Aura a zona de Aparar vira esquiva (anunciado) e não abre janela (não anunciado); sem nó, sem janela', () => {
+  let { hs: [h], e } = dfx(); h.aura = 0; H.ai(gm); assert.ok(!S.battle.cmd, 'sem Aura e sem golpe anunciado: nenhuma janela');
+  ({ hs: [h], e } = dfx(['Aparar'])); h.aura = 0; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['esq']); assert.equal(h.aura, 0);
+  dfx([]); H.ai(gm); assert.ok(!S.battle.cmd, 'sem nó de Aparar e sem golpe anunciado, sem janela');
+});
+test('defesa: janela velha (servidor reiniciado) é descartada e o inimigo age', () => {
+  const { hs: [h], e } = dfx(); S.battle.cmd = { foe: e.id, at: Date.now() - 10000, w: 1100, beats: [1100], tgs: [h.id], p: { [h.id]: [] } };
+  const hp = h.hp; H.ai(gm); assert.ok(!S.battle.cmd || S.battle.cmd.at > Date.now() - 5000, 'a janela velha saiu');
+});
+
+test('comandos: expand valida campos e gradeDef decide a zona', async () => {
+  const { expand } = await import('../content.js');
+  assert.throws(() => expand({ n: 'X', k: 'dmg', cmd: 'dança' }), /cmd/);
+  assert.throws(() => expand({ n: 'X', k: 'dmg', cmd: 'seq', seq: '↑x' }), /seq/);
+  assert.throws(() => expand({ n: 'X', k: 'dmg', cmd: 'runa', rn: 'quadrado' }), /rn/);
+  assert.equal(expand({ n: 'X', k: 'dmg', cmd: 'tempo', pf: 'st bleed 2' }).pf[0].t, 'st');
+  const g = RU.CMD.gradeDef;
+  assert.equal(g(100, 300, 450, true), 'par'); assert.equal(g(100, 300, 450, false), 'esq');
+  assert.equal(g(500, 300, 450, true), 'esq'); assert.equal(g(800, 300, 450, true), 'cedo');
+  assert.equal(g(-150, 300, 450, true), 'par'); assert.equal(g(-250, 300, 450, true), 'late');
+  assert.equal(g(500, 300, 0, true), 'cedo', 'sem golpe anunciado não há esquiva');
+});
+
+test('IA: aiPlan não muda o estado e aiRun executa o plano; alvo caído é replanejado', async () => {
+  const { aiPlan, aiRun } = await import('../server.js');
+  reset(); const h = mk(ana, {}), h2 = mk(bia, {}), e = mk(gm, { enemy: true }); e.skills = []; e.attrs.AGI = 99; h.attrs.AGI = 1; h2.attrs.AGI = 1; derive(h); derive(h2); derive(e);
+  H.battle(gm, { on: true }); while (current() !== e.id) H.next(gm);
+  const logN = S.log.length, hp = [h.hp, h2.hp], ticks = JSON.stringify(S.battle.ticks), plan = aiPlan(e);
+  assert.equal(plan.skill, 'atk'); assert.deepEqual(plan.tgs, [plan.target]); assert.ok([h.id, h2.id].includes(plan.target));
+  assert.equal(S.log.length, logN); assert.deepEqual([h.hp, h2.hp], hp); assert.equal(JSON.stringify(S.battle.ticks), ticks);
+  const other = plan.target === h.id ? h2 : h; S.chars[plan.target].hp = 0; // o alvo planejado cai durante a janela
+  const hpO = other.hp; fixR(.3, () => aiRun(e, plan)); assert.ok(other.hp < hpO, 'o outro herói leva o golpe');
+});
+
+test('batidas: golpe de 3 golpes abre 3 batidas; aparar todas dá contra-ataque, Aura cobrada uma vez', async () => {
+  const { hs: [h], e } = dfx(); e.skills = [sk('Rajada de Aura')]; assert.equal(S.skills[e.skills[0]].hits, 3); fixR(0, () => H.ai(gm));
+  const C = S.battle.cmd; assert.deepEqual(C.beats, [1100, 1800, 2500]); const hp = h.hp, ehp = e.hp, aura = h.aura, par = S.skills[sk('Aparar')];
+  for (let i = 0; i < 3; i++) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); }
+  assert.deepEqual(C.p[h.id], ['par', 'par', 'par']); await waitCmd();
+  assert.equal(h.hp, hp, 'nenhuma batida acerta'); assert.ok(S.log.some(l => /CONTRA/.test(l.text || '')), 'contra-ataque'); assert.ok(e.hp < ehp, 'o contra acerta'); assert.ok(e.st.exposed > 0, 'inimigo Exposto');
+  assert.equal(h.aura, aura - par.cost + par.power, 'Aura cobrada e devolvida uma vez');
+});
+test('batidas: aparar 2 de 3 — só a batida sem nota acerta e não há contra-ataque', async () => {
+  const { hs: [h], e } = dfx(); e.skills = [sk('Rajada de Aura')]; fixR(0, () => H.ai(gm)); const C = S.battle.cmd, ehp = e.hp, hp = h.hp;
+  for (const i of [0, 1]) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); }
+  await waitCmd(); assert.ok(h.hp < hp, 'a 3ª batida acerta'); assert.equal(e.hp, ehp); assert.ok(!S.log.some(l => /CONTRA/.test(l.text || '')));
+});
+
+test('tel: chefe nasce com 2 técnicas anunciadas, elite com 1, comum com 0; o interruptor do mestre manda', async () => {
+  const { telOf } = await import('../server.js'); reset(); const ks = ['Golpe Pesado', 'Estilhaço', 'Terremoto', 'Tiro Certeiro'].map(sk).filter(Boolean); assert.equal(ks.length, 4);
+  const mkE = f => { const e = mk(gm, { enemy: true }); e.skills = [...ks]; Object.assign(e, f); return e; };
+  const boss = mkE({ boss: true }), elite = mkE({ rank: 'elite' }), comum = mkE({}); telOf(boss, ks[0]); telOf(elite, ks[0]); telOf(comum, ks[0]);
+  assert.equal(boss.telK.length, 2); assert.equal(elite.telK.length, 1); assert.deepEqual(comum.telK, []);
+  const off = boss.telK[0]; H.tel(ana, { id: boss.id, skill: off, on: false }); assert.ok(boss.telK.includes(off), 'jogador não mexe');
+  H.tel(gm, { id: boss.id, skill: off, on: false }); assert.ok(!boss.telK.includes(off)); telOf(boss, off); assert.ok(!boss.telK.includes(off), 'o que o mestre desliga fica desligado');
+  const fresh = mkE({ boss: true }); H.tel(gm, { id: fresh.id, skill: ks[3], on: true }); assert.ok(fresh.telK.includes(ks[3]) && fresh.telK.length >= 2, 'ligar sem telK antes parte do cálculo automático');
+});
+test('chefe: golpe anunciado pode sair Perfeito (20%): batida 20% mais curta e dano ×1,25', async () => {
+  const { aiPlan, aiRun } = await import('../server.js');
+  const run = (rnd, perf) => { const { hs: [h], e } = dfx([]); e.boss = true; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(rnd, () => H.ai(gm)); const C = S.battle.cmd;
+    if (perf != null) C.perf = perf; const hp = h.hp; fixR(.3, () => aiRun(e, aiPlan(e))); return { C, loss: hp - h.hp }; };
+  assert.equal(run(0).C.perf, true); assert.equal(run(0).C.beats[0], 880); assert.equal(run(.5).C.perf, false); assert.equal(run(.5).C.beats[0], 1100);
+  const a = run(.5, false).loss, b = run(.5, true).loss; assert.ok(a > 0 && Math.abs(b / a - 1.25) < .1, `×1,25 (${a} → ${b})`);
+  const nb = (() => { const { e } = dfx([]); e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); return S.battle.cmd.perf; })(); assert.equal(nb, false, 'só chefe tem Perfeito');
+});
+
+// ---- comandos de ataque: a nota do navegador vira dano, golpes e efeitos ----
+const withCmd = (name, f, fn) => { const k = sk(name), sv = Object.fromEntries(Object.keys(f).map(x => [x, S.skills[k][x]])); Object.assign(S.skills[k], f); try { return fn(k); } finally { Object.assign(S.skills[k], sv); for (const x in f) if (sv[x] === undefined) delete S.skills[k][x]; } };
+const duelC = () => { reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; derive(h); derive(e); e.armor = 0; h.aura = h.auraMax = 99; e.hpMax = e.hp = 99999; H.battle(gm, { on: true }); return { h, e }; };
+const hitsOf = (name) => S.log.filter(l => (l.text || '').startsWith(name + ' →') || (l.text || '').startsWith(name + ' (final) →')).length;
+const lossC = (f, cmd) => withCmd('Tiro Certeiro', f, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, cmd ? { cmd } : {}); return 99999 - e.hp; });
+test('cmd: clamp limita a nota absurda; sem cmd ou sem comando vira neutro', () => {
+  const C = RU.CMD, z = { g: '', n: 0, acc: 0 };
+  assert.deepEqual(C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'perf', n: 999, acc: 9 }, { mx: 1 }), { g: 'perf', n: 5, acc: 1 });
+  assert.deepEqual(C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'perf', n: 2, acc: 1 }, {}), { g: 'bom', n: 2, acc: 1 }, 'Perfeito exige a barra cheia');
+  assert.deepEqual(C.clampCmd({}, { g: 'perf', n: 9, acc: 1 }, {}), z); assert.deepEqual(C.clampCmd({ cmd: 'tempo' }, { g: 'x', n: -3, acc: -5 }, {}), z);
+  assert.deepEqual(C.clampCmd({ cmd: 'tempo' }, null, {}), z); assert.equal(C.clampCmd({ cmd: 'segurar' }, { g: '', acc: -1 }, {}).acc, -1, 'estouro');
+  assert.equal(C.clampCmd({ cmd: 'seq', seq: '↑→↓' }, { g: 'perf', n: 99 }, {}).n, 3);
+});
+test('cmd: tempo Perfeito ×1,4, Bom ×1,2 e sem nota = normal', () => {
+  const base = lossC({ cmd: 'tempo' }), bom = lossC({ cmd: 'tempo' }, { g: 'bom' }), perf = lossC({ cmd: 'tempo' }, { g: 'perf' }), nada = lossC({ cmd: 'tempo' }, { g: '', n: 0, acc: 0 });
+  assert.equal(nada, base); assert.ok(Math.abs(bom / base - 1.2) < .08, `bom ${bom}/${base}`); assert.ok(Math.abs(perf / base - 1.4) < .08, `perf ${perf}/${base}`);
+});
+test('cmd: janela do tempo cresce com bf (30 + 8·bf ms) e com as passivas', () => {
+  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 0, cw: 0, cp: 0 }).cp, 54); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 7 }, { bf: 0, cw: 0, cp: 0 }).cp, 86);
+  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 2, cw: 0, cp: 10 }).cp, 80); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo' }, { bf: 0, cw: 40, cp: 15 }).cw, 200);
+});
+test('cmd: martelar soma golpes extras acima dos hits', () => {
+  withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 4, hits: 2 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: 'bom', n: 3, acc: .7 } }); assert.equal(hitsOf('Tiro Certeiro'), 5); });
+  withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 4, hits: 2 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e); assert.equal(hitsOf('Tiro Certeiro'), 2, 'sem martelar = os hits normais'); });
+});
+test('cmd: sequência nova soma golpe por seta; nó antigo nunca fica abaixo dos hits e só a perfeita dá o golpe final', () => {
+  withCmd('Tiro Certeiro', { cmd: 'seq', seq: '↑→↓', fin: 20 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: 'bom', n: 2, acc: 1 } }); assert.equal(hitsOf('Tiro Certeiro'), 3, '1 + 2 setas'); });
+  withCmd('Tiro Certeiro', { cmd: 'seq', seq: '↑→↓', hits: 3 }, () => {
+    let r = duelC(); use(r.h, 'Tiro Certeiro', r.e, { cmd: { g: 'bom', n: 1, acc: 1 } }); assert.equal(hitsOf('Tiro Certeiro'), 3, 'errar setas não tira golpes');
+    r = duelC(); use(r.h, 'Tiro Certeiro', r.e, { cmd: { g: 'perf', n: 3, acc: 1 } }); assert.equal(hitsOf('Tiro Certeiro'), 4, '3 golpes + golpe final'); });
+});
+test('cmd: segurar estourado sai normal e deixa o herói Exposto; mira acerta = crítico e −2 na Quebra', () => {
+  withCmd('Tiro Certeiro', { cmd: 'segurar' }, () => { const base = lossC({ cmd: 'segurar' }); const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: '', n: 0, acc: -1 } }); assert.ok(h.st.exposed > 0); assert.equal(99999 - e.hp, base); });
+  withCmd('Tiro Certeiro', { cmd: 'mira' }, () => { const b0 = lossC({ cmd: 'mira' }); const r = duelC(); r.e.rank = 'elite'; r.e.brk = { cur: 5, max: 5 }; use(r.h, 'Tiro Certeiro', r.e, { cmd: { g: 'bom', n: 0, acc: 1 } });
+    assert.ok(99999 - r.e.hp > b0 * 1.8, 'crítico ×2'); assert.equal(r.e.brk.cur, 3, 'tirou 2 pontos da Quebra'); });
+});
+test('cmd: ritual com runa Perfeita não cobra Sanidade; nota num golpe sem comando é ignorada; fora do turno nada acontece', () => {
+  const rit = Object.keys(S.skills).find(k => S.skills[k].circ && S.skills[k].pay?.san && S.skills[k].kind !== 'passive'); assert.ok(rit, 'existe ritual com custo de Sanidade');
+  withCmd(S.skills[rit].name, { cmd: 'runa', rn: 'circulo' }, () => {
+    const san = cmd => { const { h, e } = duelC(); h.san = 50; h.skills.push(rit); const s0 = h.san; turn(h); fixR(.3, () => H.act(gm, { id: h.id, skill: rit, target: e.id, ...(cmd ? { cmd } : {}) })); return s0 - h.san; };
+    assert.ok(san() > 0, 'sem nota cobra'); assert.equal(san({ g: 'perf', n: 0, acc: 1 }), 0, 'Perfeito não cobra'); });
+  assert.equal(lossC({}), lossC({}, { g: 'perf', n: 9, acc: 1 }), 'sem cmd na técnica a nota não vale');
+  const { h, e } = duelC(); use(h, 'Tiro Certeiro', e); turn(e); const hp = e.hp; fixR(.3, () => H.act(gm, { id: h.id, skill: sk('Tiro Certeiro'), target: e.id })); assert.equal(e.hp, hp, 'fora do turno nada acontece');
+});
+test('cmd: ritmo — cada nota soma +10% na cura em grupo e +1 turno nos buffs; todas as notas dão o Perfeito', () => {
+  const heal = n => withCmd('Luz Curativa', { cmd: 'ritmo', nt: 6 }, () => { reset(); const h = mk(ana, {}), f = mk(bia, {}); h.attrs.AGI = 99; derive(h); derive(f); h.aura = 99; f.hp = 1; H.battle(gm, { on: true });
+    use(h, 'Luz Curativa', f, n == null ? {} : { cmd: { g: n === 6 ? 'perf' : 'bom', n, acc: 1 } }); return f.hp - 1; });
+  const base = heal(null), quatro = heal(4); assert.ok(base > 0); assert.ok(quatro / base > 1.3 && quatro / base < 1.5, `${quatro}/${base}`); assert.ok(heal(6) > quatro);
+  const gm1 = RU.CMD.cmdEffect({ cmd: 'ritmo', kind: 'heal', power: 0, nt: 6 }, { g: 'bom', n: 3 }); assert.equal(gm1.turns, 3); assert.equal(gm1.healMult, 1);
+});
+
+// ---- Choque de poderes: cabo de guerra contra golpe anunciado de alvo único ----
+const chqFx = (area = false) => { // herói com técnica de Choque (Tiro Certeiro marcado) contra um inimigo com golpe anunciado
+  const { hs: [h], e } = dfx([]); h.skills = [sk('Tiro Certeiro')]; h.aura = 50; h.attrs.AGI = 1; S.skills[sk('Tiro Certeiro')].cmd = 'choque';
+  e.skills = [sk(area ? 'Terremoto' : 'Golpe Pesado')]; e.telK = [...e.skills]; e.hpMax = e.hp = 99999; fixR(0, () => H.ai(gm)); return { h, e, C: S.battle.cmd };
+};
+const noChq = () => { delete S.skills[sk('Tiro Certeiro')].cmd; };
+test('choque: só em golpe anunciado de alvo único e para quem tem a técnica', () => {
+  try {
+    const { h, C } = chqFx(); assert.deepEqual(C.chqOk, [h.id]);
+    const a = chqFx(true); assert.ok(!a.C.chqOk?.length, 'em área não há Choque');
+    const { hs: [h2], e } = dfx([]); h2.skills = []; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); assert.ok(!S.battle.cmd.chqOk?.length, 'sem a técnica não há Choque');
+    const { hs: [h3] } = dfx(['Aparar']); h3.skills.push(sk('Tiro Certeiro')); H.ai(gm); assert.ok(!S.battle.cmd.chqOk?.length, 'golpe não anunciado não tem Choque');
+  } finally { noChq(); }
+});
+test('choque: vencer anula o golpe, devolve ×1,3 e expõe; perder leva ×1,3; apertos acima de 20/s são cortados', () => {
+  try {
+    const win = chqFx(); const hp = win.h.hp, aura = win.h.aura; H.chq(ana, { id: win.h.id, skill: sk('Tiro Certeiro') }); const C = S.battle.cmd;
+    assert.equal(win.h.aura, aura - S.skills[sk('Tiro Certeiro')].cost, 'paga a técnica'); assert.ok(C.chq.meta >= 10 && C.chq.meta <= 40);
+    H.chq(ana, { id: win.h.id, n: 999 }); assert.ok(C.chq.n <= 3, `cortado a 20/s (${C.chq.n})`); C.chq.last -= 3000; H.chq(ana, { id: win.h.id, n: 60 }); assert.ok(C.chq.n >= C.chq.meta);
+    fixR(.3, () => H.cmdSkip(gm)); assert.equal(win.h.hp, hp, 'golpe anulado'); assert.ok(win.e.hp < 99999, 'a técnica de Choque acerta'); assert.ok(win.e.st.exposed > 0); assert.ok(S.log.some(l => /CHOQUE/.test(l.text || '')));
+    const base = (() => { const { hs: [h], e } = dfx([]); h.skills = []; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); const x = h.hp; fixR(.3, () => H.cmdSkip(gm)); return x - h.hp; })();
+    const lose = chqFx(); const hp2 = lose.h.hp; H.chq(ana, { id: lose.h.id, skill: sk('Tiro Certeiro') }); fixR(.3, () => H.cmdSkip(gm)); const perda = hp2 - lose.h.hp; assert.ok(base > 0 && Math.abs(perda / base - 1.3) < .12, `×1,3 (${perda}/${base})`);
+    const once = chqFx(); H.chq(ana, { id: once.h.id, skill: sk('Tiro Certeiro') }); const a1 = once.h.aura; H.chq(ana, { id: once.h.id, skill: sk('Tiro Certeiro') }); assert.equal(once.h.aura, a1, 'iniciar de novo não cobra');
+  } finally { noChq(); }
+});
+
+test('runa: o próprio modelo pontua ≥ 95; reta contra o círculo < 60; triângulo girado 20° ≥ 85; círculo no outro sentido e outro ponto de partida ≥ 90', () => {
+  const C = RU.CMD, T = C.RUNE_T;
+  for (const r of C.RUNES) assert.ok(C.runeScore(T[r].pts, r) >= 95, r + ' ' + C.runeScore(T[r].pts, r));
+  assert.ok(C.runeScore(Array.from({ length: 40 }, (_, i) => [i / 39, .5]), 'circulo') < 60);
+  const rot = (pts, deg) => { const a = deg * Math.PI / 180; return pts.map(([x, y]) => [.5 + (x - .5) * Math.cos(a) - (y - .5) * Math.sin(a), .5 + (x - .5) * Math.sin(a) + (y - .5) * Math.cos(a)]); };
+  assert.ok(C.runeScore(rot(T.triangulo.pts, 20), 'triangulo') >= 85);
+  const circ = T.circulo.pts.slice(0, -1), shifted = [...circ.slice(17), ...circ.slice(0, 17)].reverse(); assert.ok(C.runeScore(shifted, 'circulo') >= 90);
+  assert.ok(C.runeScore(T.circulo.pts, 'estrela') < 60, 'círculo não passa por estrela'); assert.equal(C.runeScore([], 'circulo'), 0); assert.equal(C.runeScore(T.circulo.pts, 'quadrado'), 0);
+});
+test('cmd: a visão enviada às telas traz os modificadores de comando por técnica (cm), para o mestre e para o jogador', () => {
+  withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 3 }, k => { const { h } = duelC(); h.skills.push(k);
+    for (const c of [gm, ana]) { const v = view(c).chars[h.id]; assert.ok(v.cm?.[k] && 'mx' in v.cm[k] && 'cw' in v.cm[k], c.role); } });
+  const { h } = duelC(); assert.deepEqual(view(ana).chars[h.id].cm, {}, 'sem técnica com comando, nada');
+});
+test('leva 4: 45 nós novos de comando com pré-requisito existente; todo bf é tempo; todo círculo é runa; nós antigos marcados', async () => {
+  const { LEVA4, MARCA } = await import('../arvore/leva4.js'); const novos = Object.values(LEVA4).flat(2), byName = n => Object.values(S.skills).find(s => s.name === n);
+  assert.equal(novos.length, 45); assert.ok(novos.every(o => o.cmd || o.mod), 'todo nó novo tem comando ou modificador');
+  for (const o of novos) { const s = byName(o.n); assert.ok(s, 'na grade: ' + o.n); for (const p of String(o.pre).split('|')) assert.ok(byName(p), `${o.n} exige ${p}`); }
+  const all = Object.values(S.skills); assert.ok(all.filter(s => s.bf).length >= 15 && all.filter(s => s.bf).every(s => s.cmd === 'tempo'));
+  const rit = all.filter(s => s.circ && s.kind !== 'passive'); assert.ok(rit.length >= 100 && rit.every(s => s.cmd === 'runa' && s.rn === ['circulo', 'triangulo', 'estrela', 'espiral'][s.circ - 1]));
+  assert.equal(byName('Cem Socos').cmd, 'martelar'); assert.equal(byName('Cem Socos').mx, 5); assert.equal(byName('Estilo Três Espadas').seq, '↑↑↓'); assert.equal(byName('Estilo Três Espadas').hits, 3);
+  for (const n of ['Golpe Pesado', 'Estilhaço', 'Golpe Giratório', 'Terremoto', 'Mar de Chamas', 'Maré Alta']) assert.equal(byName(n).tel, 1, n);
+  assert.equal(byName('Leitura de Combo').mod.ctr, 50); assert.equal(Object.keys(MARCA).length, 34);
+  for (const s of all.filter(s => s.cmd === 'seq' && s.hits > 1)) assert.equal(s.seq.length, s.hits, 'nó antigo: setas = hits (' + s.name + ')');
+});
+test('batidas: Leitura de Combo sobe o contra-ataque de ×1,5 para ×2', async () => {
+  const run = ctr => { const { hs: [h], e } = dfx(); h.attrs.AGI = 1; e.skills = [sk('Rajada de Aura')]; h.skills.push(sk('Leitura de Combo')); if (!ctr) h.skills = h.skills.filter(k => k !== sk('Leitura de Combo')); h.pslots = [...h.skills];
+    fixR(0, () => H.ai(gm)); const C = S.battle.cmd; for (let i = 0; i < 3; i++) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); } e.hpMax = e.hp = 99999; waitCmd(); return 99999 - e.hp; };
+  const a = run(false), b = run(true); assert.ok(a > 0 && Math.abs(b / a - 2 / 1.5) < .12, `${b}/${a}`);
+});
+
+test('descrição: nó com comando mostra a linha do comando e o ⚠; bf mostra a janela do Perfeito em ms; as chaves novas de mod têm texto', () => {
+  const E = RU.extra;
+  assert.match(E({ kind: 'dmg', cmd: 'tempo', bf: 5 }, null), /Perfeito ×1,4, janela de 70 ms.*Black Flash/); assert.match(E({ kind: 'dmg', cmd: 'martelar', mx: 4 }, null), /até \+4 golpes/);
+  assert.match(E({ kind: 'dmg', cmd: 'seq', seq: '↑→↓', fin: 20 }, null), /Sequência ↑→↓.*golpe final de 20/); assert.match(E({ kind: 'dmg', tel: 1 }, null), /golpe anunciado ⚠/);
+  assert.match(E({ kind: 'util', cmd: 'runa', rn: 'espiral', circ: 4 }, null), /uma espiral.*não cobra a Sanidade/); assert.match(E({ kind: 'dmg', cmd: 'tempo', pf: [{ t: 'st', k: 'bleed', n: 2, ch: 100 }] }, null), /no Perfeito: /);
+  assert.match(E({ kind: 'passive', mod: { cw: 60, cp: 15, mx: 1, ctr: 50 } }, null), /\+60 ms na janela Bom.*\+1 golpe extra.*\+50% no contra-ataque/); assert.match(E({ kind: 'dmg', par: 300, cost: 4, power: 3 }, null), /Exposto/);
 });

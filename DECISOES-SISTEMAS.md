@@ -88,3 +88,12 @@ Revisão antes: `tools/revisao-efeitos.js` (estática) e `tools/revisao-uso.js` 
   Preço dos dois: HP máximo e Sanidade, que voltam no **descanso longo**.
 - **Clones:** fichas reais na fila (como invocações), nascem com uma fração do HP atual do dono (que perde esse HP) e causam 50% do dano.
   Ramos: Tsukuyomi (sombras), Fuhaku (imagens residuais), Hiruko (brotos de carne) e Aura/Conjuração (aberto a todos).
+
+## Leva 4 (questionário de 2026-11-17) — comandos de ação, implementada (ver ARVORE-SISTEMAS.md e o spec)
+Inspirações: Mario RPG, Dragon Ball Legends, Clair Obscur. 10 mecânicas numa leva só: Aparar e Esquiva (uma tecla, o tempo decide), Golpe no tempo,
+Martelar, Segurar e soltar, Sequência, Ritmo do instrumento, Mira em ponto fraco, Desenhar runa e Choque de poderes.
+- **Janela só em golpes anunciados** (⚠, `tel`) e em golpes físicos de alvo único contra quem tem Aparar; só o alvo vê o anel. Esquiva de graça e sem limite; Aparar custa Aura, rende recurso e **expõe o inimigo**.
+- **Ignorar nunca pune** nos comandos de ataque; exceções: o estouro do Segurar e o Aparar, que é aposta. Sem modo assistido.
+- **Black Flash** deixou de ser sorte no d100: só o Perfeito do Golpe no tempo dispara. Chefes têm 20% de golpe anunciado Perfeito.
+- **Aparar todas as batidas** de um golpe de vários golpes devolve um contra-ataque automático (básico ×1,5).
+- Decisões minhas conferidas no spec §11: alvo escolhido antes da janela; Exposto no atacante dura 2 (1 se gasta no próprio fim de turno); Choque só em alvo único; `telK` calculado uma vez; `pre` dos nós novos = primeiro nó do ramo temático.
