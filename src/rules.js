@@ -619,7 +619,7 @@ function doAct(a, m, bonus = 0) {
   for (const pr of prs) { pr.p[pr.ps.res] -= pr.ps.cost; bump(pr.p.id, delay(pr.p)); }
   if (prs.length) log(a.name, `e ${prs.map(pr => pr.p.name).join(' e ')} executam juntos ${s.name}!`, 'ok');
   let more = false; a.bt ??= {}; a.bt.wkNow = false;
-  if (cx?.g) log(a.name, `${s.name}: ${cx.g === 'perf' ? 'PERFEITO' : 'BOM'}!`, 'ok');
+  if (cx?.g) log(a.name, `${s.name}: ${RU.CMD.GRADE_NAME[cx.g] || ''}!`, 'ok');
   const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : (cx?.crit && !s.area && off && ts.length === 1 && ts[0].weakPart) || null; // a Mira certa pega o ponto fraco do chefe
   if (cx?.brk) for (const t of ts) { const bt = brkHit(t, cx.brk, a); if (bt) log(a.name, bt.trim(), 'ok'); }
   const hitsN = s.hits || 1, total = hitsN + (cx?.extra || 0), withCx = (last) => { // turnos a mais nos efeitos bons e o efeito extra (pf) no último golpe

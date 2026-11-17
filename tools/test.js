@@ -1088,7 +1088,7 @@ test('cmd: tempo Perfeito ×1,4, Bom ×1,2 e sem nota = normal', () => {
 });
 test('cmd: janela do tempo cresce com bf (30 + 8·bf ms) e com as passivas', () => {
   assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 0, cw: 0, cp: 0 }).cp, 54); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 7 }, { bf: 0, cw: 0, cp: 0 }).cp, 86);
-  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 2, cw: 0, cp: 10 }).cp, 80); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo' }, { bf: 0, cw: 40, cp: 15 }).cw, 200);
+  assert.equal(RU.CMD.tempoWin({ cmd: 'tempo', bf: 3 }, { bf: 2, cw: 0, cp: 10 }).cp, 80); assert.equal(RU.CMD.tempoWin({ cmd: 'tempo' }, { bf: 0, cw: 40, cp: 15 }).cw, 180); // Bom fácil = 140 ms + 40
 });
 test('cmd: martelar soma golpes extras acima dos hits', () => {
   withCmd('Tiro Certeiro', { cmd: 'martelar', mx: 4, hits: 2 }, () => { const { h, e } = duelC(); use(h, 'Tiro Certeiro', e, { cmd: { g: 'bom', n: 3, acc: .7 } }); assert.equal(hitsOf('Tiro Certeiro'), 5); });
@@ -1183,4 +1183,45 @@ test('descrição: nó com comando mostra a linha do comando e o ⚠; bf mostra 
   assert.match(E({ kind: 'dmg', cmd: 'seq', seq: '↑→↓', fin: 20 }, null), /Sequência ↑→↓.*golpe final de 20/); assert.match(E({ kind: 'dmg', tel: 1 }, null), /golpe anunciado ⚠/);
   assert.match(E({ kind: 'util', cmd: 'runa', rn: 'espiral', circ: 4 }, null), /uma espiral.*não cobra a Sanidade/); assert.match(E({ kind: 'dmg', cmd: 'tempo', pf: [{ t: 'st', k: 'bleed', n: 2, ch: 100 }] }, null), /no Perfeito: /);
   assert.match(E({ kind: 'passive', mod: { cw: 60, cp: 15, mx: 1, ctr: 50 } }, null), /\+60 ms na janela Bom.*\+1 golpe extra.*\+50% no contra-ataque/); assert.match(E({ kind: 'dmg', par: 300, cost: 4, power: 3 }, null), /Exposto/);
+});
+
+// ---- comandos cinemáticos: regras puras ----
+test('cinemáticos: nível do nó pelo maior requisito e tabela de graus por contagem', () => {
+  const C = RU.CMD;
+  assert.deepEqual(C.GRADES, ['', 'erro', 'bom', 'otimo', 'perf']); assert.equal(C.GRADE_NAME.otimo, 'ÓTIMO');
+  assert.equal(C.tier({ rq: { FOR: 10 } }), 0); assert.equal(C.tier({ rq: { FOR: 20 } }), 1); assert.equal(C.tier({ rq: { FOR: 49, DES: 12 } }), 1); assert.equal(C.tier({ rq: { FOR: 50 } }), 2); assert.equal(C.tier({}), 0);
+  assert.equal(C.gradeFrac(1, true), 'perf'); assert.equal(C.gradeFrac(.75, true), 'otimo'); assert.equal(C.gradeFrac(.74, true), 'bom'); assert.equal(C.gradeFrac(.35, true), 'bom');
+  assert.equal(C.gradeFrac(.34, true), 'erro'); assert.equal(C.gradeFrac(0, true), 'erro'); assert.equal(C.gradeFrac(0, false), '');
+});
+test('cinemáticos: janelas do tempo por nível, com bf e com os campos da técnica', () => {
+  const C = RU.CMD;
+  assert.deepEqual(C.tempoWin({ cmd: 'tempo', rq: {} }, {}), { cw: 140, co: 80, cp: 50 }); assert.deepEqual(C.tempoWin({ cmd: 'tempo', rq: { FOR: 50 } }, {}), { cw: 100, co: 55, cp: 32 });
+  assert.equal(C.tempoWin({ cmd: 'tempo', bf: 3, rq: {} }, {}).cp, 54); assert.equal(C.tempoWin({ cmd: 'tempo', bf: 3, rq: { FOR: 50 } }, {}).cp, Math.round(54 * .7));
+  assert.equal(C.tempoWin({ cmd: 'tempo', cw: 200 }, { cw: 10 }).cw, 210); assert.equal(C.tune({ cmd: 'tempo', rq: { FOR: 25 } }, {}).martelarMeta, 20); assert.deepEqual(C.tune({ rq: { FOR: 25 } }).segurar, { perf: 6, otimo: 7, bom: 18 });
+  assert.equal(C.tune({ rq: { FOR: 50 }, nt: 6 }).ritmoNotas, 8); assert.equal(C.tune({ mt: 9 }).martelarMeta, 9); assert.equal(C.tune({}, { ma: 3 }).mira, 21);
+});
+test('cinemáticos: clampCmd aceita os 5 graus e deriva o grau da fração nas mecânicas de contagem', () => {
+  const C = RU.CMD, z = { g: '', n: 0, acc: 0 };
+  assert.equal(C.clampCmd({ cmd: 'tempo' }, { g: 'perf' }, {}).g, 'perf'); assert.equal(C.clampCmd({ cmd: 'tempo' }, { g: 'otimo' }, {}).g, 'otimo'); assert.equal(C.clampCmd({ cmd: 'tempo' }, { g: 'xyz' }, {}).g, '');
+  assert.deepEqual(C.clampCmd({}, { g: 'perf' }, {}), z); assert.deepEqual(C.clampCmd({ cmd: 'tempo' }, { g: 'otimo', n: -5, acc: 9 }, {}), { g: 'otimo', n: 0, acc: 1 });
+  const m = n => C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'perf', n }, {}).g; assert.equal(m(2), 'bom'); assert.equal(m(3), 'otimo'); assert.equal(m(4), 'perf');
+  assert.equal(C.clampCmd({ cmd: 'martelar', mx: 4 }, { g: 'erro', n: 0 }, {}).g, 'erro');
+});
+test('cinemáticos: cmdEffect — erro ×0,85, ótimo sem pf, difícil mais generoso', () => {
+  const C = RU.CMD, T = { cmd: 'tempo', kind: 'dmg', rq: {} }, D = { ...T, rq: { FOR: 50 } };
+  assert.equal(C.cmdEffect(T, { g: 'erro' }).mult, .85); assert.equal(C.cmdEffect(T, { g: 'bom' }).mult, 1.2);
+  let e = C.cmdEffect(T, { g: 'otimo' }); assert.equal(e.mult, 1.3); assert.equal(e.pf, false);
+  e = C.cmdEffect(T, { g: 'perf' }); assert.equal(e.mult, 1.4); assert.equal(e.pf, true); assert.equal(C.cmdEffect(D, { g: 'perf' }).mult, 1.5);
+  const S1 = { cmd: 'segurar', kind: 'dmg', rq: {} }; assert.equal(C.cmdEffect(S1, { g: 'otimo', acc: .5 }).mult, 1.45); assert.equal(C.cmdEffect(S1, { g: 'erro', acc: 0 }).mult, .85);
+  e = C.cmdEffect(S1, { g: 'erro', acc: -1 }); assert.equal(e.estouro, true); assert.equal(e.mult, 1); assert.equal(C.cmdEffect({ ...S1, rq: { FOR: 50 } }, { g: 'perf', acc: 1 }).mult, 1.7);
+  const M = { cmd: 'martelar', kind: 'dmg', mx: 4 }; e = C.cmdEffect(M, { g: 'erro', n: 1 }); assert.equal(e.extra, 0); assert.equal(e.mult, .85);
+  e = C.cmdEffect(M, { g: 'otimo', n: 3 }); assert.equal(e.extra, 3); assert.equal(e.pf, false);
+  assert.equal(C.cmdEffect({ cmd: 'runa', kind: 'dmg', rq: { FOR: 50 } }, { g: 'perf' }).mult, 1.5);
+});
+test('cinemáticos: resultLines diz o que rendeu e o quanto faltou', () => {
+  const C = RU.CMD, D = { cmd: 'tempo', kind: 'dmg', rq: { FOR: 50 } }, r = C.resultLines(D, { g: 'perf', n: 0, acc: 1 }, C.cmdEffect(D, { g: 'perf' }));
+  assert.equal(r.title, 'PERFEITO'); assert.ok(r.lines.includes('×1,5 de dano'), r.lines.join('|'));
+  const M = { cmd: 'martelar', kind: 'dmg', mx: 4 }; assert.ok(C.resultLines(M, { g: 'bom', n: 3, acc: 1 }, C.cmdEffect(M, { g: 'bom', n: 3 })).lines.includes('+3 golpes'));
+  const R = { cmd: 'ritmo', kind: 'util', nt: 6 }; assert.ok(C.resultLines(R, { g: 'bom', n: 2, acc: 1 }, C.cmdEffect(R, { g: 'bom', n: 2 })).lines.includes('+2 turnos'));
+  assert.equal(C.resultLines(R, { g: '', n: 0, acc: 0 }, C.cmdEffect(R, { g: '' })).title, '');
 });
