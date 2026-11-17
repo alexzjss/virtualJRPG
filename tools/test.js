@@ -429,3 +429,71 @@ test('Música no acampamento, Pilotagem na perseguição e identificação lembr
   const p = ofiChar('pilotagem'); assert.equal(OF.hook(p, 'chase'), 15);
   reset(); const bid = Object.keys(S.bestiary).find(k => !S.bestiary[k].boss); S.known = { [S.bestiary[bid].name]: 2 }; H.bSpawn(gm, { id: bid }); const nu = Object.values(S.chars).find(c => c.enemy); assert.equal(nu.known, 2);
 });
+
+// ---------- Ofícios: diário narrado, catálogo editável, economia das receitas ----------
+test('ofícios: teste narrativo (checar) vai para o diário; o mestre narra ao aprovar ou depois', () => {
+  const h = ofiChar('ladinagem'); h.gold = 0; const arrombar = nid('ladinagem', 'Arrombar'), punga = nid('ladinagem', 'Punga');
+  S.auto.roll = false; fixR(.05, () => H.ofiUse(ana, { id: h.id, node: arrombar }));
+  assert.equal(S.reqs && Object.keys(S.reqs).length, 0); // o jogador usa direto quando a rolagem está liberada
+  let e = h.dia.at(-1); assert.equal(e.a, 'Arrombar'); assert.equal(e.r, 'CRÍTICO'); assert.equal(e.t, ''); assert.equal(e.ok, true);
+  H.ofiNota(ana, { id: h.id, e: e.i, txt: 'hack' }); assert.equal(e.t, ''); // jogador não escreve a narração
+  H.ofiNota(gm, { id: h.id, e: e.i, txt: '  A fechadura\n cede com um clique.  ' }); assert.equal(e.t, 'A fechadura cede com um clique.'); assert.match(S.log.at(-1).text, /fechadura cede/);
+  // aprovação com narração: o pedido entra na fila e o texto do mestre fica no registro do resultado
+  S.auto.roll = false; handle(ana, { t: 'ofiUse', id: h.id, node: punga }); const [id, rq] = Object.entries(S.reqs)[0]; assert.equal(rq.t, 'ofiUse'); assert.equal(rq.m.txt, undefined);
+  fixR(.95, () => handle(gm, { t: 'reqOk', id, txt: 'O guarda percebe a sua mão no bolso.' })); e = h.dia.at(-1); assert.equal(e.a, 'Punga'); assert.equal(e.ok, false); assert.equal(e.t, 'O guarda percebe a sua mão no bolso.'); assert.equal(h.gold, 0);
+  const antes = h.dia.length; fixR(.05, () => handle(gm, { t: 'reqOk', id: (handle(ana, { t: 'ofiUse', id: h.id, node: punga }), Object.keys(S.reqs)[0]), mod: 0 })); assert.equal(h.dia.length, antes + 1); assert.equal(h.dia.at(-1).t, ''); assert.ok(h.dia.at(-1).g > 0); // sem texto: fica à espera
+  H.ofiNota(gm, { id: h.id, e: h.dia.at(-1).i, del: true }); assert.equal(h.dia.length, antes);
+  for (let i = 0; i < 60; i++) fixR(.05, () => H.ofiUse(ana, { id: h.id, node: arrombar })); assert.ok(h.dia.length <= 40); // o diário tem limite
+  assert.ok(!view({ role: 'player', name: 'Ana' }).chars[h.id].gmNote && view({ role: 'player', name: 'Ana' }).chars[h.id].dia.length); // o jogador vê o diário
+});
+test('ofícios: o mestre edita receitas, nós e perícias; a edição vale para todos e pode ser desfeita', () => {
+  const h = ofiChar('alquimia'); h.inv[itm('Erva Medicinal')] = 1; h.inv[itm('Frasco Vazio')] = 5; h.inv[itm('Óleo de Lamparina')] = 5;
+  const base = structuredClone(OF.REC.tonico);
+  H.ofiCfg(ana, { k: 'rec', id: 'tonico', v: { qty: 5 } }); assert.equal(OF.REC.tonico.qty, 1); // só o mestre
+  H.ofiCfg(gm, { k: 'rec', id: 'tonico', v: { mats: { 'Erva Medicinal': 1, 'Item Falso': 3 }, dc: 99, qty: 2 } });
+  assert.deepEqual(OF.REC.tonico.mats, { 'Erva Medicinal': 1 }); assert.equal(OF.REC.tonico.dc, 20); assert.equal(OF.REC.tonico.qty, 2); // ingredientes inexistentes caem; limites
+  const t0 = h.inv[itm('Tônico')] || 0; fixR(.05, () => H.craft(ana, { id: h.id, rec: 'tonico' })); assert.ok(h.inv[itm('Tônico')] >= t0 + 2);
+  H.ofiCfg(gm, { k: 'rec', id: 'tonico', v: { off: true } }); h.inv[itm('Erva Medicinal')] = 1; const t1 = h.inv[itm('Tônico')]; fixR(.05, () => H.craft(ana, { id: h.id, rec: 'tonico' })); assert.equal(h.inv[itm('Tônico')], t1); // receita desativada
+  H.ofiCfg(gm, { k: 'rec', id: 'tonico', v: null }); assert.deepEqual(OF.REC.tonico, base); assert.equal(S.ofiCfg.rec, undefined);
+  // receita nova do mestre: vale a partir do grau escolhido, sem precisar de nó
+  H.ofiCfg(gm, { k: 'rec', id: '', v: { n: 'Tônico Caseiro Forte', per: 'alquimia', t: 1, out: 'Tônico Forte', mats: { 'Erva Medicinal': 1 } } });
+  const nid2 = Object.keys(S.ofiCfg.rec)[0]; assert.match(nid2, /^x[0-9a-f]+$/); assert.ok(OF.recipes(h, 'alquimia').some(r => r.id === nid2));
+  const semGrau = mk(ana, {}); semGrau.ofi = ['alquimia']; assert.ok(!OF.recipes(semGrau, 'alquimia').some(r => r.id === nid2)); // sem nenhum nó, o grau é 0
+  h.inv[itm('Erva Medicinal')] = 1; fixR(.05, () => H.craft(ana, { id: h.id, rec: nid2 })); assert.ok(h.inv[itm('Tônico Forte')] >= 1);
+  H.ofiCfg(gm, { k: 'rec', id: '', v: { n: 'Inválida', per: 'alquimia', mats: {}, out: 'Tônico' } }); assert.equal(Object.keys(S.ofiCfg.rec).length, 1); // sem ingredientes: recusada
+  // nós: nome, custo e bônus; checar com ouro; nó novo ocupa o fim da lista sem mexer nos ids
+  const arr = nid('ladinagem', 'Punga'); H.ofiCfg(gm, { k: 'node', id: arr, v: { n: 'Bater Carteira', po: 3, g: 99, r: 7 } });
+  const nó = OF.PER.ladinagem.nodes.find(n => n.id === arr); assert.equal(nó.n, 'Bater Carteira'); assert.equal(nó.po, 3); assert.equal(nó.g, 99); assert.equal(nó.r, 7);
+  const tam = OF.PER.ladinagem.nodes.length; H.ofiCfg(gm, { k: 'nodeNew', per: 'ladinagem', v: { n: 'Golpe de Mestre', d: 'Um truque seu.', t: 1, chk: true, g: 10 } });
+  const novo = OF.PER.ladinagem.nodes.at(-1); assert.equal(OF.PER.ladinagem.nodes.length, tam + 1); assert.equal(novo.id, 'ladinagem.' + tam); assert.equal(novo.act, 'checar'); assert.equal(novo.po, 2);
+  H.ofiCfg(gm, { k: 'nodeNew', per: 'ladinagem', i: 0 }); assert.ok(OF.PER.ladinagem.nodes.at(-1).off); assert.match(OF.whyNot(h, novo.id), /Iniciação|Desativado/); // desativar mantém o id
+  H.ofiCfg(gm, { k: 'per', id: 'ladinagem', v: { n: 'Furtividade', a: ['SAB', 'XX'] } }); assert.equal(OF.PER.ladinagem.n, 'Furtividade'); assert.deepEqual(OF.PER.ladinagem.a, ['SAB']);
+  const salvo = JSON.parse(JSON.stringify(S.ofiCfg)); H.ofiCfg(gm, { k: 'reset' }); assert.equal(OF.PER.ladinagem.n, 'Ladinagem'); assert.equal(OF.PER.ladinagem.nodes.length, tam); assert.deepEqual(S.ofiCfg, {});
+  S.ofiCfg = salvo; handle(gm, { t: 'undo' }); // desfazer troca o estado inteiro; o próximo push reaplica o catálogo salvo
+  H.ofiCfg(gm, { k: 'reset' }); assert.equal(OF.PER.ladinagem.nodes.length, tam);
+});
+test('economia: toda receita compensa o custo, nada vira dinheiro grátis ao vender, e a loja vende os ingredientes básicos', () => {
+  H.ofiCfg(gm, { k: 'reset' });
+  for (const r of Object.values(OF.REC)) {
+    const cost = Object.entries(r.mats).reduce((a, [n, q]) => { assert.ok(itm(n), `${r.id}: ingrediente ${n}`); return a + q * S.items[itm(n)].price; }, 0);
+    if (!r.out) { assert.ok(r.meal, r.id); continue; }
+    const out = S.items[itm(r.out)]; assert.ok(out, `${r.id}: produto ${r.out}`);
+    assert.ok(out.price >= cost / r.qty, `${r.id}: custa mais para fazer (${cost}) do que o preço (${out.price})`);
+    assert.ok(Math.floor(out.price / 2) <= cost / r.qty, `${r.id}: vender o produto (${Math.floor(out.price / 2)}) pagaria mais que os ingredientes (${cost})`);
+  }
+  for (const r of Object.values(OF.REC)) assert.ok(OF.PER[r.per].nodes.some(n => (n.rec || []).includes(r.id)), `${r.id}: nenhum nó ensina a receita`);
+  for (const nome of ['Munição de Prata', 'Munição Incendiária', 'Munição de Sal']) assert.ok(S.items[itm(nome)].price * 0 === 0 && S.items[itm(nome)].shots === 6);
+  const runas = ['Precisão', 'Força', 'Brasa', 'Veneno', 'Trovão', 'Sangue']; assert.ok(runas.every(x => OF.REC['runa' + x.replace('ç', 'c').replace('ã', 'a')]), 'uma receita por runa');
+  // loja: as cenas novas já vendem os básicos; em campanha antiga o mestre usa shopBasics
+  reset(); const sc = S.scenes[S.scene]; sc.shop = { open: true, stock: [] }; H.shopBasics(ana, {}); assert.equal(sc.shop.stock.length, 0); H.shopBasics(gm, {});
+  for (const n of ['Pólvora', 'Sucata de Ferro', 'Sal Sagrado', 'Erva Medicinal', 'Papel de Arroz']) assert.ok(sc.shop.stock.includes(itm(n)), n); const n0 = sc.shop.stock.length; H.shopBasics(gm, {}); assert.equal(sc.shop.stock.length, n0);
+  const cenas = Object.values(S.scenes).filter(x => x.shop.stock.length && ['Beco do Mercado Negro', 'Santuário Profanado', 'Estação Central'].includes(x.name)); assert.equal(cenas.length, 3); for (const x of cenas) assert.ok(x.shop.stock.includes(itm('Sucata de Ferro')) && x.shop.stock.includes(itm('Pólvora')), x.name);
+});
+test('forja: as runas são receitas da Forja e o engaste aceita a runa preparada', () => {
+  const h = ofiChar('forja'); h.gold = 0; const w = itm('Sabre de Cavalaria'); h.inv[w] = 1; h.equip.arma = w;
+  assert.deepEqual(OF.recipes(h, 'forja').map(r => r.id).sort(), ['runaBrasa', 'runaForca', 'runaPrecisao', 'runaSangue', 'runaTrovao', 'runaVeneno']);
+  H.craft(ana, { id: h.id, rec: 'runaForca' }); assert.equal(h.inv[itm('Runa de Força')], undefined); // sem ingredientes
+  Object.assign(h.inv, { [itm('Essência de Atlas')]: 1, [itm('Sucata de Ferro')]: 2 }); fixR(.05, () => H.craft(ana, { id: h.id, rec: 'runaForca' })); assert.ok(h.inv[itm('Runa de Força')] >= 1);
+  fixR(.05, () => H.ofiUse(ana, { id: h.id, node: nid('forja', 'Engaste I'), item: w, rune: itm('Runa de Força') })); assert.deepEqual(h.up[w].g, ['Runa de Força']);
+  const fraco = ofiChar('forja', 4); assert.ok(!OF.recipes(fraco, 'forja').some(r => r.id === 'runaBrasa')); // Brasa é do Engaste II
+});

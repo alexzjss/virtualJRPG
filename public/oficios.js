@@ -13,15 +13,15 @@
     N('Reciclar Sucata', 'Desmonta um item velho e salva o que presta: Sucata de Ferro.', 1, { act: 'reciclar' }),
     N('Afiar a Lâmina', 'Na noite do acampamento, afia a arma: ataque básico mais forte na próxima batalha.', 1, { camp: 'afiar' }),
     N('Têmpera I', 'Refina uma arma até +1 (+2 de poder).', 1, { act: 'temperar', fg: 'temp', v: 1 }),
-    N('Engaste I', 'Abre um engaste numa arma para receber uma runa.', 1, { act: 'engastar', fg: 'slot', v: 1 }),
+    N('Engaste I', 'Abre um engaste numa arma para receber uma runa. Ensina a entalhar as runas de Precisão e de Força.', 1, { act: 'engastar', fg: 'slot', v: 1, rec: ['runaPrecisao', 'runaForca'] }),
     N('Têmpera II', 'Refina até +2.', 2, { fg: 'temp', v: 2 }),
-    N('Engaste II', 'Abre o segundo engaste.', 2, { fg: 'slot', v: 2 }),
+    N('Engaste II', 'Abre o segundo engaste. Ensina as runas de Brasa e de Veneno.', 2, { fg: 'slot', v: 2, rec: ['runaBrasa', 'runaVeneno'] }),
     N('Economia de Essência', 'Forja elemental com 2 essências em vez de 3.', 2, { hk: 'essencia', v: 2 }),
     N('Armeiro', 'Especialista em armas: cada nível de têmpera rende +3 de poder em vez de +2.', 2, { ex: 'forja-esp', hk: 'esp', v: 'armeiro' }),
     N('Couraceiro', 'Especialista em armaduras: pode temperar armaduras (+1 de armadura por nível).', 2, { ex: 'forja-esp', hk: 'esp', v: 'couraceiro' }),
     N('Ourives', 'Especialista em acessórios: pode temperar amuletos e relíquias (+2 no atributo por nível).', 2, { ex: 'forja-esp', hk: 'esp', v: 'ourives' }),
     N('Têmpera III', 'Refina até +3.', 3, { fg: 'temp', v: 3 }),
-    N('Engaste III', 'Abre o terceiro engaste.', 3, { fg: 'slot', v: 3 }),
+    N('Engaste III', 'Abre o terceiro engaste. Ensina as runas de Trovão e de Sangue.', 3, { fg: 'slot', v: 3, rec: ['runaTrovao', 'runaSangue'] }),
     N('Liga de Essências', 'Funde duas essências numa arma: ganha um segundo elemento.', 3, { act: 'ligar' }),
     N('Assinatura do Ferreiro', 'Marca uma peça com nome próprio e um bônus raro do catálogo.', 3, { act: 'assinar' }),
     N('Arma Viva', 'A arma evolui com os abates e, no último estágio, ganha o gume dos grandes.', 3, { act: 'vivo' }),
@@ -272,16 +272,20 @@
   [
     R('tonico', 'Tônico', 'alquimia', 1, 'Tônico', { 'Erva Medicinal': 2 }), R('tonicof', 'Tônico Forte', 'alquimia', 2, 'Tônico Forte', { 'Erva Medicinal': 3, 'Raiz Amarga': 1 }, { dc: -5 }),
     R('antidoto', 'Antídoto', 'alquimia', 1, 'Antídoto', { 'Raiz Amarga': 2 }), R('calmante', 'Calmante', 'alquimia', 1, 'Calmante', { 'Erva Medicinal': 2, 'Cogumelo Pálido': 1 }),
-    R('eter', 'Éter de Aura', 'alquimia', 2, 'Éter de Aura', { 'Cogumelo Pálido': 2, 'Sal Sagrado': 1 }, { dc: -5 }), R('oleo', 'Frasco de Óleo', 'alquimia', 1, 'Frasco de Óleo', { 'Óleo de Lamparina': 1, 'Frasco Vazio': 1 }),
+    R('eter', 'Éter de Aura', 'alquimia', 2, 'Éter de Aura', { 'Cogumelo Pálido': 1, 'Sal Sagrado': 1 }, { dc: -5 }), R('oleo', 'Frasco de Óleo', 'alquimia', 1, 'Frasco de Óleo', { 'Óleo de Lamparina': 1, 'Frasco Vazio': 1 }),
     R('coquetel', 'Coquetel Incendiário', 'alquimia', 2, 'Coquetel Incendiário', { 'Óleo de Lamparina': 2, 'Frasco Vazio': 1 }, { dc: -5 }), R('acido', 'Frasco de Ácido', 'alquimia', 2, 'Frasco de Ácido', { 'Raiz Amarga': 2, 'Frasco Vazio': 1 }, { dc: -5 }),
-    R('componente', 'Componente Ritualístico', 'alquimia', 2, 'Componente Ritualístico', { 'Sal Sagrado': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('elixir', 'Elixir Vital', 'alquimia', 3, 'Elixir Vital', { 'Erva Medicinal': 4, 'Raiz Amarga': 2, 'Cogumelo Pálido': 1 }, { dc: -15 }),
-    R('sais', 'Sais Aromáticos', 'alquimia', 3, 'Sais Aromáticos', { 'Sal Sagrado': 2, 'Erva Medicinal': 1 }, { dc: -10 }), R('granada', 'Granada', 'alquimia', 3, 'Granada', { 'Pólvora': 2, 'Sucata de Ferro': 1 }, { dc: -5 }),
-    R('atadura', 'Atadura', 'medicina', 1, 'Atadura', { 'Erva Medicinal': 1, 'Papel de Arroz': 1 }), R('isca', 'Isca', 'caca', 2, 'Isca', { 'Carne de Caça': 1, 'Erva Medicinal': 1 }),
+    R('componente', 'Componente Ritualístico', 'alquimia', 2, 'Componente Ritualístico', { 'Sal Sagrado': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('elixir', 'Elixir Vital', 'alquimia', 3, 'Elixir Vital', { 'Erva Medicinal': 4, 'Raiz Amarga': 3, 'Cogumelo Pálido': 2 }, { dc: -15 }),
+    R('sais', 'Sais Aromáticos', 'alquimia', 3, 'Sais Aromáticos', { 'Sal Sagrado': 3, 'Erva Medicinal': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('granada', 'Granada', 'alquimia', 3, 'Granada', { 'Pólvora': 2, 'Sucata de Ferro': 1 }, { dc: -5 }),
+    R('atadura', 'Atadura', 'medicina', 1, 'Atadura', { 'Erva Medicinal': 1, 'Papel de Arroz': 1 }), R('isca', 'Isca', 'caca', 2, 'Isca', { 'Carne de Caça': 1, 'Erva Medicinal': 1 }, { qty: 2 }),
     R('municaoPrata', 'Munição de Prata', 'engenharia', 1, 'Munição de Prata', { 'Pólvora': 1, 'Sucata de Ferro': 2 }, { dc: -5 }), R('municaoFogo', 'Munição Incendiária', 'engenharia', 1, 'Munição Incendiária', { 'Pólvora': 1, 'Óleo de Lamparina': 1 }, { dc: -5 }),
     R('municaoSal', 'Munição de Sal', 'engenharia', 2, 'Munição de Sal', { 'Pólvora': 1, 'Sal Sagrado': 2 }, { dc: -5 }),
-    R('ofudaCura', 'Ofuda de Cura', 'talismas', 1, 'Ofuda de Cura', { 'Papel de Arroz': 2, 'Sal Sagrado': 1 }), R('ofudaPura', 'Ofuda Purificadora', 'talismas', 1, 'Ofuda Purificadora', { 'Papel de Arroz': 2, 'Sal Sagrado': 1 }),
-    R('ofudaFogo', 'Ofuda de Fogo', 'talismas', 2, 'Ofuda de Fogo', { 'Papel de Arroz': 2, 'Óleo de Lamparina': 1 }, { dc: -5 }), R('ofudaSelo', 'Ofuda de Selo', 'talismas', 2, 'Ofuda de Selo', { 'Papel de Arroz': 2, 'Sal Sagrado': 2 }, { dc: -5 }),
-    R('ofudaRet', 'Ofuda de Retorno', 'talismas', 2, 'Ofuda de Retorno', { 'Papel de Arroz': 3, 'Sal Sagrado': 2 }, { dc: -10 }),
+    R('ofudaCura', 'Ofuda de Cura', 'talismas', 1, 'Ofuda de Cura', { 'Papel de Arroz': 2, 'Sal Sagrado': 2 }), R('ofudaPura', 'Ofuda Purificadora', 'talismas', 1, 'Ofuda Purificadora', { 'Papel de Arroz': 2, 'Sal Sagrado': 1 }),
+    R('ofudaFogo', 'Ofuda de Fogo', 'talismas', 2, 'Ofuda de Fogo', { 'Papel de Arroz': 2, 'Óleo de Lamparina': 2 }, { dc: -5 }), R('ofudaSelo', 'Ofuda de Selo', 'talismas', 2, 'Ofuda de Selo', { 'Papel de Arroz': 2, 'Sal Sagrado': 2 }, { dc: -5 }),
+    R('ofudaRet', 'Ofuda de Retorno', 'talismas', 2, 'Ofuda de Retorno', { 'Papel de Arroz': 3, 'Sal Sagrado': 3, 'Cogumelo Pálido': 1 }, { dc: -10 }),
+    // runas da Forja: 1 essência do elemento + sucata (+ um extra nas mais fortes); o preço da runa fica em ~1,7× o custo
+    R('runaPrecisao', 'Runa de Precisão', 'forja', 1, 'Runa de Precisão', { 'Essência de Amaterasu': 1, 'Sucata de Ferro': 2 }, { dc: -5 }), R('runaForca', 'Runa de Força', 'forja', 1, 'Runa de Força', { 'Essência de Atlas': 1, 'Sucata de Ferro': 2 }, { dc: -5 }),
+    R('runaBrasa', 'Runa de Brasa', 'forja', 2, 'Runa de Brasa', { 'Essência de Kagutsuchi': 1, 'Sucata de Ferro': 2, 'Óleo de Lamparina': 1 }, { dc: -10 }), R('runaVeneno', 'Runa de Veneno', 'forja', 2, 'Runa de Veneno', { 'Essência de Hiruko': 1, 'Sucata de Ferro': 2, 'Raiz Amarga': 1 }, { dc: -10 }),
+    R('runaTrovao', 'Runa de Trovão', 'forja', 3, 'Runa de Trovão', { 'Essência de Indra': 1, 'Sucata de Ferro': 2, 'Pólvora': 1 }, { dc: -15 }), R('runaSangue', 'Runa de Sangue', 'forja', 3, 'Runa de Sangue', { 'Essência de Shukketsu': 1, 'Sucata de Ferro': 2, 'Sal Sagrado': 1 }, { dc: -15 }),
     // refeições: viram o bônus do grupo na próxima batalha (m = modificadores)
     R('ensopado', 'Ensopado de Caça', 'culinaria', 1, '', { 'Carne de Caça': 2, 'Ervas de Cozinha': 1 }, { meal: { atk: 8 }, mealD: '+8% de dano' }), R('sopa', 'Sopa de Ervas', 'culinaria', 1, '', { 'Ervas de Cozinha': 2, 'Erva Medicinal': 1 }, { meal: { def: 8 }, mealD: '+8% de defesa' }),
     R('cha', 'Chá de Raiz', 'culinaria', 1, '', { 'Raiz Amarga': 1, 'Ervas de Cozinha': 1 }, { meal: { agi: 10 }, mealD: '+10% de velocidade' }), R('churrasco', 'Churrasco do Caçador', 'culinaria', 2, '', { 'Carne de Caça': 3, 'Ervas de Cozinha': 1 }, { meal: { hit: 10, atk: 5 }, mealD: '+10% de acerto e +5% de dano', dc: -5 }),
@@ -317,11 +321,26 @@
     if (ch.enemy) return 'Inimigos não têm ofícios.';
     if (!(ch.ofi || []).includes(per)) return `Exige a Iniciação em ${p.n} (dada pelo mestre).`;
     if ((ch.pof || []).includes(id)) return 'Já aprendido.';
+    if (n.off) return 'Desativado pelo mestre.';
     const mine = learned(ch, per);
     if (n.ex && mine.some(o => o.ex === n.ex)) return 'Trancado: você escolheu outra especialização.';
     if (n.t > 1) { const prev = mine.filter(o => o.t === n.t - 1).length; if (prev < 4) return `Exige 4 nós do grau ${GRAU[n.t - 1]} (tem ${prev}).`; }
     if ((ch.po || 0) < n.po) return `Faltam ${n.po - (ch.po || 0)} PO.`;
     return '';
   }
-  g.OFI = { PER: P, REC, RUNAS, SIG, ELST, GRAU, BONUS, learned, grau, rollBonus, hook, temp, slots, esp, whyNot, order: Object.keys(P) };
+  // receitas liberadas para o personagem na perícia: as dos nós aprendidos e as criadas pelo mestre (valem a partir do grau t)
+  const recipes = (ch, per) => { const ids = new Set(learned(ch, per).flatMap(n => n.rec || [])); for (const r of Object.values(REC)) if (r.per === per && r.custom && grau(ch, per) >= r.t) ids.add(r.id); return [...ids].map(i => REC[i]).filter(r => r && !r.off); };
+  // catálogo editável: o mestre guarda só as diferenças (cfg) e elas são mescladas sobre o catálogo acima; apply(null) volta ao padrão.
+  // cfg = { per: {id: {n,d,a}}, node: {"per.i": {n,d,po,r,g,off}}, nodeNew: {per: [{n,d,t,po,r,g,chk,rec,off}]}, rec: {id: patch ou receita nova (custom)} }
+  const SNAP = structuredClone({ P, REC });
+  const apply = cfg => {
+    cfg ||= {};
+    for (const k of Object.keys(P)) delete P[k]; for (const k of Object.keys(REC)) delete REC[k];
+    Object.assign(P, structuredClone(SNAP.P)); Object.assign(REC, structuredClone(SNAP.REC));
+    for (const [id, o] of Object.entries(cfg.per || {})) if (P[id]) Object.assign(P[id], o);
+    for (const [id, o] of Object.entries(cfg.node || {})) { const [per, i] = id.split('.'), n = P[per]?.nodes[+i]; if (n) Object.assign(n, o); }
+    for (const [per, L] of Object.entries(cfg.nodeNew || {})) if (P[per]) L.forEach(o => { const { chk, ...x } = o, i = P[per].nodes.length; P[per].nodes.push({ po: [0, 2, 4, 7][o.t] ?? 2, ...x, t: o.t, ...(chk ? { act: 'checar', g: o.g || 0 } : {}), id: per + '.' + i, custom: true }); });
+    for (const [id, o] of Object.entries(cfg.rec || {})) REC[id] = REC[id] && !o.custom ? { ...REC[id], ...o } : { dc: 0, qty: 1, mats: {}, ...o, id };
+  };
+  g.OFI = { PER: P, REC, RUNAS, SIG, ELST, GRAU, BONUS, apply, recipes, base: SNAP, learned, grau, rollBonus, hook, temp, slots, esp, whyNot, order: Object.keys(P) };
 })(globalThis);

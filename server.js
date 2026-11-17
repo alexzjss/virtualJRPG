@@ -6,7 +6,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { startTunnel } from './tunnel.js';
-import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES, SUMMONS } from './content.js';
+import { buildSkills, buildItems, buildBestiary, SCENES, VEHICLES, SUMMONS, BASICS } from './content.js';
 import './public/rules.js'; // regras compartilhadas com o navegador (globalThis.RULES)
 import './public/oficios.js'; // catálogo de ofícios (perícias), também usado pelo navegador (globalThis.OFI)
 const RU = globalThis.RULES, OF = globalThis.OFI;
@@ -50,7 +50,7 @@ const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: '
 const BBG = ['rubro', 'noite', 'floresta', 'brasa', 'gelo', 'vazio', 'santuario', 'tempestade'];
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR', 'po']); // campos numéricos que só o mestre altera
-const EXTRA = { ofi: [], po: 0, pof: [], up: {}, rrUsed: 0, vinc: [], aw: [], nen: '', body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
+const EXTRA = { ofi: [], po: 0, pof: [], up: {}, dia: [], rrUsed: 0, vinc: [], aw: [], nen: '', body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
 const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', rq: null, ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
@@ -82,6 +82,7 @@ S.items ??= buildItems(it);
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
+S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; sc.gather ??= []; }
@@ -154,7 +155,8 @@ const reseat = () => {
   }
 };
 const usable = () => { for (const ch of Object.values(S.chars)) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries(ch.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
-const push = () => { Object.values(S.chars).forEach(breakCheck); prep(); reseat(); pruneReqs(); usable(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+let cfgSig = JSON.stringify(S.ofiCfg);
+const push = () => { const sg = JSON.stringify(S.ofiCfg); if (sg !== cfgSig) { cfgSig = sg; OF.apply(S.ofiCfg); } /* desfazer pode trocar o catálogo */ Object.values(S.chars).forEach(breakCheck); prep(); reseat(); pruneReqs(); usable(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -795,6 +797,7 @@ function ofiRoll(ch, per, mod, label) { // d100 contra o melhor dos dois atribut
   log(ch.name, `${label}: ${p.n} (${attr} ${target}%) → ${r}: ${res}${ok ? ` · +${crit ? 2 : 1} PO` : ''}`, ok ? 'ok' : 'bad', { d: r, rr: { l: p.n, t: target, res, c: ch.id } });
   return { r, ok, crit, dis };
 }
+const narrar = (ch, e, txt) => { e.t = String(txt ?? '').replace(/\s+/g, ' ').trim().slice(0, 200); if (e.t) log('Mestre', `${ch.name} · ${e.a}: ${e.t}`, ''); }; // narração do resultado de um teste narrativo
 const upOf = (ch, id) => (ch.up[id] ??= { p: 0, t: 0, g: [] });
 function spawnCompanions(h) { // companheiros de ofício entram no começo da batalha
   const nodes = (h.pof || []).map(id => OF.PER[id.split('.')[0]]?.nodes.find(n => n.id === id)).filter(n => n?.comp), cap = 1 + (OF.hook(h, 'matilha') ? 1 : 0);
@@ -829,10 +832,11 @@ const OFI_ACT = {
     const R = ofiRoll(ch, per, mod, `Colher (${n.n})`); if (!R.ok) return;
     const k = pick(tbl), q = 1 + (R.crit ? 1 : 0) + hookP(ch, per, 'yield'); ch.inv[k] = (ch.inv[k] || 0) + q; log(ch.name, `colhe ${q}× ${S.items[k].name}.`, 'ok');
   },
-  checar(ch, n, per, m, mod) { // teste narrativo; algumas ações pagam (ou cobram) ouro
-    const R = ofiRoll(ch, per, mod, n.n);
-    if (n.g && R.ok) { const v = n.g * (R.crit ? 2 : 1); ch.gold += v; log(ch.name, `ganha ${v} de ouro.`, 'ok'); }
-    else if (n.g && per === 'jogos' && !R.ok) { const v = Math.min(ch.gold, R.dis ? n.g : Math.floor(n.g / 2)); ch.gold -= v; if (v) log(ch.name, `perde ${v} de ouro na aposta.`, 'bad'); }
+  checar(ch, n, per, m, mod) { // teste narrativo; algumas ações pagam (ou cobram) ouro. O resultado fica no diário da ficha para o mestre narrar
+    const R = ofiRoll(ch, per, mod, n.n); let ouro = 0;
+    if (n.g && R.ok) { const v = n.g * (R.crit ? 2 : 1); ch.gold += v; ouro = v; log(ch.name, `ganha ${v} de ouro.`, 'ok'); }
+    else if (n.g && per === 'jogos' && !R.ok) { const v = Math.min(ch.gold, R.dis ? n.g : Math.floor(n.g / 2)); ch.gold -= v; ouro = -v; if (v) log(ch.name, `perde ${v} de ouro na aposta.`, 'bad'); }
+    (ch.dia ??= []).push({ i: rid(), a: n.n, p: per, r: R.crit ? 'CRÍTICO' : R.ok ? 'Sucesso' : R.dis ? 'DESASTRE' : 'Falha', ok: R.ok, g: ouro, t: '', n: S.seq }); if (ch.dia.length > 40) ch.dia.shift();
   },
   tratar(ch, n, per, m, mod) { // cura partes do corpo fora de combate
     const t = S.chars[m.target]; if (!t || t.enemy || S.battle.active || t.dead) return;
@@ -1277,7 +1281,7 @@ const H = {
     if (c.role !== 'gm' || !r) return;
     delete S.reqs[m.id];
     const mod = int(m.mod, -100, 100), n = S.seq;
-    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' });
+    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', txt: r.t === 'ofiUse' ? String(m.txt || '').slice(0, 200) : '', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' });
     tell(r.by, S.seq === n && r.cat !== 'item' && r.cat !== 'camp' ? { kind: 'no', text: `${r.text}: não foi possível agora.` } : { kind: 'ok', text: `Aprovado: ${r.text}${mod ? ` (${mod > 0 ? '+' : ''}${mod})` : ''}` });
   },
   reqNo(c, m) {
@@ -1357,11 +1361,55 @@ const H = {
     if (!can(c, ch) || ch.enemy || !n?.act) return;
     const per = n.id.split('.')[0], mod = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0, inB = S.battle.active && ch.id in S.battle.ticks;
     if (inB && (n.act !== 'identificar' || current() !== ch.id)) return;
-    const A = OFI_ACT[n.act]; if (A) A(ch, n, per, m, mod, inB);
+    const A = OFI_ACT[n.act], ult = ch.dia?.at(-1)?.i; if (A) A(ch, n, per, m, mod, inB);
+    const e = ch.dia?.at(-1); if (e && e.i !== ult && (c.role === 'gm' || c.appr) && m.txt) narrar(ch, e, m.txt); // o mestre escreveu a narração ao aprovar
+  },
+  ofiNota(c, m) { // o mestre escreve, troca ou apaga a narração de um teste narrativo do diário de ofícios
+    const ch = S.chars[m.id], e = c.role === 'gm' && ch?.dia?.find(x => x.i === m.e); if (!e) return;
+    if (m.del) ch.dia = ch.dia.filter(x => x !== e); else narrar(ch, e, m.txt);
+  },
+  shopBasics(c) { // põe os ingredientes básicos à venda na loja da cena (campanhas antigas não os têm)
+    if (c.role !== 'gm') return; const sh = scene().shop;
+    for (const nome of BASICS) { const k = itemId(nome); if (k && !sh.stock.includes(k)) sh.stock.push(k); }
+  },
+  ofiCfg(c, m) { // o mestre edita o catálogo de ofícios: perícias, nós e receitas (guardado como diferenças sobre o padrão)
+    if (c.role !== 'gm') return;
+    const cfg = S.ofiCfg ??= {}, tx = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n), num = (v, a, b) => int(v, a, b);
+    const put = (coll, key, v) => { cfg[coll] ??= {}; if (v == null) delete cfg[coll][key]; else cfg[coll][key] = v; if (!Object.keys(cfg[coll]).length) delete cfg[coll]; };
+    const base = id => { const [per, i] = String(id).split('.'), n = OF.PER[per]?.nodes[+i]; return n && !n.custom ? n : null; };
+    const v = m.v && typeof m.v === 'object' ? m.v : null;
+    if (m.k === 'reset') S.ofiCfg = {};
+    else if (m.k === 'per' && OF.PER[m.id]) {
+      const o = {}; if (v) { if (tx(v.n, 30)) o.n = tx(v.n, 30); if (v.d != null) o.d = tx(v.d, 160); const a = [...new Set([].concat(v.a || []).filter(k => ATTRS.includes(k)))].slice(0, 2); if (a.length) o.a = a; }
+      put('per', m.id, Object.keys(o).length ? o : null);
+    } else if (m.k === 'node' && base(m.id)) {
+      const o = {}; if (v) { if (tx(v.n, 40)) o.n = tx(v.n, 40); if (v.d != null) o.d = tx(v.d, 160); if (v.po != null) o.po = num(v.po, 0, 30); if (v.r != null) o.r = num(v.r, 0, 30); if (v.g != null && base(m.id).act === 'checar') o.g = num(v.g, 0, 200); if (v.off) o.off = true; }
+      put('node', m.id, Object.keys(o).length ? o : null);
+    } else if (m.k === 'nodeNew' && OF.PER[m.per]) {
+      const L = cfg.nodeNew?.[m.per] ?? [], i = m.i == null ? L.length : num(m.i, 0, L.length);
+      if (i >= 30) return;
+      if (v && (i < L.length || tx(v.n, 40))) { const t = num(v.t, 1, 3); L[i] = { n: tx(v.n, 40) || L[i]?.n || 'Nó novo', d: tx(v.d, 160), t, po: num(v.po ?? [0, 2, 4, 7][t], 0, 30), r: num(v.r, 0, 30), ...(v.chk ? { chk: true, g: num(v.g, 0, 200) } : {}), ...(v.off ? { off: true } : {}) }; }
+      else if (!v && i < L.length) L[i] = { ...L[i], off: true }; // o espaço fica (os ids dos nós seguintes não mudam)
+      else return;
+      (cfg.nodeNew ??= {})[m.per] = L;
+    } else if (m.k === 'rec') {
+      const cur = OF.REC[m.id], novo = !cur;
+      if (!v) put('rec', m.id, null); // receita nova: apaga; receita padrão: volta ao original
+      else {
+        const o = {}, nm = tx(v.n, 40), itNm = k => Object.values(S.items).some(i => i.name === k);
+        if (nm) o.n = nm; if (OF.PER[v.per]) o.per = v.per; if (v.t != null) o.t = num(v.t, 1, 3); if (v.dc != null) o.dc = num(v.dc, -40, 20); if (v.qty != null) o.qty = num(v.qty, 1, 5); if (v.off != null) o.off = !!v.off;
+        if (v.out != null) o.out = itNm(tx(v.out, 60)) ? tx(v.out, 60) : '';
+        if (v.mats && typeof v.mats === 'object') { const mt = Object.fromEntries(Object.entries(v.mats).filter(([k]) => itNm(k)).map(([k, q]) => [k, num(q, 1, 9)]).slice(0, 6)); if (Object.keys(mt).length) o.mats = mt; }
+        if (v.meal && typeof v.meal === 'object') { const ML = { atk: 'de dano', def: 'de defesa', agi: 'de velocidade', hit: 'de acerto', crit: 'de crítico' }, ml = Object.fromEntries(Object.keys(ML).filter(k => num(v.meal[k], 0, 30) > 0).map(k => [k, num(v.meal[k], 0, 30)])); if (Object.keys(ml).length) { o.meal = ml; o.mealD = Object.entries(ml).map(([k, q]) => `+${q}% ${ML[k]}`).join(', '); o.out = ''; } }
+        if (novo) { if (!o.n || !o.per || !o.mats || !(o.out || o.meal)) return; Object.assign(o, { custom: true, t: o.t || 1 }); const id = m.id && /^x[0-9a-f]{4,8}$/.test(m.id) ? m.id : 'x' + rid(); put('rec', id, o); }
+        else put('rec', m.id, { ...cfg.rec?.[m.id], ...o });
+      }
+    } else return;
+    cfgSig = JSON.stringify(S.ofiCfg); OF.apply(S.ofiCfg);
   },
   craft(c, m) { // prepara uma receita; refeições viram o bônus da próxima batalha
     const ch = S.chars[m.id], r = OF.REC[m.rec];
-    if (!can(c, ch) || !r || ch.enemy || S.battle.active || !hasNode(ch, n => n.id.startsWith(r.per + '.') && (n.rec || []).includes(r.id))) return;
+    if (!can(c, ch) || !r || r.off || ch.enemy || S.battle.active || !OF.recipes(ch, r.per).includes(r)) return;
     const mod = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0, mats = Object.fromEntries(Object.entries(r.mats).map(([k, q]) => [k, r.per === 'engenharia' && OF.hook(ch, 'barato') ? Math.max(1, Math.ceil(q / 2)) : q]));
     if (!haveMats(ch, mats)) return log(ch.name, `não tem o que precisa para ${r.n}: ${matsText(mats)}.`, 'bad');
     const R = ofiRoll(ch, r.per, mod + r.dc, `Preparar ${r.n}`);
