@@ -86,13 +86,13 @@ function knockout(id) { // nocaute: corte em diagonal, o cartão cai e apaga
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CHOQUE!, BLACK FLASH!
   fxl.querySelector('.seal')?.remove();
-  if (kind !== 'bom') fxAdd('flash' + (kind === 'bf' ? ' dark' : ''), '', 260);
-  fxAdd(`seal ${kind}`, `<b>${esc(txt)}</b>`, 1100); sfxc(kind === 'perf' ? 'perfect' : kind === 'bf' ? 'bf' : kind === 'chq' ? 'chq' : 'weak');
+  if (kind !== 'bom' && kind !== 'erro') fxAdd('flash' + (kind === 'bf' ? ' dark' : ''), '', 260);
+  fxAdd(`seal ${kind}`, `<b>${esc(txt)}</b>`, 1100); sfxc(kind === 'perf' || kind === 'otimo' ? 'perfect' : kind === 'bf' ? 'bf' : kind === 'chq' ? 'chq' : 'weak');
 }
 function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do ataque, contra-ataque, Choque e Black Flash
   const grade = acts.find(e => e.fx.cg), bf = acts.find(e => e.fx.bf), ctr = acts.find(e => e.fx.ctr), chq = acts.find(e => e.fx.chq);
   if (bf) { if (stage && !calm()) stage.classList.add('shake'); seal('bf', 'BLACK FLASH!'); }
-  else if (grade) seal(grade.fx.cg, grade.fx.cg === 'perf' ? 'PERFEITO!' : 'BOM!');
+  else if (grade) seal(grade.fx.cg, (RULES.CMD.GRADE_NAME[grade.fx.cg] || '') + '!');
   if (ctr) setTimeout(() => seal('ctr', 'CONTRA!'), 250);
   if (chq) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 400); } seal('chq', 'CHOQUE!'); }
 }

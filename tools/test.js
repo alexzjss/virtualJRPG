@@ -1250,3 +1250,18 @@ test('cinemáticos: descrição cita Ótimo/Erro e as janelas do nível', () => 
   assert.match(E({ kind: 'dmg', cmd: 'segurar', rq: { FOR: 50 } }, null), /Ótimo ×1,45 · Perfeito ×1,7/); assert.match(E({ kind: 'dmg', cmd: 'runa', rn: 'circulo', rq: { FOR: 25 } }, null), /≥ 65%.*≥ 78%.*≥ 88%/);
   assert.match(E({ kind: 'util', cmd: 'ritmo', nt: 6, rq: { FOR: 50 } }, null), /8 notas/); assert.match(E({ kind: 'dmg', cmd: 'mira' }, null), /×0,85/);
 });
+test('cinemáticos: o servidor aplica Erro e Ótimo no ataque e anuncia a nota', () => {
+  const kT = sk('Tempestade Negra'), kPlain = sk('Faísca');
+  const hit = (key, cmd) => { reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h); h.skills = [key]; e.hpMax = e.hp = 9999;
+    H.battle(gm, { on: true }); S.battle.ticks[h.id] = -1; h.limit = 100; h.aura = 99; fixR(.3, () => H.act(ana, { id: h.id, skill: key, target: e.id, ...(cmd ? { cmd } : {}) }));
+    return { dmg: e.hpMax - e.hp, fx: S.log.map(l => l.fx).filter(f => f && f.cg), txt: S.log.map(l => l.text || '').join('\n') }; };
+  const base = hit(kT), erro = hit(kT, { g: 'erro', n: 0, acc: 0 }), ot = hit(kT, { g: 'otimo', n: 0, acc: .5 }), vazio = hit(kT, { g: '', n: 0, acc: 0 });
+  assert.ok(base.dmg > 20, 'dano base mensurável'); assert.equal(vazio.dmg, base.dmg, 'g vazio = sem comando');
+  assert.ok(Math.abs(erro.dmg - base.dmg * .85) <= 1, `erro ×0,85 (${erro.dmg} vs ${base.dmg})`);
+  assert.ok(Math.abs(ot.dmg - base.dmg * 1.3) <= 1, `ótimo ×1,3 (${ot.dmg} vs ${base.dmg})`);
+  assert.match(erro.txt, /ERROU!/); assert.match(ot.txt, /ÓTIMO!/); assert.ok(!/BLACK FLASH/.test(ot.txt), 'Ótimo não dá Black Flash');
+  assert.ok(erro.fx.length && erro.fx.every(f => f.cg === 'erro'), 'fx.cg = erro'); assert.ok(ot.fx.length && ot.fx.every(f => f.cg === 'otimo'), 'fx.cg = otimo');
+  assert.equal(hit(kT, { g: 'bom', n: 0, acc: 0 }).fx[0].cg, 'bom'); assert.equal(hit(kT, { g: 'perf', n: 0, acc: 1 }).fx[0].cg, 'perf');
+  assert.ok(!S.skills[kPlain].cmd, 'Faísca não tem comando'); const p0 = hit(kPlain), p1 = hit(kPlain, { g: 'perf', n: 0, acc: 1 });
+  assert.equal(p1.dmg, p0.dmg, 'sem cmd na técnica a nota é ignorada'); assert.equal(p1.fx.length, 0); assert.ok(!/PERFEITO|ÓTIMO|ERROU/.test(p1.txt));
+});
