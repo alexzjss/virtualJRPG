@@ -1037,9 +1037,10 @@ test('fintas: esquiva exige a direção quando a batida tem dir', () => {
   ({ h, C } = tdef(['Aparar'])); C.fin = [{ dir: '→' }]; openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['par'], 'Aparar não pede direção');
 });
 test('fintas: apertar junto do anel falso é cedo; fora dele vale a zona normal', () => {
-  let { h, C } = tdef(); C.fin = [{ fake: 400 }]; C.at = Date.now() - 400 - 60; H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['cedo'], 'no anel falso');
-  ({ h, C } = tdef()); C.fin = [{ fake: 400 }]; C.at = Date.now() - C.beats[0] + 450; assert.ok(Math.abs(Date.now() - (C.at + 400)) > 120); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['esq'], 'longe do anel falso');
-  ({ h, C } = tdef()); C.fin = [{ fake: 400 }]; C.at = Date.now() - 400 - 60; C.beats = [C.beats[0]]; assert.ok(RU.CMD.gradeDef(C.at + C.beats[0] - Date.now(), 0, 450, false) !== 'esq', 'a zona normal ali não é esquiva');
+  const par = () => S.skills[sk('Aparar')].par, at = (C, left) => { C.at = Date.now() - C.beats[0] + left; return Date.now() - C.at; }; // devolve ms decorridos desde C.at
+  let { h, C } = tdef(['Aparar']); C.fin = [{}]; at(C, par() + 250); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['esq'], 'sem finta, esse ponto é esquiva');
+  ({ h, C } = tdef(['Aparar'])); C.fin = [{ fake: 0 }]; C.fin[0].fake = at(C, par() + 250) + 60; H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['cedo'], 'no anel falso (+60 ms) o mesmo ponto vira cedo');
+  ({ h, C } = tdef(['Aparar'])); C.fin = [{ fake: 0 }]; C.fin[0].fake = at(C, par() + 250) + 400; H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['esq'], 'longe do anel falso (>120 ms) vale a zona normal');
 });
 test('defesa: janela velha (servidor reiniciado) é descartada e o inimigo age', () => {
   const { hs: [h], e } = dfx(); S.battle.cmd = { foe: e.id, at: Date.now() - 10000, w: 1100, beats: [1100], tgs: [h.id], p: { [h.id]: [] } };
