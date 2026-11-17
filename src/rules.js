@@ -602,6 +602,12 @@ function doAct(a, m, bonus = 0) {
     for (let h = 0; h < (s.hits || 1); h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, s, t, aim, bonus, { plus, beat: h }) || more; }
     if (s.dupla && off && !t.dead && t.hp > 0) more = strike(a, { ...s, name: s.name + ' (2ª mão)' }, t, aim, bonus, { plus, mult: .5 }) || more; // arma em par: segundo golpe a 50%
   }
+  const CW = S.battle.cmd; // aparou todas as batidas de um golpe de vários golpes: contra-ataque automático (básico da arma ×1,5)
+  if (CW && CW.foe === a.id && (s.hits || 1) > 1) for (const t of ts) {
+    const nt = CW.p?.[t.id]; if (!nt || t.hp <= 0 || a.hp <= 0 || nt.length !== (s.hits || 1) || !nt.every(v => v === 'par')) continue;
+    log(t.name, `CONTRA! Aparou tudo e devolve o golpe em ${a.name}.`, 'ok', { fx: { id: t.id, a: a.id, s: 'Contra-ataque', el: s.el, ctr: 1 } });
+    strike(t, { ...basicOf(t), name: 'Contra-ataque' }, a, null, 0, { counter: true, nochain: true, mult: 1.5 + modsOf(t, null).ctr / 100 });
+  }
   const ch = s.fx?.find(f => f.t === 'chain');
   if (ch && off && ts.length === 1) inB.filter(o => o.enemy === ts[0].enemy && o !== ts[0] && o.hp > 0).sort(() => Math.random() - .5).slice(0, ch.n).forEach((o, i) => strike(a, s, o, null, bonus, { mult: ch.m ** (i + 1), plus }));
   onceFx(a, s, stat);

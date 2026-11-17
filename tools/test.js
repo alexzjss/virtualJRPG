@@ -1033,3 +1033,17 @@ test('IA: aiPlan não muda o estado e aiRun executa o plano; alvo caído é repl
   const other = plan.target === h.id ? h2 : h; S.chars[plan.target].hp = 0; // o alvo planejado cai durante a janela
   const hpO = other.hp; aiRun(e, plan); assert.ok(other.hp < hpO, 'o outro herói leva o golpe');
 });
+
+test('batidas: golpe de 3 golpes abre 3 batidas; aparar todas dá contra-ataque, Aura cobrada uma vez', async () => {
+  const { hs: [h], e } = dfx(); e.skills = [sk('Rajada de Aura')]; assert.equal(S.skills[e.skills[0]].hits, 3); fixR(0, () => H.ai(gm));
+  const C = S.battle.cmd; assert.deepEqual(C.beats, [1100, 1800, 2500]); const hp = h.hp, ehp = e.hp, aura = h.aura, par = S.skills[sk('Aparar')];
+  for (let i = 0; i < 3; i++) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); }
+  assert.deepEqual(C.p[h.id], ['par', 'par', 'par']); await waitCmd();
+  assert.equal(h.hp, hp, 'nenhuma batida acerta'); assert.ok(e.hp < ehp, 'contra-ataque'); assert.ok(S.log.some(l => /CONTRA/.test(l.text || '')));
+  assert.equal(h.aura, aura - par.cost + par.power, 'Aura cobrada e devolvida uma vez');
+});
+test('batidas: aparar 2 de 3 — só a batida sem nota acerta e não há contra-ataque', async () => {
+  const { hs: [h], e } = dfx(); e.skills = [sk('Rajada de Aura')]; fixR(0, () => H.ai(gm)); const C = S.battle.cmd, ehp = e.hp, hp = h.hp;
+  for (const i of [0, 1]) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); }
+  await waitCmd(); assert.ok(h.hp < hp, 'a 3ª batida acerta'); assert.equal(e.hp, ehp); assert.ok(!S.log.some(l => /CONTRA/.test(l.text || '')));
+});
