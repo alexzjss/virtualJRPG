@@ -3,6 +3,8 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 
     npm install && npm start        # GM_KEY=suachave PORT=3000 VJ_TUNNEL=0 opcionais
 
+**Jeito rápido, sem executável:** dê dois cliques em `iniciar.bat` (Windows) ou rode `./iniciar.sh` (Linux/macOS). Os scripts instalam as dependências na primeira vez, criam a chave do mestre em `data/gm-key.txt` e sobem o servidor com o túnel do Cloudflare. Precisam do Node.js 22 ou mais novo.
+
 - `/gm` — painel do mestre (chave padrão `mestre`; troque com `GM_KEY`). A janela **Sessão** cria as contas e copia o convite.
 - `/player` — fichas do jogador (login e senha criados pelo mestre)
 - `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura; entra com a conta de um jogador ou login `mestre` + chave
