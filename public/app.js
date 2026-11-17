@@ -77,7 +77,7 @@ const chips = (obj, fn) => Object.entries(obj).map(([k, v]) => fn(k, v)).join(''
 
 // ícones da navegação (traço simples, herdam a cor do texto)
 const IC = { mesa: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>', pers: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 4-7 8-7s7 2 8 7"/>', hab: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M11 7l-5 9M13 7l5 9M7 18h10"/>',
-  itens: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 016 0v2"/>', hist: '<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/><path d="M9 9h6M9 13h6"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>' };
+  itens: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 016 0v2"/>', hist: '<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/><path d="M9 9h6M9 13h6"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>', ofi: '<path d="M13 4l7 7-3 3-7-7z"/><path d="M11 9l-7 7 4 4 7-7"/>' };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const ATN = { FOR: 'Força', CON: 'Constituição', DES: 'Destreza', AGI: 'Agilidade', INT: 'Inteligência', SAB: 'Sabedoria', CAR: 'Carisma', SOR: 'Sorte' };
 const toast = (text, kind = '', why = '') => { // aviso curto no canto (aprovado, negado, lembretes)
@@ -269,7 +269,7 @@ function iniWin() {
 }
 
 // ===== fichas na tela do mestre: cartão resumido na lista e, na janela própria, as mesmas páginas do jogador mais a aba Mestre =====
-const FT = { pers: 'Personagem', hab: 'Habilidades', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário', gm: 'Mestre' }, ftab = {};
+const FT = { pers: 'Personagem', hab: 'Skills', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário', gm: 'Mestre' }, ftab = {};
 const selC = new Set(), qa = { v: 5, st: 'burn', item: '' }; let asking = new Set();
 const sheetCard = c => `<div class="scard ${selC.has(c.id) ? 'sel' : ''} ${asking.has(c.id) ? 'asking' : ''}" data-a="selCard" data-id="${c.id}" style="--c:${esc(c.color)}" aria-pressed="${selC.has(c.id)}">
     <div class="sc-h"><i class="chk" aria-hidden="true"></i><b>${esc(c.name)}</b><small>${c.enemy ? 'Inimigo' : esc(c.owner || 'sem dono')}${(c.vinc || []).map(e => ' · ' + PATRON[e]).join('')}</small></div>
@@ -364,7 +364,7 @@ function gmSheet(c) {
 }
 
 // ===== páginas fora de combate (jogador; o mestre abre a grade em tela cheia pela ficha) =====
-const PAGES = { mesa: 'Mesa', pers: 'Ficha', hab: 'Habilidades', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário' };
+const PAGES = { mesa: 'Mesa', pers: 'Ficha', hab: 'Skills', ofi: 'Ofícios', itens: 'Itens', hist: 'Diário' };
 const PATRON = { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' };
 let pg = 'mesa', selCh = null, chatOpen = innerWidth >= 1000, gridFull = null, wasBattle = false;
 const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
@@ -668,7 +668,7 @@ app.addEventListener('change', e => {
   if (d.a === 'passSel') { passTo = v; return; }
   if (d.ou) { const [nd, f] = d.ou.split(':'); (oUi[nd] ||= {})[f] = v; return; }
   if (d.a === 'planLoad') { const b = lsGet('vj.builds', [])[+v]; if (b) lsSet('vj.plan.' + d.id, b.nodes); return render(); }
-  if (d.a === 'campWith') { campWith[d.id] = v; if (S.camp.acts[d.id] === 'conversar') send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); }
+  if (d.a === 'campWith') { campWith[d.id] = v; const pr = myReq()?.[1]; if (S.camp.acts[d.id] === 'conversar' || (pr?.t === 'campAct' && pr.m.k === 'conversar' && pr.m.id === d.id)) send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); } // com o pedido ainda na fila, reenvia: o novo substitui o anterior e leva a escolha
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
@@ -704,7 +704,7 @@ app.addEventListener('click', e => {
   if (tb) { tabs[tb.dataset.id] = tb.dataset.tab; return render(); }
   const op = e.target.closest('[data-open]');
   if (op) { open[op.dataset.open] = !(open[op.dataset.open] ?? !gm); return render(); }
-  const nd = e.target.closest('[data-node]');
+  const nd = e.target.closest('[data-node]:not([data-a])'); // botões com data-a (Aprender, Usar, plano) têm ação própria; só nós e listas selecionam
   if (nd) { selNode[nd.dataset.id] = nd.dataset.node; return render(); }
   const am = e.target.closest('[data-aim]'), sb = e.target.closest('[data-sub]'), pvb = e.target.closest('[data-pv]');
   const czb = e.target.closest('[data-cz]');
@@ -798,7 +798,7 @@ app.addEventListener('click', e => {
   if (d.a === 'copy') return copy(d.k === 'invite' ? inviteText() : accessText(sess.last), d.k === 'invite' ? 'Convite copiado. Cole no grupo dos jogadores.' : 'Acesso copiado. Mande só para esse jogador.');
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return toast('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
-  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, w: d.w, f: d.f, v: d.v };
+  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, w: d.w, f: d.f, v: d.v, node: d.node, rec: d.rec };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
   if (d.a === 'addChar' && gm && !d.enemy) { const o = prompt(`Login do jogador dono? (deixe vazio para escolher depois na janela Sessão)${S.accounts.length ? '\nContas: ' + S.accounts.join(', ') : ''}`); if (o === null) return; m.owner = o.trim(); }
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;

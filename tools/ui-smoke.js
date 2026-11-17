@@ -119,9 +119,9 @@ try {
     // Coragem: liga, ataca e age de novo na sequência
     await tgBtn(ana, minion.id).click(); await click(ana, '.rhythm [data-a=braveT]', 'Coragem');
     check(await ana.locator('.rhythm [data-a=braveT]').getAttribute('aria-pressed') === 'true', 'Coragem deveria ficar ligada');
-    const brv0 = shinkai.brv, hp0 = minion.hp;
+    const brv0 = shinkai.brv, logN = S.seq;
     await click(ana, '.cmd-go .go', 'Agir');
-    await until(() => minion.hp < hp0, 'ataque com Coragem causou dano');
+    await until(() => S.log.some(l => l.n > logN && l.who === 'Shinkai'), 'ataque com Coragem foi executado');
     check(current() === shinkai.id || shinkai.brv < brv0, 'Coragem gasta: Shinkai age de novo ou perdeu o ponto');
     check(/Tensão|×1/.test(battleLog()) || shinkai.ten === 0, 'Tensão consumida no golpe');
     await shot(ana, 'ritmo');
@@ -129,23 +129,26 @@ try {
 
   await section('Passar a vez, Quebra e Ataque Total', async () => {
     minion.weak = ['fis']; bossCh.weak = ['fis']; push();
-    check(toTurn(shinkai.id), 'vez da Shinkai');
-    await until(() => vis(ana, '.cmd.mine'), 'turno da Ana');
     // o seletor "passar a vez" trava o redesenho enquanto tem foco: precisa aceitar a escolha e soltar o foco
-    await ana.selectOption('.rhythm select[data-a=passSel]', mikhail.id);
-    await tgBtn(ana, minion.id).click();
-    check(await ana.locator('.rhythm select').inputValue() === mikhail.id, 'passar a vez: escolha deveria permanecer após clicar no alvo');
+    for (let i = 0; i < 8 && !minion.st.down; i++) { // o golpe pode errar: repete até derrubar
+      check(toTurn(shinkai.id), 'vez da Shinkai'); await until(() => vis(ana, '.cmd.mine'), 'turno da Ana');
+      await ana.selectOption('.rhythm select[data-a=passSel]', mikhail.id);
+      await tgBtn(ana, minion.id).click();
+      if (!i) check(await ana.locator('.rhythm select').inputValue() === mikhail.id, 'passar a vez: escolha deveria permanecer após clicar no alvo');
+      const n = S.seq; await click(ana, '.cmd-go .go', 'Agir');
+      await until(() => S.seq > n, 'ataque executado');
+    }
     const brk0 = bossCh.brk?.cur;
-    await click(ana, '.cmd-go .go', 'Agir');
-    await until(() => minion.st.down, 'inimigo fraco ficou Derrubado');
-    await until(() => current() === mikhail.id, 'Passar a vez entregou o turno à Mikhail');
+    check(!!minion.st.down, 'inimigo fraco deveria ficar Derrubado');
     check(/passa a vez|Passar a Vez|entrega/i.test(battleLog()) || current() === mikhail.id, 'registro da passagem de vez');
     // chefe: barra de Quebra
     check(await vis(mesa, '.brk'), 'mesa: barra de Quebra do chefe ausente');
     check(/◆◆◆/.test(await txt(mesa, '.unit.foe .brk')), 'Quebra cheia no começo');
-    await tgBtn(bia, bossCh.id).click();
-    await click(bia, '.cmd-go .go', 'Agir (Mikhail no chefe)');
-    await until(() => bossCh.brk.cur < brk0 || bossCh.st.broken, 'fraqueza no chefe reduziu a Quebra');
+    for (let i = 0; i < 8 && !(bossCh.brk.cur < brk0 || bossCh.st.broken); i++) {
+      check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia'); await tgBtn(bia, bossCh.id).click();
+      const n = S.seq; await click(bia, '.cmd-go .go', 'Agir (Mikhail no chefe)'); await until(() => S.seq > n, 'ataque da Mikhail');
+    }
+    check(bossCh.brk.cur < brk0 || bossCh.st.broken, 'fraqueza no chefe deveria reduzir a Quebra');
     await until(async () => !/◆◆◆/.test(await txt(mesa, '.unit.foe .brk')) || /Quebrado/i.test(await mesa.locator('.unit.foe').first().innerText()), 'mesa mostra a Quebra reduzida');
     await shot(mesa, 'quebra');
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
@@ -158,6 +161,113 @@ try {
     await until(() => bossCh.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');
   });
+
+  go({ t: 'battle', on: false });
+  S.auto.act = false; push();
+  const onPage = async (p, sel) => { // abre as páginas do jogador até achar o elemento
+    for (const pg of ['mesa', 'pers', 'hab', 'ofi', 'itens', 'hist']) { if (await p.locator(sel).count()) return true; await p.click(`[data-pg=${pg}]`).catch(() => {}); await sleep(120); }
+    return (await p.locator(sel).count()) > 0;
+  };
+
+  await section('pedido de rolagem: aprovação com Vantagem e Desvantagem', async () => {
+    for (const adv of ['adv', 'dis']) {
+      await ana.click('[data-pg=mesa]'); await until(() => vis(ana, '.qr button'), 'botões de rolagem da Ana');
+      await ana.locator('.qr button').first().click();
+      await until(() => vis(ana, '.bsheet'), 'folha de rolagem');
+      await click(ana, '.bsheet [data-a=rollMod][data-v="10"]', 'modificador +10');
+      await click(ana, '.bsheet [data-a=rollGo]', 'pedir ao mestre');
+      await until(() => vis(ana, '.reqbar'), 'faixa "Aguardando o mestre" no jogador');
+      await until(() => vis(gmP, '.rq'), 'pedido na faixa do mestre');
+      check(/rolar FOR \+10/.test(await txt(gmP, '.rq .rq-t span')), 'texto do pedido deveria citar o modificador');
+      await click(gmP, `.rq [data-a=rqAdv][data-v=${adv}]`, adv === 'adv' ? 'Vantagem' : 'Desvantagem');
+      check(await gmP.locator(`.rq [data-a=rqAdv][data-v=${adv}]`).getAttribute('aria-pressed') === 'true', 'botão de ' + adv + ' deveria ficar marcado');
+      const n = S.log.length;
+      await click(gmP, '.rq [data-a=rqOk]', 'Aprovar');
+      await until(() => S.log.length > n && /FOR \d+% → \d+/.test(S.log.at(-1).text), 'rolagem executada');
+      check(new RegExp(adv === 'adv' ? 'vantagem' : 'desvantagem').test(S.log.at(-1).text), `registro deveria citar ${adv}: ${S.log.at(-1).text}`);
+      await until(async () => !(await vis(ana, '.reqbar')), 'faixa de espera some após aprovar');
+      await until(() => vis(ana, '.toast'), 'aviso "Aprovado" no jogador');
+    }
+    // negar com motivo
+    await ana.locator('.qr button').first().click(); await click(ana, '.bsheet [data-a=rollGo]', 'pedir');
+    await until(() => vis(gmP, '.rq'), 'segundo pedido');
+    gmP.once('dialog', d => d.accept('sem clima agora')); await click(gmP, '.rq [data-a=rqWhy]', 'Negar com motivo');
+    await until(() => !Object.keys(S.reqs).length, 'pedido negado sai da fila');
+    await shot(ana, 'rolagem'); await shot(gmP, 'pedidos');
+  });
+
+  await section('acampamento: conversar com alguém', async () => {
+    go({ t: 'camp', on: true });
+    ana.setViewportSize?.({ width: 390, height: 844 });
+    check(await onPage(ana, '[data-a=campWith]'), 'seletor "Conversar com" não apareceu para a Ana');
+    await click(ana, '[data-a=campAct][data-k=conversar]', 'ação Conversar');
+    await until(() => Object.keys(S.reqs).length, 'pedido de acampamento (sem parceiro ainda)');
+    await ana.selectOption('select[data-a=campWith]', mikhail.id);
+    await until(() => Object.values(S.reqs)[0]?.m.w === mikhail.id, 'a escolha do parceiro vai junto no pedido pendente');
+    check(/acampamento: conversar/.test(Object.values(S.reqs)[0]?.text || ''), 'texto do pedido de acampamento');
+    await click(gmP, '.rq [data-a=rqOk]', 'Aprovar acampamento');
+    await until(() => S.camp.acts[shinkai.id] === 'conversar', 'ação registrada no acampamento');
+    check(S.camp.with?.[shinkai.id] === mikhail.id, 'o "conversar com" deveria guardar a Mikhail: ' + JSON.stringify(S.camp.with));
+    const san0 = shinkai.san; shinkai.san = 5; push();
+    go({ t: 'rest', long: true });
+    check(shinkai.san > 5 && /laço|Mikhail/.test(battleLog()), 'descanso longo deveria render Sanidade e laço');
+    check(Object.values(S.bonds || {}).some(v => v >= 1), 'laço entre Shinkai e Mikhail deveria subir');
+    await shot(ana, 'acampamento');
+    go({ t: 'camp', on: false });
+  });
+
+  await section('aba Ofícios do jogador', async () => {
+    check(/Nenhuma Iniciação/.test(await (async () => { await ana.click('[data-pg=ofi]'); return txt(ana, '.ofi'); })()), 'sem Iniciação deveria avisar');
+    go({ t: 'ofiAw', id: shinkai.id, per: 'forja' }); go({ t: 'set', id: shinkai.id, f: 'po', v: 12 });
+    await until(() => vis(ana, '.oper'), 'cartão da perícia Forja');
+    const po0 = shinkai.po;
+    S.auto.learn = true; push();
+    const btn = ana.locator('.onode.av button[data-a=ofiLearn]:not([disabled])').first();
+    check(await btn.count() > 0, 'deveria haver um nó aprendível');
+    await btn.click();
+    await until(() => (shinkai.pof || []).length > 0, 'nó de ofício aprendido');
+    check(shinkai.po < po0, 'Pontos de Ofício deveriam ser gastos');
+    await until(async () => (await ana.locator('.onode.own').count()) > 0, 'nó marcado como aprendido');
+    await shot(ana, 'oficios'); await ana.evaluate(() => scrollTo(0, 99999)); await shot(ana, 'oficios-fim');
+    const row = ana.locator('.oact').first();
+    if (await row.count()) { // ação de perícia: escolhe o que ela pede e usa
+      for (const sel of await row.locator('select').all()) { const v = await sel.locator('option:not([value=""])').first().getAttribute('value').catch(() => null); if (v) await sel.selectOption(v); }
+      S.auto.roll = true; push(); const n = S.log.length; await row.locator('[data-a=ofiUse]').click();
+      await until(() => S.log.length > n, 'ação de ofício executada');
+    }
+  });
+
+  // ---------- celular: transbordo, sobreposição e alvos de toque ----------
+  async function phoneAudit(p, label) {
+    const out = [];
+    for (const pg of ['mesa', 'pers', 'hab', 'ofi', 'itens', 'hist']) {
+      await p.click(`[data-pg=${pg}]`); await sleep(250); await p.evaluate(() => scrollTo(0, 0));
+      const r = await p.evaluate(() => {
+        const W = innerWidth, bad = [], vis = e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+        const nav = document.querySelector('.tnav')?.getBoundingClientRect();
+        const over = document.documentElement.scrollWidth - W;
+        // elementos que passam da borda direita (ignora o que rola dentro de um contêiner próprio)
+        const sideways = [...document.querySelectorAll('#app *')].filter(e => { if (!vis(e)) return false; const r = e.getBoundingClientRect(); if (r.right <= W + 1) return false; for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === 'auto' || o === 'scroll' || o === 'hidden' || o === 'clip') return false; } return true; }).slice(0, 4).map(e => e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0] + ' ' + Math.round(e.getBoundingClientRect().right));
+        const small = [...document.querySelectorAll('#app button,#app select,#app [data-a]:not(div):not(section),#app [data-pg]')].filter(e => vis(e) && !e.disabled && e.closest('.stage') === null).filter(e => { const r = e.getBoundingClientRect(); return r.height < 34 || r.width < 34; }).slice(0, 6).map(e => (e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0] + ' "' + (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 14) + '" ' + Math.round(e.getBoundingClientRect().width) + '×' + Math.round(e.getBoundingClientRect().height)));
+        const navWrap = nav ? nav.height : 0;
+        return { over, sideways, small, navWrap, W };
+      });
+      if (r.over > 1) out.push(`${pg}: página ${r.over}px mais larga que a tela`);
+      if (r.sideways.length) out.push(`${pg}: passa da borda: ${r.sideways.join(', ')}`);
+      if (r.small.length) out.push(`${pg}: botões pequenos: ${r.small.join(' | ')}`);
+      if (r.navWrap > 90) out.push(`${pg}: a barra de navegação ocupa ${Math.round(r.navWrap)}px (quebrou em duas linhas)`);
+      // o fim da página não pode ficar escondido atrás da barra de navegação
+      const hid = await p.evaluate(async () => { scrollTo(0, 1e6); await new Promise(r => setTimeout(r, 80)); const nav = document.querySelector('.tnav')?.getBoundingClientRect(), last = [...document.querySelectorAll('#app main > *, #app main section')].filter(e => e.getBoundingClientRect().height > 0).at(-1)?.getBoundingClientRect(); return nav && last ? Math.round(last.bottom - nav.top) : 0; });
+      if (hid > 2) out.push(`${pg}: o fim da página fica ${hid}px atrás da barra de navegação`);
+      await shot(p, `${label}-${pg}`);
+    }
+    return out;
+  }
+  await section('celular (fora da batalha)', async () => { const o = await phoneAudit(ana, 'cel'); o.forEach(m => check(false, 'celular: ' + m)); });
+  go({ t: 'battle', on: true });
+  await until(() => vis(ana, '.cmd'), 'batalha na tela do celular');
+  await section('celular (em batalha)', async () => { const o = await phoneAudit(ana, 'cel-batalha'); o.forEach(m => check(false, 'celular em batalha: ' + m)); });
+  go({ t: 'battle', on: false });
 
 } finally {
   for (const c of opened) await c.close().catch(() => {});

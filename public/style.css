@@ -607,3 +607,11 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
 /* faixa de clima, Cadeia e Domínio dentro do palco (mestre e mesa); o jogador a vê no painel de comandos */
 .stage>.fbar{position:absolute;left:1cqw;right:1cqw;bottom:.4rem;margin:0;z-index:3;pointer-events:none;text-shadow:0 1px 3px #000}
 .stage>.fbar span{background:rgba(0,0,0,.55)}
+
+/* celular: 7 abas na barra de baixo (6 páginas + Chat), alvos de toque de 40px, fim da página livre da barra e do botão Agir */
+@media(max-width:999px){
+  .top .tnav{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .top .tnav button{font-size:10.5px;letter-spacing:.2px;padding:6px 0}.top .tnav button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body:not([data-role=table]) .banner,body:not([data-role=table]) .banner.me{top:64px;bottom:auto;font-size:20px;padding:4px 24px 4px 44px}
+}
+@media(max-width:600px){#app button,#app select,#app .tog{min-height:40px}#app .tnav button{min-height:58px}}
