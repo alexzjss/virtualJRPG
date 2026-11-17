@@ -224,5 +224,17 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  // ----- comandos de ação (Aparar, Esquiva e minigames de ataque): regras puras usadas pelo servidor e pela tela -----
+  const CMD = {
+    KINDS: ['tempo', 'martelar', 'segurar', 'seq', 'ritmo', 'mira', 'runa', 'choque'],
+    RUNES: ['circulo', 'triangulo', 'raio', 'espiral', 'estrela', 'onda'],
+    DEF: { beat: 1100, esq: 450, grace: 200, gap: 700 },
+    // zona do aperto na janela de defesa; left = ms até o impacto (negativo = depois dele)
+    gradeDef(left, par, esq, canParry) {
+      if (left < -CMD.DEF.grace) return 'late';
+      if (left <= par) return canParry ? 'par' : esq > 0 ? 'esq' : 'late';
+      return esq > 0 && left <= par + esq ? 'esq' : 'cedo';
+    },
+  };
+  g.RULES = { CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

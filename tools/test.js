@@ -984,3 +984,27 @@ test('leva 3: Aparar — janela aberta pela IA, acerto anula o golpe e dá Aura;
   await new Promise(r => setTimeout(r, 1900)); assert.ok(S.log.some(l => /fora do tempo|errou/.test(l.text || '')));
   reset(); const h3 = mk(ana, {}), e3 = mk(gm, { enemy: true }); derive(h3); H.battle(gm, { on: true }); while (current() !== e3.id) H.next(gm); H.ai(gm); assert.ok(!S.battle.parry, 'sem nó de Aparar, sem janela');
 });
+
+test('comandos: expand valida campos e gradeDef decide a zona', async () => {
+  const { expand } = await import('../content.js');
+  assert.throws(() => expand({ n: 'X', k: 'dmg', cmd: 'dança' }), /cmd/);
+  assert.throws(() => expand({ n: 'X', k: 'dmg', cmd: 'seq', seq: '↑x' }), /seq/);
+  assert.throws(() => expand({ n: 'X', k: 'dmg', cmd: 'runa', rn: 'quadrado' }), /rn/);
+  assert.equal(expand({ n: 'X', k: 'dmg', cmd: 'tempo', pf: 'st bleed 2' }).pf[0].t, 'st');
+  const g = RU.CMD.gradeDef;
+  assert.equal(g(100, 300, 450, true), 'par'); assert.equal(g(100, 300, 450, false), 'esq');
+  assert.equal(g(500, 300, 450, true), 'esq'); assert.equal(g(800, 300, 450, true), 'cedo');
+  assert.equal(g(-150, 300, 450, true), 'par'); assert.equal(g(-250, 300, 450, true), 'late');
+  assert.equal(g(500, 300, 0, true), 'cedo', 'sem golpe anunciado não há esquiva');
+});
+
+test('IA: aiPlan não muda o estado e aiRun executa o plano; alvo caído é replanejado', async () => {
+  const { aiPlan, aiRun } = await import('../server.js');
+  reset(); const h = mk(ana, {}), h2 = mk(bia, {}), e = mk(gm, { enemy: true }); e.skills = []; e.attrs.AGI = 99; h.attrs.AGI = 1; h2.attrs.AGI = 1; derive(h); derive(h2); derive(e);
+  H.battle(gm, { on: true }); while (current() !== e.id) H.next(gm);
+  const logN = S.log.length, hp = [h.hp, h2.hp], ticks = JSON.stringify(S.battle.ticks), plan = aiPlan(e);
+  assert.equal(plan.skill, 'atk'); assert.deepEqual(plan.tgs, [plan.target]); assert.ok([h.id, h2.id].includes(plan.target));
+  assert.equal(S.log.length, logN); assert.deepEqual([h.hp, h2.hp], hp); assert.equal(JSON.stringify(S.battle.ticks), ticks);
+  const other = plan.target === h.id ? h2 : h; S.chars[plan.target].hp = 0; // o alvo planejado cai durante a janela
+  const hpO = other.hp; aiRun(e, plan); assert.ok(other.hp < hpO, 'o outro herói leva o golpe');
+});

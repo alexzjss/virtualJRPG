@@ -81,7 +81,7 @@ const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; retu
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
 const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : sc.startsWith('wt:') ? !!(s.basic || s.req || s.wpn) && wtype(ch) === sc.slice(3) : s.el === sc; // wt:<tipo> = maestria de um tipo de arma
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
-  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0, bf: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
+  const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0, bf: 0, cw: 0, cp: 0, mx: 0, cz: 0, ma: 0, esq: 0, par: 0, chq: 0, rit: 0, ctr: 0, rn: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
   const f = ch.form && ch.st?.form && SK(ch.form); if (f?.form) add(f.form.m);
   if (vows(ch).includes('tempo')) m.hit += 15;
@@ -630,9 +630,10 @@ function iaExtra(a, usable) {
   return false;
 }
 // IA: Limite, transformação, reerguer caído, curar, purificar, invocar, buffs, dano; serve para inimigos e invocações
-function aiAct(a) {
+// IA do inimigo em duas fases: aiPlan decide (sem efeito visível) e aiRun age; a janela de defesa abre entre as duas
+function aiPlan(a) {
   const all = battlers(), alive = all.filter(o => o.hp > 0), foesAll = alive.filter(o => o.enemy !== a.enemy), mates = alive.filter(o => o.enemy === a.enemy);
-  if (!foesAll.length) return endTurn(a.id);
+  if (!foesAll.length) return null;
   const foes = foesAll.filter(o => !o.st.stealth || a.st.focus).length ? foesAll.filter(o => !o.st.stealth || a.st.focus) : foesAll;
   const K = SK, has = (k, t) => K(k).fx?.some(f => f.t === t), pw = k => K(k).power * (K(k).hits || 1) * (K(k).area ? 1.5 : 1);
   const strong = l => { const o = [...l].sort((x, y) => pw(y) - pw(x)); return Math.random() < .6 ? pick(o.slice(0, 3)) : pick(o); }; // repertório grande: prefere os golpes mais fortes
@@ -645,7 +646,7 @@ function aiAct(a) {
   const sick = mates.find(o => RU.NEG.filter(k => o.st[k]).length >= 2);
   const tgt = Math.random() < R.aiFocus ? [...foes].sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
   if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
-  if (!lim && R.iaExtra && a.ia && iaExtra(a, usable)) return;
+  const ia = !lim && R.iaExtra && a.ia ? usable : null;
   let skill = 'atk', t = tgt;
   if (lim) skill = lim;
   else if (forms.length && !a.form && (a.rage || Math.random() < .2)) { skill = pick(forms); t = a; }
@@ -659,8 +660,19 @@ function aiAct(a) {
   const ks = K(skill);
   if (ks && ['heal', 'util'].includes(ks.kind) && t?.enemy !== a.enemy) t = has(skill, 'revive') && fallen.length ? fallen[0] : ks.power ? hurt0 : pick(mates); // cura e suporte (inclusive o Limite) vão para o próprio lado
   if (ks && (ks.tg === 'self' || ks.kind === 'form')) t = a;
-  if (!t || !doAct(a, { skill, target: t.id })) { if (!doAct(a, { skill: 'atk', target: tgt.id })) endTurn(a.id); }
+  if (!t) { skill = 'atk'; t = tgt; }
+  const sk0 = skill === 'atk' ? basicOf(a) : K(skill), self = t === a || sk0?.tg === 'self' || sk0?.kind === 'form';
+  const tgs = self || !sk0 || ['heal', 'util'].includes(sk0.kind) ? [] : sk0.area ? foesAll.map(o => o.id) : [t.id];
+  return { skill, target: t.id, tgt: tgt.id, tgs, ia };
 }
+function aiRun(a, plan) {
+  if (!plan) return endTurn(a.id);
+  const T = S.battle.ticks, dead = id => !S.chars[id] || !(id in T) || (S.chars[id].hp <= 0 && S.chars[id].enemy !== a.enemy);
+  if (plan.target !== a.id && dead(plan.target)) { plan = aiPlan(a); if (!plan) return endTurn(a.id); } // o alvo caiu durante a janela: escolhe de novo
+  if (plan.ia && iaExtra(a, plan.ia)) return;
+  if (!doAct(a, { skill: plan.skill, target: plan.target })) { if (!doAct(a, { skill: 'atk', target: plan.tgt })) endTurn(a.id); }
+}
+const aiAct = a => aiRun(a, aiPlan(a));
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
   color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
@@ -738,4 +750,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { parriers, parNode, BASE, SK, addLimit, aiAct, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { parriers, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

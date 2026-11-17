@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import { SEA } from './src/config.js';
 import { R } from './src/consts.js';
 import { S, fresh, migrateItems, backupOnStart } from './src/state.js';
-import { genFoe, partyRef, fitBoss, spawn, current, derive, order, prep, modsOf, slotMax, basicOf } from './src/rules.js';
+import { genFoe, partyRef, fitBoss, spawn, current, derive, order, prep, modsOf, slotMax, basicOf, aiPlan, aiRun } from './src/rules.js';
 import { seed } from './src/seed.js';
 import { H } from './src/handlers.js';
 import { view, handle, start, server, push } from './src/net.js';
@@ -15,7 +15,7 @@ import { fix, importPack, autoBackup } from './src/campaign.js';
 
 if (fresh) { seed(); fix(); }
 prep();
-export { genFoe, partyRef, fitBoss, spawn, H, S, R, current, derive, view, order, handle, migrateItems, importPack, modsOf, slotMax, server, push, basicOf }; // server e push: o teste de interface (tools/ui-smoke.js) sobe o jogo no mesmo processo
+export { aiPlan, aiRun, genFoe, partyRef, fitBoss, spawn, H, S, R, current, derive, view, order, handle, migrateItems, importPack, modsOf, slotMax, server, push, basicOf }; // server e push: o teste de interface (tools/ui-smoke.js) sobe o jogo no mesmo processo
 if (process.argv.includes('--offline')) process.env.VJ_TUNNEL = '0'; // npm run offline: sem túnel
 export const boot = () => { backupOnStart(); autoBackup(); start(); };
 if (SEA || process.argv[1] === fileURLToPath(import.meta.url)) boot();
