@@ -854,6 +854,43 @@ test('núcleo Marcial e raízes dos setores: abertos sem exigir vizinho aprendid
   const susRoot = Object.keys(S.skills).find(k => S.skills[k].el === 'susanoo' && S.skills[k].root);
   assert.match(RU.whyNot(h, S.skills[susRoot], S.skills, S.items, susRoot, true), /Vínculo/);
 });
+// par do mesmo setor vizinho na grade mas sem ligação (existe entre ramos que se encostam)
+const unlinkedPair = el => { const ids = Object.keys(S.skills).filter(k => S.skills[k].el === el && !S.skills[k].open && !S.skills[k].pre && !S.skills[k].rq && !S.skills[k].nb && !S.skills[k].cs && !S.skills[k].ex && !S.skills[k].aw && !S.skills[k].v2);
+  for (const a of ids) for (const b of ids) if (a !== b && RU.near(S.skills[a], S.skills[b]) && !S.skills[a].ln.includes(b) && !S.skills[b].ln.some(j => RU.near(S.skills[j], S.skills[a]) && S.skills[a].ln.includes(j))) return [a, b];
+};
+test('regras: vizinho de grade sem ligação não basta; ligação basta', () => {
+  reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; h.xp = 999; const [a, b] = unlinkedPair('kagutsuchi');
+  h.skills = [a]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), 'Precisa de um nó vizinho já aprendido.');
+  h.skills = [S.skills[b].ln[0]]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), '');
+});
+test('regras: skill do mestre sem ln encostada na grade continua aprendível', () => {
+  reset(); const h = mk(ana, {}); h.xp = 999; const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const nid = Object.keys(S.skills).find(k => !before.has(k));
+  const used = new Set(Object.values(S.skills).map(s => s.gx + ',' + s.gy)); let spot, host;
+  for (const k of Object.keys(S.skills).filter(k => S.skills[k].el === 'fis' && k !== nid)) { const s = S.skills[k]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!spot && !used.has((s.gx + dx) + ',' + (s.gy + dy))) { spot = [s.gx + dx, s.gy + dy]; host = k; } }
+  Object.assign(S.skills[nid], { gx: spot[0], gy: spot[1] }); h.skills = [host];
+  assert.equal(RU.whyNot(h, S.skills[nid], S.skills, S.items, nid), '');
+  delete S.skills[nid];
+});
+test('regras: save antigo mantém as skills e sempre deixa algo para aprender', async () => {
+  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; h.xp = 999;
+  const cur = S.skills, picks = Object.keys(cur).filter(k => cur[k].el === 'kagutsuchi' && cur[k].br && /-[0-5]$/.test(cur[k].br)).filter((k, i, a) => a.findIndex(j => cur[j].br === cur[k].br) === i).slice(0, 6);
+  const old = Object.fromEntries(Object.entries(cur).map(([k, s]) => ['o' + k, { ...s, ln: undefined }])); h.skills = picks.map(k => 'o' + k);
+  const names = picks.map(k => cur[k].name).sort(); S.skills = old; S.skillsSig = 'antiga'; migrate(false);
+  assert.deepEqual(h.skills.map(k => S.skills[k].name).sort(), names);
+  assert.ok(Object.keys(S.skills).some(k => !h.skills.includes(k) && RU.whyNot(h, S.skills[k], S.skills, S.items, k) === ''));
+});
+test('importar pacote com skill de mesmo nome mantém ligações e posição', async () => {
+  const { importPack } = await import('../server.js'); const id = sk('Brasa Viva'), s0 = structuredClone(S.skills[id]);
+  importPack({ vj: 'conteudo', skills: { a: { name: 'Brasa Viva', kind: 'dmg', el: 'kagutsuchi', power: 99 } } });
+  const s = S.skills[id]; assert.equal(s.power, 99); assert.deepEqual(s.ln, s0.ln); assert.equal(s.wx, s0.wx); assert.equal(s.wy, s0.wy);
+  S.skills[id] = s0;
+});
+test('segredo: silhueta leva ln, wx, wy; vizinho de grade sem ligação continua escondido', async () => {
+  const net = await import('../src/net.js'); reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; const [a, b] = unlinkedPair('kagutsuchi'); h.skills = [a];
+  const hid = net.hiddenSkills({ role: 'player', name: 'Ana' }); assert.ok(hid.includes(b), 'vizinho sem ligação à vista');
+  const sks = JSON.parse(net.defsFor({ role: 'player', name: 'Ana' }, net.curDefs()).json).skills, o = S.skills[b];
+  assert.equal(sks[b].name, '???'); assert.deepEqual(sks[b].ln, o.ln); assert.equal(sks[b].wx, o.wx); assert.equal(sks[b].wy, o.wy);
+});
 test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo', async () => {
   const net = await import('../src/net.js'); reset();
   const h = mk(ana, {}); h.vinc = ['indra']; h.skills = [sk('Faísca')];

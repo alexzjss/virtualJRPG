@@ -91,7 +91,7 @@ function importPack(p) {
   const map = { skills: {}, items: {}, best: {} }, n = { skills: 0, items: 0, best: 0, enc: 0 };
   for (const coll of ['skills', 'items']) for (const [k, o] of Object.entries(p[coll] || {}).slice(0, 2000)) {
     const d = cleanDef(coll, o), cur = Object.keys(S[coll]).find(id => S[coll][id].name === d.name), id = cur || rid();
-    if (coll === 'skills' && cur) { d.gx = S.skills[cur].gx; d.gy = S.skills[cur].gy; } // quem já está na grade fica onde está
+    if (coll === 'skills' && cur) for (const f of ['gx', 'gy', 'wx', 'wy', 'ln']) if (S.skills[cur][f] !== undefined) d[f] = S.skills[cur][f]; // quem já está na grade fica onde está, com as mesmas ligações
     S[coll][id] = d; map[coll][k] = id; n[coll]++;
   }
   for (const [k, o] of Object.entries(p.bestiary || {}).slice(0, 500)) {
