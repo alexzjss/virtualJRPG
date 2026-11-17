@@ -26,6 +26,7 @@ const opened = [];
 async function open(who, route, { phone = false, login } = {}) {
   const ctx = await browser.newContext(phone ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' } : { viewport: { width: 1280, height: 800 } });
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' })); // sem internet: a fonte cai no padrão
+  await ctx.addInitScript(() => { window.__osc = 0; const AC = window.AudioContext; if (AC) window.AudioContext = class extends AC { createOscillator() { window.__osc++; return super.createOscillator(); } }; }); // conta os sons sintetizados
   const page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error') { logs.push(`[${who}] console: ${m.text()}`); } });
   page.on('pageerror', e => logs.push(`[${who}] erro de página: ${e.message}`));
@@ -55,9 +56,9 @@ const foesOf = () => Object.values(S.chars).filter(c => c.enemy);
 const boss = Object.keys(S.bestiary).find(k => S.bestiary[k].boss);
 H.bSpawn(gmc, { id: boss, n: 1 }); H.bSpawn(gmc, { id: bestId('Diabrete de Cinzas') || Object.keys(S.bestiary)[2], n: 1 });
 const [bossCh, minion] = [foesOf().find(c => c.boss), foesOf().find(c => !c.boss)];
-for (const f of foesOf()) { f.attrs.AGI = 1; f.hp = f.hpMax = 9999; } // inimigos lentos e duráveis: o roteiro controla o ritmo
+for (const f of foesOf()) { f.attrs.AGI = 1; f.bon.hpMax = 9999; } // inimigos lentos e duráveis (o máximo é recalculado a cada push, daí o bônus)
 H.weather(gmc, { k: Object.keys(globalThis.RULES.CLIMA)[0] });
-push();
+push(); for (const f of foesOf()) f.hp = f.hpMax; push();
 
 try {
   // ---------- telas abertas ----------
@@ -76,6 +77,7 @@ try {
   const battleLog = () => S.log.map(l => l.text).join('\n');
   S.auto.act = true; // aprovar combate sozinho: o foco aqui é a tela do jogador; a fila de pedidos tem bloco próprio
   go({ t: 'battle', on: true });
+  for (const f of foesOf()) go({ t: 'ini', k: 'set', id: f.id, v: 1e6 }); // inimigos só agem quando o roteiro quiser: Derrubado e Quebra não expiram
   const tgBtn = (p, id) => p.locator(`.cmd .tg[data-tgt="${id}"]`);
 
   await section('batalha: tela do jogador abre no turno certo', async () => {
@@ -103,6 +105,29 @@ try {
     const wx = Object.keys(globalThis.RULES.CLIMA)[1];
     await click(gmP, `[data-a=weather][data-k="${wx}"]`, 'chip de clima do mestre');
     await until(async () => (await txt(ana, '.fbar .wx')).includes(globalThis.RULES.CLIMA[wx][0]), 'clima trocado pelo mestre aparece no jogador');
+  });
+
+  await section('som e animação: Tensão, Dívida de Coragem, Cadeia e Domínio', async () => {
+    const osc = p => p.evaluate(() => window.__osc), noise = async (p, f) => { const n = await osc(p); await f(); push(); await sleep(350); return (await osc(p)) - n; };
+    check(await noise(ana, () => { shinkai.ten = 2; }) > 0, 'Tensão deveria tocar um som');
+    check(await vis(ana, '.unit.ten2') && /Tensão ×2/.test(await txt(ana, '.unit.ten2 .rit')), 'unidade com Tensão 2 deveria ganhar a classe ten2');
+    check(await ana.locator('.unit.ten2 .figw').evaluate(e => getComputedStyle(e).animationName) === 'tenGlow', 'Tensão deveria brilhar (animação tenGlow)');
+    check(await noise(ana, () => { shinkai.ten = 0; shinkai.brv = -1; }) > 0, 'Dívida de Coragem deveria tocar um som');
+    check(await vis(ana, '.unit.debt') && await vis(ana, '.rhythm [data-a=braveT].debt'), 'Dívida: unidade e botão de Coragem deveriam ficar vermelhos');
+    check(await ana.locator('.unit.debt .figw').evaluate(e => getComputedStyle(e).animationName) === 'debtPulse', 'Dívida deveria pulsar');
+    check(await noise(ana, () => { shinkai.brv = 0; S.battle.chain.h = 40; }) > 0, 'Cadeia subindo deveria tocar um tique');
+    check(await noise(ana, () => { S.battle.chain.h = 100; }) > 0, 'Cadeia cheia deveria tocar o acorde');
+    check(await vis(ana, '.fbar .chain.full'), 'Cadeia cheia deveria ganhar a classe full');
+    check(await noise(mesa, () => { S.battle.dom = { by: mikhail.id, side: false, name: 'Domínio Teste', ttl: 3, ally: [], foe: [], pow: 50 }; }) > 0, 'Domínio abrindo deveria tocar na mesa');
+    check(await vis(mesa, '.stage.dom-on .domfx'), 'mesa: o palco deveria escurecer com o Domínio');
+    check(await noise(mesa, () => { delete S.battle.dom; }) > 0, 'Domínio acabando deveria tocar na mesa');
+    // som desligado: nada toca
+    await ana.click('[data-a=meT]'); await ana.click('.pop [data-a=mute]');
+    check(await noise(ana, () => { shinkai.ten = 1; }) === 0, 'com o som desligado nada deveria tocar');
+    shinkai.ten = 0; S.battle.chain.h = 0; push();
+    check(/ligar som/i.test(await txt(ana, '.pop')), 'o menu deveria oferecer Ligar som');
+    await ana.click('.pop [data-a=mute]'); await ana.click('[data-a=meT]'); // liga de novo e fecha o menu
+    await shot(ana, 'sons');
   });
 
   await section('Defender, Concentrar e Coragem', async () => {
@@ -155,10 +180,10 @@ try {
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
     const hero = S.chars[current()], pg = hero.owner === 'ana' ? ana : bia;
     await until(async () => await pg.locator('.rhythm [data-a=allOut]').isEnabled(), 'Ataque Total liberado com todos Derrubados');
-    const hp1 = bossCh.hp;
+    const hp1 = bossCh.hp + minion.hp;
     await click(pg, '.rhythm [data-a=allOut]', 'Ataque Total');
     await until(() => /ATAQUE TOTAL|Ataque Total/i.test(battleLog()), 'registro do Ataque Total');
-    await until(() => bossCh.hp < hp1, 'Ataque Total causou dano');
+    await until(() => bossCh.hp + minion.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');
   });
 
@@ -201,7 +226,7 @@ try {
     ana.setViewportSize?.({ width: 390, height: 844 });
     check(await onPage(ana, '[data-a=campWith]'), 'seletor "Conversar com" não apareceu para a Ana');
     await click(ana, '[data-a=campAct][data-k=conversar]', 'ação Conversar');
-    await until(() => Object.keys(S.reqs).length, 'pedido de acampamento (sem parceiro ainda)');
+    await until(() => vis(ana, '.reqbar'), 'pedido de acampamento (sem parceiro ainda) chegou na tela da Ana');
     await ana.selectOption('select[data-a=campWith]', mikhail.id);
     await until(() => Object.values(S.reqs)[0]?.m.w === mikhail.id, 'a escolha do parceiro vai junto no pedido pendente');
     check(/acampamento: conversar/.test(Object.values(S.reqs)[0]?.text || ''), 'texto do pedido de acampamento');

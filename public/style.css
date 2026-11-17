@@ -615,3 +615,19 @@ body[data-role=table] .rollfx.atk{bottom:auto;top:13vh;left:auto;right:3vw;trans
   body:not([data-role=table]) .banner,body:not([data-role=table]) .banner.me{top:64px;bottom:auto;font-size:20px;padding:4px 24px 4px 44px}
 }
 @media(max-width:600px){#app button,#app select,#app .tog{min-height:40px}#app .tnav button{min-height:58px}}
+
+/* Tensão (brilho que cresce por nível), Dívida de Coragem (pulso vermelho), Cadeia cheia e Domínio aberto */
+.unit.ten1 .figw,.unit.ten2 .figw,.unit.ten3 .figw{animation:tenGlow var(--tp,1.3s) ease-in-out infinite alternate}
+.unit.ten1{--tp:1.3s;--tg:.7cqw;--tc:#ffd24a}.unit.ten2{--tp:.8s;--tg:1.2cqw;--tc:#ff9f1c}.unit.ten3{--tp:.4s;--tg:1.8cqw;--tc:#fff1a8}
+@keyframes tenGlow{from{filter:drop-shadow(.5cqw .6cqw 0 #000) drop-shadow(0 0 calc(var(--tg) * .4) var(--tc))}to{filter:drop-shadow(.5cqw .6cqw 0 #000) drop-shadow(0 0 var(--tg) var(--tc)) drop-shadow(0 0 calc(var(--tg) * 2) var(--tc))}}
+.unit.ten1 .rit,.unit.ten2 .rit,.unit.ten3 .rit{color:var(--tc);font-weight:700}
+.unit.debt .figw{animation:debtPulse 1s ease-in-out infinite alternate}
+@keyframes debtPulse{from{filter:drop-shadow(.5cqw .6cqw 0 #000) saturate(.8)}to{filter:drop-shadow(.5cqw .6cqw 0 #000) drop-shadow(0 0 1.1cqw #e4002b) saturate(.6) brightness(.85)}}
+.unit.debt .rit{color:#ff5a5a;font-weight:700;animation:pulse .6s infinite alternate}
+.rhythm button.debt{color:#ff7a7a;border-color:#e4002b;animation:pulse .7s infinite alternate}
+.fbar .chain.full{color:#ffd24a;font-weight:700;animation:chainFull .45s ease-in-out infinite alternate}
+@keyframes chainFull{from{box-shadow:0 0 0 0 #ffd24a00}to{box-shadow:0 0 .9rem 2px #ffd24a99}}
+.fbar .dom{animation:domChip 1.2s ease-in-out infinite alternate}
+@keyframes domChip{from{box-shadow:0 0 0 0 #ff7a5900}to{box-shadow:0 0 .8rem 2px #ff7a5999}}
+.stage .domfx{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 38%,#5b21b6aa 100%);mix-blend-mode:screen;animation:domBreath 2.2s ease-in-out infinite alternate}
+@keyframes domBreath{from{opacity:.45}to{opacity:1}}

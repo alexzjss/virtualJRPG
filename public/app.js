@@ -107,6 +107,33 @@ const edv = (c, f, v, cls = '') => !gm ? `<span class="${cls}">${v}</span>` : ed
 const commitEd = el => { const cur = +el.dataset.cur, raw = el.value.trim().replace(',', '.'), v = /^[+-]\d+$/.test(raw) ? cur + +raw : +raw; editing = null; if (raw !== '' && Number.isFinite(v) && v !== cur) send({ t: 'set', id: el.dataset.id, f: el.dataset.edin, v: Math.max(0, Math.round(v)) }); render(); };
 let actx; const beep = () => { try { actx ||= new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime; o.type = 'triangle'; o.frequency.setValueAtTime(660, t); o.frequency.setValueAtTime(880, t + .09); g.gain.setValueAtTime(.12, t); g.gain.exponentialRampToValueAtTime(.001, t + .3); o.connect(g).connect(actx.destination); o.start(); o.stop(t + .32); } catch {} };
 
+// ===== som dos sistemas de ritmo: Tensão, Dívida de Coragem, Cadeia e Domínio (Web Audio sintetizado; respeita o botão de som) =====
+// as animações são por estado (classes ten1-3, debt, chain.full, dom-on): sobrevivem ao redesenho; o som toca só na mudança
+const tone = (seq, { type = 'triangle', vol = .08 } = {}) => {
+  if (mute) return;
+  try { actx ||= new AudioContext(); actx.resume?.(); const t0 = actx.currentTime; for (const [f, at, d, f2] of seq) { const o = actx.createOscillator(), g = actx.createGain(), t = t0 + at; o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + d); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + .03); } } catch {}
+};
+const SFX = {
+  tensao: n => tone([[330 * 1.26 ** n, 0, .12], [495 * 1.26 ** n, .08, .18]]), // sobe a cada nível acumulado
+  divida: () => tone([[240, 0, .32, 80]], { type: 'sawtooth', vol: .06 }), // grave que cai: ficou devendo tempo
+  cadeia: h => tone([[500 + h * 4, 0, .07]], { vol: .04 }),
+  cadeiaCheia: () => tone([[523, 0, .1], [659, .09, .1], [784, .18, .1], [1047, .27, .32]], { type: 'square', vol: .045 }),
+  dominio: () => tone([[110, 0, 1, 260], [165, .08, 1, 390]], { type: 'sawtooth', vol: .055 }),
+  dominioFim: () => tone([[330, 0, .6, 70]], { vol: .07 }),
+};
+let fxPrev = null;
+function fxWatch() {
+  const B = S.battle;
+  if (!B.active) { fxPrev = null; return; }
+  const now = { u: {}, h: B.chain?.h || 0, dom: B.dom?.name || '' };
+  for (const c of Object.values(S.chars)) if (!c.enemy && c.id in B.ticks) now.u[c.id] = { brv: c.brv || 0, ten: c.ten || 0 };
+  const was = fxPrev; fxPrev = now;
+  if (!was) return;
+  for (const [id, n] of Object.entries(now.u)) { const o = was.u[id]; if (!o) continue; if (n.ten > o.ten) SFX.tensao(n.ten); if (n.brv < 0 && n.brv < o.brv) SFX.divida(); }
+  if (now.h > was.h) now.h >= 100 ? SFX.cadeiaCheia() : SFX.cadeia(now.h);
+  if (now.dom && !was.dom) SFX.dominio(); else if (!now.dom && was.dom) SFX.dominioFim();
+}
+
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
   ws.onopen = () => document.body.classList.remove('off') || send({ t: 'hello', role, name, pass, key, as: asWho || undefined, ctl: ctl || undefined });
@@ -172,7 +199,7 @@ function unit(c, cur) {
     : `<div class="hpn"><span>${c.hp}</span><small>/${c.hpMax}</small><em>HP</em></div>${bar('hp', c, true)}<div class="duo"><div>${bar('aura', c, true)}<small>Aura ${c.aura}/${c.auraMax}</small></div><div>${bar('san', c, true)}<small>Sanidade ${c.san}/${c.sanMax}</small></div></div>
       <div class="lim ${c.limit >= 100 ? 'full' : ''}">${bar('limit', c, true)}<small>${c.limit >= 100 ? 'Limite!' : 'Limite ' + c.limit + '%'}</small></div>`;
   const brk = c.brk && c.hp > 0 ? `<div class="brk" title="Barra de Quebra: fraquezas e pontos fracos a esvaziam">Quebra ${'◆'.repeat(c.brk.cur)}${'◇'.repeat(c.brk.max - c.brk.cur)}</div>` : '', rit = !foe && (c.brv || c.ten) ? `<div class="rit">${c.brv ? `Coragem ${c.brv}` : ''}${c.brv && c.ten ? ' · ' : ''}${c.ten ? `Tensão ×${[1, 1.5, 2, 3][c.ten]}` : ''}</div>` : '';
-  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${brk}${rit}${stats}</div></div>`;
+  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c.ten ? 'ten' + c.ten : ''} ${(c.brv || 0) < 0 ? 'debt' : ''} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${brk}${rit}${stats}</div></div>`;
 }
 const BBG = { rubro: 'Rubro', noite: 'Noite', floresta: 'Floresta', brasa: 'Brasa', gelo: 'Gelo', vazio: 'Vazio', santuario: 'Santuário', tempestade: 'Tempestade' }; // fundos prontos da batalha
 function battle() {
@@ -185,8 +212,8 @@ function battle() {
       <button data-a="next">Passar</button></div>${aimBox()}`;
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
   const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
-  return `<section class="stage battle heat-${heat} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}${gm && cur ? acts(cur) : ''}</section>`;
+  return `<section class="stage battle heat-${heat} ${S.battle.dom ? 'dom-on' : ''} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
+    ${S.battle.dom ? '<i class="domfx" aria-hidden="true"></i>' : ''}<div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {
@@ -494,7 +521,7 @@ const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat', 'mun'];
 let pick = { k: 'atk', id: 'atk' }, aimOpen = false, braveOn = false, passTo = '', campWith = {};
 // faixa do campo de batalha: clima, barra de Cadeia, Domínio aberto
 const fieldBar = () => { const B = S.battle, wx = RULES.CLIMA[B.wx?.k], ch = B.chain || { h: 0, e: 0 }, D = B.dom;
-  return `<div class="fbar">${wx ? `<span class="wx" title="${esc(Object.entries(wx[1]).map(([k, v]) => k === 'hit' ? `acerto ${v}` : `${PATRON[k] || k} ×${v}`).join(' · '))}">${wx[0]}</span>` : ''}<span class="chain" title="Fraquezas, críticos e golpes enchem a barra; cheia, o grupo ataca em sequência">Cadeia <b style="--p:${ch.h}%"></b>${ch.h}%</span>${D ? `<span class="dom">Domínio: ${esc(D.name)} (${D.ttl})</span>` : ''}</div>`; };
+  return `<div class="fbar">${wx ? `<span class="wx" title="${esc(Object.entries(wx[1]).map(([k, v]) => k === 'hit' ? `acerto ${v}` : `${PATRON[k] || k} ×${v}`).join(' · '))}">${wx[0]}</span>` : ''}<span class="chain ${ch.h >= 100 ? 'full' : ''}" title="Fraquezas, críticos e golpes enchem a barra; cheia, o grupo ataca em sequência">Cadeia <b style="--p:${ch.h}%"></b>${ch.h}%</span>${D ? `<span class="dom">Domínio: ${esc(D.name)} (${D.ttl})</span>` : ''}</div>`; };
 const blockWhy = (c, s, k) => k && c.cant?.[k] ? c.cant[k] : c.st.silence ? 'Silenciado' : c.st.fury ? 'Em fúria: só ataca' : s.limit && c.limit < 100 ? 'Limite incompleto' : c[s.res] < s.cost ? `Falta ${RES[s.res]}` : s.req && s.req !== wtype(c) ? `Exige ${WT[s.req]}` : '';
 function command(c, cur) {
   const my = cur === c, inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead).sort((x, y) => y.enemy - x.enemy), t = inB.find(o => o.id === tgt), [rqId, rq] = myReq() || [], wait = rq && rq.ch === c.id;
@@ -510,7 +537,7 @@ function command(c, cur) {
     : opt('atk', 'atk', 'Ataque', 'sem custo', `${wp ? wp.name : 'Punhos'} · poder ${wp?.power ?? c.arma} · ${wp?.wt === 'fogo' ? 'DES' : 'FOR'}`);
   const tl = timeline(6).slice(1).map(id => `<i class="${S.chars[id].enemy ? 'foe' : ''}">${esc(S.chars[id].name)}</i>`).join('');
   const allies = inB.filter(o => !o.enemy && o.id !== c.id && o.hp > 0), downAll = inB.filter(o => o.enemy && o.hp > 0).length > 0 && inB.filter(o => o.enemy && o.hp > 0).every(o => o.st.down || o.st.broken);
-  const rhythm = `<div class="rhythm"><button class="ghost" data-a="defend" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)">Defender${c.brv > 0 ? ' ' + c.brv : ''}</button><button class="ghost" data-a="focus" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3">Concentrar${c.ten ? ' ×' + [1, 1.5, 2, 3][c.ten] : ''}</button><button class="ghost ${braveOn ? 'on' : ''}" data-a="braveT" ${c.brv > -2 ? '' : 'disabled'} aria-pressed="${braveOn}" title="Gasta 1 ponto de Coragem para agir de novo; sem pontos, fica devendo tempo">Coragem ${c.brv || 0}</button><select data-a="passSel" aria-label="Passar a vez depois de acertar uma fraqueza"><option value="">Passar a vez: ninguém</option>${allies.map(o => `<option value="${o.id}" ${passTo === o.id ? 'selected' : ''}>Passar a vez: ${esc(o.name)}</option>`).join('')}</select><button class="ghost allout" data-a="allOut" data-id="${c.id}" ${my && !wait && downAll ? '' : 'disabled'} title="Todo inimigo Derrubado ou Quebrado: o grupo inteiro ataca">Ataque Total</button></div>`;
+  const rhythm = `<div class="rhythm"><button class="ghost" data-a="defend" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)">Defender${c.brv > 0 ? ' ' + c.brv : ''}</button><button class="ghost" data-a="focus" data-id="${c.id}" ${my && !wait ? '' : 'disabled'} title="Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3">Concentrar${c.ten ? ' ×' + [1, 1.5, 2, 3][c.ten] : ''}</button><button class="ghost ${braveOn ? 'on' : ''} ${c.brv < 0 ? 'debt' : ''}" data-a="braveT" ${c.brv > -2 ? '' : 'disabled'} aria-pressed="${braveOn}" title="Gasta 1 ponto de Coragem para agir de novo; sem pontos, fica devendo tempo (dívida: o próximo turno demora mais)">Coragem ${c.brv || 0}</button><select data-a="passSel" aria-label="Passar a vez depois de acertar uma fraqueza"><option value="">Passar a vez: ninguém</option>${allies.map(o => `<option value="${o.id}" ${passTo === o.id ? 'selected' : ''}>Passar a vez: ${esc(o.name)}</option>`).join('')}</select><button class="ghost allout" data-a="allOut" data-id="${c.id}" ${my && !wait && downAll ? '' : 'disabled'} title="Todo inimigo Derrubado ou Quebrado: o grupo inteiro ataca">Ataque Total</button></div>`;
   return `<section class="cmd ${my ? 'mine' : ''}" style="--c:${esc(c.color)}"><div class="cmd-h"><div class="turn ${my ? 'me' : ''}">${my ? 'Seu turno' : 'Turno de ' + esc(cur?.name || '—')}</div><div class="nextup"><small>Depois:</small>${tl}</div></div>
     <div class="cmd-g"><div class="cmd-me"><h2>${esc(c.name)}</h2>${['hp', 'aura', 'san', 'limit'].map(k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${c[k]}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`).join('')}
         <div class="sts">${c.hp > 0 ? [sanSt(c), ...Object.entries(c.st).map(([k, n]) => ST[k] + ' ' + n)].filter(Boolean).map(x => `<i>${x}</i>`).join('') || '<small>Sem condições.</small>' : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}</div></div>
@@ -580,7 +607,7 @@ function render() {
     lastPg = pg + (c?.id || '');
     app.innerHTML = `<header class="top"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
       <nav class="tnav" aria-label="Páginas">${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}" ${pg === k ? 'aria-current="page"' : ''}>${ico(k)}<span>${k === 'mesa' && b ? 'Batalha' : l}</span></button>`)}<button class="tchat ${chatOpen ? 'on' : ''}" data-a="chatT" aria-pressed="${chatOpen}">${ico('chat')}<span>Chat</span>${unread ? `<i class="bdg">${unread > 9 ? '9+' : unread}</i>` : ''}</button></nav>
-      <div class="me"><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? '<div class="pop"><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>' : ''}</div></header>
+      <div class="me"><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? `<div class="pop"><button data-a="mute">${mute ? 'Ligar som' : 'Desligar som'}</button><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>` : ''}</div></header>
       ${ctl ? `<div class="peek ctl">Você está <b>jogando por ${esc(asWho)}</b>: o que fizer aqui acontece na hora, sem passar pela fila de pedidos.</div>` : asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
       <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`;
     lastReq = (myReq() || [])[0] || null;
@@ -660,6 +687,7 @@ function fx() {
   if (win) { const v = document.createElement('div'); v.className = 'victory'; v.innerHTML = `<b>Vitória</b><span>${esc(win.text.replace(/^Vitória!\s*/, ''))}</span>`; document.body.append(v); setTimeout(() => v.remove(), 6500); }
   if (cur && cur.id !== lastCur && lastCur !== undefined) { const bn = document.createElement('div'); bn.className = 'banner'; const mineT = role === 'player' && mine(cur); bn.textContent = mineT ? 'Seu turno' : 'Turno de ' + cur.name; if (mineT) { bn.classList.add('me'); navigator.vibrate?.([60, 40, 60]); } bn.style.setProperty('--c', cur.enemy ? '#e4002b' : cur.color); document.body.append(bn); setTimeout(() => bn.remove(), 1200); }
   lastCur = cur?.id ?? null;
+  fxWatch();
 }
 
 app.addEventListener('change', e => {
