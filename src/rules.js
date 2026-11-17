@@ -517,14 +517,26 @@ const canPar = p => { const n = parNode(p); return !!n && !p.parT && !p.st.silen
 const autoTel = ch => { const n = ch.boss ? 2 : ch.rank === 'elite' ? 1 : 0, pw = k => SK(k).power * (SK(k).hits || 1) * (SK(k).area ? 1.5 : 1);
   return (ch.skills || []).filter(k => SK(k) && ['dmg', 'mental'].includes(SK(k).kind) && !SK(k).limit).sort((x, y) => pw(y) - pw(x)).slice(0, n); };
 const telOf = (a, k) => { if (k === 'atk') return false; if (a.enemy && a.telK === undefined) a.telK = autoTel(a); return SK(k)?.tel === 1 || a.telK?.includes(k); };
+// Fintas: comum não tem; elite (~30% das batidas) atrasa ou faz anel falso; chefe tem combo irregular, fintas em 50% das batidas e direção no golpe anunciado.
+// beats segue number[]; fin é paralelo: { ease?: 1, fake?: ms a partir de C.at, dir?: '←'|'→' }
+function finPlan(a, hits, tel, beat) {
+  const D = RU.CMD.DEF, boss = !!a.boss, elite = a.rank === 'elite', p = boss ? .5 : elite ? .3 : 0, gaps = [450, 450, 900], beats = [], fin = [];
+  for (let i = 0; i < hits; i++) {
+    const gap = i ? (boss ? gaps[i % 3] : D.gap) : beat; beats.push(i ? beats[i - 1] + gap : beat); const f = {};
+    if (p && Math.random() < p) { if (Math.random() < .5 || gap < 900) f.ease = 1; else f.fake = beats[i] - 700; }
+    if (boss && tel) f.dir = Math.random() < .5 ? '←' : '→';
+    fin.push(f);
+  }
+  return { beats, fin };
+}
 function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devolve null se ninguém pode se defender
   const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), D = RU.CMD.DEF;
   if (!s || !plan.tgs.length || !['dmg', 'mental'].includes(s.kind) || s.fx?.some(f => f.t === 'sure')) return null;
   const tel = telOf(a, plan.skill), ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (tel || (parryable(a, s, t, {}, false) && canPar(t))));
   if (!ts.length) return null;
-  const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, beats = Array.from({ length: hits }, (_, i) => beat + i * D.gap);
+  const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, { beats, fin } = finPlan(a, hits, tel, beat);
   const z = Object.fromEntries(ts.map(t => { const n = parNode(t), mo = modsOf(t, null); return [t.id, { par: n ? n.par + mo.par : 0, esq: tel ? D.esq + mo.esq : 0, cost: n?.cost || 0, canP: canPar(t) }]; })); // zonas de cada alvo, para a tela desenhar
-  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, fin, tel, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
   if (tel && !s.area && ts.length === 1 && chqSkill(ts[0])) C.chqOk = [ts[0].id]; // Choque de poderes: só golpe anunciado de alvo único
   return C;
 }
@@ -801,4 +813,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, finPlan, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

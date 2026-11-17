@@ -2,7 +2,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
-const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
+const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, finPlan, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 const { TREE } = await import('../tree.js');
 const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
@@ -1007,6 +1007,39 @@ test('defesa: sem Aura a zona de Aparar vira esquiva (anunciado) e não abre jan
   let { hs: [h], e } = dfx(); h.aura = 0; H.ai(gm); assert.ok(!S.battle.cmd, 'sem Aura e sem golpe anunciado: nenhuma janela');
   ({ hs: [h], e } = dfx(['Aparar'])); h.aura = 0; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['esq']); assert.equal(h.aura, 0);
   dfx([]); H.ai(gm); assert.ok(!S.battle.cmd, 'sem nó de Aparar e sem golpe anunciado, sem janela');
+});
+// ---- fintas na janela de defesa ----
+const FIN = (a, hits = 1, tel = false, beat = 1100) => finPlan(a, hits, tel, beat);
+test('fintas: inimigo comum não tem fintas e as batidas ficam a 700 ms', () => {
+  for (let i = 0; i < 50; i++) { const { beats, fin } = FIN({}, 4); assert.deepEqual(beats, [1100, 1800, 2500, 3200]); assert.deepEqual(fin, [{}, {}, {}, {}]); }
+  const { fin } = FIN({ rank: 'comum' }, 2, true); assert.deepEqual(fin, [{}, {}]);
+});
+test('fintas: chefe tem combo irregular e a janela fecha na última batida', () => {
+  for (let i = 0; i < 30; i++) { const { beats } = FIN({ boss: true }, 3), gaps = beats.slice(1).map((b, k) => b - beats[k]); assert.equal(beats[0], 1100); assert.ok(new Set(gaps).size > 1, 'espaçamento não uniforme'); assert.ok(gaps.every(g => g === 450 || g === 900)); }
+  const { hs: [h], e } = dfx(['Aparar']); e.boss = true; e.skills = [sk('Rajada de Aura')]; e.telK = []; fixR(0, () => H.ai(gm)); const C = S.battle.cmd;
+  assert.equal(C.beats.length, 3); assert.equal(C.fin.length, 3); assert.equal(C.w, C.beats[2]); assert.ok(C.beats.every(b => b <= C.w));
+});
+test('fintas: golpe anunciado de chefe dá direção a toda batida', () => {
+  for (let i = 0; i < 30; i++) { const { fin } = FIN({ boss: true }, 3, true); assert.ok(fin.every(f => f.dir === '←' || f.dir === '→')); }
+  const { fin } = FIN({ boss: true }, 3, false); assert.ok(fin.every(f => f.dir === undefined), 'sem anúncio, sem direção');
+  const el = FIN({ rank: 'elite' }, 3, true).fin; assert.ok(el.every(f => f.dir === undefined), 'direção é só de chefe');
+});
+test('fintas: elite faz ~30% das batidas com atraso ou anel falso; o anel falso só onde há espaço', () => {
+  let n = 0, tot = 0; for (let i = 0; i < 300; i++) { const { beats, fin } = FIN({ rank: 'elite' }, 3); fin.forEach((f, k) => { tot++; if (f.ease || f.fake != null) n++; if (f.fake != null) { assert.equal(f.fake, beats[k] - 700); assert.ok(k === 0, 'elite: só a 1ª batida tem espaço'); } }); }
+  const r = n / tot; assert.ok(r > .18 && r < .42, 'proporção ' + r);
+  for (let i = 0; i < 100; i++) { const { beats, fin } = FIN({ boss: true }, 3); fin.forEach((f, k) => { if (f.fake != null) assert.ok((k ? beats[k] - beats[k - 1] : beats[0]) >= 900); assert.ok(!(f.ease && f.fake != null)); }); }
+});
+const tdef = (names = [], boss = false) => { const { hs: [h], e } = dfx(names); e.boss = boss; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); return { h, C: S.battle.cmd }; };
+test('fintas: esquiva exige a direção quando a batida tem dir', () => {
+  let { h, C } = tdef(); C.fin = [{ dir: '→' }]; openAt(450); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['cedo'], 'sem dir');
+  ({ h, C } = tdef()); C.fin = [{ dir: '→' }]; openAt(450); H.def(ana, { id: h.id, dir: '←' }); assert.deepEqual(C.p[h.id], ['cedo'], 'dir trocada');
+  ({ h, C } = tdef()); C.fin = [{ dir: '→' }]; openAt(450); H.def(ana, { id: h.id, dir: '→' }); assert.deepEqual(C.p[h.id], ['esq'], 'dir certa');
+  ({ h, C } = tdef(['Aparar'])); C.fin = [{ dir: '→' }]; openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['par'], 'Aparar não pede direção');
+});
+test('fintas: apertar junto do anel falso é cedo; fora dele vale a zona normal', () => {
+  let { h, C } = tdef(); C.fin = [{ fake: 400 }]; C.at = Date.now() - 400 - 60; H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['cedo'], 'no anel falso');
+  ({ h, C } = tdef()); C.fin = [{ fake: 400 }]; C.at = Date.now() - C.beats[0] + 450; assert.ok(Math.abs(Date.now() - (C.at + 400)) > 120); H.def(ana, { id: h.id }); assert.deepEqual(C.p[h.id], ['esq'], 'longe do anel falso');
+  ({ h, C } = tdef()); C.fin = [{ fake: 400 }]; C.at = Date.now() - 400 - 60; C.beats = [C.beats[0]]; assert.ok(RU.CMD.gradeDef(C.at + C.beats[0] - Date.now(), 0, 450, false) !== 'esq', 'a zona normal ali não é esquiva');
 });
 test('defesa: janela velha (servidor reiniciado) é descartada e o inimigo age', () => {
   const { hs: [h], e } = dfx(); S.battle.cmd = { foe: e.id, at: Date.now() - 10000, w: 1100, beats: [1100], tgs: [h.id], p: { [h.id]: [] } };

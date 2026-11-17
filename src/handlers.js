@@ -237,7 +237,9 @@ const H = {
     const ch = S.chars[m.id], C = S.battle.cmd, D = RU.CMD.DEF; if (!C || !ch || ch.enemy || ch.hp <= 0 || !can(c, ch) || !C.tgs.includes(ch.id) || C.chq?.id === ch.id) return;
     const notes = C.p[ch.id], now = Date.now(), i = C.beats.findIndex((b, k) => notes[k] === undefined && now <= C.at + b + D.grace); if (i < 0) return;
     const n = parNode(ch), mods = modsOf(ch, null), canP = !!n && (C.paid[ch.id] || canPar(ch)), left = C.at + C.beats[i] - now;
-    const g = RU.CMD.gradeDef(left, (n?.par || 0) + mods.par, C.tel ? D.esq + mods.esq : 0, canP); if (g === 'late') return;
+    let g = RU.CMD.gradeDef(left, (n?.par || 0) + mods.par, C.tel ? D.esq + mods.esq : 0, canP); if (g === 'late') return;
+    const fi = C.fin?.[i]; if (g !== 'late' && fi?.fake != null && Math.abs(now - (C.at + fi.fake)) <= 120) g = 'cedo'; // caiu no anel falso
+    else if (g === 'esq' && fi?.dir && m.dir !== fi.dir) g = 'cedo'; // esquiva para o lado errado
     if (canP && !C.paid[ch.id] && (g === 'par' || (g === 'cedo' && !C.tel))) { ch.aura -= n.cost || 0; ch.parT = 1; C.paid[ch.id] = true; } // paga a Aura na hora, uma vez por golpe
     notes[i] = g;
   },
