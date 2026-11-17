@@ -96,6 +96,11 @@ if (S.itemsV < 3) { // expansão das armas: Pistolas Gêmeas viram arma em par; 
   for (const m of Object.values(cat0)) if (m.type === 'mun' && !have.has(m.name)) S.items['m' + crypto.randomBytes(4).toString('hex')] = structuredClone(m);
   S.itemsV = 3;
 }
+if (S.itemsV < 4) { // básicas de todos os modelos, escudos e instrumentos: entram no catálogo as armas que faltam (pelo nome); lojas só nas campanhas novas ou em "+ cenas de exemplo"
+  const have = new Set(Object.values(S.items).map(i => i.name));
+  for (const w of Object.values(buildItems(it))) if (w.type === 'arma' && !have.has(w.name)) S.items['w' + crypto.randomBytes(4).toString('hex')] = structuredClone(w);
+  S.itemsV = 4;
+}
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
@@ -460,7 +465,7 @@ function onceFx(a, s, stat) {
   }
   if (txt) log(a.name, `${s.name}:${txt}`, 'ok');
 }
-const hitFx = (a, s, t, c) => (s.fx || []).filter(f => !f.to || f.to === 'tgt').map(f => fx1(a, s, t, f, c)).join('');
+const hitFx = (a, s, t, c) => (s.fx || []).filter(f => (!f.to || f.to === 'tgt') && !(c.blk && f.t === 'st')).map(f => fx1(a, s, t, f, c)).join('');
 function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por turno de condição, fúria do ferido
   let m = 1;
   for (const f of s.fx || []) {
@@ -596,7 +601,8 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   a.bt ??= {}; const wu = (s.basic || s.req || s.wpn) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
   if (olho) a.bt.olho = 1;
-  const mult = (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
+  const blkP = !mental && !s.area && !o.counter && t.enemy !== a.enemy ? AR.prof(eq(t, 'arma')).block : 0, blk = blkP > 0 && Math.random() * 100 < blkP; // escudo: bloqueia golpe físico único de inimigo
+  const mult = (blk ? .4 : 1) * (crit ? 2 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
     * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1)
     * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);
@@ -615,14 +621,15 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   }
   if (wk) extra = ' PONTO FRACO!' + extra;
   if (rx) { rx.on.forEach(k => delete t.st[k]); if (t.hp > 0 && rx.a) applySt(t, rx.a[0], rx.a[1]); extra += ` [Reação: ${rx.n}]`; }
-  if (t.hp > 0) { if (s.st) applySt(t, s.st); if (down) t.st.down = 1; }
-  if (wu && t.hp > 0 && !mental) { // engastes e segundo elemento da liga
+  if (blk) extra += ' [bloqueado]';
+  if (t.hp > 0 && !blk) { if (s.st) applySt(t, s.st); if (down) t.st.down = 1; }
+  if (wu && t.hp > 0 && !mental && !blk) { // engastes e segundo elemento da liga
     for (const rn of wu.g || []) { const Ru = OF.RUNAS[rn]; if (Ru?.st && Math.random() * 100 < Ru.st[2]) { applySt(t, Ru.st[0], Ru.st[1]); extra += ` [${STN[Ru.st[0]]}: ${rn}]`; } if (Ru?.drain && a.hp > 0) a.hp = Math.min(a.hpMax, a.hp + Math.max(1, Math.round(d * Ru.drain / 100))); }
     if (wu.el2 && Math.random() < .3) { const e2 = OF.ELST[wu.el2]; if (e2) applySt(t, e2[0], e2[1]); }
   }
   if (s.el === 'susanoo' && t.hp > 0 && !mental && !rx && (S.battle.wx?.k === 'chuva' || Math.random() < .35)) applySt(t, 'wet', 2); // a água molha
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
-  extra += hitFx(a, s, t, { d, stat });
+  extra += hitFx(a, s, t, { d, stat, blk });
   if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
   log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
@@ -1487,6 +1494,29 @@ const H = {
     if (S.battle.active) usable();
     log('Mestre', `${m.id === id ? 'atualizou' : 'criou'} a arma ${w.name}.${errs.length ? ' Corrigido: ' + errs.join(' · ') : ''}`, errs.length ? 'bad' : 'ok', { to: GM });
     tell0(c, { kind: errs.length ? 'no' : 'ok', text: errs.length ? errs.join(' · ') : `${w.name} salva.`, id });
+  },
+  wpnVar(c, m) { // variante elemental de uma arma do catálogo: um elemento ou os 9 (m.el = 'all'); nomes já usados são pulados
+    const src = S.items[m.id]; if (c.role !== 'gm' || src?.type !== 'arma') return;
+    const els = m.el === 'all' ? Object.keys(VN) : Object.hasOwn(VN, m.el) ? [m.el] : [];
+    const names = new Set(Object.values(S.items).map(i => i.name)), made = [], skip = [];
+    for (const el of els) {
+      const d = AR.variantEl(AR.clean(src).w, el); if (!d) { skip.push(VN[el]); continue; }
+      const { w } = AR.clean(d); if (names.has(w.name)) { skip.push(VN[el]); continue; }
+      names.add(w.name); S.items[rid()] = { ...it(w.name, 'arma', w.power), ...w }; made.push(w.name);
+    }
+    log('Mestre', `variantes elementais de ${src.name}: ${made.length ? made.join(', ') : 'nenhuma nova'}${skip.length ? ` (já existiam: ${skip.join(', ')})` : ''}.`, made.length ? 'ok' : '', { to: GM });
+    tell0(c, { kind: made.length ? 'ok' : 'no', text: made.length ? `${made.length} variante(s) criada(s).` : 'Essas variantes já existem.' });
+  },
+  wpnImport(c, m) { // importar armas de um arquivo ou texto (lotes de até 25): cada uma passa pela mesma limpeza do criador
+    if (c.role !== 'gm' || !Array.isArray(m.list)) return;
+    const names = new Set(Object.values(S.items).map(i => i.name)); let n = 0, fixed = 0;
+    for (const d of m.list.slice(0, 25)) {
+      if (!d || typeof d !== 'object') continue;
+      const { w, errs } = AR.clean(d); let name = w.name, k = 2; while (names.has(name)) name = `${w.name.slice(0, 54)} (${k++})`;
+      names.add(name); S.items[rid()] = { ...it(name, 'arma', w.power), ...w, name }; n++; if (errs.length) fixed++;
+    }
+    log('Mestre', `importou ${n} arma(s)${fixed ? `, ${fixed} com correções` : ''}.`, 'ok', { to: GM });
+    tell0(c, { kind: n ? 'ok' : 'no', text: n ? `${n} arma(s) importada(s).` : 'Nenhuma arma válida no arquivo.' });
   },
   edSet(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(SCH, m.coll) || !Object.hasOwn(SCH[m.coll], m.f) || !Object.hasOwn(S[m.coll], m.id)) return;

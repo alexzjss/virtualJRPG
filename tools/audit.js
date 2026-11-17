@@ -46,7 +46,7 @@ for (const n of dmg) {
 
 // 5. o nome promete algo que o efeito não faz
 const PROMESSAS = [
-  [/Escudo|Muralha|Barreira|Égide|Bastião/i, /shield|st defUp|st guarded|st taunt|fm|pas|reflect|brk|st defDn/i, 'escudo/defesa'],
+  [/Escudo|Muralha|Barreira|Égide|Bastião/i, /shield|st defUp|st guarded|guard|st counter|st taunt|fm|pas|reflect|brk|st defDn/i, 'escudo/defesa'],
   [/Ricochete|Cadeia|Em Cadeia/i, /chain|spread/i, 'ricochete'],
   [/Execu|Guilhotina|Misericórdia/i, /exec/i, 'execução'],
   [/Reviver|Ressurre|Renascer|Ressurgir/i, /revive|fall|on/i, 'reerguer'],

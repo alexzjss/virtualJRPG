@@ -122,6 +122,20 @@ export const WEAPONS = [
   ['Grimório do Sem-Nome', 'grimorio', 2, 'maldita', 'oculto', { d: 'As páginas se reescrevem sozinhas à noite. Ler custa caro.' }],
 ];
 
+// básicas pré-implementadas: todo modelo ganha uma arma Comum com o próprio nome, sem duplicar quem já tem básica no catálogo
+// (se o nome já estiver em uso por outra peça, vira "<nome> comum")
+const WNAMES = new Set(WEAPONS.map(w => w[0])), WHAS = new Set(WEAPONS.filter(w => w[3] === 'basica').map(w => w[1]));
+export const WEAPONS_ALL = [...WEAPONS, ...Object.values(globalThis.ARMAS.MOD).filter(m => !WHAS.has(m.id)).map(m => [WNAMES.has(m.n) ? m.n + ' comum' : m.n, m.id, 0, 'basica'])];
+const basicName = tpl => WEAPONS_ALL.filter(w => w[1] === tpl && w[3] === 'basica').sort((a, b) => a[2] - b[2])[0]?.[0];
+// lojas temáticas: cada modelo é vendido em 1 ou 2 cenas (a básica dele, no menor nível que existir)
+export const WSHOP = {
+  beco: ['adaga', 'navalha', 'facao', 'tanto', 'derringer', 'revolver', 'escopeta', 'sinalizador', 'soqueira', 'garras', 'boxe', 'chicote', 'kunai', 'facas', 'bumerangue', 'boleadeira', 'zarabatana', 'dardos', 'machado', 'nunchaku', 'broquel', 'shuriken', 'baioneta'],
+  santuario: ['cajado', 'sino', 'leque', 'grimorio', 'rosario', 'espelho', 'tambor', 'boneca', 'taro', 'flauta', 'shakuhachi', 'talisma', 'espelhoscudo', 'bo', 'faixas', 'yumi', 'naginata', 'eletricas'],
+  estacao: ['rifle', 'pistolas', 'metralhadora', 'canhao', 'lancachamas', 'repeticao', 'besta', 'picareta', 'marreta', 'martelo', 'machado2', 'kanabo', 'meteoro', 'mangual', 'ancora', 'montante', 'lanca', 'torre', 'pavese', 'arcocurto', 'eletricas', 'baioneta'],
+  mansao: ['sabre', 'katana', 'florete', 'bengala', 'nodachi', 'sabresg', 'foice', 'tridente', 'naginata', 'alabarda', 'javali', 'revolver', 'violino', 'shamisen', 'taiko', 'tamborguerra', 'cacador', 'escudolamina', 'pregos', 'kusarigama', 'chakram', 'arpao', 'tonfas', 'sai', 'katar', 'manoplas', 'derringer'],
+};
+const wstock = k => WSHOP[k].map(basicName).filter(Boolean);
+
 export function buildItems(it) {
   const L = [], add = (...a) => L.push(it(...a)), n = PATRON;
   // consumíveis
@@ -149,7 +163,7 @@ export function buildItems(it) {
   // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)
   add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + n[el], 'mat', 0, { el, price: 20 }));
   // armas: todas saem dos modelos de public/armas.js (tipo, traços do ataque básico e técnicas próprias); veja WEAPONS abaixo
-  for (const [name, tpl, lvl, cat, el, o] of WEAPONS) add(name, 'arma', 0, globalThis.ARMAS.make(tpl, { name, lvl, cat, el: el || '', ...o }));
+  for (const [name, tpl, lvl, cat, el, o] of WEAPONS_ALL) add(name, 'arma', 0, globalThis.ARMAS.make(tpl, { name, lvl, cat, el: el || '', ...o }));
   // armaduras
   [['Casaco de Couro', 2, 40], ['Colete Reforçado', 4, 120], ['Sobretudo Selado', 5, 260], ['Couraça de Trincheira', 6, 300]].forEach(([name, p, price]) => add(name, 'armadura', p, { price }));
   // acessórios: amuletos (+10 no atributo) e relíquias dos patronos (+8 no atributo e resistência ao elemento)
@@ -234,13 +248,13 @@ export function buildBestiary(make) {
 // ingredientes básicos que toda loja de cena pode vender (os raros, como Carne de Demônio e Essências, só por colheita, caça ou forja)
 export const BASICS = ['Erva Medicinal', 'Raiz Amarga', 'Ervas de Cozinha', 'Carne de Caça', 'Sal Sagrado', 'Pólvora', 'Sucata de Ferro', 'Papel de Arroz', 'Frasco Vazio', 'Óleo de Lamparina'];
 export const SCENES = [
-  { name: 'Beco do Mercado Negro', gather: ['Sucata de Ferro', 'Frasco Vazio', 'Pólvora', 'Papel de Arroz', 'Carne de Caça'], bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Adaga de Trincheira', 'Escopeta de Cano Serrado', 'Machado de Lenhador', 'Pistola Sinalizadora', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
+  { name: 'Beco do Mercado Negro', gather: ['Sucata de Ferro', 'Frasco Vazio', 'Pólvora', 'Papel de Arroz', 'Carne de Caça'], bg: '/maps/beco.svg', stock: [...wstock('beco'), 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
     note: 'Encontros: 3 Bandidos + 1 Capanga da Máfia (emboscada); à noite, 2 Diabretes de Cinzas nos telhados. Armeiro vende sem perguntas; a botica é fachada de um Cultista.' },
-  { name: 'Santuário Profanado', gather: ['Sal Sagrado', 'Papel de Arroz', 'Cogumelo Pálido', 'Erva Medicinal', 'Raiz Amarga'], bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo', 'Cajado de Peregrino', 'Sino de Exorcismo', 'Leque de Ofudas', 'Grimório Gasto', 'Componente Ritualístico', 'Munição de Sal', ...BASICS],
+  { name: 'Santuário Profanado', gather: ['Sal Sagrado', 'Papel de Arroz', 'Cogumelo Pálido', 'Erva Medicinal', 'Raiz Amarga'], bg: '/maps/santuario.svg', stock: [...wstock('santuario'), 'Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo', 'Componente Ritualístico', 'Munição de Sal', ...BASICS],
     note: 'Encontros: 2 Yurei + 1 Espectro da Trincheira; chefe opcional: Serafim Caído no altar. A fonte restaura Sanidade uma vez (mestre concede). Teste de horror ao entrar (perda 5).' },
-  { name: 'Estação Central', gather: ['Sucata de Ferro', 'Pólvora', 'Óleo de Lamparina', 'Frasco Vazio'], bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Marreta de Ferroviário', 'Pistolas Gêmeas', 'Florete de Duelo', 'Garras de Ferro', 'Arpão de Baleeiro', 'Faixas de Monge', 'Colete Reforçado', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
+  { name: 'Estação Central', gather: ['Sucata de Ferro', 'Pólvora', 'Óleo de Lamparina', 'Frasco Vazio'], bg: '/maps/estacao.svg', stock: [...wstock('estacao'), 'Tônico', 'Tônico Forte', 'Éter de Aura', 'Colete Reforçado', 'Munição de Prata', 'Munição Incendiária', ...BASICS],
     note: 'Encontros: 2 Soldados Desertores + 1 Autômato Possuído no depósito; Golem de Sucata na locomotiva. Boa cena para iniciar uma perseguição (automóvel contra motocicleta).' },
-  { name: 'Mansão Ashworth', gather: ['Erva Medicinal', 'Ervas de Cozinha', 'Cogumelo Pálido', 'Papel de Arroz', 'Óleo de Lamparina', 'Carne de Caça', 'Couro Curtido'], bg: '/maps/mansao.svg', stock: [],
+  { name: 'Mansão Ashworth', gather: ['Erva Medicinal', 'Ervas de Cozinha', 'Cogumelo Pálido', 'Papel de Arroz', 'Óleo de Lamparina', 'Carne de Caça', 'Couro Curtido'], bg: '/maps/mansao.svg', stock: [...wstock('mansao'), 'Tônico', 'Antídoto', 'Atadura'],
     note: 'Encontros: Cultistas (3) na capela + Ocultista na biblioteca; Súcubo no salão. Chefe: Condessa Escarlate (ponto fraco: torso). Use névoa de guerra e revele cômodo a cômodo.' },
 ];
 export const VEHICLES = { pe: ['A pé', 1, 0], cavalo: ['Cavalo', 3, 10], moto: ['Motocicleta', 5, 0], auto: ['Automóvel', 4, -5], caminhao: ['Caminhão', 3, -15] }; // nome, velocidade, manobra

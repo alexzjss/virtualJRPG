@@ -7,6 +7,7 @@
 //   wa / wa2 atributo do ataque (com dois, usa a média) · hit acerto · crit chance de crítico · ct tempo da ação (%)
 //   hits golpes por ataque · dupla arma em par: 2º golpe a 50% no mesmo alvo (só com golpe único e sem área) · area ataque em área · pierce % da armadura ignorada · mental ataque fere a Sanidade
 //   st / stc / stn condição que o ataque causa, chance (%) e turnos · fx efeitos extras na notação de rules.js
+//   block % de bloquear um golpe físico de inimigo (escudos): −60% de dano e sem condições do golpe · pk pacotes de traços aplicados
 //   mod 'def 5; agi -5; FOR 3' bônus enquanto empunhada (modificadores e atributos) · rq 'FOR 50' requisito (abaixo: −20 de acerto)
 //   atkN nome do ataque básico · d descrição · sk técnicas da arma (skills que só existem com ela equipada)
 (g => {
@@ -25,6 +26,8 @@
     foco: { n: 'Foco místico', wa: 'INT', d: 'Grimórios, cajados, sinos, espelhos e baralhos: o ataque é canalizado pela mente (INT, SAB, CAR ou SOR).' },
     corrente: { n: 'Corrente', wa: 'DES', dist: 1, d: 'Kusarigamas, chicotes, manguais e nunchakus: alcance médio, enroscam e derrubam; não sofrem contra-ataque.' },
     arremesso: { n: 'Arremesso', wa: 'DES', dist: 1, d: 'Shurikens, kunais, facas, bumerangues e chakrams: rápidos e de vários golpes; não sofrem contra-ataque.' },
+    escudo: { n: 'Escudo', wa: 'FOR', d: 'Broquéis, pavieses e escudos de torre: ataque de borda fraco, mas bloqueiam golpes físicos, dão defesa e protegem aliados.' },
+    instrumento: { n: 'Instrumento', wa: 'CAR', d: 'Violinos, flautas e tambores: o ataque é leve (CAR, ou SAB nos sopros), mas as técnicas curam, aceleram e inspiram o grupo todo.' },
     arco: { n: 'Arco e besta', wa: 'DES', dist: 1, mun: 1, d: 'Arcos, yumis, bestas e zarabatanas: precisão e perfuração, usam as flechas equipadas e não sofrem contra-ataque.' },
   };
   // categoria: nome, descrição, multiplicador de preço
@@ -57,7 +60,7 @@
     const T = TIPOS[i?.wt] || TIPOS.punho, n = (v, d = 0) => Number.isFinite(+v) && v !== '' && v != null ? +v : d;
     return {
       wt: TIPOS[i?.wt] ? i.wt : 'punho', wa: ATTRS.includes(i?.wa) ? i.wa : T.wa, wa2: ATTRS.includes(i?.wa2) && i.wa2 !== i?.wa ? i.wa2 : '',
-      hit: n(i?.hit), crit: n(i?.crit), ct: n(i?.ct, 100) || 100, hits: Math.max(1, n(i?.hits, 1)), area: !!i?.area, dupla: !!i?.dupla && !i?.area && !(n(i?.hits, 1) > 1), pierce: n(i?.pierce), mental: !!i?.mental,
+      hit: n(i?.hit), crit: n(i?.crit), ct: n(i?.ct, 100) || 100, hits: Math.max(1, n(i?.hits, 1)), area: !!i?.area, block: Math.min(60, Math.max(0, n(i?.block))), dupla: !!i?.dupla && !i?.area && !(n(i?.hits, 1) > 1), pierce: n(i?.pierce), mental: !!i?.mental,
       st: i?.st || '', stc: i?.st ? n(i?.stc, 100) : 0, stn: n(i?.stn, 3) || 3, fx: i?.fx || '', mod: kv(i?.mod), rq: kv(i?.rq).a, atkN: i?.atkN || '',
     };
   }
@@ -91,6 +94,8 @@
   // faixa recomendada de orçamento por categoria (o resto do valor vem das técnicas e do elemento)
   const DIST = wt => !!TIPOS[wt]?.dist, MUN = wt => !!TIPOS[wt]?.mun; // tipos de distância (sem contra-ataque) e que usam munição
   const FAIXA = { basica: [90, 115], especial: [95, 125], elemental: [90, 120], lendaria: [115, 150], maldita: [120, 160] };
+  const SUP = new Set(['escudo', 'instrumento']); // armas de apoio: o ataque é de propósito mais fraco, o valor está no bloqueio, na defesa e nas técnicas
+  const faixaOf = w => { const [lo, hi] = FAIXA[w?.cat] || [90, 120]; return SUP.has(w?.wt) ? [Math.max(40, lo - 35), hi - 25] : [lo, hi]; };
 
   // ----- modelos -----
   // p poder no nível Comum · $ preço base · traços do perfil · sk: [técnica principal, segunda técnica] na notação dos nós
@@ -325,6 +330,50 @@
   T('zarabatana', 'Zarabatana', 'arco', 4, 25, { ct: 80, hit: 5, st: 'poison', stc: 50 }, [
     { n: 'Dardo do Sono', k: 'dmg', p: 3, c: 5, fx: 'st sleep 2 60%', d: 'Um sopro, e o alvo boceja.' },
     { n: 'Toxina Rara', k: 'dmg', p: 6, c: 6, fx: 'st poison 3; per poison 15', d: 'Veneno de sapo que piora a cada turno de veneno.' }], 'Quase não fere, mas envenena metade das vezes; rapidíssima.');
+  // ----- escudos (arma de mão que é ele mesmo): bloqueio %, defesa fixa e ataque de borda -----
+  T('broquel', 'Broquel', 'escudo', 6, 35, { wa: 'DES', ct: 80, block: 10, mod: 'def 5', st: 'stun', stc: 10 }, [
+    { n: 'Aparar de Broquel', k: 'util', c: 3, ct: 60, tg: 'self', fx: 'st counter 2 self; st evade 1 self', d: 'O broquel desvia a lâmina e já devolve.' },
+    { n: 'Estocada de Borda', k: 'dmg', p: 11, c: 4, ct: 80, fx: 'push 15', d: 'A borda do escudo bate de ponta, rápida.' }], 'Escudo pequeno e ágil: bloqueia 10%, ataque rápido (80%).');
+  T('cacador', 'Escudo de Caçador', 'escudo', 7, 45, { block: 15, mod: 'def 8', st: 'stun', stc: 15 }, [
+    { n: 'Guarda Firme', k: 'util', c: 4, tg: 'self', fx: 'st defUp 2 self; shield 12 self', d: 'Agacha atrás do escudo e espera o golpe.' },
+    { n: 'Pancada de Escudo', k: 'dmg', p: 12, c: 4, fx: 'st stun 1 40%', d: 'Um tranco de ombro com o escudo na frente.' }], 'Escudo redondo de patrulha: bloqueia 15%, às vezes atordoa.');
+  T('torre', 'Escudo de Torre', 'escudo', 8, 60, { ct: 125, block: 25, mod: 'def 15; agi -10', fx: 'push 25', rq: 'CON 45' }, [
+    { n: 'Cobrir o Grupo', k: 'util', c: 5, fx: 'guard 3', d: 'Planta o escudo na frente do aliado e recebe os golpes dele.' },
+    { n: 'Investida de Escudo', k: 'dmg', p: 15, c: 6, ct: 130, fx: 'st down 1 50%', d: 'Avança com o muro de aço e derruba quem estiver na frente.' }], 'Muro de ferro: bloqueia 25% e protege muito, mas lento. Pede CON 45.');
+  T('pavese', 'Pavese', 'escudo', 8, 55, { ct: 120, block: 20, mod: 'def 12; agi -5', rq: 'FOR 40' }, [
+    { n: 'Abrigar Aliado', k: 'util', c: 4, fx: 'guard 3; shield 10', d: 'Abre o pavese em cima do aliado e o cobre por inteiro.' },
+    { n: 'Empurrão de Pavese', k: 'dmg', p: 13, c: 5, fx: 'push 40', d: 'Empurra o inimigo para o fim da fila.' }], 'Escudo de cerco: bloqueia 20%, atrasa o alvo. Pede FOR 40.');
+  T('escudolamina', 'Escudo-Lâmina', 'escudo', 8, 65, { wa2: 'DES', block: 10, mod: 'def 5', st: 'bleed', stc: 25, pierce: 10 }, [
+    { n: 'Corte de Borda', k: 'dmg', p: 13, c: 5, fx: 'st bleed 3 60%', d: 'A borda afiada abre o inimigo.' },
+    { n: 'Giro Cortante', k: 'dmg', p: 9, c: 7, area: true, d: 'Gira com o escudo estendido, cortando em volta.' }], 'Escudo com gume: bloqueia 10% e faz sangrar; média de FOR e DES.');
+  T('pregos', 'Escudo de Pregos', 'escudo', 7, 50, { block: 12, mod: 'def 6', st: 'bleed', stc: 25 }, [
+    { n: 'Abraço de Espinhos', k: 'util', c: 4, tg: 'self', fx: 'st reflect 2 self; st defUp 1 self', d: 'Quem bate no escudo se fere.' },
+    { n: 'Pancada Espinhosa', k: 'dmg', p: 12, c: 5, fx: 'st bleed 2 50%', d: 'A face cheia de pregos arranha o alvo.' }], 'Escudo cravejado: bloqueia 12% e faz sangrar.');
+  T('talisma', 'Escudo de Talismã', 'escudo', 6, 60, { wa: 'SAB', block: 15, mod: 'def 6; heal 5' }, [
+    { n: 'Selo de Proteção', k: 'util', c: 5, fx: 'shield 14', d: 'Um talismã na face do escudo envolve o aliado.' },
+    { n: 'Pancada Abençoada', k: 'dmg', p: 10, c: 4, fx: 'vs demon 1.3', d: 'O papel sagrado queima o que é profano.' }], 'Escudo de santuário: usa SAB, bloqueia 15% e reforça curas.');
+  T('espelhoscudo', 'Espelho-Escudo', 'escudo', 6, 75, { wa: 'SAB', block: 15, mod: 'def 5', el: 'amaterasu', st: 'blind', stc: 20 }, [
+    { n: 'Reflexo Total', k: 'util', c: 5, tg: 'self', fx: 'st reflect 3 self; shield 10 self', d: 'A face polida devolve o golpe.' },
+    { n: 'Clarão do Espelho', k: 'dmg', p: 9, c: 5, area: true, fx: 'st blind 2 50%', d: 'O sol bate no espelho e cega todos.' }], 'Escudo de bronze polido: luz de Amaterasu, bloqueia 15%, cega.');
+  // ----- instrumentos: ataque leve, técnicas de grupo fortes -----
+  T('violino', 'Violino', 'instrumento', 7, 60, { mental: true, ct: 90 }, [
+    { n: 'Melodia de Coragem', k: 'heal', p: 0, c: 6, area: true, fx: 'st atkUp 2', d: 'Uma melodia que acende o sangue do grupo todo.' },
+    { n: 'Sonata de Cura', k: 'heal', p: 10, c: 7, area: true, d: 'Notas suaves que fecham as feridas de todos.' }], 'Cordas de salão: o ataque fere a Sanidade e as técnicas animam o grupo.');
+  T('shamisen', 'Shamisen', 'instrumento', 7, 55, { wa2: 'INT', mental: true, ct: 85 }, [
+    { n: 'Acorde Dissonante', k: 'mental', p: 9, c: 5, area: true, fx: 'st fear 2 50%', d: 'Um acorde que arrepia a espinha de todos.' },
+    { n: 'Melodia Hipnótica', k: 'mental', p: 6, c: 6, fx: 'st sleep 2 50%', d: 'Uma toada lenta que dá sono.' }], 'Cordas de taverna: média de CAR e INT, ataque mental rápido.');
+  T('flauta', 'Flauta', 'instrumento', 6, 35, { wa: 'SAB', mental: true, ct: 85 }, [
+    { n: 'Canção de Ninar', k: 'mental', p: 4, c: 5, area: true, fx: 'st sleep 2 60%', d: 'Um sopro manso que fecha os olhos dos inimigos.' },
+    { n: 'Trinado Agudo', k: 'mental', p: 8, c: 4, fx: 'st silence 2 50%', d: 'Uma nota que cala a voz e a magia.' }], 'Sopro simples (SAB): quase não fere, mas põe para dormir e cala.');
+  T('shakuhachi', 'Shakuhachi', 'instrumento', 7, 55, { wa: 'SAB', mental: true, ct: 90, mod: 'heal 8' }, [
+    { n: 'Sopro Calmante', k: 'heal', p: 12, c: 6, area: true, fx: 'cleanse', d: 'Um sopro longo que cura e lava as feridas da mente.' },
+    { n: 'Lamento do Vento', k: 'mental', p: 10, c: 6, area: true, fx: 'st fear 2', d: 'Um lamento que arrasta o medo por entre os inimigos.' }], 'Flauta de bambu (SAB): reforça curas e cura condições.');
+  T('taiko', 'Tambor Taiko', 'instrumento', 5, 60, { area: true, ct: 110 }, [
+    { n: 'Batida de Guerra', k: 'heal', p: 0, c: 6, area: true, fx: 'st agiUp 2', d: 'Um ritmo que acelera todo o grupo.' },
+    { n: 'Rufar Atordoante', k: 'dmg', p: 7, c: 6, area: true, fx: 'push 20', d: 'O rufar sacode o chão e atrasa todos.' }], 'Tambor de festival: o ataque acerta todos os inimigos, com CAR.');
+  T('tamborguerra', 'Tambor de Guerra', 'instrumento', 7, 50, { ct: 105, mod: 'atk 5' }, [
+    { n: 'Marcha Forçada', k: 'heal', p: 0, c: 6, area: true, fx: 'st defUp 2', d: 'Um passo firme que endurece o grupo.' },
+    { n: 'Compasso de Batalha', k: 'util', c: 6, tg: 'self', fx: 'haste 25 ally', d: 'O compasso adianta o próximo turno de todos.' }], 'Tambor de marcha: reforça o dano de quem o toca.');
   // golpe supremo das lendárias, por tipo
   const ULT = {
     lamina: { n: 'Corte do Horizonte', k: 'dmg', p: 28, c: 10, area: true, ct: 130, uses: 1, d: 'Um único corte que risca o campo inteiro.' },
@@ -335,9 +384,11 @@
     corrente: { n: 'Dragão Acorrentado', k: 'dmg', p: 24, c: 12, area: true, ct: 140, uses: 1, fx: 'st root 2', d: 'A corrente vira um dragão de ferro que enrosca o campo.' },
     arremesso: { n: 'Céu de Lâminas', k: 'dmg', p: 5, c: 12, hits: 5, area: true, ct: 140, uses: 1, d: 'Lâminas caem do céu sobre todos os inimigos.' },
     arco: { n: 'Flecha Estelar', k: 'dmg', p: 45, c: 10, ct: 150, uses: 1, fx: 'sure; pierce 100', d: 'Uma flecha que risca o céu como estrela cadente.' },
+    escudo: { n: 'Bastião Final', k: 'dmg', p: 26, c: 10, ct: 130, uses: 1, fx: 'st stun 1 60%; shield 25 self', d: 'O escudo vira uma muralha viva que esmaga e protege.' },
+    instrumento: { n: 'Sinfonia Final', k: 'heal', p: 20, c: 12, area: true, ct: 130, uses: 1, fx: 'st atkUp 3; st defUp 3', d: 'A peça que o conjunto ensaiou a vida inteira.' },
     foco: { n: 'Palavra Proibida', k: 'mental', p: 30, c: 12, area: true, uses: 1, fx: 'st fear 2', d: 'Uma palavra que a mente não deveria ouvir.' },
   };
-  const PERFIL = ['wa', 'wa2', 'hit', 'crit', 'ct', 'hits', 'dupla', 'area', 'pierce', 'mental', 'st', 'stc', 'stn', 'fx', 'mod', 'rq', 'el'];
+  const PERFIL = ['wa', 'wa2', 'hit', 'crit', 'ct', 'hits', 'dupla', 'block', 'area', 'pierce', 'mental', 'st', 'stc', 'stn', 'fx', 'mod', 'rq', 'el'];
   // monta uma arma a partir de um modelo: o = { lvl, cat, el, name, ...campos que sobrescrevem }
   function make(tid, o = {}) {
     const t = M[tid]; if (!t) return null;
@@ -371,12 +422,14 @@
   // limpa um rascunho do criador (vindo do navegador): devolve a arma pronta e os erros encontrados
   function clean(d = {}) {
     const errs = [], s40 = (v, n = 40) => String(v ?? '').trim().slice(0, n), ST = RU().ST;
-    const w = { name: s40(d.name) || 'Arma sem nome', type: 'arma', wt: TIPOS[d.wt] ? d.wt : 'lamina', cat: CATS[d.cat] ? d.cat : 'basica', lvl: num(d.lvl, 0, 3), tpl: M[d.tpl] ? d.tpl : '',
+    const w = { name: s40(d.name, 60) || 'Arma sem nome', type: 'arma', wt: TIPOS[d.wt] ? d.wt : 'lamina', cat: CATS[d.cat] ? d.cat : 'basica', lvl: num(d.lvl, 0, 3), tpl: M[d.tpl] ? d.tpl : '',
       power: num(d.power, 0, 99), price: num(d.price, 0, 99999), el: EL.includes(d.el) && d.el !== 'fis' ? d.el : '', wa: ATTRS.includes(d.wa) ? d.wa : '', wa2: ATTRS.includes(d.wa2) && d.wa2 !== d.wa ? d.wa2 : '',
-      hit: num(d.hit, -50, 50), crit: num(d.crit, 0, 50), ct: num(d.ct || 100, 40, 200), hits: num(d.hits || 1, 1, 6), area: !!d.area, dupla: !!d.dupla, pierce: num(d.pierce, 0, 100), mental: !!d.mental,
+      hit: num(d.hit, -50, 50), crit: num(d.crit, 0, 50), ct: num(d.ct || 100, 40, 200), hits: num(d.hits || 1, 1, 6), area: !!d.area, dupla: !!d.dupla, block: num(d.block, 0, 60), pk: (Array.isArray(d.pk) ? d.pk : []).filter(x => PK[x]).slice(0, 3), pierce: num(d.pierce, 0, 100), mental: !!d.mental,
       st: ST[d.st] ? d.st : '', stc: num(d.stc ?? 100, 0, 100), stn: num(d.stn || 3, 1, 6), fx: s40(d.fx, 160), mod: s40(d.mod, 80), rq: s40(d.rq, 40), atkN: s40(d.atkN, 30), d: s40(d.d, 200), sk: [] };
     if (w.dupla && (w.area || w.hits > 1)) { errs.push('Arma em par só com golpe único e sem área: tirei o "em par".'); w.dupla = false; }
     if (!w.dupla) delete w.dupla;
+    if (!w.block) delete w.block;
+    if (!w.pk.length) delete w.pk;
     try { RU().parseFx(w.fx, 'ataque'); } catch (e) { errs.push('Efeitos do ataque: ' + e.message); w.fx = ''; }
     const mk = kv(w.mod); if (mk.bad.length) { errs.push(`Bônus inválidos: ${mk.bad.join(', ')} (use ${MODK.join(', ')} ou um atributo)`); w.mod = Object.entries({ ...mk.m, ...mk.a }).map(([k, v]) => `${k} ${v}`).join('; '); }
     const rk = kv(w.rq); if (rk.bad.length || Object.keys(rk.m).length) { errs.push('Requisito: use atributos, por exemplo "FOR 50".'); w.rq = Object.entries(rk.a).map(([k, v]) => `${k} ${v}`).join('; '); }
@@ -392,6 +445,7 @@
     if (P.ct !== 100) o.push(`tempo ${P.ct}%`);
     if (P.hits > 1) o.push(`${P.hits} golpes`);
     if (P.dupla) o.push('em par (2º golpe a 50%)');
+    if (P.block) o.push(`bloqueia ${P.block}% dos golpes físicos`);
     if (DIST(P.wt)) o.push('distância');
     if (P.area) o.push('em área');
     if (P.mental) o.push('fere a Sanidade');
@@ -407,5 +461,60 @@
     const rq = Object.entries(P.rq).map(([k, v]) => `${k} ${v}`).join(', '); if (rq) o.push('pede ' + rq);
     return o;
   }
-  g.ARMAS = { DIST, MUN, TIPOS, CATS, NIVEIS, ELST, MOD: M, ULT, FAIXA, ATTRS, MODK, prof, basicFx, short, kv, fxOf, score, rel, lvlOf, make, skill, clean, traits };
+
+  // ----- pacotes de traços: aplicados em cima de qualquer arma (até 3 por arma; uma qualidade e um elemento no máximo) -----
+  const PK = {}, PKG = { of: 'Ofensivos', pv: 'Precisão e velocidade', df: 'Defensivos', mi: 'Místicos', q: 'Qualidade', el: 'Elemento' };
+  const per = (w, v) => { const d = v / (w.hits || 1) / (w.dupla ? 1.5 : 1); return Math.sign(d) * Math.max(1, Math.round(Math.abs(d))); }; // poder por golpe, como em make()
+  const addPow = (w, v) => { w.power = Math.max(0, (+w.power || 0) + per(w, v)); };
+  const addMod = (w, add) => { const a = kv(w.mod), b = kv(add), m = { ...a.m, ...a.a }; for (const [k, v] of Object.entries({ ...b.m, ...b.a })) m[k] = (m[k] || 0) + v; w.mod = Object.entries(m).map(([k, v]) => `${k} ${v}`).join('; '); };
+  const addFx = (w, x) => { w.fx = [w.fx, x].filter(Boolean).join('; '); };
+  const addSt = (w, st, c, n = 2) => { if (!w.st) { w.st = st; w.stc = Math.min(100, c); w.stn = n; } else if (w.st === st) w.stc = Math.min(100, (+w.stc || 0) + c); else addFx(w, `st ${st} ${n} ${c}%`); };
+  const price = (w, k) => { w.price = Math.round((+w.price || 0) * k / 5) * 5; };
+  const P = (id, grp, n, noun, d, f) => { PK[id] = { id, grp, n, noun, d, f }; };
+  P('sangrante', 'of', 'Sangrante', 'Sangria', '35% de Sangramento', w => addSt(w, 'bleed', 35, 3));
+  P('venenosa', 'of', 'Venenosa', 'Veneno', '35% de Veneno', w => addSt(w, 'poison', 35, 3));
+  P('flamejante', 'of', 'Flamejante', 'Chamas', '30% de Queimadura, sem mudar o elemento', w => addSt(w, 'burn', 30, 3));
+  P('atordoante', 'of', 'Atordoante', 'Atordoamento', '15% de Atordoamento, +5% no tempo', w => { addSt(w, 'stun', 15, 1); w.ct = (+w.ct || 100) + 5; });
+  P('perfurante', 'of', 'Perfurante', 'Perfuração', 'ignora +25% da armadura, −1 de poder', w => { w.pierce = Math.min(100, (+w.pierce || 0) + 25); addPow(w, -1); });
+  P('cruel', 'of', 'Cruel', 'Crueldade', '+8% de crítico, −3% de acerto', w => { w.crit = Math.min(50, (+w.crit || 0) + 8); w.hit = Math.max(-50, (+w.hit || 0) - 3); });
+  P('precisa', 'pv', 'Precisa', 'Precisão', '+12% de acerto', w => { w.hit = Math.min(50, (+w.hit || 0) + 12); });
+  P('veloz', 'pv', 'Veloz', 'Velocidade', 'tempo −10%, −1 de poder', w => { w.ct = Math.max(40, (+w.ct || 100) - 10); addPow(w, -1); });
+  P('leve', 'pv', 'Leve', 'Leveza', '+8% de velocidade empunhada, −1 de poder', w => { addMod(w, 'agi 8'); addPow(w, -1); });
+  P('duelo', 'pv', 'De Duelo', 'Duelo', '+6% de acerto e +5% de crítico', w => { w.hit = Math.min(50, (+w.hit || 0) + 6); w.crit = Math.min(50, (+w.crit || 0) + 5); });
+  P('pesada', 'df', 'Pesada', 'Peso', '+3 de poder, tempo +10%', w => { addPow(w, 3); w.ct = (+w.ct || 100) + 10; });
+  P('reforcada', 'df', 'Reforçada', 'Reforço', '−6% de dano recebido, tempo +5%', w => { addMod(w, 'def 6'); w.ct = (+w.ct || 100) + 5; });
+  P('aparar', 'df', 'De Aparar', 'Aparar', 'cada ataque deixa você com Contra-ataque por 1 turno', w => addFx(w, 'st counter 1 self'));
+  P('guarda', 'df', 'De Guarda', 'Guarda', 'cada ataque dá Escudo 6 a você, −3% de dano recebido', w => { addFx(w, 'shield 6 self'); addMod(w, 'def 3'); });
+  P('abencoada', 'mi', 'Abençoada', 'Bênção', '×1,25 contra demônios', w => addFx(w, 'vs demon 1.25'));
+  P('amaldicoada', 'mi', 'Amaldiçoada', 'Maldição', '30% de Maldição, +1 de poder', w => { addSt(w, 'curse', 30, 3); addPow(w, 1); });
+  P('ressonante', 'mi', 'Ressonante', 'Ressonância', 'cada ataque devolve 2 de Aura', w => addFx(w, 'gain aura 2'));
+  P('cobicada', 'mi', 'Cobiçada', 'Cobiça', 'rouba 15% do dano como HP', w => addFx(w, 'drain hp 15'));
+  P('refugo', 'q', 'Mal feita', 'Refugo', '−3 de poder, −5% de acerto, metade do preço', w => { addPow(w, -3); w.hit = Math.max(-50, (+w.hit || 0) - 5); price(w, .5); });
+  P('segunda', 'q', 'Gasta', 'Segunda', '−1 de poder, 70% do preço', w => { addPow(w, -1); price(w, .7); });
+  P('oficina', 'q', 'De oficina', 'Oficina', '+2 de poder, 2,5× o preço', w => { addPow(w, 2); price(w, 2.5); });
+  P('artesao', 'q', 'De artesão', 'Artesão', '+4 de poder, +3% de crítico, 5× o preço', w => { addPow(w, 4); w.crit = Math.min(50, (+w.crit || 0) + 3); price(w, 5); });
+  P('mestre', 'q', 'Mestra', 'Mestre', '+6 de poder, +5% de crítico e de acerto, 10× o preço', w => { addPow(w, 6); w.crit = Math.min(50, (+w.crit || 0) + 5); w.hit = Math.min(50, (+w.hit || 0) + 5); price(w, 10); });
+  // um pacote por Vínculo: elemento, condição do elemento (20%) e um bônus temático
+  const EBON = { kagutsuchi: 'atk 5', susanoo: 'agi 5', atlas: 'def 5', indra: 'hit 5', fuhaku: 'crit 4', amaterasu: 'heal 8', tsukuyomi: 'hit 4; crit 3', shukketsu: 'atk 4', hiruko: 'atk 6' };
+  for (const el of Object.keys(EBON)) P('el:' + el, 'el', 'de ' + (g.RULES?.PATRON?.[el] || el), g.RULES?.PATRON?.[el] || el, `elemento ${g.RULES?.PATRON?.[el] || el}, 20% de ${g.RULES?.ST?.[ELST[el][0]] || ELST[el][0]} e ${EBON[el]}`, w => {
+    w.el = el; addSt(w, ELST[el][0], 20, ELST[el][1] + 1); addMod(w, EBON[el]);
+    if (w.cat === 'basica' || w.cat === 'especial') { price(w, 2 / CATS[w.cat][2]); w.cat = 'elemental'; } // vira elemental: forjável com essências
+  });
+  const noun = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l.at(-1) : l[0] || '';
+  // aplica um pacote no rascunho d (muda d); devolve '' ou o motivo de não ter aplicado
+  function applyPack(d, id) {
+    const p = PK[id]; if (!p) return 'pacote desconhecido';
+    d.pk = Array.isArray(d.pk) ? d.pk : [];
+    if (d.pk.includes(id)) return `${p.n}: já aplicado`;
+    if (d.pk.length >= 3) return 'no máximo 3 pacotes por arma';
+    if (p.grp === 'q' && d.pk.some(x => PK[x]?.grp === 'q')) return 'só uma qualidade por arma';
+    if (p.grp === 'el' && d.pk.some(x => PK[x]?.grp === 'el')) return 'só um elemento por arma';
+    d.base ??= d.name; d.sfxFrom ??= 0;
+    p.f(d); d.pk.push(id);
+    const nm = noun(d.pk.slice(d.sfxFrom).map(x => PK[x].noun)); d.name = String(d.base + (nm ? ' de ' + nm : '')).slice(0, 60);
+    return '';
+  }
+  // variante elemental de uma arma já pronta (rascunho novo; o chamador valida com clean)
+  function variantEl(w, el) { const d = structuredClone(w); delete d.pk; delete d.base; delete d.sfxFrom; d.base = w.name; d.sfxFrom = 0; d.pk = []; const e = applyPack(d, 'el:' + el); return e ? null : d; }
+  g.ARMAS = { PK, PKG, applyPack, variantEl, faixaOf, SUP, DIST, MUN, TIPOS, CATS, NIVEIS, ELST, MOD: M, ULT, FAIXA, ATTRS, MODK, prof, basicFx, short, kv, fxOf, score, rel, lvlOf, make, skill, clean, traits };
 })(globalThis);

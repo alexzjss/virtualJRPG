@@ -581,9 +581,9 @@ test('armas: técnicas próprias só com a arma equipada, herdam elemento e têm
 test('armas: modelos geram armas válidas e dentro da régua; o criador do mestre limpa o rascunho', () => {
   for (const id of Object.keys(AR.MOD)) for (const cat of Object.keys(AR.CATS)) for (const lvl of [0, 3]) {
     const w = AR.make(id, { lvl, cat, el: cat === 'elemental' ? 'indra' : '' }); assert.ok(w.sk.length >= 1 && w.sk.every(s => s.name && s.kind), id + cat);
-    const r = AR.rel(w); assert.ok(r >= 75 && r <= 200, `${id}/${cat}/${lvl}: ${r}%`);
+    const r = AR.rel(w); assert.ok(r >= (AR.SUP.has(w.wt) ? 55 : 75) && r <= 200, `${id}/${cat}/${lvl}: ${r}%`);
   }
-  for (const id of Object.keys(AR.MOD)) { const r = AR.rel(AR.make(id, { lvl: 1 })); assert.ok(r >= 88 && r <= 125, `${id} básico: ${r}%`); } // básicas perto do sabre simples
+  for (const id of Object.keys(AR.MOD)) { const w = AR.make(id, { lvl: 1 }), r = AR.rel(w), [lo, hi] = AR.SUP.has(w.wt) ? [60, 125] : [88, 125]; assert.ok(r >= lo && r <= hi, `${id} básico: ${r}%`); } // básicas perto do sabre simples; escudos e instrumentos (apoio) podem atacar menos
   reset(); const n = Object.keys(S.items).length;
   H.wpnSave(ana, { w: { name: 'Hack' } }); assert.equal(Object.keys(S.items).length, n, 'jogador não cria arma');
   const d = { ...AR.make('machado', { cat: 'especial' }), name: 'Machado do Teste', fx: 'efeito-falso 2', mod: 'def 5; xyz 3', hit: 999, sk: [{ name: 'Golpe Novo', kind: 'dmg', power: 20, cost: 5, fxs: 'st bleed 3 50%' }, { name: 'Quebrado', kind: 'dmg', fxs: 'nada 1' }] };
@@ -613,7 +613,7 @@ test('armas (expansão): distância não sofre contra-ataque, flechas no slot de
   const { w, errs } = AR.clean({ ...AR.make('escopeta'), dupla: true }); assert.equal(w.dupla, undefined); assert.ok(errs.length);
   assert.ok(AR.make('sabresg').dupla && AR.make('tonfas').dupla && AR.make('sai').dupla && AR.make('pistolas').dupla);
   // trilhas novas: 10 nós por tipo, com req, postura, reação, maestria e golpe final com requisito 55
-  for (const wt of ['pesada', 'foco', 'corrente', 'arremesso', 'arco']) {
+  for (const wt of ['pesada', 'foco', 'corrente', 'arremesso', 'arco', 'escudo', 'instrumento']) {
     const ns = Object.values(S.skills).filter(x => x.req === wt); assert.equal(ns.length, 10, wt);
     assert.ok(ns.some(x => x.kind === 'form') && ns.some(x => x.kind === 'util') && ns.some(x => x.rq && Object.values(x.rq)[0] === 55), wt);
     assert.ok(ns.some(x => x.kind === 'passive' && x.sc === 'wt:' + wt), wt + ': maestria');
@@ -622,4 +622,60 @@ test('armas (expansão): distância não sofre contra-ataque, flechas no slot de
   [a, e] = duelW(); a.skills.push(sk('Olho de Falcão')); a.pslots = [sk('Olho de Falcão')]; equipK(a, novo('arcocurto'));
   const comArco = modsOf(a, { basic: true }).hit; equipK(a, novo('sabre')); assert.equal((comArco - 5) - (modsOf(a, { basic: true }).hit - 5), 10, 'Olho de Falcão: +10 de acerto só com arco'); // arco curto e sabre têm +5 de acerto próprio
   for (const k of Object.keys(S.items)) if (k.startsWith('tw')) delete S.items[k];
+});
+
+// ---------- armas: escudos, instrumentos, básicas pré-implementadas, pacotes, variantes e importação ----------
+test('armas (escopo maior): todo modelo tem uma básica no catálogo, com loja em 1 ou 2 cenas e sem nome repetido', async () => {
+  const { WSHOP, WEAPONS_ALL } = await import('../content.js');
+  const itens = Object.values(S.items).filter(i => i.type === 'arma'); assert.equal(new Set(itens.map(i => i.name)).size, itens.length, 'nomes únicos');
+  for (const id of Object.keys(AR.MOD)) assert.ok(itens.some(i => i.tpl === id && i.cat === 'basica'), `${id}: sem básica no catálogo`);
+  assert.ok(itens.some(i => i.name === 'Kusarigama' && i.lvl === 0) && itens.some(i => i.name === 'Violino') && itens.some(i => i.name === 'Broquel'), 'básicas com o nome do modelo');
+  assert.equal(WEAPONS_ALL.filter(w => w[3] === 'basica' && w[2] === 0 && w[1] === 'sabre').length, 1, 'modelo que já tinha básica não duplica');
+  const nas = {}; for (const [k, l] of Object.entries(WSHOP)) for (const t of l) (nas[t] ??= []).push(k);
+  for (const id of Object.keys(AR.MOD)) assert.ok(nas[id]?.length >= 1 && nas[id].length <= 2, `${id}: em ${nas[id]?.length || 0} lojas`);
+  const noStock = Object.values(S.scenes).find(sc => sc.name === 'Mansão Ashworth'); assert.ok(noStock.shop.stock.length > 10, 'a Mansão agora vende armas'); assert.ok(noStock.shop.stock.every(k => S.items[k]));
+});
+test('armas: escudo bloqueia golpe físico único (−60% e sem condições), mas não área, mental nem contra aliado', () => {
+  const novo = n => Object.keys(S.items).find(k => S.items[k].name === n);
+  const hit = (skill, setup = () => {}) => { const [a, e] = duelW(); e.attrs.AGI = 99; e.arma = 20; derive(e); const sh = novo('Escudo de Torre'); a.inv[sh] = 1; a.equip.arma = sh; a.attrs.CON = 70; derive(a); a.hp = a.hpMax; setup(a, e);
+    const hp = a.hp; turn(e); fixR(.2, () => H.act(gm, { id: e.id, skill, target: a.id })); return { dano: hp - a.hp, a, log: S.log.at(-1).text }; };
+  assert.equal(AR.prof(S.items[novo('Escudo de Torre')]).block, 25);
+  const com = hit('atk'); assert.ok(/bloqueado/.test(com.log), 'com 20 < 25: bloqueia'); // fixR(.2) → rola 20
+  const sem = (() => { const [a, e] = duelW(); e.attrs.AGI = 99; e.arma = 20; derive(e); a.attrs.CON = 70; derive(a); a.hp = a.hpMax; const hp = a.hp; turn(e); fixR(.2, () => H.act(gm, { id: e.id, skill: 'atk', target: a.id })); return hp - a.hp; })();
+  assert.ok(com.dano < sem * .6, `com escudo ${com.dano} contra ${sem} sem`);
+  const fraco = (() => { const [a, e] = duelW(); e.arma = 20; derive(e); const sh = novo('Escudo de Torre'); a.inv[sh] = 1; a.equip.arma = sh; turn(e); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: a.id })); return S.log.at(-1).text; })();
+  assert.ok(!/bloqueado/.test(fraco), 'rolagem 30 > 25: não bloqueia');
+  // o escudo do inimigo não bloqueia o golpe de um aliado (só golpe de inimigo)
+  const [a, e] = duelW(); const b = mk(ana, {}); derive(b); b.hp = b.hpMax; S.battle.ticks[b.id] = 900; const sh = novo('Escudo de Torre'); b.inv[sh] = 1; b.equip.arma = sh; a.attrs.AGI = 99; turn(a); fixR(.2, () => H.act(gm, { id: a.id, skill: 'atk', target: b.id }));
+  assert.ok(!/bloqueado/.test(S.log.at(-1).text), 'aliado não é bloqueado');
+});
+test('armas: instrumentos têm técnicas de grupo e o ataque mental do violino fere a Sanidade', () => {
+  let [a, e] = duelW(); const vk = Object.keys(S.items).find(k => S.items[k].name === 'Violino'); a.inv[vk] = 1; a.equip.arma = vk; assert.equal(basicOf(a).kind, 'mental'); assert.equal(basicOf(a).attr, 'CAR');
+  const w = S.items[vk]; assert.equal(w.sk[0].kind, 'heal'); assert.equal(w.sk[0].area, true);
+  const b = mk(ana, {}); derive(b); b.hp = b.hpMax; S.battle.ticks[b.id] = 900; a.aura = a.auraMax; turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: `w:${vk}:0`, target: a.id }));
+  assert.ok(a.st.atkUp > 0 && b.st.atkUp > 0, 'Melodia de Coragem acende o grupo todo');
+  const fl = Object.keys(S.items).find(k => S.items[k].name === 'Flauta'); assert.equal(S.items[fl].wa, 'SAB');
+});
+test('armas: pacotes empilham até 3 (uma qualidade, um elemento), mexem nos traços e renomeiam; variantes elementais e importação', () => {
+  const d = structuredClone(AR.make('sabre')); assert.equal(AR.applyPack(d, 'sangrante'), ''); assert.equal(d.st, 'bleed'); assert.equal(d.stc, 35);
+  assert.equal(AR.applyPack(d, 'sangrante'), 'Sangrante: já aplicado'); assert.equal(AR.applyPack(d, 'venenosa'), ''); assert.ok(/st poison 3 35%/.test(d.fx), 'segunda condição vai para os efeitos');
+  assert.equal(AR.applyPack(d, 'mestre'), ''); assert.ok(/não|3/.test(AR.applyPack(d, 'precisa')), 'limite de 3'); assert.equal(d.pk.length, 3);
+  assert.equal(d.name, 'Sabre de Sangria, Veneno e Mestre'); assert.equal(d.power, 16); assert.equal(d.price, 400);
+  assert.equal(AR.applyPack(structuredClone(d), 'mestre'), 'Mestra: já aplicado'.replace('Mestra', 'Mestra'));
+  const q = structuredClone(AR.make('katana')); AR.applyPack(q, 'refugo'); assert.match(AR.applyPack(q, 'artesao'), /só uma qualidade/);
+  const e2 = structuredClone(AR.make('sabre')); AR.applyPack(e2, 'el:kagutsuchi'); assert.match(AR.applyPack(e2, 'el:indra'), /só um elemento/); assert.equal(e2.cat, 'elemental'); assert.equal(e2.el, 'kagutsuchi');
+  const par = structuredClone(AR.make('sabresg')); AR.applyPack(par, 'pesada'); assert.ok(par.power >= AR.make('sabresg').power + 1, 'poder por golpe respeita o traço em par');
+  assert.ok(AR.clean(d).w.pk.length === 3 && AR.clean({ ...d, pk: ['x', 'sangrante', 'y'] }).w.pk.length === 1, 'o criador só guarda pacotes conhecidos');
+  assert.ok(Object.values(AR.PK).filter(p => p.grp === 'el').length === 9 && Object.values(AR.PK).filter(p => p.grp === 'q').length === 5);
+  // variantes: um elemento ou os 9, sem repetir nome
+  reset(); const gk = Object.keys(S.items).find(k => S.items[k].name === 'Sabre de Cavalaria'), n0 = Object.keys(S.items).length;
+  H.wpnVar(ana, { id: gk, el: 'all' }); assert.equal(Object.keys(S.items).length, n0, 'jogador não cria');
+  H.wpnVar(gm, { id: gk, el: 'indra' }); const iv = Object.values(S.items).find(i => i.name === 'Sabre de Cavalaria de Indra'); assert.ok(iv && iv.el === 'indra' && iv.cat === 'elemental' && iv.sk.length >= 1 && iv.st === 'para');
+  H.wpnVar(gm, { id: gk, el: 'all' }); assert.equal(Object.keys(S.items).length, n0 + 9, 'as 9 de uma vez, sem repetir a de Indra');
+  const forjavel = Object.values(S.items).filter(i => i.name.startsWith('Sabre de Cavalaria de ')); assert.ok(forjavel.every(i => i.cat === 'elemental' && i.el));
+  // importação: exporta o rascunho, importa de volta e valida o que vier errado
+  const k0 = Object.keys(S.items).length, base = AR.make('mangual', { name: 'Mangual Importado' }); H.wpnImport(gm, { list: [base, { ...base, hits: 99, fx: 'xx 1', pk: ['nada'] }, 'lixo', null] });
+  assert.equal(Object.keys(S.items).length, k0 + 2); const nomes = Object.values(S.items).map(i => i.name); assert.ok(nomes.includes('Mangual Importado') && nomes.includes('Mangual Importado (2)'), 'nome repetido ganha número');
+  const ruim = Object.values(S.items).find(i => i.name === 'Mangual Importado (2)'); assert.equal(ruim.hits, 6); assert.equal(ruim.fx, ''); H.wpnImport(ana, { list: [base] }); assert.equal(Object.keys(S.items).length, k0 + 2, 'só o mestre importa');
+  H.wpnImport(gm, { list: Array.from({ length: 40 }, (_, i) => AR.make('adaga', { name: 'Adaga ' + i })) }); assert.equal(Object.keys(S.items).length, k0 + 2 + 25, 'lote de no máximo 25');
 });

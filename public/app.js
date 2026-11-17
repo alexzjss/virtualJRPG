@@ -403,7 +403,15 @@ const ocMods = { atk: 'dano', def: 'defesa', agi: 'velocidade', hit: 'acerto', c
 const ocDraft = r => ({ id: r.id, n: r.n, per: r.per, t: r.t, out: r.out || '', mats: Object.entries(r.mats), dc: r.dc, qty: r.qty, meal: r.meal ? { ...r.meal } : null, off: !!r.off, custom: !!r.custom });
 const ocCusto = d => d.mats.reduce((a, [n, q]) => a + q * (Object.values(S.items).find(i => i.name === n)?.price || 0), 0);
 // ----- Forja de armas (mestre): modelos, ajuste fino do ataque básico, técnicas próprias e orçamento -----
-const wf = { tpl: 'sabre', lvl: 0, cat: 'basica', el: '', id: '', d: null };
+const wf = { tpl: 'sabre', lvl: 0, cat: 'basica', el: '', id: '', d: null, imp: null };
+// exportar: arquivo .json com os rascunhos das armas; importar: arquivo ou texto colado, com prévia antes de confirmar
+const wfOut = i => { const d = wDraft(i); delete d.id; delete d.eff; delete d.attr; delete d.base; delete d.sfxFrom; return d; };
+function wfDownload(file, arr) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ formato: 'virtualJRPG-armas', v: 1, armas: arr }, null, 1)], { type: 'application/json' })); a.download = file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+function wfImpParse(text) {
+  let list = [], err = '';
+  try { const j = JSON.parse(text); list = Array.isArray(j) ? j : Array.isArray(j?.armas) ? j.armas : j && typeof j === 'object' ? [j] : []; } catch (e) { err = 'Texto não é um JSON válido: ' + e.message; }
+  wf.imp = { text, err: err || (list.length ? '' : 'Nenhuma arma encontrada.'), list: list.filter(x => x && typeof x === 'object').slice(0, 200).map(d => { try { const { w, errs } = ARMAS.clean(d); return { d, w, errs }; } catch (e) { return { d, w: { name: String(d.name || '?'), wt: 'lamina', cat: 'basica', power: 0, sk: [] }, errs: [e.message] }; } }) };
+}
 const SKD = s => ({ name: s.name, kind: s.kind, attr: s.attr || '', el: s.el || 'fis', power: s.power || 0, cost: s.cost || 0, res: s.res || 'aura', ct: s.ct || 100, hits: s.hits || 1, area: !!s.area, tg: s.tg || '', uses: s.uses || 0,
   fxs: s.fxs ?? RULES.fxSrc(s.fx), fms: s.fms ?? RULES.formSrc(s.form), d: s.d || '', payHp: s.pay?.hp || 0 }); // técnica → rascunho editável
 const wDraft = w => ({ ...structuredClone(w), sk: (w.sk || []).map(SKD) });
@@ -417,7 +425,7 @@ function armasWin() {
   const chk = (f, v, l) => `<label class="wchk"><input type="checkbox" data-wf="${f}" ${v ? 'checked' : ''}> ${l}</label>`;
   const AT = ARMAS.ATTRS.map(a => [a, a]), ELO = [['', '— físico'], ...Object.entries(EL).filter(([k]) => k !== 'fis')], STO = [['', '— nenhuma'], ...Object.entries(ST)], M0 = ARMAS.MOD[wf.tpl], T0 = ARMAS.TIPOS[D.wt];
   const gal = Object.entries(ARMAS.TIPOS).map(([t, T]) => `<div class="wgal"><em title="${esc(T.d)}">${esc(T.n)}</em>${Object.values(ARMAS.MOD).filter(m => m.wt === t).map(m => `<button class="${wf.tpl === m.id ? 'on' : ''}" data-a="wfTpl" data-k="${m.id}" title="${esc(m.d)}">${esc(m.n)}</button>`).join('')}</div>`).join('');
-  const r = ARMAS.rel(w), [lo, hi] = ARMAS.FAIXA[w.cat] || [90, 120], cls = r < lo ? 'low' : r > hi ? 'high' : 'ok';
+  const r = ARMAS.rel(w), [lo, hi] = ARMAS.faixaOf(w), cls = r < lo ? 'low' : r > hi ? 'high' : 'ok';
   const skRow = (x, n) => `<div class="wskr"><div class="row">${txt(`sk.${n}.name`, x.name, 'Nome', '', 40)}${sel(`sk.${n}.kind`, x.kind, [['dmg', 'Dano'], ['mental', 'Dano mental'], ['heal', 'Cura'], ['util', 'Suporte'], ['form', 'Transformação']], 'Tipo')}${sel(`sk.${n}.attr`, x.attr, [['', 'atributo da arma'], ...AT], 'Atributo')}${sel(`sk.${n}.el`, x.el, [['fis', 'Físico (herda o da arma)'], ...ELO.slice(1)], 'Elemento')}<button class="ghost" data-a="wfSkDel" data-k="${n}" aria-label="Tirar técnica">×</button></div>
     <div class="row"><label>Poder ${num(`sk.${n}.power`, x.power, 0, 99)}</label><label>Custo ${num(`sk.${n}.cost`, x.cost, 0, 99)}</label>${sel(`sk.${n}.res`, x.res, [['aura', 'Aura'], ['san', 'Sanidade']], 'Recurso')}<label>Tempo % ${num(`sk.${n}.ct`, x.ct, 40, 200)}</label><label>Golpes ${num(`sk.${n}.hits`, x.hits, 1, 8)}</label><label>Usos/batalha ${num(`sk.${n}.uses`, x.uses, 0, 9)}</label><label>% HP ${num(`sk.${n}.payHp`, x.payHp, 0, 30)}</label>${chk(`sk.${n}.area`, x.area, 'área')}${chk(`sk.${n}.tg`, x.tg === 'self', 'em si')}</div>
     <div class="row"><label class="g">Efeitos ${txt(`sk.${n}.fxs`, x.fxs, 'st bleed 3 50%; pierce 50; exec 30 1.5')}</label>${x.kind === 'form' ? `<label class="g">Forma ${txt(`sk.${n}.fms`, x.fms, 'dur 3; hit 15; crit 10')}</label>` : ''}</div><div class="row"><label class="g">Descrição ${txt(`sk.${n}.d`, x.d, 'O que a técnica faz, na voz do mundo', 'w', 200)}</label></div></div>`;
@@ -428,11 +436,11 @@ function armasWin() {
     <div class="row"><label>Nível ${sel('_lvl', wf.lvl, ARMAS.NIVEIS.map((n, i) => [i, `${n.n} (+${n.p} de poder)`]))}</label><label>Categoria ${sel('_cat', wf.cat, Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]))}</label><label>Elemento ${sel('_el', wf.el, ELO)}</label><button class="ghost" data-a="wfApply" title="Refaz o rascunho com o modelo, o nível, a categoria e o elemento escolhidos">Refazer do modelo</button></div>
     <small class="hint">${esc(M0 ? M0.n + ': ' + M0.d : '')} ${esc(ARMAS.CATS[wf.cat][1])}</small>
     <h4>2. Arma ${wf.id ? `<small>editando <b>${esc(S.items[wf.id]?.name || '')}</b></small>` : '<small>rascunho novo</small>'}</h4>
-    <div class="row"><label class="g">Nome ${txt('name', D.name, 'Nome da arma', 'w', 40)}</label><label>Tipo ${sel('wt', D.wt, Object.entries(ARMAS.TIPOS).map(([k, t]) => [k, t.n]))}</label><label>Categoria ${sel('cat', D.cat, Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]))}</label></div>
+    <div class="row"><label class="g">Nome ${txt('name', D.name, 'Nome da arma', 'w', 60)}</label><label>Tipo ${sel('wt', D.wt, Object.entries(ARMAS.TIPOS).map(([k, t]) => [k, t.n]))}</label><label>Categoria ${sel('cat', D.cat, Object.entries(ARMAS.CATS).map(([k, c]) => [k, c[0]]))}</label></div>
     <div class="row"><label>Poder ${num('power', D.power, 0, 99)}</label><label>Preço ${num('price', D.price, 0, 99999)}</label><label>Elemento ${sel('el', D.el, ELO)}</label><label>Nível ${sel('lvl', D.lvl, ARMAS.NIVEIS.map((n, i) => [i, n.n]))}</label></div>
     <h4>3. Ataque básico <small>${esc(T0?.d || '')}</small></h4>
     <div class="row"><label>Nome ${txt('atkN', D.atkN, 'Ataque', '', 30)}</label><label>Atributo ${sel('wa', D.wa, [['', `do tipo (${T0?.wa || 'FOR'})`], ...AT])}</label><label>2º atributo ${sel('wa2', D.wa2, [['', '— nenhum'], ...AT])}</label></div>
-    <div class="row"><label>Acerto ${num('hit', D.hit, -50, 50)}</label><label>Crítico ${num('crit', D.crit, 0, 50)}</label><label>Tempo % ${num('ct', D.ct || 100, 40, 200)}</label><label>Golpes ${num('hits', D.hits || 1, 1, 6)}</label><label>Perfura % ${num('pierce', D.pierce, 0, 100)}</label>${chk('area', D.area, 'em área')}${chk('dupla', D.dupla, 'em par (2º golpe a 50%)')}${chk('mental', D.mental, 'fere a Sanidade')}</div>
+    <div class="row"><label>Acerto ${num('hit', D.hit, -50, 50)}</label><label>Crítico ${num('crit', D.crit, 0, 50)}</label><label>Tempo % ${num('ct', D.ct || 100, 40, 200)}</label><label>Golpes ${num('hits', D.hits || 1, 1, 6)}</label><label>Perfura % ${num('pierce', D.pierce, 0, 100)}</label><label title="Chance de bloquear um golpe físico único de inimigo: −60% de dano e sem condições">Bloqueio % ${num('block', D.block, 0, 60)}</label>${chk('area', D.area, 'em área')}${chk('dupla', D.dupla, 'em par (2º golpe a 50%)')}${chk('mental', D.mental, 'fere a Sanidade')}</div>
     <div class="row"><label>Condição ${sel('st', D.st, STO)}</label><label>Chance % ${num('stc', D.st ? D.stc ?? 100 : 0, 0, 100)}</label><label>Turnos ${num('stn', D.stn || 3, 1, 6)}</label></div>
     <div class="row"><label class="g">Efeitos ${txt('fx', D.fx, 'exec 30 1.5; vs bleed 1.3; push 20; drain hp 20; st marked 2 30%')}</label></div>
     <div class="row"><label class="g">Bônus empunhada ${txt('mod', D.mod, 'def 5; agi -5; FOR 3', 'w', 80)}</label><label>Requisito ${txt('rq', D.rq, 'FOR 50', '', 40)}</label></div>
@@ -441,25 +449,49 @@ function armasWin() {
     ${D.sk.map(skRow).join('') || '<small>Nenhuma técnica: a arma só melhora o ataque básico.</small>'}
     <div class="row"><button class="ghost" data-a="wfSkAdd" ${D.sk.length >= 4 ? 'disabled' : ''}>+ Técnica nova</button><input class="bq" data-bf="wsq" placeholder="Copiar da árvore: digite o nome…" aria-label="Copiar técnica da árvore" value="${esc(bf.wsq || '')}"></div>
     ${found.length ? `<div class="row chips">${found.map(([k, s]) => `<span data-a="wfSkCopy" data-id="${k}" title="${esc(desc(s))}">+ ${esc(s.name)}</span>`).join('')}</div>` : ''}
+    <h4>5. Pacotes de traços <small>${(D.pk || []).length}/3 · empilham em cima desta arma (uma qualidade e um elemento no máximo); "Refazer do modelo" desfaz</small></h4>
+    ${Object.entries(ARMAS.PKG).map(([g, l]) => `<div class="wgal"><em>${esc(l)}</em>${Object.values(ARMAS.PK).filter(p => p.grp === g).map(p => `<button class="${(D.pk || []).includes(p.id) ? 'on' : ''}" data-a="wfPk" data-k="${p.id}" title="${esc(p.d)}">${esc(p.n)}</button>`).join('')}</div>`).join('')}
+    ${wf.id ? `<h4>6. Variantes elementais <small>cria cópias elementais da arma <b>salva</b> (nome “${esc(S.items[wf.id]?.name || '')} de …”); as que já existem são puladas</small></h4><div class="row chips">${Object.keys(ARMAS.ELST).slice(0, 9).map(e => `<span data-a="wfVar" data-k="${e}" style="border-color:${ELC[e]}">${esc((EL[e] || e).split('·')[0])}</span>`).join('')}<span class="weak" data-a="wfVar" data-k="all">As 9 de uma vez</span></div>` : ''}
     <div class="row wsave">${wf.id ? '<button class="own" data-a="wfSave">Salvar alterações</button><button data-a="wfSaveNew">Salvar como arma nova</button>' : '<button class="own" data-a="wfSaveNew">Criar arma</button>'}<button class="ghost" data-a="wfApply">Descartar e voltar ao modelo</button></div>
   </div><div class="wf-side">
     <div class="wprev"><em>Prévia</em><b>${esc(w.name)}</b><small>${esc(idesc(w))}</small><small class="wtr">${esc(wpnLine(w))}</small>
-      <div class="wbar ${cls}"><i style="width:${Math.min(100, r / 1.8)}%"></i><span>Orçamento do ataque: <b>${r}%</b> do sabre simples do mesmo nível · faixa ${esc(CATN[w.cat] || '')}: ${lo}–${hi}%</span></div>
+      <div class="wbar ${cls}"><i style="width:${Math.min(100, r / 1.8)}%"></i><span>Orçamento do ataque: <b>${r}%</b> do sabre simples do mesmo nível · faixa ${esc(CATN[w.cat] || '')}${ARMAS.SUP.has(w.wt) ? ' (arma de apoio)' : ''}: ${lo}–${hi}%</span></div>
       ${w.sk.map(x => `<small class="wsk"><b>${esc(x.name)}</b> ${esc(desc(x))}</small>`).join('')}${errs.length ? `<p class="warn">${errs.map(esc).join('<br>')}</p>` : ''}</div>
     <h4>Armas da campanha <small>${list.length}</small></h4><input class="bq" data-bf="wq" placeholder="Buscar por nome ou tipo…" aria-label="Buscar arma" value="${esc(bf.wq || '')}">
-    <div class="orows">${list.map(([k, i]) => `<button class="orow ${wf.id === k ? 'on' : ''}" data-a="wfEdit" data-id="${k}"><b>${esc(i.name)}</b><small>${esc(WT[i.wt] || '—')} · ${esc(CATN[i.cat] || 'sem modelo')} · poder ${i.power} · ${ARMAS.rel(i)}%${(i.sk || []).length ? ` · ${i.sk.length} técnica(s)` : ''}</small></button>`).join('')}</div>
+    <div class="row"><button class="ghost" data-a="wfExpAll" title="Baixa um .json com as armas da lista (respeita a busca)">⬇ Exportar ${list.length}</button><button class="ghost ${wf.imp ? 'on' : ''}" data-a="wfImpT">⬆ Importar</button></div>
+    ${wf.imp ? wfImpPanel() : ''}
+    <div class="orows">${list.map(([k, i]) => `<div class="wrow ${wf.id === k ? 'on' : ''}"><button class="orow ${wf.id === k ? 'on' : ''}" data-a="wfEdit" data-id="${k}"><b>${esc(i.name)}</b><small>${esc(WT[i.wt] || '—')} · ${esc(CATN[i.cat] || 'sem modelo')} · poder ${i.power} · ${ARMAS.rel(i)}%${(i.sk || []).length ? ` · ${i.sk.length} técnica(s)` : ''}</small></button><span class="wact"><button class="ghost" data-a="wfDup" data-id="${k}" title="Duplicar e editar: abre uma cópia no editor" aria-label="Duplicar ${esc(i.name)}">⧉</button><button class="ghost" data-a="wfExp" data-id="${k}" title="Baixar esta arma (.json)" aria-label="Exportar ${esc(i.name)}">⬇</button></span></div>`).join('')}</div>
   </div></div>`;
 }
+function wfImpPanel() {
+  const I = wf.imp, ok = I.list.length;
+  return `<div class="wimp"><small>Cole o texto de um arquivo exportado (ou de uma só arma) ou carregue o .json. Nada é criado antes de você confirmar.</small>
+    <textarea data-wf="_imptxt" rows="4" placeholder='{"formato":"virtualJRPG-armas","armas":[…]}' aria-label="Texto das armas a importar">${esc(I.text)}</textarea>
+    <div class="row"><label class="up">Carregar .json<input type="file" accept=".json,application/json" data-wfup="1"></label><button class="ghost" data-a="wfImpX">Fechar</button></div>
+    ${I.err ? `<p class="warn">${esc(I.err)}</p>` : ''}
+    ${ok ? `<div class="wimpl">${I.list.map(x => `<div class="${x.errs.length ? 'bad' : ''}" title="${esc(x.errs.join(' · '))}"><b>${esc(x.w.name)}</b><small>${esc(WT[x.w.wt] || '—')} · ${esc(CATN[x.w.cat] || '')} · poder ${x.w.power} · ${ARMAS.rel(x.w)}%${x.errs.length ? ` · ${x.errs.length} correção(ões)` : ''}</small></div>`).join('')}</div>
+    <button class="own" data-a="wfImpGo">Importar ${ok} arma(s)${I.list.some(x => x.errs.length) ? ' (com as correções)' : ''}</button>` : ''}</div>`;
+}
 function wfChange(f, v) {
+  if (f === '_imptxt') { wfImpParse(v); return render(); }
   if (['_lvl', '_cat', '_el'].includes(f)) { wf[f.slice(1)] = f === '_lvl' ? +v : v; if (!wf.id) wfNew(); return render(); }
   const m = f.match(/^sk\.(\d+)\.(\w+)$/);
   if (m) { const x = wf.d.sk[+m[1]]; if (x) x[m[2]] = m[2] === 'tg' ? (v ? 'self' : '') : v; return render(); }
-  wf.d[f] = v; return render();
+  wf.d[f] = v; if (f === 'name') { wf.d.base = v; wf.d.sfxFrom = (wf.d.pk || []).length; } // renomear à mão recomeça o sufixo dos pacotes
+  return render();
 }
 function wfClick(d) {
   if (d.a === 'wfTpl') { wf.tpl = d.k; wfNew(); }
   else if (d.a === 'wfApply') wfNew();
   else if (d.a === 'wfEdit') { const i = S.items[d.id]; if (!i) return; wf.id = d.id; wf.d = wDraft(i); if (ARMAS.MOD[i.tpl]) wf.tpl = i.tpl; }
+  else if (d.a === 'wfPk') { const e = ARMAS.applyPack(wf.d, d.k); if (e) toast(e, 'no'); }
+  else if (d.a === 'wfDup') { const i = S.items[d.id]; if (!i) return; wf.d = wDraft(i); wf.id = ''; wf.d.name = (i.name + ' (cópia)').slice(0, 60); wf.d.base = wf.d.name; wf.d.sfxFrom = (wf.d.pk || []).length; if (ARMAS.MOD[i.tpl]) wf.tpl = i.tpl; setTimeout(() => document.querySelector('.win[data-win=armas] .win-body')?.scrollTo(0, 0)); toast(`Cópia de ${i.name} aberta no editor.`, 'ok'); }
+  else if (d.a === 'wfVar') return send({ t: 'wpnVar', id: wf.id, el: d.k });
+  else if (d.a === 'wfExp') { const i = S.items[d.id]; if (i) wfDownload(`arma-${i.name.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.json`, [wfOut(i)]); return; }
+  else if (d.a === 'wfExpAll') { const q = (bf.wq || '').trim().toLowerCase(), l = Object.values(S.items).filter(i => i.type === 'arma' && (!q || i.name.toLowerCase().includes(q) || (WT[i.wt] || '').toLowerCase().includes(q))); wfDownload(`armas-${l.length}.json`, l.map(wfOut)); return; }
+  else if (d.a === 'wfImpT') wf.imp = wf.imp ? null : { text: '', err: '', list: [] };
+  else if (d.a === 'wfImpX') wf.imp = null;
+  else if (d.a === 'wfImpGo') { const l = (wf.imp?.list || []).map(x => x.d); for (let i = 0; i < l.length; i += 10) send({ t: 'wpnImport', list: l.slice(i, i + 10) }); wf.imp = null; } // lotes pequenos: o limite de uma mensagem é 64 KB
   else if (d.a === 'wfSkAdd') { if (wf.d.sk.length < 4) wf.d.sk.push(SKD({ name: 'Técnica nova', kind: 'dmg', power: 12, cost: 4 })); }
   else if (d.a === 'wfSkDel') wf.d.sk.splice(+d.k, 1);
   else if (d.a === 'wfSkCopy') { const s = S.skills[d.id]; if (s && wf.d.sk.length < 4) { wf.d.sk.push(SKD({ ...s, attr: s.attr })); bf.wsq = ''; } }
@@ -878,6 +910,7 @@ app.addEventListener('change', e => {
   if (d.ou) { const [nd, f] = d.ou.split(':'); (oUi[nd] ||= {})[f] = v; return; }
   if (d.nota) return send({ t: 'ofiNota', id: d.id, e: d.nota, txt: v });
   if (d.oc) return ocChange(el, v);
+  if (d.wfup) { const f = el.files[0]; if (f) f.text().then(t => { wfImpParse(t); render(); }); return; }
   if (d.wf) return wfChange(d.wf, v);
   if (d.a === 'planLoad') { const b = lsGet('vj.builds', [])[+v]; if (b) lsSet('vj.plan.' + d.id, b.nodes); return render(); }
   if (d.a === 'campWith') { campWith[d.id] = v; const pr = myReq()?.[1]; if (S.camp.acts[d.id] === 'conversar' || (pr?.t === 'campAct' && pr.m.k === 'conversar' && pr.m.id === d.id)) send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); } // com o pedido ainda na fila, reenvia: o novo substitui o anterior e leva a escolha

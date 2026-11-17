@@ -65,3 +65,11 @@ Tudo acima foi implementado nesta sessão. Detalhes e arquivos: `ARVORE-SISTEMAS
 - Arremesso usa DES (bumerangue e chakram: média DES/AGI). Os tipos novos ganham golpe supremo de lendária.
 - Pistolas Gêmeas viram arma em par.
 - **Trilhas de 10 nós** no tronco Marcial para pesada, foco, corrente, arremesso e arco, com postura, reação, passiva de maestria e golpe final com requisito 55 do atributo do tipo.
+
+## Armas: escopo maior (questionário desta frente)
+- **Básicas:** uma básica Comum por modelo, com o nome do modelo; modelos que já tinham básica não duplicam. **Lojas por cena** com tema (Beco, Santuário, Estação, Mansão), cada arma em 1 ou 2.
+- **Tipos novos:** escudos e instrumentos musicais; trilha de 10 nós na árvore para os dois. Só esses dois (não os 18 modelos extras nos tipos antigos, nem explosivos nem armas naturais).
+- **Escudo:** arma de mão que é ele mesmo (sem slot extra). Regras: defesa fixa (`mod def`), **bloqueio de golpe** (chance fixa, −60% e sem condições), guarda-costas (`guard`) e ataque de borda.
+- **Instrumento:** arma de foco com buffs de grupo (sem regra de "canto contínuo"); CAR, e SAB nos sopros.
+- **Criar a partir das básicas:** duplicar e editar, variantes elementais com 1 clique (os 9 elementos), **pacotes de traços** (elemento, status e qualidade; empilham até 3), exportar/importar `.json` e colar texto. Tudo dentro da Forja de armas, na lista lateral.
+- Bestiário com armas: fora do escopo.

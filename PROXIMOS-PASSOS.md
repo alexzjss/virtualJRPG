@@ -4,7 +4,7 @@ Leia primeiro: `README.md`, `ARVORE-SISTEMAS.md` (mecânicas e notação dos nó
 O usuário escreve em português; responda e comente o código em português, no estilo existente. Decisões já tomadas não se perguntam de novo: use `AskUserQuestion` só para decisões novas.
 
 ## Como trabalhar
-- `npm install && npm test` (67 testes devem passar) · `npm run audit` (0 erros; 7 avisos conhecidos: 5 de nomes metafóricos e 2 de poder alto nas Pinças do Marcial) · `npm run ui` (teste de fumaça da interface com Chromium/Playwright; `UI_SHOTS=pasta` guarda capturas, `UI_ONLY=celular` roda só um bloco) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio; `node tools/sim.js 300 armas` para o ataque básico de cada arma.
+- `npm install && npm test` (71 testes devem passar) · `npm run audit` (0 erros; 6 avisos conhecidos: 4 de nomes metafóricos e 2 de poder alto nas Pinças do Marcial; 1 de poder alto na Postura do Falcão) · `npm run ui` (teste de fumaça da interface com Chromium/Playwright; `UI_SHOTS=pasta` guarda capturas, `UI_ONLY=celular` roda só um bloco) · `node tools/sim.js 60 enc` e `node tools/sim.js 80 boss` para equilíbrio; `node tools/sim.js 300 armas` para o ataque básico de cada arma.
 - Compare sempre com a base: encontros (nível 0/1/2, fácil→mortal) estavam em ~90/77/93/73/42/23 e chefes entre 46% e 89%. Variação de ±10 pontos é ruído.
 - Toda mecânica nova ganha teste em `tools/test.js`; as de combate passam pelo simulador antes de entrar.
 - Mudou `tree.js` ou `arvore/`: a grade é refeita ao iniciar (skills ficam pelo nome). Nomes de nós precisam ser únicos (`npm run audit` confere).
@@ -50,3 +50,11 @@ Ideias que sobraram:
 - Os 44 modelos da expansão estão só na Forja de armas (o usuário pediu para não mexer em catálogo e lojas agora).
 - Trocar de arma em batalha não custa tempo hoje; se virar abuso, cobrar meio turno.
 - A régua de orçamento não conta as técnicas nem o elemento.
+
+## Armas: escopo maior (sessão `weapons-system-review`, 3ª etapa)
+Feito: escudo (com `block`) e instrumento como tipos (85 modelos, 11 tipos), básica Comum de todo modelo no catálogo (108 armas), lojas temáticas nas 4 cenas, 32 pacotes de traços (empilham até 3), duplicar, variantes elementais, exportar/importar `.json` e trilhas de 10 nós para escudo e instrumento. Ver `ARMAS.md`.
+Ideias que sobraram:
+- Revisar nó a nó com o usuário as trilhas das armas (pesada, foco, corrente, arremesso, arco, escudo, instrumento).
+- Inimigos humanos do bestiário com arma equipada (o usuário disse que está fora do escopo por ora; passar no `sim.js` antes).
+- `Padrão` não entrou como qualidade (não faria nada); as 5 qualidades são Mal feita, Gasta, De oficina, De artesão e Mestra.
+- Campanhas salvas não recebem as lojas novas sozinhas (só o catálogo): usar "+ cenas de exemplo" ou pôr à venda pela janela Itens.

@@ -51,12 +51,12 @@ Os números ficam em `R` no topo de `server.js`. `node tools/sim.js 500` simula 
 - O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
 
 ## Conteúdo padrão
-`content.js` gera a grade de skills (1391 nós), o catálogo de itens (128, com 47 armas, flechas e materiais de forja), o bestiário (22 inimigos + 9 chefes + o trio da Tempestade Ígnea), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
+`content.js` gera a grade de skills (1411 nós), o catálogo de itens (189, com 108 armas, flechas e materiais de forja), o bestiário (22 inimigos + 9 chefes + o trio da Tempestade Ígnea), 4 cenas de exemplo com mapa e loja própria, e os veículos de perseguição.
 Campanhas já salvas mantêm o conteúdo antigo: use **Restaurar padrão** nas janelas Skills, Itens e loja ou Cena (bestiário) para carregar o novo.
 
 ## Vínculos e personagens base
 Cada caçador tem um ou mais **Vínculos** (Kagutsuchi, Susanoo, Atlas, Indra, Fuhaku, Amaterasu, Tsukuyomi, Shukketsu, Hiruko). Ele só aprende o tronco Marcial e as skills dos próprios Vínculos, e resiste ao elemento deles. O mestre concede Vínculos na aba **Mestre** da ficha.
-A árvore (1391 nós: 90 por Vínculo em 9 ramos, 207 marciais, 110 de Aura e 110 de Ocultismo; veja `REVISAO-ARVORE.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
+A árvore (1411 nós: 90 por Vínculo em 9 ramos, 227 marciais, 110 de Aura e 110 de Ocultismo; veja `REVISAO-ARVORE.md`) fica em `tree.js` e na pasta `arvore/`; `content.js` só a distribui na grade.
 
 ## Árvore expandida: transformações, rituais, votos e mais
 Além de dano, cura e condições, os nós agora têm efeitos compostos e sistemas próprios: transformações (uma por vez, com dreno por turno e efeito colateral), golpes concentrados, multi-golpe e ricochete, roubo de vida, detonar condições, execução, escudo, regeneração, purificar, reerguer caídos, contra-ataque, reflexo, esquiva, provocar, guarda-costas, selos que explodem depois, invocações que agem sozinhas, técnicas em dupla, votos e restrições, rituais em círculos com versões Discente e Verdadeiro, e passivas com gatilho. A descrição mecânica de cada nó aparece na grade.
@@ -89,7 +89,7 @@ Veja `ARVORE-SISTEMAS.md` (mecânicas) e `DECISOES-SISTEMAS.md` (o que foi decid
 - `npm run audit` confere a árvore (nomes repetidos, XP, poder fora da curva, nomes que não cumprem o efeito).
 
 ## Armas
-Cada personagem empunha uma arma, e ela define o **ataque básico** (atributo, tempo, golpes, área, condição com chance, perfuração, efeitos e bônus enquanto empunhada) e traz **técnicas próprias**, que aparecem na aba **Arma** do menu de batalha só enquanto ela está equipada. Nove tipos (lâmina, haste, arma de fogo, punhos, arma pesada, foco místico, corrente, arremesso e arco), o traço **em par**, cinco categorias (básica, especial, elemental, lendária, maldita) e quatro níveis. Armas de distância não sofrem contra-ataque; arcos usam flechas. Cada tipo tem trilha na árvore Marcial. O mestre monta armas novas a partir de 71 modelos na janela **Forja de armas**, com prévia e régua de orçamento. Detalhes em `ARMAS.md`; `node tools/sim.js 300 armas` mede o ataque de cada arma no motor.
+Cada personagem empunha uma arma, e ela define o **ataque básico** (atributo, tempo, golpes, área, condição com chance, perfuração, efeitos e bônus enquanto empunhada) e traz **técnicas próprias**, que aparecem na aba **Arma** do menu de batalha só enquanto ela está equipada. Onze tipos (lâmina, haste, arma de fogo, punhos, arma pesada, foco místico, corrente, arremesso, arco, **escudo** e **instrumento**), o traço **em par**, o **bloqueio** dos escudos, cinco categorias (básica, especial, elemental, lendária, maldita) e quatro níveis. Armas de distância não sofrem contra-ataque; arcos usam flechas. Cada tipo tem trilha na árvore Marcial. Todo modelo (85) tem uma **arma básica pronta** no catálogo e à venda em lojas temáticas. O mestre monta armas novas na janela **Forja de armas** a partir de um modelo, **duplicando** uma arma pronta, aplicando **pacotes de traços** (até 3: sangrante, veloz, de um elemento, qualidade…), criando **variantes elementais** com 1 clique ou **importando e exportando** `.json`, sempre com prévia e régua de orçamento. Detalhes em `ARMAS.md`; `node tools/sim.js 300 armas` mede o ataque de cada arma no motor.
 
 ## Forja (aba Forja do inventário)
 Duas formas de forjar, ambas fora de batalha e com aprovação do mestre:

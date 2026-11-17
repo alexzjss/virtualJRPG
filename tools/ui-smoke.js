@@ -199,6 +199,19 @@ try {
     await until(() => S.log.slice(-6).some(l => /Leque do Pistoleiro/.test(l.text)), 'técnica da arma executada');
   });
 
+  await section('armas: escudo bloqueia na tela e instrumento aparece com técnicas de grupo', async () => {
+    const torre = Object.keys(S.items).find(k => S.items[k].name === 'Escudo de Torre'), violino = Object.keys(S.items).find(k => S.items[k].name === 'Violino');
+    thomas.inv[torre] = 1; thomas.equip.arma = torre; mikhail.inv[violino] = 1; mikhail.equip.arma = violino; push();
+    check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia');
+    await click(bia, '.cmd [data-sub=wp]', 'aba Arma do violino');
+    await until(async () => /Melodia de Coragem/i.test(await txt(bia, '.alist')), 'violino básico mostra a técnica de grupo (a 2ª vem nas categorias acima de básica)');
+    await bia.locator('.cmd [data-sub=""]').first().click().catch(() => bia.locator('.cmd [data-sub=atk]').first().click().catch(() => {}));
+    await shot(bia, 'instrumento');
+    thomas.equip.arma = torre; push();
+    await until(async () => (await gmP.evaluate(() => 1)) === 1, 'estado estável');
+    mikhail.equip.arma = Object.keys(S.items).find(k => S.items[k].name === 'Revólver .38'); delete thomas.equip.arma; push();
+  });
+
   go({ t: 'battle', on: false });
   S.auto.act = false; push();
   const onPage = async (p, sel) => { // abre as páginas do jogador até achar o elemento
@@ -224,6 +237,32 @@ try {
     const made = await until(() => Object.values(S.items).find(i => i.name === 'Machado de Teste'), 'arma criada no catálogo');
     check(made && made.tpl === 'machado' && made.cat === 'especial' && made.sk.length === 2 && made.fx === 'vs bleed 1.3', 'arma criada com modelo, categoria, técnicas e efeito');
     await until(async () => /editando/i.test(await txt(gmP, '.wforge')), 'depois de criar, a Forja continua editando a arma');
+    // pacotes: aplica Veloz, o nome ganha o sufixo e Salvar alterações regrava a mesma peça
+    await tap('.wforge [data-a=wfPk][data-k=veloz]');
+    await until(async () => (await gmP.locator('.wforge input[data-wf=name]').inputValue()) === 'Machado de Teste de Velocidade', 'pacote Veloz renomeia a arma');
+    await tap('.wforge [data-a=wfPk][data-k=sangrante]'); await tap('.wforge [data-a=wfPk][data-k=mestre]'); await tap('.wforge [data-a=wfPk][data-k=precisa]'); // o 4º é recusado
+    await until(async () => (await gmP.locator('.wforge input[data-wf=name]').inputValue()) === 'Machado de Teste de Velocidade, Sangria e Mestre', 'três pacotes empilhados, o quarto recusado');
+    await tap('.wforge [data-a=wfSave]');
+    const emp = await until(() => Object.values(S.items).find(i => i.name === 'Machado de Teste de Velocidade, Sangria e Mestre' && i.pk?.length === 3), 'arma regravada com os pacotes');
+    check(emp && Object.values(S.items).filter(i => i.tpl === 'machado' && /Machado de Teste/.test(i.name)).length === 1, 'regravar não cria outra arma');
+    // variante elemental pela tela
+    await tap('.wforge [data-a=wfVar][data-k=indra]');
+    await until(() => Object.values(S.items).some(i => i.name.endsWith(' de Indra') && i.name.startsWith('Machado de Teste') && i.el === 'indra' && i.cat === 'elemental'), 'variante de Indra criada');
+    // duplicar e editar
+    await tap('.wforge .wrow [data-a=wfDup]');
+    await until(async () => /\(cópia\)/.test(await gmP.locator('.wforge input[data-wf=name]').inputValue()), 'duplicar abre a cópia no editor');
+    check(!(await txt(gmP, '.wforge .wsave')).includes('Salvar alterações'), 'a cópia é uma arma nova (sem "Salvar alterações")');
+    // exportar e importar: o texto exportado volta pela caixa de importação, com prévia
+    const baixou = gmP.waitForEvent('download', { timeout: 4000 }).catch(() => null);
+    await tap('.wforge [data-a=wfExpAll]'); const dl = await baixou; check(!!dl, 'Exportar baixa um arquivo .json');
+    await tap('.wforge [data-a=wfImpT]');
+    const json = JSON.stringify({ formato: 'virtualJRPG-armas', v: 1, armas: [{ name: 'Lâmina Importada', wt: 'lamina', power: 12, cat: 'basica', hit: 999, fx: 'xx 1' }] });
+    await gmP.fill('.wforge textarea[data-wf=_imptxt]', json); await gmP.locator('.wforge textarea[data-wf=_imptxt]').press('Tab');
+    await until(async () => /Lâmina Importada/.test(await txt(gmP, '.wimp')) && /correç/.test(await txt(gmP, '.wimp')), 'prévia da importação mostra a arma e as correções');
+    check(!Object.values(S.items).some(i => i.name === 'Lâmina Importada'), 'nada é criado antes de confirmar');
+    await tap('.wforge [data-a=wfImpGo]');
+    const imp = await until(() => Object.values(S.items).find(i => i.name === 'Lâmina Importada'), 'arma importada ao confirmar');
+    check(imp && imp.hit === 50 && imp.fx === '', 'importação corrige o que veio fora dos limites');
     await tap('.win[data-win=armas] [data-a=winX]');
   });
 
