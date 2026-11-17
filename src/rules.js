@@ -425,6 +425,7 @@ function ammoFor(a, s) { // munição equipada: balas (armas de fogo) ou flechas
   a.shots[id]--; return am;
 }
 function strike(a, s, t, aim, bonus = 0, o = {}) {
+  if (o.beat != null && S.battle.cmd?.perf && S.battle.cmd.foe === a.id) o = { ...o, mult: (o.mult || 1) * 1.25 }; // golpe anunciado Perfeito de chefe
   const am = ammoFor(a, s); if (am) { const pi = Math.max(am.pierce || 0, s.fx?.find(f => f.t === 'pierce')?.p || 0); s = { ...s, el: am.el || s.el, fx: [...(s.fx || []).filter(f => f.t !== 'pierce'), ...(pi ? [{ t: 'pierce', p: pi }] : []), ...(am.st ? [{ t: 'st', k: am.st, n: am.stn || 2, ch: am.stc ?? 100 }] : [])] }; }
   const ma = modsOf(a, s), stat = statOf(a, s), stTxt = s.st ? ` [${STN[s.st]}]` : '';
   if (s.kind === 'heal' || s.kind === 'util') {
@@ -512,14 +513,17 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
 const parryable = (a, s, t, o, sure) => s.kind === 'dmg' && !s.area && !o.counter && t && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure;
 const parNode = ch => (ch.skills || []).map(k => S.skills[k]).filter(x => x?.par).sort((x, y) => y.par - x.par)[0];
 const canPar = p => { const n = parNode(p); return !!n && !p.parT && !p.st.silence && p.aura >= (n.cost || 0); };
-const telOf = (a, k) => k !== 'atk' && (SK(k)?.tel === 1 || !!a.telK?.includes(k)); // golpe anunciado: a ficha do inimigo (telK) e o próprio nó
+// golpe anunciado: o nó (tel: 1) ou a lista da ficha do inimigo (telK). A lista nasce sozinha na primeira consulta (chefe: 2 mais fortes, elite: 1) e daí o mestre manda
+const autoTel = ch => { const n = ch.boss ? 2 : ch.rank === 'elite' ? 1 : 0, pw = k => SK(k).power * (SK(k).hits || 1) * (SK(k).area ? 1.5 : 1);
+  return (ch.skills || []).filter(k => SK(k) && ['dmg', 'mental'].includes(SK(k).kind) && !SK(k).limit).sort((x, y) => pw(y) - pw(x)).slice(0, n); };
+const telOf = (a, k) => { if (k === 'atk') return false; if (a.enemy && a.telK === undefined) a.telK = autoTel(a); return SK(k)?.tel === 1 || a.telK?.includes(k); };
 function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devolve null se ninguém pode se defender
   const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), D = RU.CMD.DEF;
   if (!s || !plan.tgs.length || !['dmg', 'mental'].includes(s.kind) || s.fx?.some(f => f.t === 'sure')) return null;
   const tel = telOf(a, plan.skill), ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (tel || (parryable(a, s, t, {}, false) && canPar(t))));
   if (!ts.length) return null;
-  const beat = D.beat, hits = s.hits || 1, beats = Array.from({ length: hits }, (_, i) => beat + i * D.gap);
-  return { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, beats = Array.from({ length: hits }, (_, i) => beat + i * D.gap);
+  return { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, tel, perf, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
 }
 function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'bad' (golpe sai +50%) ou ''
   const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
@@ -772,4 +776,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { defWindow, telOf, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { iaExtra, defWindow, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

@@ -649,7 +649,7 @@ test('bestiário: Domínio só em 3 chefes (Leviatã, Condessa, Filho de Hiruko)
   reset(); for (let i = 0; i < 10; i++) { H.foeGen(gm, { el: ['kagutsuchi', 'susanoo', 'amaterasu'][i % 3], role: 'conjurador', rank: 'chefe' }); }
   assert.ok(Object.values(S.chars).every(c => c.skills.every(k => !S.skills[k].dom && !S.skills[k].trio)));
 });
-const foeTurn = (e, f) => { turn(e); return fixR(.3, () => H.ai(gm)); };
+const foeTurn = (e, f) => { turn(e); return fixR(.3, () => { H.ai(gm); H.cmdSkip(gm); }); }; // cmdSkip: chefe com golpe anunciado abre a janela; o teste não espera
 test('IA: o chefe abre o Domínio uma única vez, com Aura cheia e vida < 75%, e o Choque vale contra herói', () => {
   reset(); const h = mk(ana, {}); H.bSpawn(gm, { id: bst('Condessa Escarlate'), fit: false }); const b = Object.values(S.chars).find(c => c.boss); derive(b); b.hp = b.hpMax; b.aura = b.auraMax;
   H.battle(gm, { on: true }); foeTurn(b); assert.ok(!S.battle.dom && !b.domUsed); // vida cheia: não abre
@@ -978,7 +978,7 @@ const dfx = (names = ['Aparar'], heroes = 1) => { // um inimigo rápido e `heroe
   const e = mk(gm, { enemy: true }); e.skills = []; e.attrs.AGI = 99; derive(e); H.battle(gm, { on: true }); while (current() !== e.id) H.next(gm); return { hs, e };
 };
 const openAt = left => { const C = S.battle.cmd; C.at = Date.now() - C.beats[0] + left; return C; }; // põe o impacto da 1ª batida daqui a `left` ms
-const waitCmd = () => new Promise(r => setTimeout(r, (S.battle.cmd?.w || 1100) + 350));
+const waitCmd = () => fixR(.3, () => H.cmdSkip(gm)); // fecha a janela já, com dados fixos (acerta sem crítico)
 test('defesa: golpe não anunciado abre só Aparar e só para o alvo', () => {
   const { hs, e } = dfx(['Aparar'], 2); H.ai(gm); const C = S.battle.cmd;
   assert.ok(C && C.foe === e.id && C.tel === false); assert.equal(C.tgs.length, 1);
@@ -1031,7 +1031,7 @@ test('IA: aiPlan não muda o estado e aiRun executa o plano; alvo caído é repl
   assert.equal(plan.skill, 'atk'); assert.deepEqual(plan.tgs, [plan.target]); assert.ok([h.id, h2.id].includes(plan.target));
   assert.equal(S.log.length, logN); assert.deepEqual([h.hp, h2.hp], hp); assert.equal(JSON.stringify(S.battle.ticks), ticks);
   const other = plan.target === h.id ? h2 : h; S.chars[plan.target].hp = 0; // o alvo planejado cai durante a janela
-  const hpO = other.hp; aiRun(e, plan); assert.ok(other.hp < hpO, 'o outro herói leva o golpe');
+  const hpO = other.hp; fixR(.3, () => aiRun(e, plan)); assert.ok(other.hp < hpO, 'o outro herói leva o golpe');
 });
 
 test('batidas: golpe de 3 golpes abre 3 batidas; aparar todas dá contra-ataque, Aura cobrada uma vez', async () => {
@@ -1039,11 +1039,29 @@ test('batidas: golpe de 3 golpes abre 3 batidas; aparar todas dá contra-ataque,
   const C = S.battle.cmd; assert.deepEqual(C.beats, [1100, 1800, 2500]); const hp = h.hp, ehp = e.hp, aura = h.aura, par = S.skills[sk('Aparar')];
   for (let i = 0; i < 3; i++) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); }
   assert.deepEqual(C.p[h.id], ['par', 'par', 'par']); await waitCmd();
-  assert.equal(h.hp, hp, 'nenhuma batida acerta'); assert.ok(e.hp < ehp, 'contra-ataque'); assert.ok(S.log.some(l => /CONTRA/.test(l.text || '')));
+  assert.equal(h.hp, hp, 'nenhuma batida acerta'); assert.ok(S.log.some(l => /CONTRA/.test(l.text || '')), 'contra-ataque'); assert.ok(e.hp < ehp, 'o contra acerta'); assert.ok(e.st.exposed > 0, 'inimigo Exposto');
   assert.equal(h.aura, aura - par.cost + par.power, 'Aura cobrada e devolvida uma vez');
 });
 test('batidas: aparar 2 de 3 — só a batida sem nota acerta e não há contra-ataque', async () => {
   const { hs: [h], e } = dfx(); e.skills = [sk('Rajada de Aura')]; fixR(0, () => H.ai(gm)); const C = S.battle.cmd, ehp = e.hp, hp = h.hp;
   for (const i of [0, 1]) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); }
   await waitCmd(); assert.ok(h.hp < hp, 'a 3ª batida acerta'); assert.equal(e.hp, ehp); assert.ok(!S.log.some(l => /CONTRA/.test(l.text || '')));
+});
+
+test('tel: chefe nasce com 2 técnicas anunciadas, elite com 1, comum com 0; o interruptor do mestre manda', async () => {
+  const { telOf } = await import('../server.js'); reset(); const ks = ['Golpe Pesado', 'Estilhaço', 'Terremoto', 'Tiro Certeiro'].map(sk).filter(Boolean); assert.equal(ks.length, 4);
+  const mkE = f => { const e = mk(gm, { enemy: true }); e.skills = [...ks]; Object.assign(e, f); return e; };
+  const boss = mkE({ boss: true }), elite = mkE({ rank: 'elite' }), comum = mkE({}); telOf(boss, ks[0]); telOf(elite, ks[0]); telOf(comum, ks[0]);
+  assert.equal(boss.telK.length, 2); assert.equal(elite.telK.length, 1); assert.deepEqual(comum.telK, []);
+  const off = boss.telK[0]; H.tel(ana, { id: boss.id, skill: off, on: false }); assert.ok(boss.telK.includes(off), 'jogador não mexe');
+  H.tel(gm, { id: boss.id, skill: off, on: false }); assert.ok(!boss.telK.includes(off)); telOf(boss, off); assert.ok(!boss.telK.includes(off), 'o que o mestre desliga fica desligado');
+  const fresh = mkE({ boss: true }); H.tel(gm, { id: fresh.id, skill: ks[3], on: true }); assert.ok(fresh.telK.includes(ks[3]) && fresh.telK.length >= 2, 'ligar sem telK antes parte do cálculo automático');
+});
+test('chefe: golpe anunciado pode sair Perfeito (20%): batida 20% mais curta e dano ×1,25', async () => {
+  const { aiPlan, aiRun } = await import('../server.js');
+  const run = (rnd, perf) => { const { hs: [h], e } = dfx([]); e.boss = true; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(rnd, () => H.ai(gm)); const C = S.battle.cmd;
+    if (perf != null) C.perf = perf; const hp = h.hp; fixR(.3, () => aiRun(e, aiPlan(e))); return { C, loss: hp - h.hp }; };
+  assert.equal(run(0).C.perf, true); assert.equal(run(0).C.beats[0], 880); assert.equal(run(.5).C.perf, false); assert.equal(run(.5).C.beats[0], 1100);
+  const a = run(.5, false).loss, b = run(.5, true).loss; assert.ok(a > 0 && Math.abs(b / a - 1.25) < .1, `×1,25 (${a} → ${b})`);
+  const nb = (() => { const { e } = dfx([]); e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); return S.battle.cmd.perf; })(); assert.equal(nb, false, 'só chefe tem Perfeito');
 });

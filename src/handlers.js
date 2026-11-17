@@ -5,7 +5,10 @@ import { ATTRS, BBG, CAMP, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TI
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
 import { kick, push, tell, tell0 } from './net.js';
-import { derive, modsOf, defWindow, canPar, parNode, aiPlan, aiRun } from './rules.js';
+import { derive, modsOf, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun } from './rules.js';
+function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo executa o plano guardado
+  const plan = cmdPlan; if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) aiRun(a, plan); } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
+}
 let cmdPlan = null; // plano do inimigo que espera a janela de defesa fechar (fica fora do estado enviado aos clientes)
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
@@ -209,10 +212,16 @@ const H = {
   ai(c) { // IA do inimigo da vez; se alguém pode se defender, abre antes a janela (S.battle.cmd) e o golpe sai quando ela fecha
     const a = S.chars[current()]; if (S.battle.cmd && Date.now() > S.battle.cmd.at + S.battle.cmd.w + 3000) S.battle.cmd = null; // janela velha (servidor reiniciado)
     if (c.role !== 'gm' || !S.battle.active || !a?.enemy || S.battle.cmd) return;
-    const plan = aiPlan(a), C = plan && defWindow(a, plan);
+    const plan = aiPlan(a); if (plan?.ia && iaExtra(a, plan.ia)) return; // Defender, Concentrar e Domínio agem na hora (não são golpes)
+    if (plan) plan.ia = null; const C = plan && defWindow(a, plan);
     if (!C) return aiRun(a, plan);
     S.battle.cmd = C; cmdPlan = plan;
-    setTimeout(() => { if (S.battle.cmd !== C) return; try { if (S.battle.active && current() === a.id) aiRun(a, cmdPlan); } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; push(); }, C.w + RU.CMD.DEF.grace + 50);
+    setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }, C.w + RU.CMD.DEF.grace + 50);
+  },
+  cmdSkip(c) { const C = S.battle.cmd; if (c.role === 'gm' && C && S.chars[C.foe]) fireCmd(C, S.chars[C.foe]); }, // o mestre não quer esperar a janela: o golpe sai já
+  tel(c, m) { // o mestre liga ou desliga um golpe anunciado na ficha do inimigo (ou do bestiário)
+    const ch = getCh(c, m.id); if (c.role !== 'gm' || !ch?.enemy || !(ch.skills || []).includes(m.skill)) return;
+    ch.telK ??= autoTel(ch); ch.telK = ch.telK.filter(k => k !== m.skill); if (m.on) ch.telK.push(m.skill);
   },
   def(c, m) { // o jogador aperta o botão da defesa: a zona (Aparar, Esquiva, cedo) vem de quanto falta para o impacto da próxima batida
     const ch = S.chars[m.id], C = S.battle.cmd, D = RU.CMD.DEF; if (!C || !ch || ch.enemy || ch.hp <= 0 || !can(c, ch) || !C.tgs.includes(ch.id)) return;
