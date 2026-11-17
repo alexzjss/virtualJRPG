@@ -203,12 +203,13 @@
   const cmdText = s => { // o que o comando de ataque da técnica pede e rende
     const dmg = s.kind === 'dmg' || s.kind === 'mental';
     if (s.cmd === 'tempo') { const w = g.RULES.CMD.tempoWin(s, {}); return `Golpe no tempo: aperte quando o anel fechar (Bom ×1,2 · Ótimo ×1,3 · Perfeito ×1,4, janela de ${w.cp} ms no Perfeito; errar rende ×0,85)${s.bf ? `. Só o Perfeito dispara o Black Flash: ×2,5 e devolve 25% da Aura` : ''}`; }
-    if (s.cmd === 'martelar') return `Martelar: aperte o máximo de vezes em 2 s e ganhe até +${s.mx || 0} golpe${s.mx > 1 ? 's' : ''}`;
-    if (s.cmd === 'segurar') return 'Segurar e soltar: segure e solte na faixa (Bom ×1,3 · Perfeito ×1,6); passar do topo estoura e deixa você Exposto';
-    if (s.cmd === 'seq') return `Sequência ${s.seq}: uma seta por batida; ${s.hits > 1 ? 'os golpes normais são o mínimo' : 'cada seta certa soma um golpe de 50%'}; todas certas: golpe final${s.fin ? ` de ${s.fin} de poder` : ''}`;
-    if (s.cmd === 'ritmo') return `Ritmo: ${s.nt || 6} notas; cada nota certa soma ${dmg ? '+10% de dano' : s.kind === 'heal' && s.power > 0 ? '+10% de cura e +1 turno' : '+1 turno'}; todas: Perfeito`;
-    if (s.cmd === 'mira') return 'Mira: clique no ponto fraco; acertou = crítico e −2 na Quebra';
-    if (s.cmd === 'runa') return `Runa: desenhe ${RUNA_N[s.rn] || 'o símbolo'} em 4 s; ≥ 60% de semelhança é Bom, ≥ 85% é Perfeito${dmg ? ' (×1,2 e ×1,4)' : '; Bom: +1 turno e ×1,2 em cura e escudo; Perfeito: não cobra a Sanidade'}`;
+    const T = g.RULES.CMD.tune(s, {}), hard = g.RULES.CMD.tier(s) === 2;
+    if (s.cmd === 'martelar') return `Martelar: aperte o máximo de vezes em 2 s (meta de ${T.martelarMeta} apertos) e ganhe até +${s.mx || 0} golpe${s.mx > 1 ? 's' : ''}; ≥ 75% é Ótimo, menos de 35% erra (×0,85)`;
+    if (s.cmd === 'segurar') return `Segurar e soltar: segure e solte na faixa (Bom ×1,3 · Ótimo ×1,45 · Perfeito ×${hard ? '1,7' : '1,6'}, faixa Perfeita de ${T.segurar.perf}%); soltar fora dela erra (×0,85); passar do topo estoura e deixa você Exposto`;
+    if (s.cmd === 'seq') return `Sequência ${s.seq}: uma seta por batida (tolerância de ±${T.seqTol} ms); ${s.hits > 1 ? 'os golpes normais são o mínimo' : 'cada seta certa soma um golpe de 50%'}; ≥ 75% é Ótimo; todas certas: golpe final${s.fin ? ` de ${s.fin} de poder` : ''}; errar quase tudo rende ×0,85`;
+    if (s.cmd === 'ritmo') return `Ritmo: ${T.ritmoNotas} notas (±${T.ritmoTol} ms); cada nota certa soma ${dmg ? '+10% de dano' : s.kind === 'heal' && s.power > 0 ? '+10% de cura e +1 turno' : '+1 turno'}; ≥ 75% é Ótimo, todas: Perfeito`;
+    if (s.cmd === 'mira') return `Mira: clique no ponto fraco (${T.mira}% da tela); acertou = crítico e −2 na Quebra; errar rende ×0,85`;
+    if (s.cmd === 'runa') return `Runa: desenhe ${RUNA_N[s.rn] || 'o símbolo'} em 4 s; ≥ ${T.runa.bom}% de semelhança é Bom, ≥ ${T.runa.otimo}% é Ótimo, ≥ ${T.runa.perf}% é Perfeito${dmg ? ` (×1,2 · ×1,3 · ×${hard ? '1,5' : '1,4'})` : '; Bom ou melhor: +1 turno e ×1,2 em cura e escudo; Perfeito: não cobra a Sanidade'}`;
     if (s.cmd === 'choque') return 'Choque: contra golpe anunciado de alvo único, aperte C e martele; vencer devolve o golpe ×1,3 e deixa o inimigo Exposto, perder leva ×1,3';
     return '';
   };
@@ -324,10 +325,10 @@
       return e;
     },
     // o que mostrar depois da nota: título do grau e linhas (o que rendeu + quanto faltou para o Perfeito)
-    resultLines(s, c, e) {
-      const t = CMD.tune(s), L = [], f = v => String(+v.toFixed(2)).replace('.', ','), g = c?.g || '';
-      const cnt = s?.cmd === 'martelar' ? (s.mx || t.martelarMeta) : s?.cmd === 'seq' ? (s.seq?.length || 0) : s?.cmd === 'ritmo' ? t.ritmoNotas : 0;
-      if (e.mult !== 1) L.push(`×${f(e.mult)} de dano`);
+    resultLines(s, c, e, mods = {}) {
+      const t = CMD.tune(s, mods), L = [], f = v => String(+v.toFixed(2)).replace('.', ','), g = c?.g || '', dmg = s?.kind === 'dmg' || s?.kind === 'mental';
+      const cnt = s?.cmd === 'martelar' ? (s.mx || 0) + (mods.mx || 0) : s?.cmd === 'seq' ? (s.seq?.length || 0) : s?.cmd === 'ritmo' ? t.ritmoNotas : 0;
+      if (e.mult !== 1) L.push(`×${f(e.mult)} ${dmg ? 'de dano' : 'no efeito'}`);
       if (e.extra > 0) L.push(`+${e.extra} golpe${e.extra > 1 ? 's' : ''}`);
       if (e.fin) L.push('golpe final');
       if (e.turns > 0) L.push(`+${e.turns} turno${e.turns > 1 ? 's' : ''}`);

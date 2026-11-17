@@ -1225,3 +1225,23 @@ test('cinemáticos: resultLines diz o que rendeu e o quanto faltou', () => {
   const R = { cmd: 'ritmo', kind: 'util', nt: 6 }; assert.ok(C.resultLines(R, { g: 'bom', n: 2, acc: 1 }, C.cmdEffect(R, { g: 'bom', n: 2 })).lines.includes('+2 turnos'));
   assert.equal(C.resultLines(R, { g: '', n: 0, acc: 0 }, C.cmdEffect(R, { g: '' })).title, '');
 });
+test('cinemáticos: clampCmd sanea NaN/Infinity, e limita seq e ritmo (nt + nível)', () => {
+  const C = RU.CMD, M = { cmd: 'martelar', mx: 4 };
+  for (const n of [NaN, Infinity, -Infinity, 1e9, '7']) { const r = C.clampCmd(M, { g: 'bom', n, acc: NaN }, {}); assert.ok(Number.isInteger(r.n) && r.n >= 0 && r.n <= 4, `n=${n} -> ${r.n}`); assert.equal(r.acc, 0); }
+  assert.equal(C.clampCmd(M, { g: 'perf', n: Infinity, acc: Infinity }, {}).g, 'perf'); assert.equal(C.clampCmd(M, { g: 'perf', n: NaN }, {}).g, 'erro');
+  assert.equal(C.clampCmd({ cmd: 'seq', seq: '↑→↓←' }, { g: 'perf', n: 3 }, {}).g, 'otimo'); assert.equal(C.clampCmd({ cmd: 'seq', seq: '↑→↓←' }, { g: 'perf', n: 99 }, {}).n, 4);
+  const R = { cmd: 'ritmo', nt: 6, rq: { FOR: 50 } }; assert.equal(C.clampCmd(R, { g: 'perf', n: 99 }, {}).n, 8); assert.equal(C.clampCmd(R, { g: 'perf', n: 7 }, {}).g, 'otimo'); assert.equal(C.clampCmd(R, { g: 'perf', n: 8 }, {}).g, 'perf');
+});
+test('cinemáticos: resultLines usa mods, proximidade e rótulo sem dano', () => {
+  const C = RU.CMD, M = { cmd: 'martelar', kind: 'dmg', mx: 4 };
+  assert.ok(C.resultLines(M, { g: 'otimo', n: 5, acc: 1 }, C.cmdEffect(M, { g: 'otimo', n: 5 }), { mx: 1 }).lines.includes('5/5 apertos'));
+  assert.ok(C.resultLines(M, { g: 'bom', n: 2, acc: .5 }, C.cmdEffect(M, { g: 'bom', n: 2 })).lines.includes('2/4 apertos'));
+  const T = { cmd: 'tempo', kind: 'dmg' }; assert.ok(C.resultLines(T, { g: 'bom', n: 0, acc: .5 }, C.cmdEffect(T, { g: 'bom' }), { cp: 10 }).lines.includes('faltaram 10 ms'), 'bom 140, acc .5 -> 70 ms; perfeito 60');
+  const Ru = { cmd: 'runa', kind: 'util', rn: 'circulo' }; const r = C.resultLines(Ru, { g: 'erro', n: 0, acc: .52 }, C.cmdEffect(Ru, { g: 'erro' }));
+  assert.ok(r.lines.includes('×0,85 no efeito') && r.lines.includes('semelhança 52%'), r.lines.join('|')); assert.ok(!r.lines.some(l => l.includes('de dano')));
+});
+test('cinemáticos: descrição cita Ótimo/Erro e as janelas do nível', () => {
+  const E = RU.extra;
+  assert.match(E({ kind: 'dmg', cmd: 'segurar', rq: { FOR: 50 } }, null), /Ótimo ×1,45 · Perfeito ×1,7/); assert.match(E({ kind: 'dmg', cmd: 'runa', rn: 'circulo', rq: { FOR: 25 } }, null), /≥ 65%.*≥ 78%.*≥ 88%/);
+  assert.match(E({ kind: 'util', cmd: 'ritmo', nt: 6, rq: { FOR: 50 } }, null), /8 notas/); assert.match(E({ kind: 'dmg', cmd: 'mira' }, null), /×0,85/);
+});
