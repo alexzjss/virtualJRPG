@@ -1,29 +1,29 @@
-// Campanhas (várias, com troca a quente), cópias de segurança, diário de sessão e pacotes de conteúdo.
-import fs from 'fs';
 import path from 'path';
-import { DATA, KEY, GM } from './config.js';
-import { R, SCH, NEW, ATTRS, EL, PARTS, ITYPES, TIER, STK, BBG } from './consts.js';
-import { S, BK, adopt, backup, slug, diaryFile, flushDiary, log, BLANK } from './state.js';
-import { rid, int, okUrl, newChar, prep } from './rules.js';
-import { seed } from './seed.js';
-import { H, undoStack, NOUNDO } from './handlers.js';
-import { ipOf, blocked, penalize, same } from './auth.js';
-import { push, hooks } from './net.js';
+import fs from 'fs';
+import { DATA, GM, KEY } from './config.js';
+import { BK, BLANK, S, adopt, backup, diaryFile, flushDiary, log, slug } from './state.js';
 import { fixMedia } from './media.js';
+import { seed } from './seed.js';
+import { int, newChar, okUrl, prep, rid } from './rules.js';
+import { H, NOUNDO, undoStack } from './handlers.js';
+import { ATTRS, BBG, EL, ITYPES, NEW, PARTS, R, SCH, STK, TIER } from './consts.js';
+import { blocked, ipOf, penalize, same } from './auth.js';
+import { hooks, push } from './net.js';
+
 
 const CAMPS = path.join(DATA, 'campanhas');
 const jsons = d => { try { return fs.readdirSync(d).filter(f => f.endsWith('.json')).sort(); } catch { return []; } };
 const safe = f => typeof f === 'string' && /^[\w.-]+$/.test(f) && !f.includes('..');
 const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 // só o mestre; um erro (arquivo ruim, disco cheio) volta como aviso na tela dele em vez de derrubar a ação em silêncio
-export const gm = fn => (c, m) => { if (c.role !== 'gm') return; try { fn(c, m); } catch (e) { console.error(e); c.send?.(JSON.stringify({ t: 'err', msg: e.message || String(e) })); } };
+const gm = fn => (c, m) => { if (c.role !== 'gm') return; try { fn(c, m); } catch (e) { console.error(e); c.send?.(JSON.stringify({ t: 'err', msg: e.message || String(e) })); } };
 
 // o que o painel do mestre lista: campanhas guardadas e cópias de segurança (relido só quando algo muda)
 let store = null;
-export const storeInfo = () => store ??= { camps: jsons(CAMPS).map(f => f.slice(0, -5)), backups: jsons(BK).reverse() };
+const storeInfo = () => store ??= { camps: jsons(CAMPS).map(f => f.slice(0, -5)), backups: jsons(BK).reverse() };
 const touch = () => { store = null; };
 // valores que este módulo e o de mídia esperam encontrar no estado, qualquer que seja a origem dele
-export const fix = () => { S.title = String(S.title || 'Campanha').slice(0, 40); S.v = 3; fixMedia(); };
+const fix = () => { S.title = String(S.title || 'Campanha').slice(0, 40); S.v = 3; fixMedia(); };
 fix();
 
 function saveSlot() { // guarda a campanha atual em data/campanhas/<nome>.json
@@ -86,7 +86,7 @@ function cleanFoe(o, map) {
   return ch;
 }
 // importa juntando pelo nome: o que já existe com o mesmo nome é atualizado, o resto entra como novo; nada do que existe é apagado
-export function importPack(p) {
+function importPack(p) {
   if (!p || typeof p !== 'object' || p.vj !== 'conteudo') throw new Error('Este arquivo não é um pacote de conteúdo do virtualJRPG.');
   const map = { skills: {}, items: {}, best: {} }, n = { skills: 0, items: 0, best: 0, enc: 0 };
   for (const coll of ['skills', 'items']) for (const [k, o] of Object.entries(p[coll] || {}).slice(0, 2000)) {
@@ -136,7 +136,7 @@ Object.assign(H, {
 });
 
 // cópia automática a cada 10 minutos, só se algo mudou desde a última
-export function autoBackup() { let last = S.seq; setInterval(() => { if (S.seq === last) return; last = S.seq; try { backup('auto'); touch(); } catch (e) { console.error('Falha na cópia automática:', e.message); } }, 600e3).unref(); }
+function autoBackup() { let last = S.seq; setInterval(() => { if (S.seq === last) return; last = S.seq; try { backup('auto'); touch(); } catch (e) { console.error('Falha na cópia automática:', e.message); } }, 600e3).unref(); }
 
 // ---------- /api: exportar, importar e ler o diário (só com a chave do mestre) ----------
 const diaryText = () => {
@@ -147,7 +147,7 @@ const diaryText = () => {
     out.push(e.who === 'Sessão' ? `\n--- ${e.text} ---` : `[${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}] ${e.who}: ${e.text}`); }
   return out.join('\n') + (raw ? '\n' : '\nNada registrado ainda.\n');
 };
-export function api(req, res) {
+function api(req, res) {
   const u = new URL(req.url, 'http://x'), p = u.pathname, what = u.searchParams.get('what');
   if (!p.startsWith('/api/') || p === '/api/hi') return false;
   const kIp = 'api:' + ipOf(req), end = (code, body = '') => (res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end(body), true);
@@ -175,3 +175,5 @@ export function api(req, res) {
 }
 
 hooks.api = api; hooks.store = storeInfo;
+
+export { api, autoBackup, fix, importPack, storeInfo };

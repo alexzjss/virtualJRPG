@@ -8,7 +8,7 @@ O usuário escreve em português; responda e comente o código em português, no
 - Compare sempre com a base: encontros (nível 0/1/2, fácil→mortal) estavam em ~90/77/93/73/42/23 e chefes entre 46% e 89%. Variação de ±10 pontos é ruído.
 - Toda mecânica nova ganha teste em `tools/test.js`; as de combate passam pelo simulador antes de entrar.
 - Mudou `tree.js` ou `arvore/`: a grade é refeita ao iniciar (skills ficam pelo nome). Nomes de nós precisam ser únicos (`npm run audit` confere).
-- Arquivos: `server.js` (motor), `public/rules.js`, `public/oficios.js` e `public/armas.js` (compartilhados com o navegador), `public/app.js` (interface), `content.js` (grade, itens, bestiário, cenas), `arvore/*.js` (nós).
+- Arquivos: `server.js` é só a entrada; o motor está em `src/` (`rules.js` combate e fila, `handlers.js` ações dos clientes, `oficios.js` Ofícios, `state.js` estado e migrações, `net.js` HTTP/WebSocket, `campaign.js` campanhas e backups, `consts.js` tabelas, `seed.js`, `auth.js`, `media.js`, `config.js`). Compartilhados com o navegador: `public/rules.js`, `public/oficios.js`, `public/armas.js`. Interface: `public/js/*.js` (carregados na ordem de `gm.html`) e `public/painel.js`. `content.js` (grade, itens, bestiário, cenas), `arvore/*.js` (nós).
 
 ## Pendências, em ordem sugerida
 1. **Revisar os 154 nós novos** (`arvore/sistemas.js`) ramo por ramo com o usuário, como foi feito no Kagutsuchi: poder e XP, efeitos, nomes e descrições. Os nós 🆕 das expansões anteriores também continuam sem revisão nó a nó (`REVISAO-ARVORE.md`).
@@ -23,6 +23,14 @@ O usuário escreve em português; responda e comente o código em português, no
    - [x] Dívida de Coragem, Tensão e Cadeia: som e animação feitos (ver "Interface testada").
 6. **Itens para o mestre:** [x] janela **Catálogo de ofícios** (receitas, perícias, nós e nós novos, persistido em `S.ofiCfg`). Ideias que sobraram: editar runas e assinaturas, ligar uma receita nova a um nó específico, importar/exportar o catálogo.
 7. ✅ **Limpeza** (feito): `README.md` descreve a Forja com Economia de Essência e os Ofícios; `docs/index.html` não menciona forja nem acesso novo, ficou como está.
+
+## Restauração depois da divisão em módulos
+A divisão de `app.js`/`server.js` em módulos (`acedabf`) foi feita a partir de um retrato antigo e o merge da branch de segurança com as features (Ofícios, armas com modelo, Cadeia, painel, mesa) manteve só o lado dela nos conflitos. A branch `restaurar-tudo` refez esse merge conflito a conflito e portou tudo para os módulos. Decisões tomadas:
+- O catálogo de armas completo (modelos de `public/armas.js`, Forja de armas) voltou; `Florete` e `Perfuradora de Montanhas` continuam como itens (a Perfuradora é lendária, com perfuração 50). Os campos `reqFor` e `grant` do catálogo só-Florete saíram: o requisito de atributo e as técnicas da arma vêm dos modelos.
+- Os nomes novos dos consumáveis e equipamentos (`RENAME` em `content.js`, catálogo v5) valem; as receitas de `public/oficios.js` e as lojas usam esses nomes. `migrateItems` renomeia pelo nome e mantém armas forjadas e itens do mestre.
+- O id do Vínculo de Hiruko é `hiruko` em todo lugar (saves com `radiacao` são convertidos em `preFix`).
+- Os diálogos de `ux.js` substituem `prompt()`/`confirm()`; a mira automática na vez do jogador foi mantida (o teste de interface foi ajustado a isso).
+- `public/painel.html` tinha script inline, que o CSP de `src/net.js` bloqueia: o código foi para `public/painel.js`.
 
 ## Armadilhas conhecidas
 - `strike` e `doAct` em `server.js` concentram quase todos os efeitos; mudanças ali quebram testes de longe. Rode `npm test` a cada passo.

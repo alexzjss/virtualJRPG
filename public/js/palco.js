@@ -5,7 +5,7 @@ function bar(k, c, hideNum) {
 }
 
 // ===== palco de batalha =====
-const KANJI = { fis: '武', kagutsuchi: '火', susanoo: '水', atlas: '土', indra: '雷', fuhaku: '風', amaterasu: '光', tsukuyomi: '闇', shukketsu: '血', radiacao: '核' };
+const KANJI = { fis: '武', kagutsuchi: '火', susanoo: '水', atlas: '土', indra: '雷', fuhaku: '風', amaterasu: '光', tsukuyomi: '闇', shukketsu: '血', hiruko: '核', aura: '気', oculto: '呪' };
 const mainEl = c => c.el || c.resist?.find(e => e !== 'fis') || 'fis';
 const bodyMini = c => `<svg class="mini" viewBox="0 0 120 260" aria-hidden="true">${PARTS.map(k => `<${SHAPE[k][0]} ${SHAPE[k][1]} class="l${lvl(c, k)}"/>`).join('')}</svg>`;
 function unit(c, cur) {
@@ -16,21 +16,22 @@ function unit(c, cur) {
   const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
     : `<div class="hpn"><span>${c.hp}</span><small>/${c.hpMax}</small><em>HP</em></div>${bar('hp', c, true)}<div class="duo"><div>${bar('aura', c, true)}<small>Aura ${c.aura}/${c.auraMax}</small></div><div>${bar('san', c, true)}<small>Sanidade ${c.san}/${c.sanMax}</small></div></div>
       <div class="lim ${c.limit >= 100 ? 'full' : ''}">${bar('limit', c, true)}<small>${c.limit >= 100 ? 'Limite!' : 'Limite ' + c.limit + '%'}</small></div>`;
-  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${stats}</div></div>`;
+  const brk = c.brk && c.hp > 0 ? `<div class="brk" title="Barra de Quebra: fraquezas e pontos fracos a esvaziam">Quebra ${'◆'.repeat(c.brk.cur)}${'◇'.repeat(c.brk.max - c.brk.cur)}</div>` : '', rit = !foe && (c.brv || c.ten) ? `<div class="rit">${c.brv ? `Coragem ${c.brv}` : ''}${c.brv && c.ten ? ' · ' : ''}${c.ten ? `Tensão ×${[1, 1.5, 2, 3][c.ten]}` : ''}</div>` : '';
+  return `<div class="unit ${foe ? 'foe' : 'hero'} ${c.ten ? 'ten' + c.ten : ''} ${(c.brv || 0) < 0 ? 'debt' : ''} ${c === cur ? 'cur' : ''} ${c.id === tgt ? 'tgt' : ''} ${c.hp > 0 ? '' : 'ko'} ${low ? 'low' : ''}" data-tgt="${c.id}" style="--c:${esc(c.color)}">${fig}${foe ? '' : bodyMini(c)}<div class="plate"><b class="nm">${esc(c.name)}</b><div class="sts">${sts}</div>${brk}${rit}${stats}</div></div>`;
 }
 const BBG = { rubro: 'Rubro', noite: 'Noite', floresta: 'Floresta', brasa: 'Brasa', gelo: 'Gelo', vazio: 'Vazio', santuario: 'Santuário', tempestade: 'Tempestade' }; // fundos prontos da batalha
 function battle() {
   const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
   const side = e => { const l = inB.filter(c => !!c.enemy === e), n = l.length, cols = n > 4 ? Math.ceil(n / 2) : Math.max(1, n), w = Math.min(14.5, 43 / cols - 1.3);
     return `<div class="side ${e ? 'foes' : 'heroes'} ${n > 4 ? 'two' : ''}" style="--w:${w.toFixed(2)}cqw">${l.map(c => unit(c, cur)).join('')}</div>`; };
-  const acts = c => `<div class="row"><b>${esc(c.name)}:</b>${gm && c.enemy ? '<button class="own" data-a="ai">IA decide</button>' : ''}<button data-a="act" data-id="${c.id}" data-skill="atk">Ataque</button>${c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => { const s = S.skills[k];
-      return `<button data-a="act" data-id="${c.id}" data-skill="${k}" title="${esc(desc(s))}" ${blocked(c, s) ? 'disabled' : ''}>${esc(s.name)}</button>`; }).join('')}
+  const acts = c => `<div class="row"><b>${esc(c.name)}:</b>${gm && c.enemy ? '<button class="own" data-a="ai">IA decide</button>' : ''}<button data-a="act" data-id="${c.id}" data-skill="atk" title="${esc(wpnLine(eq(c, 'arma'), c))}">${esc(ARMAS.prof(eq(c, 'arma')).atkN || 'Ataque')}</button>${[...wSk(c), ...c.skills].filter(k => SK(k) && SK(k).kind !== 'passive').map(k => { const s = SK(k);
+      return `<button data-a="act" data-id="${c.id}" data-skill="${k}" class="${s.wpn ? 'wpn' : ''}" title="${esc(c.cant?.[k] || desc(s))}" ${blocked(c, s, k) ? 'disabled' : ''}>${s.wpn ? '⚔ ' : ''}${esc(s.name)}</button>`; }).join('')}
       ${Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons').map(([k, q]) => `<button class="item" data-a="use" data-id="${c.id}" data-item="${k}">${esc(S.items[k].name)} ×${q}</button>`).join('')}
       <button data-a="next">Passar</button></div>${aimBox()}`;
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
   const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
-  return `<section class="stage battle heat-${heat} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
-    <div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${S.battle.end === 'won' ? ' · inimigos derrotados' : heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${gm && cur ? acts(cur) : ''}</section>`;
+  return `<section class="stage battle heat-${heat} ${S.battle.dom ? 'dom-on' : ''} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)}">${i ? '' : '<small>Agora</small>'}${esc(S.chars[id].name)}</span>`).join('')}</div>
+    ${S.battle.dom ? '<i class="domfx" aria-hidden="true"></i>' : ''}<div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${S.battle.end === 'won' ? ' · inimigos derrotados' : heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}${gm && cur ? acts(cur) : ''}</section>`;
 }
 
 function map() {
@@ -56,4 +57,3 @@ function setBg(u) {
 let cropMode = false, cropSel = null, cdrag = null, lastCam = null;
 const cropper = () => { const sc = S.scenes[S.scene], c = cropSel || sc.crop; return cropMode && sc.bg ? `<div class="cropper"><header><b>Recortar mapa</b><small>Arraste sobre a imagem para marcar a área que vira o mapa.</small><button class="own" data-a="cropOk">Aplicar recorte</button><button data-a="cropAll">Usar imagem inteira</button><button data-a="cropX">Cancelar</button></header>
   <div class="cropbox"><img src="${esc(sc.bg)}" draggable="false" alt=""><i class="csel" style="left:${c.x * 100}%;top:${c.y * 100}%;width:${c.w * 100}%;height:${c.h * 100}%"></i></div></div>` : ''; };
-

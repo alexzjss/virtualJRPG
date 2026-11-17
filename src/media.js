@@ -1,12 +1,12 @@
-// Som (trilha, ambiência e efeitos sincronizados pelo mestre) e extras do mapa (névoa inteira, pincel, marcadores, escala).
 import { S } from './state.js';
-import { rid, int, okUrl, scene } from './rules.js';
-import { H, NOUNDO } from './handlers.js';
 import { wss } from './net.js';
+import { H, NOUNDO } from './handlers.js';
+import { int, okUrl, rid, scene } from './rules.js';
 
-export const AMB = ['chuva', 'vento', 'fogueira', 'caverna', 'mar', 'multidao'], SFX = ['sino', 'trovao', 'porta', 'grito', 'fanfarra', 'tensao', 'moeda', 'passos'];
+
+const AMB = ['chuva', 'vento', 'fogueira', 'caverna', 'mar', 'multidao'], SFX = ['sino', 'trovao', 'porta', 'grito', 'fanfarra', 'tensao', 'moeda', 'passos'];
 // valores padrão no estado (campanhas antigas, cenas novas, campanha recém-aberta)
-export const fixMedia = () => {
+const fixMedia = () => {
   S.audio = { url: '', on: false, vol: .6, loop: true, amb: '', t0: 0, n: 0, ...S.audio }; S.tracks ??= {}; S.handout ??= null;
   for (const sc of Object.values(S.scenes)) { sc.pins ??= {}; sc.unit ??= 0; sc.grid ??= true; sc.music ??= ''; }
 };
@@ -51,3 +51,5 @@ Object.assign(H, {
   sceneAdd(c, m) { add0(c, m); fixMedia(); },
   sceneGo(c, m) { go0(c, m); const mu = c.role === 'gm' && scene().music; if (mu && mu !== S.audio.url) play({ url: mu, on: true }); }, // cena com trilha própria troca a música ao entrar
 });
+
+export { AMB, fixMedia };

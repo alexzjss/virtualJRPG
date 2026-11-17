@@ -68,7 +68,8 @@ try {
   const mesa = await open('mesa', '/table', { login: { n: 'mestre', p: 'chave' } });
 
   await section('exploração: telas sem batalha', async () => {
-    for (const p of [gmP, ana, bia, mesa]) check((await p.locator('#app').innerText()).length > 50, `${p.who}: tela vazia`);
+    await until(async () => (await mesa.locator('#app').innerHTML()).length > 500, 'mesa desenhada');
+    for (const p of [gmP, ana, bia, mesa]) check(p === mesa ? (await p.locator('#app').innerHTML()).length > 500 : (await p.locator('#app').innerText()).length > 50, `${p.who}: tela vazia`); // a mesa é só mapa e cartões, quase sem texto
     await shot(gmP, 'explora'); await shot(ana, 'explora'); await shot(mesa, 'explora');
   });
 
@@ -84,7 +85,7 @@ try {
     await until(() => vis(ana, '.cmd'), 'comandos de batalha da Ana');
     check(current() === shinkai.id, 'Shinkai (AGI 95) deveria abrir a fila');
     check(await until(() => ana.locator('.cmd.mine').count(), 'turno da Ana destacado'), 'turno destacado');
-    check(await ana.locator('.cmd-go .go').isEnabled() === false, 'Agir deveria estar desligado sem alvo');
+    check(await ana.locator('.cmd-go .go').isEnabled() === true, 'Agir já vem mirado no primeiro inimigo de pé (mira automática na sua vez)');
     check(/aguarde/i.test(await txt(bia, '.cmd-go .go')), 'Bia deveria ver "Aguarde a sua vez"');
     await shot(ana, 'batalha'); await shot(bia, 'batalha'); await shot(mesa, 'batalha'); await shot(gmP, 'batalha');
   });
@@ -288,7 +289,7 @@ try {
     // negar com motivo
     await ana.locator('.qr button').first().click(); await click(ana, '.bsheet [data-a=rollGo]', 'pedir');
     await until(() => vis(gmP, '.rq'), 'segundo pedido');
-    gmP.once('dialog', d => d.accept('sem clima agora')); await click(gmP, '.rq [data-a=rqWhy]', 'Negar com motivo');
+    await click(gmP, '.rq [data-a=rqWhy]', 'Negar com motivo'); await until(() => vis(gmP, '.dlg-in'), 'diálogo do motivo'); await gmP.locator('.dlg-in').fill('sem clima agora'); await gmP.locator('.dlg-bt .own').click(); // prompt() vira o diálogo da interface (ux.js)
     await until(() => !Object.keys(S.reqs).length, 'pedido negado sai da fila');
     await shot(ana, 'rolagem'); await shot(gmP, 'pedidos');
   });

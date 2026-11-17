@@ -274,13 +274,13 @@
   const R = (id, n, per, t, out, mats, o = {}) => ({ id, n, per, t, out, mats, dc: 0, qty: 1, ...o });
   const REC = {};
   [
-    R('tonico', 'Tônico', 'alquimia', 1, 'Tônico', { 'Erva Medicinal': 2 }), R('tonicof', 'Tônico Forte', 'alquimia', 2, 'Tônico Forte', { 'Erva Medicinal': 3, 'Raiz Amarga': 1 }, { dc: -5 }),
-    R('antidoto', 'Antídoto', 'alquimia', 1, 'Antídoto', { 'Raiz Amarga': 2 }), R('calmante', 'Calmante', 'alquimia', 1, 'Calmante', { 'Erva Medicinal': 2, 'Cogumelo Pálido': 1 }),
-    R('eter', 'Éter de Aura', 'alquimia', 2, 'Éter de Aura', { 'Cogumelo Pálido': 1, 'Sal Sagrado': 1 }, { dc: -5 }), R('oleo', 'Frasco de Óleo', 'alquimia', 1, 'Frasco de Óleo', { 'Óleo de Lamparina': 1, 'Frasco Vazio': 1 }),
-    R('coquetel', 'Coquetel Incendiário', 'alquimia', 2, 'Coquetel Incendiário', { 'Óleo de Lamparina': 2, 'Frasco Vazio': 1 }, { dc: -5 }), R('acido', 'Frasco de Ácido', 'alquimia', 2, 'Frasco de Ácido', { 'Raiz Amarga': 2, 'Frasco Vazio': 1 }, { dc: -5 }),
-    R('componente', 'Componente Ritualístico', 'alquimia', 2, 'Componente Ritualístico', { 'Sal Sagrado': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('elixir', 'Elixir Vital', 'alquimia', 3, 'Elixir Vital', { 'Erva Medicinal': 4, 'Raiz Amarga': 3, 'Cogumelo Pálido': 2 }, { dc: -15 }),
-    R('sais', 'Sais Aromáticos', 'alquimia', 3, 'Sais Aromáticos', { 'Sal Sagrado': 3, 'Erva Medicinal': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('granada', 'Granada', 'alquimia', 3, 'Granada', { 'Pólvora': 2, 'Sucata de Ferro': 1 }, { dc: -5 }),
-    R('atadura', 'Atadura', 'medicina', 1, 'Atadura', { 'Erva Medicinal': 1, 'Papel de Arroz': 1 }), R('isca', 'Isca', 'caca', 2, 'Isca', { 'Carne de Caça': 1, 'Erva Medicinal': 1 }, { qty: 2 }),
+    R('tonico', 'Poção', 'alquimia', 1, 'Poção', { 'Erva Medicinal': 2 }), R('tonicof', 'Líquido Dourado do Sanatório', 'alquimia', 2, 'Líquido Dourado do Sanatório', { 'Erva Medicinal': 3, 'Raiz Amarga': 1 }, { dc: -5 }),
+    R('antidoto', 'Antídoto do TN-1', 'alquimia', 1, 'Antídoto do TN-1', { 'Raiz Amarga': 2 }), R('calmante', 'Pedra de Sal Purificado', 'alquimia', 1, 'Pedra de Sal Purificado', { 'Erva Medicinal': 2, 'Cogumelo Pálido': 1 }),
+    R('eter', 'Cubo de Shinkai', 'alquimia', 2, 'Cubo de Shinkai', { 'Cogumelo Pálido': 1, 'Sal Sagrado': 1 }, { dc: -5 }), R('oleo', 'Frasco de Óleo', 'alquimia', 1, 'Frasco de Óleo', { 'Óleo de Lamparina': 1, 'Frasco Vazio': 1 }),
+    R('coquetel', 'Frasco de Chamas Carmesim', 'alquimia', 2, 'Frasco de Chamas Carmesim', { 'Óleo de Lamparina': 2, 'Frasco Vazio': 1 }, { dc: -5 }), R('acido', 'Veneno TN-1', 'alquimia', 2, 'Veneno TN-1', { 'Raiz Amarga': 2, 'Frasco Vazio': 1 }, { dc: -5 }),
+    R('componente', 'Componente Ritualístico', 'alquimia', 2, 'Componente Ritualístico', { 'Sal Sagrado': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('elixir', 'Elixir de Flamel', 'alquimia', 3, 'Elixir de Flamel', { 'Erva Medicinal': 4, 'Raiz Amarga': 3, 'Cogumelo Pálido': 2 }, { dc: -15 }),
+    R('sais', 'Pena de Fênix', 'alquimia', 3, 'Pena de Fênix', { 'Sal Sagrado': 3, 'Erva Medicinal': 2, 'Cogumelo Pálido': 1 }, { dc: -10 }), R('granada', 'Bomba do Feiticeiro', 'alquimia', 3, 'Bomba do Feiticeiro', { 'Pólvora': 2, 'Sucata de Ferro': 1 }, { dc: -5 }),
+    R('atadura', 'Bálsamo de Hermione', 'medicina', 1, 'Bálsamo de Hermione', { 'Erva Medicinal': 1, 'Papel de Arroz': 1 }), R('isca', 'Isca', 'caca', 2, 'Isca', { 'Carne de Caça': 1, 'Erva Medicinal': 1 }, { qty: 2 }),
     R('municaoPrata', 'Munição de Prata', 'engenharia', 1, 'Munição de Prata', { 'Pólvora': 1, 'Sucata de Ferro': 2 }, { dc: -5 }), R('municaoFogo', 'Munição Incendiária', 'engenharia', 1, 'Munição Incendiária', { 'Pólvora': 1, 'Óleo de Lamparina': 1 }, { dc: -5 }),
     R('municaoSal', 'Munição de Sal', 'engenharia', 2, 'Munição de Sal', { 'Pólvora': 1, 'Sal Sagrado': 2 }, { dc: -5 }),
     R('flechaPrata', 'Flecha de Prata', 'caca', 1, 'Flecha de Prata', { 'Sucata de Ferro': 2, 'Sal Sagrado': 1 }, { dc: -5 }), R('flechaFogo', 'Flecha Incendiária', 'caca', 1, 'Flecha Incendiária', { 'Sucata de Ferro': 1, 'Óleo de Lamparina': 1 }, { dc: -5 }),

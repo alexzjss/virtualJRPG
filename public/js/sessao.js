@@ -29,4 +29,3 @@ function sessWin() {
     <li>Jogador esqueceu a senha: <b>Nova senha</b>. Quem estiver conectado com a senha antiga é desconectado.</li></ol></details>`;
   return net + `<h4>Contas dos jogadores</h4>${acc}<h4>Nova conta</h4>${form}${guide}`;
 }
-

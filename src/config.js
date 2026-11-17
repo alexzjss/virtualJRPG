@@ -1,7 +1,12 @@
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import '../public/rules.js'; // regras compartilhadas com o navegador (globalThis.RULES)
+import '../public/oficios.js'; // catálogo de ofícios (perícias), também usado pelo navegador (globalThis.OFI)
+import '../public/armas.js'; // armas: modelos, perfil do ataque básico e criador (globalThis.ARMAS)
 import { fileURLToPath } from 'url';
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
+
+const RU = globalThis.RULES, OF = globalThis.OFI, AR = globalThis.ARMAS;
 
 // __SEA__ só existe no executável gerado por tools/build-exe.mjs: arquivos do jogo vêm embutidos e os dados ficam ao lado do .exe
 const SEA = typeof __SEA__ !== 'undefined', seaMod = SEA ? process.getBuiltinModule('node:sea') : null;
@@ -20,4 +25,4 @@ const IMG = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 
 const AUD = { 'audio/mpeg': '.mp3', 'audio/mp3': '.mp3', 'audio/ogg': '.ogg', 'audio/wav': '.wav', 'audio/x-wav': '.wav', 'audio/wave': '.wav', 'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a' };
 const MIME = { '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', ...Object.fromEntries(Object.entries(IMG).map(([m, e]) => [e, m])) };
 
-export { SEA, seaMod, dir, PUB, DATA, UP, PORT, PORTAL, keyFile, KEY, FILE, VEND, GM, IMG, AUD, MIME };
+export { AR, AUD, DATA, FILE, GM, IMG, KEY, MIME, OF, PORT, PORTAL, PUB, RU, SEA, UP, VEND, dir, keyFile, seaMod };

@@ -1,6 +1,14 @@
 app.addEventListener('change', e => {
   const el = e.target, d = el.dataset, v = el.type === 'number' || el.type === 'range' ? +el.value : el.type === 'checkbox' ? el.checked : el.value;
   if (el.tagName === 'SELECT' || el.type === 'file') el.blur();
+  if (d.a === 'passSel') { passTo = v; return; }
+  if (d.ou) { const [nd, f] = d.ou.split(':'); (oUi[nd] ||= {})[f] = v; return; }
+  if (d.nota) return send({ t: 'ofiNota', id: d.id, e: d.nota, txt: v });
+  if (d.oc) return ocChange(el, v);
+  if (d.wfup) { const f = el.files[0]; if (f) f.text().then(t => { wfImpParse(t); render(); }); return; }
+  if (d.wf) return wfChange(d.wf, v);
+  if (d.a === 'planLoad') { const b = lsGet('vj.builds', [])[+v]; if (b) lsSet('vj.plan.' + d.id, b.nodes); return render(); }
+  if (d.a === 'campWith') { campWith[d.id] = v; const pr = myReq()?.[1]; if (S.camp.acts[d.id] === 'conversar' || (pr?.t === 'campAct' && pr.m.k === 'conversar' && pr.m.id === d.id)) send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); } // com o pedido ainda na fila, reenvia: o novo substitui o anterior e leva a escolha
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type, ...(key ? { 'X-VJ-Key': encodeURIComponent(key) } : { 'X-VJ-User': encodeURIComponent(name), 'X-VJ-Pass': encodeURIComponent(pass) }) }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
@@ -14,13 +22,14 @@ app.addEventListener('change', e => {
   else if (d.sess) sess[d.sess] = v;
   else if (d.qa) qa[d.qa] = v;
 });
-app.addEventListener('input', e => { const ds = e.target.dataset; if (ds.sess) sess[ds.sess] = e.target.value; if (ds.qa) qa[ds.qa] = e.target.type === 'number' ? +e.target.value : e.target.value; const k = ds.bf; if (!k) return; bf[k] = e.target.value; if (k === 'q' || k === 'giveq' || k === 'skq') render(); }); // filtros e buscas
+app.addEventListener('input', e => { const ds = e.target.dataset; if (ds.rqtxt && reqUi[ds.rqtxt]) reqUi[ds.rqtxt].txt = e.target.value; if (ds.sess) sess[ds.sess] = e.target.value; if (ds.qa) qa[ds.qa] = e.target.type === 'number' ? +e.target.value : e.target.value; const k = ds.bf; if (!k) return; bf[k] = e.target.value; if (['q', 'giveq', 'skq', 'wq', 'wsq'].includes(k)) render(); }); // filtros e buscas
+app.addEventListener('toggle', e => { const k = e.target.dataset?.oper; if (k) oOpen[k] = e.target.open; }, true); // lembra as perícias abertas e fechadas
 app.addEventListener('keydown', e => { const el = e.target; if (!el.dataset?.edin) return; if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.stopPropagation(); el.value = ''; el.blur(); } }, true);
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open],[data-aim]')) { e.preventDefault(); e.target.click(); }
 });
 const sayChat = el => { if (el?.value.trim()) { send({ t: 'chat', text: el.value, secret }); el.value = ''; } };
-app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.chat) sayChat(e.target); });
+app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.chat) sayChat(e.target); if (e.key === 'Enter' && e.target.dataset.rqtxt) { e.preventDefault(); send({ t: 'reqOk', id: e.target.dataset.rqtxt, ...reqUi[e.target.dataset.rqtxt] }); } });
 app.addEventListener('focusout', e => {
   if (e.target.dataset?.edin && editing) return commitEd(e.target);
   // campo restaurado após redesenho não dispara "change" sozinho: dispara aqui para não perder a edição
@@ -36,13 +45,13 @@ app.addEventListener('click', e => {
   if (tb) { tabs[tb.dataset.id] = tb.dataset.tab; return render(); }
   const op = e.target.closest('[data-open]');
   if (op) { open[op.dataset.open] = !(open[op.dataset.open] ?? !gm); return render(); }
-  const nd = e.target.closest('[data-node]');
+  const nd = e.target.closest('[data-node]:not([data-a])'); // os botões dos Ofícios também têm data-node, mas são ações (data-a)
   if (nd) { selNode[nd.dataset.id] = nd.dataset.node; return render(); }
   const am = e.target.closest('[data-aim]'), sb = e.target.closest('[data-sub]'), pvb = e.target.closest('[data-pv]');
   const czb = e.target.closest('[data-cz]');
   if (czb) { cz[czb.dataset.cz] = czb.dataset.v; return render(); }
   if (am) { aim = aim === am.dataset.aim ? null : am.dataset.aim; return render(); }
-  if (sb) { sub = sb.dataset.sub || null; if (sub !== 'sk' && sub !== 'it') pick = { k: 'atk', id: 'atk' }; return render(); }
+  if (sb) { sub = sb.dataset.sub || null; if (!['sk', 'it', 'wp'].includes(sub)) pick = { k: 'atk', id: 'atk' }; return render(); }
   if (pvb) { pv = pvb.dataset.pv; return render(); }
   const ftb = e.target.closest('[data-ftab]');
   if (ftb) { ftab[ftb.dataset.id] = ftb.dataset.ftab; return render(); }
@@ -59,7 +68,7 @@ app.addEventListener('click', e => {
     if (saved[d.k]) wins = { ...wins, ...structuredClone(saved[d.k]) };
     else { for (const k in wins) wins[k].open = LAYD[d.k].includes(k);
       const W = innerWidth, H = innerHeight, at = (k, x, y) => Object.assign(wins[k], { x, y });
-      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); at('best', 360, 56); }
+      at('cena', 16, 56); at('ini', 16, 56); at('chat', 16, Math.max(330, H - 360)); at('batalha', 360, 56); at('fichas', W - 416, 56); at('skills', 360, 56); at('items', 360, 420); at('best', 360, 56); at('armas', 16, 56); }
     localStorage.vj_wins = JSON.stringify(wins); return render();
   }
   if (d.a === 'winT' || d.a === 'winX') { wins[d.id].open = d.a === 'winT' && !wins[d.id].open; localStorage.vj_wins = JSON.stringify(wins); return render(); }
@@ -81,19 +90,29 @@ app.addEventListener('click', e => {
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
   if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
-  if (d.a === 'go') { if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
-    { const s0 = pick.k === 'sk' ? skOf(S.chars[d.id], pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim }); aim = null; aimOpen = false; return; }
+  if (d.a === 'ofiUse') { const u = oUi[d.node] || {}; return send({ t: 'ofiUse', id: d.id, node: d.node, item: u.item, rune: u.rune, el2: u.el2, sig: u.sig, nm: u.nm, target: u.target, part: u.part }); }
+  if (d.a?.startsWith('oc') && gm) return ocClick(d);
+  if (d.a?.startsWith('wf') && gm) return wfClick(d);
+  if (d.a === 'ofiNota') return send({ t: 'ofiNota', id: d.id, e: d.k, del: true });
+  if (d.a === 'skF') { bf.skf = bf.skf === d.v ? '' : d.v; return render(); }
+  if (d.a === 'planT') { const k = 'vj.plan.' + d.id, p = lsGet(k, []); lsSet(k, p.includes(d.name) ? p.filter(n => n !== d.name) : [...p, d.name]); return render(); }
+  if (d.a === 'planClear') { lsSet('vj.plan.' + d.id, []); return render(); }
+  if (d.a === 'planSave') { const n = prompt('Nome da build?'); if (!n) return; lsSet('vj.builds', [...lsGet('vj.builds', []).filter(b => b.name !== n), { name: n.slice(0, 40), nodes: lsGet('vj.plan.' + d.id, []) }].slice(-12)); return render(); }
+  if (d.a === 'braveT') { braveOn = !braveOn; return render(); }
+  if (d.a === 'go') { if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
+    { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } send(pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }); aim = null; aimOpen = false; braveOn = false; passTo = ''; return; }
   if (d.a === 'rollAsk') { rollDlg = { id: d.id, attr: d.attr }; return render(); }
   if (d.a === 'rollX') { rollDlg = null; return render(); }
   if (d.a === 'rollMod') { mods[rollDlg.id] = +d.v; return render(); }
   if (d.a === 'rollGo') { send({ t: 'roll', id: rollDlg.id, attr: rollDlg.attr, mod: mods[rollDlg.id] || 0 }); mods[rollDlg.id] = 0; rollDlg = null; return render(); }
   if (d.a === 'reqNo') return send({ t: 'reqNo', id: d.id });
   if (d.a === 'rqMod') { reqUi[d.id].mod = +d.v; return render(); }
+  if (d.a === 'rqAdv') { const u = reqUi[d.id]; u.adv = u.adv === d.v ? '' : d.v; return render(); }
   if (d.a === 'rqSecret') { reqUi[d.id].secret = !reqUi[d.id].secret; return render(); }
   if (d.a === 'rqOk') return send({ t: 'reqOk', id: d.id, ...reqUi[d.id] });
   if (d.a === 'rqNo') return send({ t: 'reqNo', id: d.id });
   if (d.a === 'rqWhy') { const why = prompt('Motivo (o jogador vê esta frase):'); return why === null ? null : send({ t: 'reqNo', id: d.id, why }); }
-  if (d.a === 'mute') { mute = !mute; ls('vj_mute', mute ? '1' : null); if (!mute) beep(); return render(); }
+  if (d.a === 'mute') { snd.mute = !snd.mute; ls('vj_mute', snd.mute ? '1' : null); if (!snd.mute) beep(); drawSnd(); return render(); }
   if (d.a === 'selCard') { if (selC.has(d.id)) selC.delete(d.id); else selC.add(d.id); return render(); }
   if (d.a === 'selAll') { selC.clear(); if (d.k) Object.values(S.chars).filter(c => !!c.enemy === (d.k === 'e')).forEach(c => selC.add(c.id)); return render(); }
   if (d.a === 'bulk') return send({ t: 'bulk', ids: [...selC], k: d.k, v: qa.v, st: qa.st, item: qa.item || Object.entries(S.items).sort((a, b) => a[1].name.localeCompare(b[1].name))[0]?.[0] });
@@ -125,7 +144,7 @@ app.addEventListener('click', e => {
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return toast('Escolha um alvo clicando em uma unidade.');
   if (d.a === 'act') { const s0 = S.skills[d.skill]; if (S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); }
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
-  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
+  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, w: d.w, f: d.f, v: d.v, node: d.node, rec: d.rec };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
   if (d.a === 'addChar' && gm && !d.enemy) { const o = prompt(`Login do jogador dono? (deixe vazio para escolher depois na janela Sessão)${S.accounts.length ? '\nContas: ' + S.accounts.join(', ') : ''}`); if (o === null) return; m.owner = o.trim(); }
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;

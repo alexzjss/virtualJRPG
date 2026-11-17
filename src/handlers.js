@@ -1,13 +1,15 @@
-import os from 'os';
-import { buildSkills, buildItems, ITEMS_V, VEHICLES } from '../content.js';
-import { GM } from './config.js';
-import { R, ATTRS, EL, STK, VN, STN, PARTS, BBG, CAMP, GMF, sk, it, NEW, SCH, TIER, ROLES, NUM } from './consts.js';
-import { S, newScene, log } from './state.js';
+import { BASICS, ITEMS_V, VEHICLES, buildItems, buildSkills } from '../content.js';
+import { BASE, addLimit, aiAct, allDown, allOut, applySt, at, at0, bondAdd, breakVow, can, current, d100, delay, doAct, doDefend, doFocus, endTurn, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, newChar, normSlots, ofiSync, okUrl, onMap, partyRef, passive, pick, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, trig, usable, vows } from './rules.js';
+import { S, log, newScene } from './state.js';
+import { ATTRS, BBG, CAMP, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TIER, VN, it, sk } from './consts.js';
+import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
-import { pick, d100, rid, int, okUrl, can, scene, eq, at0, lvl, at, healBody, BASE, evolveCh, sanPen, delay, current, onMap, applySt, addLimit, hurt, endTurn, strike, newChar, loadScenes, loadBestiary, passive, getCh, spot, partyRef, genFoe, fitBoss, spawn, wtype, rollExpr } from './rules.js';
-import { tell, kick, start } from './net.js';
+import { kick, tell, tell0 } from './net.js';
+import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
+
 
 const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet']);
+
 const H = {
   addChar(c, m) {
     if (c.role !== 'gm') return; // personagens novos só pelo mestre; ele escolhe o dono
@@ -38,6 +40,7 @@ const H = {
     else if (f === 'owner' && c.role === 'gm') ch.owner = String(m.v).trim().slice(0, 30);
     else if (f === 'bio') ch.bio = String(m.v).slice(0, 3000);
     else if (f === 'gmNote' && c.role === 'gm') ch.gmNote = String(m.v).slice(0, 3000);
+    else if (f === 'nen' && c.role === 'gm') ch.nen = RU.NEN.includes(m.v) ? m.v : '';
 
   },
   move(c, m) { const ch = S.chars[m.id]; if (can(c, ch)) { ch.x = int(m.x, 0, Math.ceil(scene().cols) - 1); ch.y = int(m.y, 0, Math.ceil(scene().rows) - 1); } },
@@ -45,10 +48,12 @@ const H = {
   roll(c, m) {
     const ch = S.chars[m.id];
     if (!can(c, ch) || !ATTRS.includes(m.attr)) return;
-    const target = int(at(ch, m.attr) + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r = d100();
+    if (!m.rr) ch.lastRoll = { attr: m.attr, mod: int(m.mod, -100, 100) };
+    const target = int(at(ch, m.attr) + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r1 = d100(), r2 = d100();
+    const mode = Math.max(-1, Math.min(1, (m.adv === 'adv' ? 1 : m.adv === 'dis' ? -1 : 0) + (ch.st?.focus ? 1 : 0) - (ch.st?.blind || ch.st?.exaus || ch.st?.fear ? 1 : 0))), r = mode > 0 ? Math.min(r1, r2) : mode < 0 ? Math.max(r1, r2) : r1; // vantagem: 2d100, fica o melhor; desvantagem: o pior
     const res = r <= Math.max(1, Math.floor(target / 10)) ? 'CRÍTICO' : r <= target ? 'Sucesso' : r >= 96 ? 'DESASTRE' : 'Falha';
     if (r <= target) ch.marks[m.attr] = true; // atributo usado com sucesso pode evoluir
-    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}`, r <= target ? 'ok' : 'bad', { d: r, rr: { l: m.attr, t: target, res, c: ch.id }, ...((c.role === 'gm' || c.appr) && m.secret ? { to: GM } : {}) });
+    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}${mode ? ` (${mode > 0 ? 'vantagem' : 'desvantagem'}: ${r1} e ${r2})` : ''}`, r <= target ? 'ok' : 'bad', { d: r, rr: { l: m.attr, t: target, res, c: ch.id }, ...((c.role === 'gm' || c.appr) && m.secret ? { to: GM } : {}) });
   },
   evolve(c, m) {
     const ch = S.chars[m.id];
@@ -62,6 +67,12 @@ const H = {
     const target = int(at(ch, 'SAB') - sanPen(ch), 1, 95), r = d100(), loss = int(m.loss, 1, 99);
     if (r > target) ch.san = Math.max(0, ch.san - loss);
     log(ch.name, `Teste de horror SAB ${target}% → ${r}: ${r > target ? `perdeu ${loss} de Sanidade` : 'resistiu'}`, r > target ? 'bad' : 'ok', { d: r, rr: { l: 'Horror · SAB', t: target, res: r > target ? 'Falha' : 'Sucesso', c: ch.id } });
+  },
+  aw(c, m) { // mestre concede ou retira um Despertar (selo narrativo que libera nós)
+    const ch = getCh(c, m.id);
+    if (c.role !== 'gm' || !ch || !Object.hasOwn(RU.AW, m.k)) return;
+    ch.aw = (ch.aw || []).includes(m.k) ? ch.aw.filter(k => k !== m.k) : [...(ch.aw || []), m.k];
+    if (ch.aw.includes(m.k)) log(ch.name, `recebeu o Despertar: ${RU.AW[m.k]}.`, 'ok');
   },
   vinc(c, m) { // mestre concede ou remove um Vínculo; ao ganhar, o personagem já aprende a skill raiz dele
     const ch = getCh(c, m.id);
@@ -136,7 +147,8 @@ const H = {
   battle(c, m) {
     if (c.role !== 'gm') return;
     const all = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(Boolean), dead = all.filter(o => o.enemy && o.hp <= 0), pcs = all.filter(o => !o.enemy);
-    all.forEach(o => { o.st = {}; delete o.dying; });
+    all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; delete o.brv; delete o.ten; delete o.brk; delete o.domUsed; delete o.icd; o.shield = 0; });
+    for (const [k, o] of Object.entries(S.chars)) if (o.summon) delete S.chars[k]; // invocações somem com o fim da luta
     if (!m.on && m.win && pcs.length && dead.length) { // recompensas divididas entre os heróis
       const sum = f => Math.floor(dead.reduce((a, o) => a + o[f], 0) / pcs.length), xp = sum('xpR'), gold = sum('goldR'), drops = [];
       pcs.forEach(p => { p.xp += xp; p.gold += gold; });
@@ -156,31 +168,46 @@ const H = {
         log('Mestre', `Contrato cumprido: ${ct.target}! +${Math.floor(ct.gold / pcs.length)} de ouro e +${ct.xp} XP para cada herói.`, 'ok');
       }
     }
-    S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {} };
-    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => S.battle.ticks[ch.id] = delay(ch));
+    if (!m.on && S.battle.active) { if (S.meal && --S.meal.left <= 0) delete S.meal; Object.values(S.chars).forEach(o => { delete o.sharp; }); } // refeição e arma afiada valem por uma batalha
+    S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
+    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
+    if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
+    if (m.on) { // ganchos de ofício: emboscada, canção, armadilha e companheiros
+      const hs = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.enemy), emb = Math.max(0, ...hs.map(h => OF.hook(h, 'emb'))), T = S.battle.ticks;
+      if (emb) hs.forEach(h => { T[h.id] = Math.round(T[h.id] * (1 - emb / 100)); });
+      if (S.marcha) { hs.forEach(h => { h.st.focus = 3; }); delete S.marcha; }
+      if (S.tenac) { hs.forEach(h => { h.st.endure = 1; }); delete S.tenac; }
+      hs.forEach(spawnCompanions); trapStart();
+    }
     log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
   },
-  ai(c) { // IA simples: 70% usa uma skill disponível; cura o aliado mais ferido, ataca um oponente aleatório
+  // comandos de ritmo: Defender (Coragem), Concentrar (Tensão) e Ataque Total
+  defend(c, m) {
     const a = S.chars[current()];
-    if (c.role !== 'gm' || !S.battle.active || !a?.enemy) return;
-    const alive = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o?.hp > 0), foes = alive.filter(o => o.enemy !== a.enemy);
-    const usable = a.st.silence || a.st.fury ? [] : a.skills.filter(k => { const s = S.skills[k]; return s && s.kind !== 'passive' && (!s.req || s.req === wtype(a)) && a[s.res] >= s.cost && (!s.limit || a.limit >= 100); });
-    const lim = usable.find(k => S.skills[k].limit); // Limite carregado tem prioridade
-    const mates = alive.filter(o => o.enemy === a.enemy), hurt = mates.sort((x, y) => x.hp / x.hpMax - y.hp / y.hpMax)[0], K = k => S.skills[k];
-    // só cura quem está abaixo de metade; buffs puros são raros; dano mental não serve contra quem já está sem Sanidade
-    const heals = usable.filter(k => K(k).kind === 'heal' && K(k).power > 0), buffs = usable.filter(k => K(k).kind === 'heal' && !K(k).power), hits = usable.filter(k => K(k).kind === 'dmg' && !K(k).limit), mental = usable.filter(k => K(k).kind === 'mental' && !K(k).limit);
-    const tgt = Math.random() < R.aiFocus ? foes.sort((x, y) => x.hp - y.hp)[0] : pick(foes), mOk = mental.length && tgt && tgt.san > 0;
-    if (a.hcd > 0) a.hcd--; // intervalo entre curas, para ninguém se curar sem parar
-    const skill = lim || (heals.length && !a.hcd && hurt.hp < hurt.hpMax * .5 && Math.random() < .6 ? pick(heals) : buffs.length && Math.random() < .12 ? pick(buffs)
-      : hits.length && Math.random() < (mOk ? .45 : .7) ? pick(hits) : mOk && Math.random() < .6 ? pick(mental) : 'atk'), heal = S.skills[skill]?.kind === 'heal';
-    const t = heal ? (K(skill).power ? hurt : pick(mates)) : tgt;
-    if (heal && K(skill).power) a.hcd = 4;
-    if (t) H.act(c, { id: a.id, skill, target: t.id }); else endTurn(a.id);
+    if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || a.hp <= 0) return;
+    doDefend(a);
   },
+  focus(c, m) {
+    const a = S.chars[current()];
+    if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || a.hp <= 0 || a.chg) return;
+    doFocus(a);
+  },
+  allOut(c, m) {
+    const a = S.chars[current()];
+    if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || a.hp <= 0 || skipping(a) || !allDown(a.enemy)) return;
+    allOut(a); endTurn(a.id, 150);
+  },
+  weather(c, m) { // o mestre escolhe o clima da cena (vale já, se há batalha)
+    if (c.role !== 'gm') return;
+    const k = Object.hasOwn(RU.CLIMA, m.k) ? m.k : '';
+    scene().wx = k; if (S.battle.active) S.battle.wx = { k, ttl: 0 };
+    log('Mestre', k ? `Clima: ${RU.CLIMA[k][0]}.` : 'O clima volta ao normal.');
+  },
+  ai(c) { const a = S.chars[current()]; if (c.role === 'gm' && S.battle.active && a?.enemy) aiAct(a); }, // IA do inimigo da vez
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
     const ch = S.chars[m.id], T = S.battle.ticks;
     if (c.role !== 'gm' || !S.battle.active || !ch) return;
-    if (m.k === 'in') { if (!(ch.id in T) && ch.hp > 0) T[ch.id] = Math.max(0, ...Object.values(T)) + 1; }
+    if (m.k === 'in') { if (!(ch.id in T) && ch.hp > 0) { T[ch.id] = Math.max(0, ...Object.values(T)) + 1; ch.bt = {}; } }
     else if (!(ch.id in T)) return;
     else if (m.k === 'out') delete T[ch.id];
     else if (m.k === 'set') T[ch.id] = int(m.v, 0, 999999);
@@ -188,36 +215,26 @@ const H = {
   },
   next(c) { const id = current(); if (S.battle.active && id && can(c, S.chars[id])) endTurn(id, 50); }, // passar custa metade do tempo
   act(c, m) {
-    const a = S.chars[current()], t0 = S.chars[m.target];
-    if (!S.battle.active || !a || a.id !== m.id || !can(c, a) || !t0 || !(t0.id in S.battle.ticks)) return;
-    const basic = m.skill === 'atk';
-    const wp = eq(a, 'arma');
-    const s = basic ? { name: 'Ataque', kind: 'dmg', attr: wp?.wt === 'fogo' ? 'DES' : 'FOR', el: wp?.el || 'fis', power: wp?.power ?? a.arma, pierce: wp?.pierce || 0, cost: 0, res: 'aura' } : m.skill === 'wpn' ? wp?.grant : a.skills.includes(m.skill) && S.skills[m.skill];
-    if (!s || s.kind === 'passive' || (s.req && s.req !== wtype(a)) || (s.reqFor && at0(a, 'FOR') < s.reqFor) || a[s.res] < s.cost || (s.limit && a.limit < 100) || (!basic && (a.st.silence || a.st.fury))) return;
-    if (s.kind !== 'heal' && !s.area && t0.hp <= 0) return; // não se gasta o turno golpeando quem já caiu
-    a[s.res] -= s.cost;
-    if (s.limit) a.limit = 0;
-    const inB = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.dead), heal = s.kind === 'heal';
-    const mates = inB.filter(o => o.hp > 0 && o.enemy === a.enemy && o !== a);
-    const ts = !heal && (a.st.possess || a.san <= 0) && mates.length ? [pick(mates)] // possuído, ou em colapso de Sanidade, ataca os próprios aliados
-      : s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : t0];
-    let more = false;
-    const aim = !s.area && !heal && PARTS.includes(m.aim) ? m.aim : null;
-    const bonus = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0; // bônus ou penalidade dado pelo mestre ao aprovar
-    for (const t of ts) if (!t.dead) more = strike(a, s, t, aim, bonus) || more;
-    if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }
-    if (more && a.hp > 0) log(a.name, 'acertou a fraqueza — MAIS UM turno!', 'ok'); else endTurn(a.id, s.ct);
+    const a = S.chars[current()];
+    if (!S.battle.active || !a || a.id !== m.id || !can(c, a)) return;
+    doAct(a, m, c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0); // bônus ou penalidade dado pelo mestre ao aprovar
+  },
+  pslot(c, m) { // liga ou desliga uma passiva ativa (só no acampamento ou pelo mestre, fora de batalha)
+    const ch = S.chars[m.id];
+    if (!can(c, ch) || ch.enemy || S.battle.active || !(c.role === 'gm' || S.camp.open) || !slotted(S.skills[m.skill]) || !ch.skills.includes(m.skill)) return;
+    normSlots(ch); ch.pslotOff ??= [];
+    if (ch.pslots.includes(m.skill)) { ch.pslots = ch.pslots.filter(k => k !== m.skill); ch.pslotOff.push(m.skill); log(ch.name, `desativa ${S.skills[m.skill].name}.`, ''); }
+    else if (ch.pslots.length < slotMax(ch)) { ch.pslots.push(m.skill); ch.pslotOff = ch.pslotOff.filter(k => k !== m.skill); log(ch.name, `ativa ${S.skills[m.skill].name} (${ch.pslots.length}/${slotMax(ch)}).`, 'ok'); }
+    normSlots(ch); // a vaga que sobrou é ocupada pela próxima passiva aprendida (desligue-a também para deixar vaga)
   },
   learn(c, m) {
     const ch = S.chars[m.id], s = S.skills[m.skill];
-    if (!can(c, ch) || !s || ch.skills.includes(m.skill) || ch.xp < s.xp) return;
-    if (s.el !== 'fis' && !ch.vinc.includes(s.el)) return; // só o tronco marcial e os próprios Vínculos
-    if (s.ex && ch.skills.some(k => S.skills[k]?.ex === s.ex)) return; // escolha excludente já feita
-    if (s.rq && Object.entries(s.rq).some(([a, v]) => at0(ch, a) < v)) return; // requisito de atributo
-    if (ch.skills.length && !ch.skills.some(k => S.skills[k] && Math.max(Math.abs(S.skills[k].gx - s.gx), Math.abs(S.skills[k].gy - s.gy)) <= 1)) return;
-    ch.xp -= s.xp; ch.skills.push(m.skill);
-    passive(ch, s, 1);
-    log(ch.name, `aprendeu ${s.name}`, 'ok');
+    if (!can(c, ch) || !s || RU.whyNot(ch, s, S.skills, S.items, m.skill)) return;
+    ch.xp -= RU.xpCost(ch, s);
+    if (s.cat && !ch.nen) { ch.nen = s.cat; log(ch.name, `descobre sua natureza de Aura: ${RU.NENN[s.cat]}.`, 'ok'); }
+    ch.skills.push(m.skill);
+    passive(ch, s, 1); normSlots(ch);
+    log(ch.name, `aprendeu ${s.name}${slotted(s) && !ch.pslots.includes(m.skill) ? ' (sem slot livre: troque no acampamento)' : ''}`, 'ok');
   },
   // ----- itens -----
   give(c, m) { const ch = getCh(c, m.id); if (c.role === 'gm' && ch && Object.hasOwn(S.items, m.item)) ch.inv[m.item] = (ch.inv[m.item] || 0) + 1; },
@@ -238,35 +255,40 @@ const H = {
     const inB = S.battle.active && ch.id in S.battle.ticks;
     if (inB && current() !== ch.id) return;
     const t = inB && S.chars[m.target] && m.target in S.battle.ticks ? S.chars[m.target] : ch;
-    if (t.dead || (i.eff === 'bomb' && (!inB || t === ch)) || (i.eff === 'rev' && t.hp > 0) || (t.hp <= 0 && !['rev', 'hp'].includes(i.eff))) return;
+    if (t.dead || (['bomb', 'oil'].includes(i.eff) && (!inB || t === ch)) || (i.eff === 'rev' && t.hp > 0) || (t.hp <= 0 && !['rev', 'hp'].includes(i.eff))) return;
     let txt = `+${i.power} ${i.eff.toUpperCase()}`, fx;
     if (i.eff === 'bomb') { // bomba: dano fixo do elemento, sem rolagem
       const d = Math.max(1, Math.round(i.power * (t.weak.includes(i.el) ? 1.5 : 1) * (t.resist.includes(i.el) ? .5 : 1)));
       txt = `${d} de dano${hurt(t, d)}`; fx = { fx: { id: t.id, dmg: d, el: i.el } };
-    } else if (i.eff === 'cure') { for (const k of Object.keys(t.st)) if (!k.endsWith('Up')) delete t.st[k]; txt = 'condições removidas'; }
+    } else if (i.eff === 'oil') { applySt(t, 'oil', 3); txt = 'encharcado de óleo'; }
+    else if (i.eff === 'cure') { for (const k of RU.NEG) delete t.st[k]; delete t.sealD; txt = 'condições removidas'; }
     else if (i.eff === 'body') { healBody(t, i.power); txt = 'ferimentos tratados'; }
     else if (i.eff === 'rev') { t.hp = Math.min(t.hpMax, i.power); delete t.dying; txt = 'de volta à luta'; }
     else { const v = Math.round(i.power * (i.eff === 'hp' && t.st.curse ? .5 : 1)); if (i.eff === 'hp') { delete t.dying; healBody(t, v); } t[i.eff] = Math.min(t[i.eff + 'Max'], t[i.eff] + v); }
+    if (inB && t === ch && ['hp', 'rev'].includes(i.eff) && vows(ch).includes('corpo')) breakVow(ch, 'corpo', 'curou a si mesmo');
     H.drop(c, m);
     log(ch.name, `usou ${i.name}${t === ch ? '' : ' em ' + t.name} (${txt})`, 'ok', fx);
     if (inB) endTurn(ch.id);
   },
   // ----- descanso e acampamento -----
   camp(c, m) { if (c.role === 'gm') S.camp = { open: !!m.on, acts: {} }; },
-  campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && CAMP.includes(m.k)) S.camp.acts[m.id] = m.k; },
+  campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && (CAMP.includes(m.k) || hasNode(ch, n => n.camp === m.k))) { S.camp.acts[m.id] = m.k; (S.camp.with ??= {})[m.id] = S.chars[m.w] && !S.chars[m.w].enemy && m.w !== m.id ? m.w : ''; } },
   rest(c, m) { // Sanidade não volta com descanso: só itens, skills, "conversar" no acampamento ou o mestre
     if (c.role !== 'gm' || S.battle.active) return;
-    const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), long = !!m.long, notes = [];
+    const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), long = !!m.long, notes = [], curto = Math.max(0, ...pcs.map(p => OF.hook(p, 'curto')));
     for (const p of pcs) {
-      p.aura = p.auraMax; p.hp = long ? p.hpMax : Math.min(p.hpMax, p.hp + Math.ceil(p.hpMax / 2)); delete p.dying;
+      p.aura = p.auraMax; p.hp = long ? p.hpMax : Math.min(p.hpMax, p.hp + Math.ceil(p.hpMax * (.5 + curto / 100))); delete p.dying;
       for (const k of PARTS) p.body[k] = long ? 0 : Math.floor((p.body[k] || 0) / 2);
-      if (long) { p.st = {}; const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }
+      if (long) { p.st = {}; delete p.afl; p.san = Math.min(p.sanMax, p.san + OF.hook(p, 'sonoSan')); const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }
     }
     if (long && S.camp.open) {
       for (const [id, k] of Object.entries(S.camp.acts)) {
         const p = S.chars[id];
         if (!p) continue;
-        if (k === 'vigiar') p.st.agiUp = 3; else if (k === 'cozinhar') pcs.forEach(o => o.st.atkUp = 3); else if (k === 'conversar') p.san = Math.min(p.sanMax, p.san + 5);
+        if (k === 'vigiar') { p.st.agiUp = 3; if (OF.hook(p, 'vigia')) p.st.focus = 3; } else if (k === 'afiar') p.sharp = true;
+        else if (k === 'armadilha') S.trap = { sang: !!OF.hook(p, 'trapSang'), stun: !!OF.hook(p, 'trapStun') };
+        else if (k === 'cantar') { const v = OF.hook(p, 'cantar'), sf = OF.hook(p, 'sinfonia'); pcs.forEach(o => { o.san = Math.min(o.sanMax, o.san + v); if (sf) o.hp = Math.min(o.hpMax, o.hp + Math.ceil(o.hpMax * sf / 100)); }); if (OF.hook(p, 'marcha')) S.marcha = true; if (OF.hook(p, 'tenac')) S.tenac = true; }
+        else if (k === 'cozinhar') pcs.forEach(o => o.st.atkUp = 3); else if (k === 'conversar') { p.san = Math.min(p.sanMax, p.san + 5); const w = S.chars[S.camp.with?.[id]]; if (w && !w.enemy) { const up = bondAdd(p, w, 1); if (up) notes.push(`o laço de ${p.name} e ${w.name} sobe para o nível ${up}`); } }
         else if (k === 'treinar') p.xp += 5; else addLimit(p, 30);
         notes.push(`${p.name}: ${k}`);
       }
@@ -283,7 +305,7 @@ const H = {
     const move = side => {
       const ch = S.chars[side.id], [vn, vel, man] = VEHICLES[side.veh];
       if (!ch) return 0;
-      const target = int(at(ch, 'DES') + man - sanPen(ch), 1, 95), r = d100(), mv = r <= target ? vel : r >= 96 ? 0 : Math.floor(vel / 2);
+      const target = int(at(ch, 'DES') + man + OF.hook(ch, 'chase') - sanPen(ch), 1, 95), r = OF.hook(ch, 'semAcidente') ? Math.min(d100(), 95) : d100(), mv = r <= target ? vel : r >= 96 ? 0 : Math.floor(vel / 2);
       if (r <= target) ch.marks.DES = true;
       log(ch.name, `conduz ${vn}: DES ${target}% → ${r}: ${r <= target ? `avança ${mv}` : r >= 96 ? 'ACIDENTE! Fica parado' : `derrapa, avança ${mv}`}${r >= 96 ? hurt(ch, 10) : ''}`, r <= target ? 'ok' : 'bad', { d: r });
       return mv;
@@ -300,20 +322,21 @@ const H = {
   },
   buy(c, m) {
     const ch = S.chars[m.id], i = S.items[m.item];
-    if (!can(c, ch) || !scene().shop.open || !i || !scene().shop.stock.includes(m.item) || ch.gold < i.price) return;
-    ch.gold -= i.price; ch.inv[m.item] = (ch.inv[m.item] || 0) + 1;
-    log(ch.name, `comprou ${i.name} por ${i.price}`, 'ok');
+    const price = i ? Math.max(1, Math.ceil(i.price * (1 - OF.hook(ch, 'desc') / 100))) : 0; // Lábia: desconto
+    if (!can(c, ch) || !scene().shop.open || !i || !scene().shop.stock.includes(m.item) || ch.gold < price) return;
+    ch.gold -= price; ch.inv[m.item] = (ch.inv[m.item] || 0) + 1;
+    log(ch.name, `comprou ${i.name} por ${price}`, 'ok');
   },
   sell(c, m) {
     const ch = S.chars[m.id], i = S.items[m.item];
     if (!can(c, ch) || !scene().shop.open || !i || !(ch.inv[m.item] > 0)) return;
-    ch.gold += Math.floor(i.price / 2); H.drop(c, m);
-    log(ch.name, `vendeu ${i.name} por ${Math.floor(i.price / 2)}`, 'ok');
+    const got = Math.floor(i.price / 2 * (1 + OF.hook(ch, 'desc') / 100)); ch.gold += got; H.drop(c, m);
+    log(ch.name, `vendeu ${i.name} por ${got}`, 'ok');
   },
   forge(c, m) { // forja com essências do elemento: arma = 3, relíquia = 5, mais metade do preço em ouro
     const ch = S.chars[m.id], i = S.items[m.item];
-    if (!can(c, ch) || S.battle.active || !i?.el || !['arma', 'acess'].includes(i.type)) return;
-    const ess = Object.keys(S.items).find(k => S.items[k].type === 'mat' && S.items[k].el === i.el), need = i.type === 'arma' ? 3 : 5, cost = Math.round(i.price / 2);
+    if (!can(c, ch) || S.battle.active || !i?.el || !['arma', 'acess'].includes(i.type) || (i.type === 'arma' && i.cat && i.cat !== 'elemental')) return; // lendárias e malditas não saem da forja
+    const ess = Object.keys(S.items).find(k => S.items[k].type === 'mat' && S.items[k].el === i.el), need = i.type === 'arma' ? OF.hook(ch, 'essencia') || 3 : 5, cost = Math.round(i.price / 2);
     if (!ess || !(ch.inv[ess] >= need) || ch.gold < cost) return;
     ch.gold -= cost; if ((ch.inv[ess] -= need) <= 0) delete ch.inv[ess];
     ch.inv[m.item] = (ch.inv[m.item] || 0) + 1;
@@ -366,7 +389,7 @@ const H = {
     if (c.role !== 'gm' || !r) return;
     delete S.reqs[m.id];
     const mod = int(m.mod, -100, 100), n = S.seq;
-    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll' });
+    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', txt: r.t === 'ofiUse' ? String(m.txt || '').slice(0, 200) : '', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' });
     tell(r.by, S.seq === n && r.cat !== 'item' && r.cat !== 'camp' ? { kind: 'no', text: `${r.text}: não foi possível agora.` } : { kind: 'ok', text: `Aprovado: ${r.text}${mod ? ` (${mod > 0 ? '+' : ''}${mod})` : ''}` });
   },
   reqNo(c, m) {
@@ -426,6 +449,133 @@ const H = {
       else { delete ch.inv[m.id]; for (const k in ch.equip) if (ch.equip[k] === m.id) delete ch.equip[k]; }
     }
   },
+  // ----- ofícios (perícias) -----
+  ofiAw(c, m) { // o mestre concede ou retira a Iniciação em uma perícia
+    const ch = S.chars[m.id]; if (c.role !== 'gm' || !ch || ch.enemy || !OF.PER[m.per]) return;
+    const has = ch.ofi.includes(m.per); ch.ofi = has ? ch.ofi.filter(p => p !== m.per) : [...ch.ofi, m.per];
+    log('Mestre', `${ch.name} ${has ? 'perde' : 'recebe'} a Iniciação em ${OF.PER[m.per].n}.`, has ? '' : 'ok');
+  },
+  ofiLearn(c, m) {
+    const ch = S.chars[m.id]; if (!can(c, ch) || typeof m.node !== 'string' || OF.whyNot(ch, m.node)) return;
+    const [per, i] = m.node.split('.'), n = OF.PER[per].nodes[+i]; ch.po -= n.po; ch.pof.push(n.id);
+    log(ch.name, `aprendeu ${n.n} (${OF.PER[per].n} · ${OF.GRAU[n.t]})`, 'ok');
+  },
+  ofiGive(c, m) { // o mestre dá ou tira um nó sem custo
+    const ch = S.chars[m.id]; if (c.role !== 'gm' || !ch || ch.enemy || typeof m.node !== 'string' || !OF.PER[m.node.split('.')[0]]?.nodes[+m.node.split('.')[1]]) return;
+    ch.pof = ch.pof.includes(m.node) ? ch.pof.filter(k => k !== m.node) : [...ch.pof, m.node];
+  },
+  ofiUse(c, m) { // uma ação de ofício (rolagem de perícia): coletar, tratar, identificar, forja...
+    const ch = S.chars[m.id], n = ch && nodeOf(ch, m.node);
+    if (!can(c, ch) || ch.enemy || !n?.act) return;
+    const per = n.id.split('.')[0], mod = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0, inB = S.battle.active && ch.id in S.battle.ticks;
+    if (inB && (n.act !== 'identificar' || current() !== ch.id)) return;
+    const A = OFI_ACT[n.act], ult = ch.dia?.at(-1)?.i; if (A) A(ch, n, per, m, mod, inB);
+    const e = ch.dia?.at(-1); if (e && e.i !== ult && (c.role === 'gm' || c.appr) && m.txt) narrar(ch, e, m.txt); // o mestre escreveu a narração ao aprovar
+  },
+  ofiNota(c, m) { // o mestre escreve, troca ou apaga a narração de um teste narrativo do diário de ofícios
+    const ch = S.chars[m.id], e = c.role === 'gm' && ch?.dia?.find(x => x.i === m.e); if (!e) return;
+    if (m.del) ch.dia = ch.dia.filter(x => x !== e); else narrar(ch, e, m.txt);
+  },
+  shopBasics(c) { // põe os ingredientes básicos à venda na loja da cena (campanhas antigas não os têm)
+    if (c.role !== 'gm') return; const sh = scene().shop;
+    for (const nome of BASICS) { const k = itemId(nome); if (k && !sh.stock.includes(k)) sh.stock.push(k); }
+  },
+  ofiCfg(c, m) { // o mestre edita o catálogo de ofícios: perícias, nós e receitas (guardado como diferenças sobre o padrão)
+    if (c.role !== 'gm') return;
+    const cfg = S.ofiCfg ??= {}, tx = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n), num = (v, a, b) => int(v, a, b);
+    const put = (coll, key, v) => { cfg[coll] ??= {}; if (v == null) delete cfg[coll][key]; else cfg[coll][key] = v; if (!Object.keys(cfg[coll]).length) delete cfg[coll]; };
+    const base = id => { const [per, i] = String(id).split('.'), n = OF.PER[per]?.nodes[+i]; return n && !n.custom ? n : null; };
+    const v = m.v && typeof m.v === 'object' ? m.v : null;
+    if (m.k === 'reset') S.ofiCfg = {};
+    else if (m.k === 'per' && OF.PER[m.id]) {
+      const o = {}; if (v) { if (tx(v.n, 30)) o.n = tx(v.n, 30); if (v.d != null) o.d = tx(v.d, 160); const a = [...new Set([].concat(v.a || []).filter(k => ATTRS.includes(k)))].slice(0, 2); if (a.length) o.a = a; }
+      put('per', m.id, Object.keys(o).length ? o : null);
+    } else if (m.k === 'node' && base(m.id)) {
+      const o = {}; if (v) { if (tx(v.n, 40)) o.n = tx(v.n, 40); if (v.d != null) o.d = tx(v.d, 160); if (v.po != null) o.po = num(v.po, 0, 30); if (v.r != null) o.r = num(v.r, 0, 30); if (v.g != null && base(m.id).act === 'checar') o.g = num(v.g, 0, 200); if (v.off) o.off = true; }
+      put('node', m.id, Object.keys(o).length ? o : null);
+    } else if (m.k === 'nodeNew' && OF.PER[m.per]) {
+      const L = cfg.nodeNew?.[m.per] ?? [], i = m.i == null ? L.length : num(m.i, 0, L.length);
+      if (i >= 30) return;
+      if (v && (i < L.length || tx(v.n, 40))) { const t = num(v.t, 1, 3); L[i] = { n: tx(v.n, 40) || L[i]?.n || 'Nó novo', d: tx(v.d, 160), t, po: num(v.po ?? [0, 2, 4, 7][t], 0, 30), r: num(v.r, 0, 30), ...(v.chk ? { chk: true, g: num(v.g, 0, 200) } : {}), ...(v.off ? { off: true } : {}) }; }
+      else if (!v && i < L.length) L[i] = { ...L[i], off: true }; // o espaço fica (os ids dos nós seguintes não mudam)
+      else return;
+      (cfg.nodeNew ??= {})[m.per] = L;
+    } else if (m.k === 'rec') {
+      const cur = OF.REC[m.id], novo = !cur;
+      if (!v) put('rec', m.id, null); // receita nova: apaga; receita padrão: volta ao original
+      else {
+        const o = {}, nm = tx(v.n, 40), itNm = k => Object.values(S.items).some(i => i.name === k);
+        if (nm) o.n = nm; if (OF.PER[v.per]) o.per = v.per; if (v.t != null) o.t = num(v.t, 1, 3); if (v.dc != null) o.dc = num(v.dc, -40, 20); if (v.qty != null) o.qty = num(v.qty, 1, 5); if (v.off != null) o.off = !!v.off;
+        if (v.out != null) o.out = itNm(tx(v.out, 60)) ? tx(v.out, 60) : '';
+        if (v.mats && typeof v.mats === 'object') { const mt = Object.fromEntries(Object.entries(v.mats).filter(([k]) => itNm(k)).map(([k, q]) => [k, num(q, 1, 9)]).slice(0, 6)); if (Object.keys(mt).length) o.mats = mt; }
+        if (v.meal && typeof v.meal === 'object') { const ML = { atk: 'de dano', def: 'de defesa', agi: 'de velocidade', hit: 'de acerto', crit: 'de crítico' }, ml = Object.fromEntries(Object.keys(ML).filter(k => num(v.meal[k], 0, 30) > 0).map(k => [k, num(v.meal[k], 0, 30)])); if (Object.keys(ml).length) { o.meal = ml; o.mealD = Object.entries(ml).map(([k, q]) => `+${q}% ${ML[k]}`).join(', '); o.out = ''; } }
+        if (novo) { if (!o.n || !o.per || !o.mats || !(o.out || o.meal)) return; Object.assign(o, { custom: true, t: o.t || 1 }); const id = m.id && /^x[0-9a-f]{4,8}$/.test(m.id) ? m.id : 'x' + rid(); put('rec', id, o); }
+        else put('rec', m.id, { ...cfg.rec?.[m.id], ...o });
+      }
+    } else return;
+    ofiSync(true);
+  },
+  craft(c, m) { // prepara uma receita; refeições viram o bônus da próxima batalha
+    const ch = S.chars[m.id], r = OF.REC[m.rec];
+    if (!can(c, ch) || !r || r.off || ch.enemy || S.battle.active || !OF.recipes(ch, r.per).includes(r)) return;
+    const mod = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0, mats = Object.fromEntries(Object.entries(r.mats).map(([k, q]) => [k, r.per === 'engenharia' && OF.hook(ch, 'barato') ? Math.max(1, Math.ceil(q / 2)) : q]));
+    if (!haveMats(ch, mats)) return log(ch.name, `não tem o que precisa para ${r.n}: ${matsText(mats)}.`, 'bad');
+    const R = ofiRoll(ch, r.per, mod + r.dc, `Preparar ${r.n}`);
+    takeMats(ch, mats, R.ok ? 'all' : R.dis ? 'half' : 'one');
+    if (!R.ok) return;
+    if (r.meal) {
+      const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), dbl = ['ensopado', 'sopa'].includes(r.id) && OF.hook(ch, 'dobro') ? 2 : 1;
+      S.meal = { n: r.n, by: ch.name, left: OF.hook(ch, 'refDupla') ? 2 : 1, m: Object.fromEntries(Object.entries(r.meal).map(([k, v]) => [k, v * dbl])) };
+      const sanUp = OF.hook(ch, 'sanRef'); pcs.forEach(o => { if (sanUp) o.san = Math.min(o.sanMax, o.san + sanUp); if (r.san) o.san = Math.max(0, o.san - r.san); });
+      return log(ch.name, `serve ${r.n}: ${r.mealD} para o grupo na próxima batalha.`, 'ok');
+    }
+    const k = itemId(r.out); if (!k) return;
+    const qty = r.qty + OF.learned(ch, r.per).filter(n => n.hk === 'rende').reduce((a, n) => Math.max(a, n.v), 0) + (R.crit ? 1 : 0);
+    ch.inv[k] = (ch.inv[k] || 0) + qty; log(ch.name, `prepara ${qty}× ${r.out}.`, 'ok');
+  },
+  reroll(c, m) { // Jogos de Azar: repete a última rolagem de atributo
+    const ch = S.chars[m.id], L = ch?.lastRoll; if (!can(c, ch) || !L) return;
+    const free = L.attr === 'SOR' && OF.hook(ch, 'rrSor');
+    if (!free && (ch.rrUsed || 0) >= OF.hook(ch, 'rr')) return;
+    if (!free) ch.rrUsed = (ch.rrUsed || 0) + 1;
+    log(ch.name, `rola de novo ${L.attr}!`, 'ok'); H.roll(c, { id: ch.id, attr: L.attr, mod: L.mod, rr: 1 });
+  },
+  newSession(c) { if (c.role !== 'gm') return; Object.values(S.chars).forEach(o => { o.rrUsed = 0; }); log('Mestre', 'Nova sessão: as rolagens de novo foram renovadas.', 'ok'); },
+  gatherSet(c, m) { // o mestre escolhe o que a cena oferece para colher
+    if (c.role !== 'gm' || !S.items[m.item] || S.items[m.item].type !== 'mat') return;
+    const g = scene().gather ??= []; scene().gather = m.on === false ? g.filter(k => k !== m.item) : g.includes(m.item) ? g : [...g, m.item];
+  },
+  wpnSave(c, m) { // criador de armas do mestre: cria uma arma nova ou regrava uma existente (m.id), a partir de um rascunho
+    if (c.role !== 'gm' || !m.w || typeof m.w !== 'object') return;
+    const { w, errs } = AR.clean(m.w), id = m.id && S.items[m.id]?.type === 'arma' ? m.id : rid();
+    S.items[id] = { ...it(w.name, 'arma', w.power), ...w };
+    if (S.battle.active) usable();
+    log('Mestre', `${m.id === id ? 'atualizou' : 'criou'} a arma ${w.name}.${errs.length ? ' Corrigido: ' + errs.join(' · ') : ''}`, errs.length ? 'bad' : 'ok', { to: GM });
+    tell0(c, { kind: errs.length ? 'no' : 'ok', text: errs.length ? errs.join(' · ') : `${w.name} salva.`, id });
+  },
+  wpnVar(c, m) { // variante elemental de uma arma do catálogo: um elemento ou os 9 (m.el = 'all'); nomes já usados são pulados
+    const src = S.items[m.id]; if (c.role !== 'gm' || src?.type !== 'arma') return;
+    const els = m.el === 'all' ? Object.keys(VN) : Object.hasOwn(VN, m.el) ? [m.el] : [];
+    const names = new Set(Object.values(S.items).map(i => i.name)), made = [], skip = [];
+    for (const el of els) {
+      const d = AR.variantEl(AR.clean(src).w, el); if (!d) { skip.push(VN[el]); continue; }
+      const { w } = AR.clean(d); if (names.has(w.name)) { skip.push(VN[el]); continue; }
+      names.add(w.name); S.items[rid()] = { ...it(w.name, 'arma', w.power), ...w }; made.push(w.name);
+    }
+    log('Mestre', `variantes elementais de ${src.name}: ${made.length ? made.join(', ') : 'nenhuma nova'}${skip.length ? ` (já existiam: ${skip.join(', ')})` : ''}.`, made.length ? 'ok' : '', { to: GM });
+    tell0(c, { kind: made.length ? 'ok' : 'no', text: made.length ? `${made.length} variante(s) criada(s).` : 'Essas variantes já existem.' });
+  },
+  wpnImport(c, m) { // importar armas de um arquivo ou texto (lotes de até 25): cada uma passa pela mesma limpeza do criador
+    if (c.role !== 'gm' || !Array.isArray(m.list)) return;
+    const names = new Set(Object.values(S.items).map(i => i.name)); let n = 0, fixed = 0;
+    for (const d of m.list.slice(0, 25)) {
+      if (!d || typeof d !== 'object') continue;
+      const { w, errs } = AR.clean(d); let name = w.name, k = 2; while (names.has(name)) name = `${w.name.slice(0, 54)} (${k++})`;
+      names.add(name); S.items[rid()] = { ...it(name, 'arma', w.power), ...w, name }; n++; if (errs.length) fixed++;
+    }
+    log('Mestre', `importou ${n} arma(s)${fixed ? `, ${fixed} com correções` : ''}.`, 'ok', { to: GM });
+    tell0(c, { kind: n ? 'ok' : 'no', text: n ? `${n} arma(s) importada(s).` : 'Nenhuma arma válida no arquivo.' });
+  },
   edSet(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(SCH, m.coll) || !Object.hasOwn(SCH[m.coll], m.f) || !Object.hasOwn(S[m.coll], m.id)) return;
     const o = S[m.coll][m.id], r = SCH[m.coll][m.f], v = m.v;
@@ -433,4 +583,4 @@ const H = {
   },
 };
 
-export { undoStack, NOUNDO, H };
+export { H, NOUNDO, undoStack };

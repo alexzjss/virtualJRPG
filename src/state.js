@@ -1,9 +1,10 @@
-import fs from 'fs';
+import { ITEMS_V, RENAME, buildItems, buildSkills } from '../content.js';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
-import { buildSkills, buildItems, ITEMS_V, RENAME } from '../content.js';
-import { DATA, FILE } from './config.js';
-import { EXTRA, ATTRS, EL, sk, it } from './consts.js';
+import { DATA, FILE, OF } from './config.js';
+import { ATTRS, EL, EXTRA, it, sk } from './consts.js';
+
 
 // ---------- estado ----------
 let S = { chars: {}, battle: { active: false, ticks: {} }, log: [] }, fresh = true;
@@ -40,12 +41,12 @@ if (!S.scenes) { S.scenes = { a: newScene('Cena 1', S.map) }; S.scene = 'a'; del
 }
 S.items ??= buildItems(it);
 }
-function migrateItems() { // catálogo v3 (armas e itens da campanha); as chaves mudam, então tudo é remapeado pelo nome
+function migrateItems() { // catálogo v5: nomes novos dos consumáveis e equipamentos (RENAME) e o catálogo completo de armas com modelo (armas forjadas e itens do mestre ficam); as chaves mudam, então tudo é remapeado pelo nome
   if (S.itemsV === ITEMS_V) return;
-  const old = S.items, fresh = buildItems(it), byName = n => Object.keys(fresh).find(k => fresh[k].name === n), flo = byName('Florete'), map = {};
+  const old = S.items, fresh = buildItems(it), byName = n => Object.keys(fresh).find(k => fresh[k].name === n), map = {};
   for (const [k, i] of Object.entries(old)) {
-    if (i.type === 'arma') { map[k] = byName(i.name) || flo; continue; } // arma que não existe mais vira Florete
-    const nk = byName(RENAME[i.name] || i.name) || 'x' + k; map[k] = nk; fresh[nk] = { ...i }; // mantém edições do mestre e itens criados por ele
+    if (i.type === 'arma' && byName(i.name) && !i.tpl) { map[k] = byName(i.name); continue; } // arma do catálogo: vale a versão atual dele
+    const nn = RENAME[i.name] || i.name, nk = byName(nn) || 'x' + k; map[k] = nk; fresh[nk] = { ...i, name: nn }; // o nome novo vale; o resto (preço, poder) fica como o mestre deixou // mantém edições do mestre e itens criados por ele
   }
   S.items = fresh;
   const tr = k => map[k] ?? (fresh[k] ? k : null);
@@ -53,16 +54,17 @@ function migrateItems() { // catálogo v3 (armas e itens da campanha); as chaves
     const inv = {}; for (const [k, n] of Object.entries(ch.inv || {})) { const nk = tr(k); if (nk) inv[nk] = (inv[nk] || 0) + n; } ch.inv = inv;
     for (const sl of Object.keys(ch.equip || {})) { const nk = tr(ch.equip[sl]); if (nk) ch.equip[sl] = nk; else delete ch.equip[sl]; }
   }
-  for (const sc of Object.values(S.scenes)) if (sc.shop) sc.shop.stock = [...new Set(sc.shop.stock.map(tr).filter(k => k && fresh[k].type !== 'arma'))];
+  for (const sc of Object.values(S.scenes)) if (sc.shop) sc.shop.stock = [...new Set(sc.shop.stock.map(tr).filter(k => k && fresh[k]))];
   S.itemsV = ITEMS_V;
 }
 function migrateB(isNew) {
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
-for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; i.pierce ??= 0; i.reqFor ??= 0; i.grant ??= null; }
+for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
+S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
-for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; }
+for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; sc.gather ??= []; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 if (isNew) S.itemsV = ITEMS_V; else migrateItems();
 fixShape();
@@ -74,6 +76,7 @@ for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...struct
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const fin = (v, d = 0) => v !== null && v !== '' && typeof v !== 'boolean' && Number.isFinite(+v) ? +v : d;
 function preFix() { // antes das migrações: coleções que não são objetos de objetos são descartadas (as que têm padrão são recriadas)
+  if (S.skills && JSON.stringify(S).includes('radiacao')) { const o = JSON.parse(JSON.stringify(S).replace(/radiacao/g, 'hiruko')); for (const k of Object.keys(S)) delete S[k]; Object.assign(S, o); } // id antigo do Vínculo de Hiruko: converte fichas, itens e a grade salvas
   for (const k of ['chars', 'scenes', 'bestiary', 'skills', 'items', 'encounters', 'contracts']) {
     if (S[k] === undefined) continue;
     if (!isObj(S[k])) { delete S[k]; continue; }
@@ -172,4 +175,4 @@ function adopt(o, isNew = false, after = () => {}) {
   }
 }
 
-export { S, fresh, BK, writeState, newScene, migrateItems, saveT, flush, save, log, backupOnStart, migrate, adopt, backup, slug, diaryFile, flushDiary, BLANK, isObj, fin };
+export { BK, BLANK, S, adopt, backup, backupOnStart, diaryFile, fin, flush, flushDiary, fresh, isObj, log, migrate, migrateItems, newScene, save, saveT, slug, writeState };
