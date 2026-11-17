@@ -133,6 +133,15 @@ export function buildItems(it) {
   add('Componente Ritualístico', 'mat', 0, { eff: 'comp', price: 25 }); // gasto sozinho por rituais: corta o preço em Sanidade pela metade
   add('Granada', 'cons', 28, { eff: 'bomb', el: 'fis', price: 35 }); add('Coquetel Incendiário', 'cons', 25, { eff: 'bomb', el: 'kagutsuchi', price: 35 });
   add('Frasco de Ácido', 'cons', 22, { eff: 'bomb', el: 'hiruko', price: 35 }); add('Bomba de Sal Sagrado', 'cons', 24, { eff: 'bomb', el: 'amaterasu', price: 35 });
+  // ingredientes e materiais de ofício (colhidos nas cenas, de demônios abatidos, comprados ou reciclados)
+  [['Erva Medicinal', 'erva', 4], ['Raiz Amarga', 'erva', 6], ['Cogumelo Pálido', 'erva', 8], ['Ervas de Cozinha', 'tempero', 3], ['Carne de Caça', 'carne', 5], ['Couro Curtido', 'carne', 6], ['Carne de Demônio', 'carne', 25],
+    ['Sal Sagrado', 'mineral', 6], ['Pólvora', 'mineral', 7], ['Sucata de Ferro', 'mineral', 4], ['Papel de Arroz', 'papel', 3], ['Frasco Vazio', 'mineral', 3], ['Óleo de Lamparina', 'mineral', 5]]
+    .forEach(([name, tag, price]) => add(name, 'mat', 0, { tag, price }));
+  add('Frasco de Óleo', 'cons', 0, { eff: 'oil', price: 8 }); // molha o inimigo: fogo e raio reagem
+  ['Brasa', 'Veneno', 'Sangue', 'Trovão', 'Precisão', 'Força'].forEach(r => add('Runa de ' + r, 'mat', 0, { rune: 1, price: 40 }));
+  add('Munição de Prata', 'mun', 0, { el: 'amaterasu', shots: 6, price: 30 }); add('Munição Incendiária', 'mun', 0, { el: 'kagutsuchi', shots: 6, price: 30 }); add('Munição de Sal', 'mun', 0, { el: 'amaterasu', shots: 6, price: 30, salt: 1 });
+  add('Ofuda de Cura', 'cons', 40, { eff: 'hp', price: 30 }); add('Ofuda Purificadora', 'cons', 0, { eff: 'cure', price: 25 }); add('Ofuda de Fogo', 'cons', 30, { eff: 'bomb', el: 'kagutsuchi', price: 30 });
+  add('Ofuda de Selo', 'cons', 32, { eff: 'bomb', el: 'amaterasu', price: 32 }); add('Ofuda de Retorno', 'cons', 35, { eff: 'rev', price: 60 }); add('Isca', 'mat', 0, { tag: 'carne', price: 5 });
   // materiais de demônio: caem em batalha e servem para forjar armas elementais (3) e relíquias (5)
   add('Garra de Demônio', 'mat', 0, { price: 8 }); EL9.forEach(el => add('Essência de ' + n[el], 'mat', 0, { el, price: 20 }));
   // armas em três níveis por tipo
@@ -162,6 +171,9 @@ export const SUMMONS = Object.fromEntries([
   ['Cria Aberrante', '#84cc16', 'hiruko', ['FOR', 'AGI'], ['Isótopo Instável'], .3, 3],
   ['Enxame Mutante', '#a3e635', 'hiruko', ['AGI'], ['Nuvem Tóxica', 'Espora Venenosa'], .3, 3],
   ['Abominação', '#4d7c0f', 'hiruko', ['FOR', 'CON'], ['Explosão Isotópica', 'Garra Crescente'], .7, 3, { armor: 3 }],
+  // companheiros de ofício: entram sozinhos no começo da batalha e ficam até caírem
+  ['Lobo Adestrado', '#6b7280', '', ['FOR', 'AGI'], ['Golpe Pesado'], .3, 99], ['Falcão de Caça', '#a16207', '', ['DES', 'AGI'], ['Tiro Certeiro'], .22, 99], ['Urso Pardo', '#78350f', '', ['FOR', 'CON'], ['Golpe Giratório'], .5, 99, { armor: 2 }],
+  ['Cão Mecânico', '#9ca3af', '', ['AGI', 'DES'], ['Tiro Certeiro'], .28, 99], ['Autômato de Latão', '#b45309', '', ['CON', 'FOR'], ['Golpe Pesado'], .5, 99, { armor: 4 }],
   ['Fera Conjurada', '#40e0d0', '', ['FOR', 'AGI'], ['Punho Reforçado'], .45, 4],
   ['Carniçal', '#6b7280', '', ['FOR'], ['Golpe Pesado'], .35, 3],
   ['Esqueleto de Trincheira', '#d6d3d1', '', ['DES'], ['Tiro Certeiro'], .35, 4, { armor: 2, arma: 12 }],
@@ -213,13 +225,13 @@ export function buildBestiary(make) {
 
 // cenas de exemplo: mapa esquemático, encontros sugeridos (nota secreta do mestre) e estoque da loja local
 export const SCENES = [
-  { name: 'Beco do Mercado Negro', bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura'],
+  { name: 'Beco do Mercado Negro', gather: ['Sucata de Ferro', 'Frasco Vazio', 'Pólvora', 'Papel de Arroz', 'Carne de Caça'], bg: '/maps/beco.svg', stock: ['Sabre de Cavalaria', 'Revólver .38', 'Soqueira', 'Baioneta', 'Casaco de Couro', 'Granada', 'Coquetel Incendiário', 'Tônico', 'Antídoto', 'Atadura'],
     note: 'Encontros: 3 Bandidos + 1 Capanga da Máfia (emboscada); à noite, 2 Diabretes de Cinzas nos telhados. Armeiro vende sem perguntas; a botica é fachada de um Cultista.' },
-  { name: 'Santuário Profanado', bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo', 'Componente Ritualístico'],
+  { name: 'Santuário Profanado', gather: ['Sal Sagrado', 'Papel de Arroz', 'Cogumelo Pálido', 'Erva Medicinal', 'Raiz Amarga'], bg: '/maps/santuario.svg', stock: ['Calmante', 'Bomba de Sal Sagrado', 'Rosário Antigo', 'Componente Ritualístico'],
     note: 'Encontros: 2 Yurei + 1 Espectro da Trincheira; chefe opcional: Serafim Caído no altar. A fonte restaura Sanidade uma vez (mestre concede). Teste de horror ao entrar (perda 5).' },
-  { name: 'Estação Central', bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Colete Reforçado'],
+  { name: 'Estação Central', gather: ['Sucata de Ferro', 'Pólvora', 'Óleo de Lamparina', 'Frasco Vazio'], bg: '/maps/estacao.svg', stock: ['Tônico', 'Tônico Forte', 'Éter de Aura', 'Rifle de Ferrolho', 'Colete Reforçado'],
     note: 'Encontros: 2 Soldados Desertores + 1 Autômato Possuído no depósito; Golem de Sucata na locomotiva. Boa cena para iniciar uma perseguição (automóvel contra motocicleta).' },
-  { name: 'Mansão Ashworth', bg: '/maps/mansao.svg', stock: [],
+  { name: 'Mansão Ashworth', gather: ['Erva Medicinal', 'Ervas de Cozinha', 'Cogumelo Pálido', 'Papel de Arroz', 'Óleo de Lamparina', 'Carne de Caça', 'Couro Curtido'], bg: '/maps/mansao.svg', stock: [],
     note: 'Encontros: Cultistas (3) na capela + Ocultista na biblioteca; Súcubo no salão. Chefe: Condessa Escarlate (ponto fraco: torso). Use névoa de guerra e revele cômodo a cômodo.' },
 ];
 export const VEHICLES = { pe: ['A pé', 1, 0], cavalo: ['Cavalo', 3, 10], moto: ['Motocicleta', 5, 0], auto: ['Automóvel', 4, -5], caminhao: ['Caminhão', 3, -15] }; // nome, velocidade, manobra
