@@ -48,7 +48,9 @@ export function buildSkills(sk) {
   const N = 111, C = 55, G = {}, used = new Map(); // casa "x,y" → elemento
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !used.has(x + ',' + y);
   const node = (o, el, extra = {}) => { const { n, k, a, p, c, ...rest } = expand(o); return sk(n, k, a || 'FOR', el, p || 0, c || 0, 0, 0, { ...rest, ...extra }); };
-  const put = (x, y, s) => { used.set(x + ',' + y, s.el); G['g' + Object.keys(G).length] = { ...s, gx: x, gy: y }; return [x, y]; };
+  // put grava o nó na casa e, se houver, a ligação (ln, simétrica) com o nó da casa pai
+  const idAt = new Map(), put = (x, y, s, parent) => { const id = 'g' + Object.keys(G).length; used.set(x + ',' + y, s.el); idAt.set(x + ',' + y, id); G[id] = { ...s, gx: x, gy: y, ln: [] };
+    const pid = parent && idAt.get(parent.join(',')); if (pid && !G[pid].ln.includes(id)) { G[pid].ln.push(id); G[id].ln.push(pid); } return [x, y]; };
   const around = (x, y) => { const o = []; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) o.push([x + dx, y + dy]); return o; };
   const at = k => k.split(',').map(Number), dist = k => Math.hypot(...at(k).map(v => v - C));
   // encadeia nós para fora do centro; o primeiro precisa encostar numa casa já usada que sirva de âncora (anchor)
@@ -56,10 +58,13 @@ export function buildSkills(sk) {
     let prev = start || null; const placed = [];
     nodes.forEach((s, i) => {
       const a = deg * Math.PI / 180, tx = C + (r0 + i) * Math.cos(a), ty = C + (r0 + i) * Math.sin(a);
-      let cand = prev ? around(...prev).filter(p => free(...p)) : [...used.keys()].filter(k => anchor(k)).flatMap(k => around(...at(k))).filter(p => free(...p));
-      if (!cand.length) cand = [...used.keys()].filter(k => used.get(k) === s.el || used.get(k) === 'fis').flatMap(k => around(...at(k))).filter(p => free(...p));
+      // cada candidato lembra a casa de onde saiu (o pai da ligação)
+      const from = keys => keys.flatMap(k => around(...at(k)).map(p => [...p, at(k)])).filter(p => free(p[0], p[1]));
+      let cand = prev ? around(...prev).map(p => [...p, prev]).filter(p => free(p[0], p[1])) : from([...used.keys()].filter(k => anchor(k)));
+      if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === s.el || used.get(k) === 'fis'));
       if (!cand.length) throw new Error('grade sem espaço para ' + s.name);
-      prev = put(...cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0], s); placed.push(prev.join(','));
+      const [bx, by, par] = cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0];
+      prev = put(bx, by, s, par); placed.push(prev.join(','));
     });
     return placed;
   };
@@ -74,12 +79,12 @@ export function buildSkills(sk) {
   // tronco Marcial: ramo 0 no centro, estilos de arma e ramos novos em raios, treinos nas casas livres junto ao centro
   // núcleo Marcial (centro e o anel em volta): aberto a todos, sem exigir vizinho aprendido; dele se anda para o resto do tronco
   put(C, C, node(M[0][0], 'fis', { open: 1 }));
-  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 })));
+  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 }), [C, C]));
   const rays = M.slice(1).filter((_, i) => i !== 4);
   rays.forEach((br, i) => chain(i * 360 / rays.length + 360 / ORDER.length / 2, 2, br.map(o => node(o, 'fis')), fis));
   const train = M[5].map(o => node(o, 'fis'));
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
-    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
+    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift(), around(x, y).find(p => used.get(p.join(',')) === 'fis'));
   // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó, aberta a quem tem o Vínculo, sem exigir vizinho); depois um ramo de cada setor por vez,
   // para nenhum setor cercar o vizinho. Um ramo em que todo nó exige arma vira uma trilha por tipo de arma.
   const SEC = 360 / ORDER.length, R0 = 13, RING = 10, SLOT = [0, -1, 1, -2, 2], W = SEC / 5.2, cells = {};

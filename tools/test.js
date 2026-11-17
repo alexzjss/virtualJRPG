@@ -21,6 +21,30 @@ test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam t
     assert.equal(ns.filter(s => s.el === el).length, TREE[el].branches.flat().length); assert.ok(ns.filter(s => s.el === el).length >= (['aura', 'oculto'].includes(el) ? 120 : 104));
   }
 });
+test('ligações: simétricas, nunca entre setores diferentes (só com o Marcial), sem repetição', () => {
+  for (const [id, s] of Object.entries(S.skills)) {
+    assert.ok(Array.isArray(s.ln) && s.ln.length, 'sem ligação: ' + s.name);
+    assert.equal(new Set(s.ln).size, s.ln.length, s.name);
+    for (const j of s.ln) { const o = S.skills[j]; assert.ok(o && o.ln.includes(id), `${s.name} → ${o?.name} não volta`);
+      assert.ok(o.el === s.el || o.el === 'fis' || s.el === 'fis', `${s.name} liga a ${o.name}`); }
+  }
+});
+test('ligações: cada setor alcança todos os seus nós andando só por ln, por ele e pelo Marcial', () => {
+  for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
+    const ok = id => [el, 'fis'].includes(S.skills[id].el), start = Object.keys(S.skills).find(id => S.skills[id].el === el && S.skills[id].root), seen = new Set([start]), q = [start];
+    assert.ok(start, 'raiz de ' + el);
+    while (q.length) for (const j of S.skills[q.pop()].ln || []) if (!seen.has(j) && ok(j)) { seen.add(j); q.push(j); }
+    assert.deepEqual(Object.keys(S.skills).filter(id => ok(id) && !seen.has(id)).map(id => S.skills[id].name), [], el);
+  }
+});
+test('ligações: ramo de 10 nós segue tronco 1-4, A 5-7, B 8-9 e final', () => {
+  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'kagutsuchi-0'); assert.equal(br.length, 10);
+  const id = i => br[i][0], L = i => br[i][1].ln;
+  assert.ok(L(1).includes(id(0)) && L(2).includes(id(1)) && L(3).includes(id(2)));
+  assert.ok(L(4).includes(id(3)) && L(7).includes(id(3)));
+  assert.ok(L(5).includes(id(4)) && L(6).includes(id(5)) && L(8).includes(id(7)));
+  assert.ok(L(9).includes(id(6)));
+});
 test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e reanimar funcionam', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }), it = n => Object.keys(S.items).find(k => S.items[k].name === n);
   h.attrs.AGI = 95; e.attrs.AGI = 1; h.skills = [sk('Tiro Duplo')]; h.aura = 20; H.battle(gm, { on: true });
