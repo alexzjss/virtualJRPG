@@ -13,6 +13,23 @@
     blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental' };
   const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal'];
   const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt'];
+  // Aflições (Sanidade zerada e teste de SAB falho) e Virtudes (crítico): valem até o descanso longo
+  const AFL = {
+    paranoia: ['Paranoia', 'Desconfia de todos: −10% de acerto e −10% de defesa.', { hit: -10, def: -10 }],
+    egoismo: ['Egoísmo', 'Só pensa em si: +10% de dano, mas as suas curas valem metade.', { atk: 10, heal: -50 }],
+    desespero: ['Desespero', 'Perde as forças: −15% de dano e −10% de velocidade.', { atk: -15, agi: -10 }],
+    masoquismo: ['Masoquismo', 'Procura a dor: +15% de dano e −20% de defesa.', { atk: 15, def: -20 }],
+    abulia: ['Abulia', 'Nada importa: −10% de acerto e −20% de velocidade.', { hit: -10, agi: -20 }],
+  };
+  const VIR = {
+    vigor: ['Vigor', 'O corpo responde: +20% de dano.', { atk: 20 }],
+    foco: ['Foco', 'A mente clareia: +15% de acerto e +10% de crítico.', { hit: 15, crit: 10 }],
+    resolucao: ['Resolução', 'Nada derruba: +20% de defesa.', { def: 20 }],
+    inspiracao: ['Inspiração', 'Uma ideia que acende o grupo: +15% de velocidade e +20% de cura.', { agi: 15, heal: 20 }],
+    bravura: ['Bravura', 'Coragem de sobra: +10% de dano e de defesa.', { atk: 10, def: 10 }],
+  };
+  // laços entre personagens: pontos → nível 0-5
+  const BOND = [0, 2, 4, 7, 10, 14], bondLv = p => BOND.filter(v => p >= v).length - 1;
   // clima da batalha: a cena define o inicial e algumas skills trocam; reforça ou enfraquece elementos e mexe no acerto
   const CLIMA = {
     sol: ['Sol Forte', { kagutsuchi: 1.2, amaterasu: 1.2, susanoo: .85, tsukuyomi: .85 }],
@@ -54,6 +71,7 @@
     livre: ['não ter Vínculo', ch => !(ch.vinc || []).length],
     voto: ['ter um voto', (ch, sk) => ch.skills.some(k => sk[k]?.vow)],
     marcado: ['ter perdido 10+ de Sanidade máxima para o Outro Lado', ch => (ch.bon?.sanMax || 0) <= -10],
+    laco: ['ter um laço de nível 3 ou mais com alguém', ch => (ch.bondMax || 0) >= 3],
     forma: ['conhecer uma transformação', (ch, sk) => ch.skills.some(k => sk[k]?.kind === 'form')],
   };
   // hexágono das categorias de Aura: vizinhas a 80%, a duas casas 60%, opostas 40% (e mais caras)
@@ -149,5 +167,5 @@
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }
-  g.RULES = { CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

@@ -165,7 +165,7 @@ const mainEl = c => c.el || c.resist?.find(e => e !== 'fis') || 'fis';
 const bodyMini = c => `<svg class="mini" viewBox="0 0 120 260" aria-hidden="true">${PARTS.map(k => `<${SHAPE[k][0]} ${SHAPE[k][1]} class="l${lvl(c, k)}"/>`).join('')}</svg>`;
 function unit(c, cur) {
   const foe = !!c.enemy, el = mainEl(c), low = c.hp > 0 && c.hp <= c.hpMax * .25;
-  const sts = c.hp > 0 ? [[sanSt(c)], ...Object.entries(c.st).map(([k, n]) => [k === 'shield' && c.shield ? `${ST[k]} ${c.shield}` : ST[k] + (n < 90 ? ' ' + n : ''), STD[k]])].filter(x => x[0]).map(([s, t]) => `<i${t ? ` title="${esc(t)}"` : ''}>${s}</i>`).join('') : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
+  const sts = c.hp > 0 ? [[sanSt(c)], ...(c.afl ? [[`${c.afl.t === 'v' ? 'Virtude' : 'Aflição'}: ${(c.afl.t === 'v' ? RULES.VIR : RULES.AFL)[c.afl.k][0]}`, (c.afl.t === 'v' ? RULES.VIR : RULES.AFL)[c.afl.k][1]]] : []), ...Object.entries(c.st).map(([k, n]) => [k === 'shield' && c.shield ? `${ST[k]} ${c.shield}` : ST[k] + (n < 90 ? ' ' + n : ''), STD[k]])].filter(x => x[0]).map(([s, t]) => `<i${t ? ` title="${esc(t)}"` : ''}>${s}</i>`).join('') : `<i class="dead">${c.dead ? 'Morto' : c.dying ? 'Caído · ' + c.dying : 'Caído'}</i>`;
   const vb = !foe && c.vinc?.[0] ? `<em class="vb" style="--e:${ELC[c.vinc[0]]}" title="Vínculo: ${PATRON[c.vinc[0]]}">${KANJI[c.vinc[0]]}</em>` : '';
   const fig = `<div class="figw">${vb}<div class="fig" style="--e:${ELC[el]}">${c.img ? `<img src="${esc(c.img)}" alt="">` : `<span class="glyph">${foe ? KANJI[el] : esc(c.name.slice(0, 1).toUpperCase())}</span>`}</div></div>`;
   const stats = foe ? bar('hp', c, true) + (gm ? `<div class="duo"><small>${c.hp}/${c.hpMax}</small></div>` : '')
@@ -295,6 +295,7 @@ function reqStrip() {
   const card = ([id, r], i) => { const u = reqUi[id] ||= { mod: 0, secret: false }, c = S.chars[r.ch], canMod = r.t === 'roll' || r.t === 'act';
     return `<div class="rq ${id === reqIn ? 'in' : ''}" style="--c:${esc(c?.color || '#888')}"><div class="rq-t"><small>${esc(r.by)} · ${AUTOL[r.cat]}</small><b>${esc(c?.name || '?')}</b><span>${esc(r.text)}</span></div>
       ${canMod ? `<div class="stepper sm" role="group" aria-label="Bônus ou penalidade">${[-20, -10, 0, 10, 20].map(v => `<button data-a="rqMod" data-id="${id}" data-v="${v}" class="${u.mod === v ? 'on' : ''}" aria-pressed="${u.mod === v}">${v > 0 ? '+' + v : v}</button>`).join('')}</div>` : ''}
+      ${r.cat === 'roll' ? `<div class="stepper sm" role="group" aria-label="Vantagem ou desvantagem">${[['adv', 'Vantagem'], ['dis', 'Desvantagem']].map(([v, l]) => `<button data-a="rqAdv" data-id="${id}" data-v="${v}" class="${u.adv === v ? 'on' : ''}" aria-pressed="${u.adv === v}" title="Rola 2d100 e fica com o ${v === 'adv' ? 'melhor' : 'pior'}">${l}</button>`).join('')}</div>` : ''}
       ${r.cat === 'roll' ? `<button class="tog ${u.secret ? 'on' : ''}" data-a="rqSecret" data-id="${id}" aria-pressed="${u.secret}" title="Só você vê o resultado">Secreta</button>` : ''}
       <div class="rq-b"><button class="ok" data-a="rqOk" data-id="${id}">Aprovar${i ? '' : ' <kbd>Enter</kbd>'}</button><button class="no" data-a="rqNo" data-id="${id}">Negar${i ? '' : ' <kbd>Del</kbd>'}</button><button class="ghost" data-a="rqWhy" data-id="${id}" title="Negar e dizer o motivo ao jogador">Negar com motivo</button></div></div>`; };
   return `<div class="reqs ${rs.length ? 'has' : ''}"><div class="rq-bar"><b>Pedidos${rs.length ? ` <i>${rs.length}</i>` : ''}</b><span>Aprovar sozinho:</span>${chips(AUTOL, (k, l) => `<button class="tog ${S.auto[k] ? 'on' : ''}" data-a="autoSet" data-k="${k}" data-v="${S.auto[k] ? '' : 1}" aria-pressed="${!!S.auto[k]}" title="${S.auto[k] ? 'Acontece na hora, sem passar por você' : 'Espera a sua aprovação'}">${l}</button>`)}<button class="ghost" data-a="mute" aria-pressed="${mute}">${mute ? 'Som desligado' : 'Som ligado'}</button></div>${rs.map(card).join('')}</div>`;
@@ -386,7 +387,7 @@ function persPage(c) {
       <div class="card"><h3>Ferimentos</h3>${bodyFig(c)}</div>
       <div class="card"><h3>Equipamento</h3><div class="slots"><div><em>Arma</em>${eqn('arma')}</div><div><em>Armadura</em>${eqn('armadura')}</div><div><em>Acessório</em>${eqn('acess')}</div></div>
         <h3>Afinidades</h3><div class="row chips">${[...c.weak.map(k => `<span class="weak">Fraco: ${EL[k]}</span>`), ...c.resist.map(k => `<span class="res">Resiste: ${EL[k]}</span>`), eq(c, 'acess')?.el ? `<span class="res">Resiste: ${EL[eq(c, 'acess').el]}</span>` : ''].join('') || '<small>Nenhuma fraqueza ou resistência.</small>'}</div></div>
-      ${S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}">${l}</span>`)}</div></div>` : ''}
+      ${S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips(CAMPL, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}" data-w="${campWith[c.id] || S.camp.with?.[c.id] || ''}">${l}</span>`)}</div><div class="row"><label>Conversar com <select data-a="campWith" data-id="${c.id}"><option value="">ninguém em especial</option>${Object.values(S.chars).filter(o => !o.enemy && o.id !== c.id && !o.summon).map(o => `<option value="${o.id}" ${(campWith[c.id] || S.camp.with?.[c.id]) === o.id ? 'selected' : ''}>${esc(o.name)} · laço ${RULES.bondLv(S.bonds?.[[c.id, o.id].sort().join('|')] || 0)}</option>`).join('')}</select></label></div></div>` : ''}
       <div class="card"><h3>Contratos de caça</h3><ul class="plain">${cts || '<li><small>Nenhum contrato aberto.</small></li>'}</ul></div></div></section>`;
 }
 
@@ -413,7 +414,7 @@ function itemsPage(c) {
 const ITO = ['arma', 'armadura', 'acess', 'cons', 'mat'];
 
 // tela do jogador em batalha: 1) alvo, 2) ação, 3) pedir ao mestre
-let pick = { k: 'atk', id: 'atk' }, aimOpen = false, braveOn = false, passTo = '';
+let pick = { k: 'atk', id: 'atk' }, aimOpen = false, braveOn = false, passTo = '', campWith = {};
 // faixa do campo de batalha: clima, barra de Cadeia, Domínio aberto
 const fieldBar = () => { const B = S.battle, wx = RULES.CLIMA[B.wx?.k], ch = B.chain || { h: 0, e: 0 }, D = B.dom;
   return `<div class="fbar">${wx ? `<span class="wx" title="${esc(Object.entries(wx[1]).map(([k, v]) => k === 'hit' ? `acerto ${v}` : `${PATRON[k] || k} ×${v}`).join(' · '))}">${wx[0]}</span>` : ''}<span class="chain" title="Fraquezas, críticos e golpes enchem a barra; cheia, o grupo ataca em sequência">Cadeia <b style="--p:${ch.h}%"></b>${ch.h}%</span>${D ? `<span class="dom">Domínio: ${esc(D.name)} (${D.ttl})</span>` : ''}</div>`; };
@@ -587,6 +588,7 @@ app.addEventListener('change', e => {
   const el = e.target, d = el.dataset, v = el.type === 'number' || el.type === 'range' ? +el.value : el.type === 'checkbox' ? el.checked : el.value;
   if (el.tagName === 'SELECT' || el.type === 'file') el.blur();
   if (d.a === 'passSel') { passTo = v; return; }
+  if (d.a === 'campWith') { campWith[d.id] = v; if (S.camp.acts[d.id] === 'conversar') send({ t: 'campAct', id: d.id, k: 'conversar', w: v }); return render(); }
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
@@ -675,6 +677,7 @@ app.addEventListener('click', e => {
   if (d.a === 'rollGo') { send({ t: 'roll', id: rollDlg.id, attr: rollDlg.attr, mod: mods[rollDlg.id] || 0 }); mods[rollDlg.id] = 0; rollDlg = null; return render(); }
   if (d.a === 'reqNo') return send({ t: 'reqNo', id: d.id });
   if (d.a === 'rqMod') { reqUi[d.id].mod = +d.v; return render(); }
+  if (d.a === 'rqAdv') { const u = reqUi[d.id]; u.adv = u.adv === d.v ? '' : d.v; return render(); }
   if (d.a === 'rqSecret') { reqUi[d.id].secret = !reqUi[d.id].secret; return render(); }
   if (d.a === 'rqOk') return send({ t: 'reqOk', id: d.id, ...reqUi[d.id] });
   if (d.a === 'rqNo') return send({ t: 'reqNo', id: d.id });
@@ -710,7 +713,7 @@ app.addEventListener('click', e => {
   if (d.a === 'copy') return copy(d.k === 'invite' ? inviteText() : accessText(sess.last), d.k === 'invite' ? 'Convite copiado. Cole no grupo dos jogadores.' : 'Acesso copiado. Mande só para esse jogador.');
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return toast('Escolha um alvo clicando em uma unidade.');
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
-  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, f: d.f, v: d.v };
+  const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, w: d.w, f: d.f, v: d.v };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
   if (d.a === 'addChar' && gm && !d.enemy) { const o = prompt(`Login do jogador dono? (deixe vazio para escolher depois na janela Sessão)${S.accounts.length ? '\nContas: ' + S.accounts.join(', ') : ''}`); if (o === null) return; m.owner = o.trim(); }
   if (d.a === 'horror') m.loss = +prompt('Perda de Sanidade se falhar?', 5) || 5;

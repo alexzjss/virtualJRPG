@@ -176,3 +176,11 @@ export const MARCIAL_SIST = [
   { n: 'Esmagar a Postura', k: 'dmg', d: 'Um golpe pesado e lento que quebra a postura de uma vez.', xp: 45, a: 'FOR', p: 28, c: 9, ct: 130, chg: 1, fx: 'brk 2' },
   { n: 'Pacto de Guerra', k: 'passive', d: 'Jurar nunca sair do campo: dano, defesa e pontaria sobem, e a aura vai embora.', xp: 90, mod: 'atk 20; def 15; hit 10', bon: 'auraMax -20', nb: 3 },
 ];
+
+// Marcial: laços entre personagens (exigem um laço de nível 3 com alguém; os laços sobem ao "conversar" no acampamento)
+export const MARCIAL_LACOS = [
+  { n: 'Olhar de Cumplicidade', k: 'passive', d: 'Um olhar basta para dois caçadores que se conhecem de verdade.', xp: 20, cs: 'laco', mod: 'atk 6; hit 4' },
+  { n: 'Escudo de Confiança', k: 'util', d: 'Confiar o suficiente para receber o golpe no lugar do outro.', xp: 30, a: 'CON', c: 5, cs: 'laco', fx: 'guard 3' },
+  { n: 'Promessa Entre Amigos', k: 'passive', d: 'Quando um aliado cai, o caçador cerra os dentes: mais força e algum fôlego.', xp: 45, cs: 'laco', on: 'ally', fx: 'st atkUp 3 self; res hp 12 self' },
+  { n: 'Laço Inquebrável', k: 'passive', d: 'Um golpe que derrubaria o caçador encontra a lembrança de quem espera por ele: um escudo se forma.', xp: 70, cs: 'laco', on: 'fall', fx: 'shield 24 self; st regen 2 self', pre: 'Promessa Entre Amigos' },
+];

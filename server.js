@@ -139,7 +139,7 @@ const view = c => c.role === 'gm' ? { ...S, users: undefined, accounts: Object.k
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 const sendState = c => c.role && c.readyState === 1 && c.send(JSON.stringify({ t: 'state', s: view(c) }));
 // recalcula máximos de personagens e modelos antes de enviar o estado
-const prep = () => { Object.values(S.chars).forEach(derive); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
+const prep = () => { Object.values(S.chars).forEach(derive); const hs = Object.values(S.chars).filter(c => !c.enemy && !c.summon); for (const c of hs) c.bondMax = Math.max(0, ...hs.filter(o => o !== c).map(o => bondLv(c, o))); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
 // herói que caiu e voltou (cura, item, mestre) é reencaixado na fila logo após o tempo atual, sem tempo velho ou ausente
 const reseat = () => {
   const T = S.battle.ticks;
@@ -153,7 +153,7 @@ const reseat = () => {
   }
 };
 const usable = () => { for (const ch of Object.values(S.chars)) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries(ch.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
-const push = () => { prep(); reseat(); pruneReqs(); usable(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
+const push = () => { Object.values(S.chars).forEach(breakCheck); prep(); reseat(); pruneReqs(); usable(); S.battle.order = S.battle.active ? order() : []; wss.clients.forEach(sendState); save(); };
 const log = (who, text, kind = '', x = {}) => { S.log.push({ n: ++S.seq, who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 const hash = (pw, salt = crypto.randomBytes(8).toString('hex')) => salt + ':' + crypto.scryptSync(String(pw), salt, 32).toString('hex');
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -181,6 +181,21 @@ const order = () => { const T = { ...S.battle.ticks }, out = []; for (let i = 0;
 const onMap = ch => ch.x != null && ch.scene === S.scene;
 // quem acabou de perder um turno fica 2 turnos imune a novo controle (evita ficar travado para sempre)
 const addLimit = (ch, v) => ch.limit = Math.min(100, ch.limit + v);
+// ---------- laços, Aflição e Virtude ----------
+const bondKey = (a, b) => [a.id, b.id].sort().join('|');
+const bondLv = (a, b) => RU.bondLv((S.bonds ??= {})[bondKey(a, b)] || 0);
+const bondAdd = (a, b, n = 1) => { S.bonds ??= {}; const k = bondKey(a, b), was = bondLv(a, b); S.bonds[k] = (S.bonds[k] || 0) + n; return bondLv(a, b) > was ? bondLv(a, b) : 0; };
+function breakCheck(ch) { // Sanidade em zero: teste de SAB. Falha = Aflição, crítico = Virtude. Volta com 25% da Sanidade.
+  if (ch.enemy || ch.dead || ch.summon) return;
+  if (ch.san > 0) { ch.collapsed = false; return; }
+  if (ch.collapsed) return;
+  ch.collapsed = true;
+  const target = int(at(ch, 'SAB'), 1, 95), r = d100(), crit = r <= Math.max(1, Math.floor(target / 10)), ok = r <= target;
+  ch.san = Math.max(1, Math.ceil(ch.sanMax * .25));
+  if (crit) { const k = pick(Object.keys(RU.VIR)); ch.afl = { t: 'v', k }; log(ch.name, `chega ao limite da mente (SAB ${target}% → ${r}): CRÍTICO! Virtude: ${RU.VIR[k][0]}. ${RU.VIR[k][1]}`, 'ok', { d: r, rr: { l: 'SAB', t: target, res: 'CRÍTICO', c: ch.id } }); }
+  else if (ok) log(ch.name, `chega ao limite da mente (SAB ${target}% → ${r}) e se segura. Volta com ${ch.san} de Sanidade.`, 'ok', { d: r, rr: { l: 'SAB', t: target, res: 'Sucesso', c: ch.id } });
+  else { const k = pick(Object.keys(RU.AFL)); ch.afl = { t: 'a', k }; log(ch.name, `chega ao limite da mente (SAB ${target}% → ${r}): Aflição: ${RU.AFL[k][0]}. ${RU.AFL[k][1]}`, 'bad', { d: r, rr: { l: 'SAB', t: target, res: 'Falha', c: ch.id } }); }
+}
 // ---------- sistema de skills: passivas, modificadores, votos, transformações ----------
 const passOf = ch => (ch.skills || []).map(k => S.skills[k]).filter(s => s && s.kind === 'passive');
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
@@ -191,6 +206,11 @@ function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da sk
   const f = ch.form && ch.st?.form && S.skills[ch.form]; if (f?.form) add(f.form.m);
   if (vows(ch).includes('tempo')) m.hit += 15;
   const D = S.battle?.dom; if (D) add(ch.enemy === D.side ? D.ally : D.foe); // Expansão de Domínio aberta
+  const af = ch.afl && (ch.afl.t === 'v' ? RU.VIR : RU.AFL)[ch.afl.k]; if (af) add(af[2]); // Aflição ou Virtude
+  if (S.battle?.active && !ch.enemy && ch.id in S.battle.ticks) for (const o of battlers()) { // laços: aliados queridos por perto fortalecem
+    if (o === ch || o.enemy || o.hp <= 0) continue;
+    const lv = bondLv(ch, o); if (lv >= 2) m.atk += 3; if (lv >= 3) m.def += 3; if (lv >= 4) m.hit += 5; if (lv >= 5) m.crit += 5;
+  }
   return m;
 }
 const delay = ch => Math.round(1000 / Math.max(1, at(ch, 'AGI') * (ch.st.agiUp ? 1.25 : 1) * (ch.st.agiDn ? .75 : 1) * (ch.boss ? 2 : 1) * Math.max(.5, 1 + modsOf(ch).agi / 100))); // chefes agem com o dobro da frequência
@@ -567,7 +587,7 @@ function doAct(a, m, bonus = 0) {
   const mates = inB.filter(o => o.hp > 0 && o.enemy === a.enemy && o !== a);
   const ts = off && (a.st.possess || a.san <= 0) && mates.length ? [pick(mates)] // possuído, ou em colapso de Sanidade, ataca os próprios aliados
     : s.area ? inB.filter(o => o.enemy === t0.enemy && (o.hp > 0 || heal)) : [a.st.confuse ? pick(inB.filter(o => o.hp > 0)) : off ? redirect(a, t0) : t0];
-  const prs = linksOf(s) ? partners(a, s) || [] : [], plus = prs.reduce((v, pr) => v + Math.floor(at(pr.p, pr.ps.attr) / R.dmgDiv), 0);
+  const prs = linksOf(s) ? partners(a, s) || [] : [], plus = prs.reduce((v, pr) => v + Math.floor(at(pr.p, pr.ps.attr) / R.dmgDiv) + (pr.p.enemy ? 0 : 2 * bondLv(a, pr.p)), 0);
   for (const pr of prs) { pr.p[pr.ps.res] -= pr.ps.cost; bump(pr.p.id, delay(pr.p)); }
   if (prs.length) log(a.name, `e ${prs.map(pr => pr.p.name).join(' e ')} executam juntos ${s.name}!`, 'ok');
   let more = false; a.bt ??= {}; a.bt.wkNow = false;
@@ -755,10 +775,11 @@ const H = {
   roll(c, m) {
     const ch = S.chars[m.id];
     if (!can(c, ch) || !ATTRS.includes(m.attr)) return;
-    const target = int(at(ch, m.attr) + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r = d100();
+    const target = int(at(ch, m.attr) + int(m.mod, -100, 100) - sanPen(ch), 1, 95), r1 = d100(), r2 = d100();
+    const mode = Math.max(-1, Math.min(1, (m.adv === 'adv' ? 1 : m.adv === 'dis' ? -1 : 0) + (ch.st?.focus ? 1 : 0) - (ch.st?.blind || ch.st?.exaus || ch.st?.fear ? 1 : 0))), r = mode > 0 ? Math.min(r1, r2) : mode < 0 ? Math.max(r1, r2) : r1; // vantagem: 2d100, fica o melhor; desvantagem: o pior
     const res = r <= Math.max(1, Math.floor(target / 10)) ? 'CRÍTICO' : r <= target ? 'Sucesso' : r >= 96 ? 'DESASTRE' : 'Falha';
     if (r <= target) ch.marks[m.attr] = true; // atributo usado com sucesso pode evoluir
-    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}`, r <= target ? 'ok' : 'bad', { d: r, rr: { l: m.attr, t: target, res, c: ch.id }, ...((c.role === 'gm' || c.appr) && m.secret ? { to: GM } : {}) });
+    log(ch.name, `${m.attr} ${target}% → ${r}: ${res}${mode ? ` (${mode > 0 ? 'vantagem' : 'desvantagem'}: ${r1} e ${r2})` : ''}`, r <= target ? 'ok' : 'bad', { d: r, rr: { l: m.attr, t: target, res, c: ch.id }, ...((c.role === 'gm' || c.appr) && m.secret ? { to: GM } : {}) });
   },
   evolve(c, m) {
     const ch = S.chars[m.id];
@@ -959,20 +980,20 @@ const H = {
   },
   // ----- descanso e acampamento -----
   camp(c, m) { if (c.role === 'gm') S.camp = { open: !!m.on, acts: {} }; },
-  campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && CAMP.includes(m.k)) S.camp.acts[m.id] = m.k; },
+  campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && CAMP.includes(m.k)) { S.camp.acts[m.id] = m.k; (S.camp.with ??= {})[m.id] = S.chars[m.w] && !S.chars[m.w].enemy && m.w !== m.id ? m.w : ''; } },
   rest(c, m) { // Sanidade não volta com descanso: só itens, skills, "conversar" no acampamento ou o mestre
     if (c.role !== 'gm' || S.battle.active) return;
     const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), long = !!m.long, notes = [];
     for (const p of pcs) {
       p.aura = p.auraMax; p.hp = long ? p.hpMax : Math.min(p.hpMax, p.hp + Math.ceil(p.hpMax / 2)); delete p.dying;
       for (const k of PARTS) p.body[k] = long ? 0 : Math.floor((p.body[k] || 0) / 2);
-      if (long) { p.st = {}; const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }
+      if (long) { p.st = {}; delete p.afl; const up = evolveCh(p); if (up.length) notes.push(`${p.name} evoluiu ${up.join(', ')}`); }
     }
     if (long && S.camp.open) {
       for (const [id, k] of Object.entries(S.camp.acts)) {
         const p = S.chars[id];
         if (!p) continue;
-        if (k === 'vigiar') p.st.agiUp = 3; else if (k === 'cozinhar') pcs.forEach(o => o.st.atkUp = 3); else if (k === 'conversar') p.san = Math.min(p.sanMax, p.san + 5);
+        if (k === 'vigiar') p.st.agiUp = 3; else if (k === 'cozinhar') pcs.forEach(o => o.st.atkUp = 3); else if (k === 'conversar') { p.san = Math.min(p.sanMax, p.san + 5); const w = S.chars[S.camp.with?.[id]]; if (w && !w.enemy) { const up = bondAdd(p, w, 1); if (up) notes.push(`o laço de ${p.name} e ${w.name} sobe para o nível ${up}`); } }
         else if (k === 'treinar') p.xp += 5; else addLimit(p, 30);
         notes.push(`${p.name}: ${k}`);
       }
@@ -1072,7 +1093,7 @@ const H = {
     if (c.role !== 'gm' || !r) return;
     delete S.reqs[m.id];
     const mod = int(m.mod, -100, 100), n = S.seq;
-    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll' });
+    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' });
     tell(r.by, S.seq === n && r.cat !== 'item' && r.cat !== 'camp' ? { kind: 'no', text: `${r.text}: não foi possível agora.` } : { kind: 'ok', text: `Aprovado: ${r.text}${mod ? ` (${mod > 0 ? '+' : ''}${mod})` : ''}` });
   },
   reqNo(c, m) {
@@ -1149,7 +1170,7 @@ function handle(c, m) {
     if (!can(c, ch) || (cat === 'act' && !(S.battle.active && current() === ch.id))) return;
     for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
     S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq,
-      m: { id: m.id, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
+      m: { id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
     return push();
   }
   try { H[m.t](c, m); } catch (e) { console.error(e); } push();
