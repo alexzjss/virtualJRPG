@@ -24,12 +24,16 @@ fs.writeFileSync('dist/LEIA-ME.txt', `virtualJRPG - mesa virtual de RPG
 
 COMO USAR
 1. Dê dois cliques em ${path.basename(exe)}${win ? ' (se o Windows avisar "PC protegido", clique em Mais informações > Executar assim mesmo; o programa não é assinado)' : mac ? ' (no macOS: clique com o botão direito > Abrir, na primeira vez)' : ' (no terminal: ./virtualJRPG)'}.
-2. A janela mostra os endereços e a CHAVE DO MESTRE. A chave também fica no arquivo data/gm-key.txt.
-3. Mestre abre /gm, jogadores abrem /player, a TV abre /table.
-4. Para jogar pela internet, abra um túnel para a porta 3000 (veja GUIA-RODAR.md no GitHub; o mais simples é: cloudflared tunnel --url http://localhost:3000).
+2. A janela mostra a CHAVE DO MESTRE (também em data/gm-key.txt) e, depois de alguns segundos, o CÓDIGO DA SESSÃO.
+   Na primeira vez o programa baixa o cloudflared (o túnel gratuito da Cloudflare) para a pasta data.
+3. Abra http://localhost:3000/gm, entre com a chave e use a janela "Sessão":
+   - crie uma conta (login e senha) para cada jogador e escolha o personagem dela;
+   - no dia, clique em "Copiar convite" e cole no grupo. Os jogadores só abrem o link, sem instalar nada.
+4. TV ou segundo monitor: http://localhost:3000/table, login "mestre" e a sua chave.
+Ao fechar esta janela, o link dos jogadores para de funcionar. Sem internet, o jogo continua na mesma rede Wi-Fi.
 
 DADOS
 Tudo fica na pasta "data" ao lado do programa (campanha, mapas enviados, cópias de segurança). Para trocar de versão, substitua só o programa e mantenha a pasta data.
-Porta diferente: defina a variável PORT. Chave própria: defina GM_KEY.
+Porta diferente: defina a variável PORT. Chave própria: defina GM_KEY. Sem túnel: VJ_TUNNEL=0.
 `);
 console.log('\nOK:', exe, (fs.statSync(exe).size / 1e6).toFixed(0) + ' MB');

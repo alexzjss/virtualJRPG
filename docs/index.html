@@ -1,0 +1,90 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entrar · virtualJRPG</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@500;700&family=Barlow+Condensed:wght@600&display=swap" rel="stylesheet">
+<style>
+/* Página fixa de entrada dos jogadores (GitHub Pages). Leva ao endereço da sessão do mestre, que muda a cada vez. */
+:root{--ink:#09090b;--ink2:#131316;--line:#34343d;--paper:#f4efe4;--dim:#a8a5b2;--red:#e4002b;--red2:#8c0019;--gold:#ffc93c;--ok:#3ddc84;
+  --disp:Anton,Impact,"Arial Narrow Bold",sans-serif;--cond:"Barlow Condensed","Arial Narrow",sans-serif;--body:Barlow,"Segoe UI",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--paper);font:500 16px/1.5 var(--body);background:radial-gradient(120% 90% at 80% 0,#2a0a12 0,transparent 55%),var(--ink)}
+main{max-width:440px;margin:0 auto;padding:40px 16px 60px}
+h1{font:400 34px var(--disp);letter-spacing:2px;margin:0 0 4px;text-transform:uppercase}h1 span{color:var(--red)}
+.sub{color:var(--dim);margin:0 0 24px}
+form,.help{background:var(--ink2);border:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:14px}
+label{display:flex;flex-direction:column;gap:5px;font:600 13px var(--cond);letter-spacing:.8px;text-transform:uppercase;color:var(--dim)}
+input[type=text],input[type=password]{font:500 17px var(--body);padding:10px 12px;background:var(--ink);color:var(--paper);border:1px solid var(--line);border-radius:0;width:100%}
+input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.chk{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font:500 15px var(--body)}
+button{font:400 20px var(--disp);letter-spacing:1.5px;text-transform:uppercase;padding:12px;background:var(--red);color:#fff;border:0;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.msg{margin:0;padding:10px 12px;background:var(--red2);color:#fff}.msg:empty{display:none}
+.code-ok{font:600 13px var(--cond);letter-spacing:.6px;color:var(--ok);text-transform:uppercase}
+.help{margin-top:18px;gap:6px}
+details{border-top:1px solid #ffffff12;padding-top:8px}details:first-of-type{border-top:0;padding-top:0}
+summary{cursor:pointer;font:600 15px var(--cond);letter-spacing:.8px;text-transform:uppercase}
+details p,details li{color:var(--dim);margin:6px 0}details ol,details ul{padding-left:20px;margin:6px 0}
+b{color:var(--paper)}code{color:var(--gold)}
+</style></head>
+<body><main>
+<h1>virtual<span>JRPG</span></h1>
+<p class="sub">Entrar na campanha</p>
+
+<form id="f" novalidate>
+  <p class="msg" id="msg" role="alert"></p>
+  <label id="codeBox">Código da sessão<input type="text" name="c" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ex.: lago-verde-mesa-norte"></label>
+  <p class="code-ok" id="codeOk" hidden>Código da sessão já preenchido pelo link</p>
+  <label>Login<input type="text" name="n" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+  <label>Senha<input type="password" name="p" autocomplete="current-password" required></label>
+  <label class="chk"><input type="checkbox" name="r" checked> Lembrar login e senha neste aparelho</label>
+  <button id="go">Entrar</button>
+</form>
+
+<section class="help" aria-label="Ajuda">
+  <details open><summary>Como entrar</summary><ol>
+    <li>No dia da sessão, o mestre manda um <b>link</b> no grupo. Abra esse link: o código da sessão já vem preenchido.</li>
+    <li>Digite o <b>login</b> e a <b>senha</b> que o mestre te passou (só na primeira vez, se marcar "Lembrar").</li>
+    <li>Clique em <b>Entrar</b>. Sua ficha abre e tudo o que acontece na mesa aparece na hora.</li>
+    <li>Rolagens e ações são <b>pedidos</b>: aparece "Aguardando o mestre" até ele aprovar. Você pode cancelar e pedir outra coisa.</li></ol>
+    <p>Não precisa instalar nada: funciona no navegador do celular ou do computador.</p></details>
+  <details><summary>Não conecta</summary><ul>
+    <li><b>"Não achei a mesa"</b>: o mestre ainda não abriu o programa, ou o código é de outra sessão. O código muda a cada sessão: peça o link de hoje.</li>
+    <li><b>"Login ou senha incorretos"</b>: confira maiúsculas e minúsculas. Esqueceu? O mestre gera uma senha nova para você.</li>
+    <li><b>"Reconectando…"</b> no meio do jogo: a internet de alguém oscilou. Espere alguns segundos; se não voltar, o mestre pode ter fechado o programa.</li>
+    <li>Rede da escola ou do trabalho pode bloquear o site. Tente pelos dados do celular.</li></ul></details>
+  <details><summary>Trocar a senha</summary><p>Dentro do jogo, clique em <b>Senha</b> no alto da tela. Depois, na próxima vez, digite a senha nova aqui.</p></details>
+  <details><summary>Seus dados</summary><p>A campanha inteira fica no computador do mestre. Esta página não guarda nada no servidor; se você marcar "Lembrar", o login e a senha ficam só neste navegador.</p></details>
+</section>
+</main>
+<script>
+const f = document.getElementById('f'), msg = document.getElementById('msg'), go = document.getElementById('go');
+const ls = (k, v) => { try { if (v === undefined) return localStorage[k] || ''; if (v === null) delete localStorage[k]; else localStorage[k] = v; } catch { return ''; } };
+// aceita o código puro, com espaços, ou o endereço inteiro do túnel colado
+const norm = s => String(s || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\.trycloudflare\.com.*$/, '').replace(/[\s_.]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
+const q = new URLSearchParams(location.search), fromLink = norm(q.get('c'));
+f.c.value = fromLink || ls('vj_code'); f.n.value = ls('vj_name'); f.p.value = ls('vj_pass');
+if (fromLink) { document.getElementById('codeBox').hidden = true; document.getElementById('codeOk').hidden = false; }
+(f.n.value ? f.p.value ? go : f.p : f.n).focus();
+
+f.onsubmit = async e => {
+  e.preventDefault(); msg.textContent = '';
+  const c = norm(f.c.value), n = f.n.value.trim(), p = f.p.value;
+  if (!c) { document.getElementById('codeBox').hidden = false; msg.textContent = 'Falta o código da sessão. Ele vem no link que o mestre manda.'; return f.c.focus(); }
+  if (!n || !p) { msg.textContent = 'Digite o login e a senha.'; return (n ? f.p : f.n).focus(); }
+  const base = `https://${c}.trycloudflare.com`;
+  go.disabled = true; go.textContent = 'Procurando a mesa…';
+  try { // confere se o código leva mesmo a uma mesa aberta antes de sair desta página
+    const r = await fetch(base + '/api/hi', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    if (!(await r.json()).vj) throw 0;
+  } catch {
+    go.disabled = false; go.textContent = 'Entrar'; document.getElementById('codeBox').hidden = false; document.getElementById('codeOk').hidden = true;
+    msg.textContent = 'Não achei a mesa com esse código. O mestre já abriu o programa? O código muda a cada sessão: confira o link de hoje.';
+    return;
+  }
+  ls('vj_code', c);
+  if (f.r.checked) { ls('vj_name', n); ls('vj_pass', p); } else { ls('vj_name', null); ls('vj_pass', null); }
+  // login e senha vão depois do "#": o navegador não os manda pela rede e o jogo apaga da barra de endereço
+  const vj = btoa(unescape(encodeURIComponent(JSON.stringify({ n, p })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  location.href = `${base}/player#vj=${vj}`;
+};
+</script>
+</body></html>

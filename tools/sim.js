@@ -1,5 +1,5 @@
 // Simulador de balanceamento com as regras reais do servidor.
-//   node tools/sim.js [batalhas] [modo]     modos: base (4x4 contra o inimigo padrão), enc (encontros gerados), boss (chefes)
+//   node tools/sim.js [batalhas] [modo]     modos: base (4x4 contra o inimigo padrão), enc (encontros gerados), boss (chefes), armas (dano do ataque básico por tempo de cada arma)
 //   VJ_RULES='{"hit":50}' node tools/sim.js 300 enc   testa uma variação sem editar o código
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjsim-'));
@@ -10,7 +10,7 @@ const TREE = (await import('../tree.js')).TREE, ids = (el, b, n) => TREE[el].bra
 console.log = () => {};
 const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
 // grupo de heróis por nível: 0 = recém-criado, 1 = algumas sessões, 2 = veterano. O 4º herói é curandeiro de Amaterasu.
-const VINC = [['indra', 'AGI', 'INT'], ['fuhaku', 'DES', 'INT'], ['radiacao', 'CON', 'FOR'], ['amaterasu', 'SAB', 'CAR']];
+const VINC = [['indra', 'AGI', 'INT'], ['fuhaku', 'DES', 'INT'], ['hiruko', 'CON', 'FOR'], ['amaterasu', 'SAB', 'CAR']];
 function party(size, lvl) {
   return VINC.slice(0, size).map(([el, a1, a2]) => {
     const had = new Set(Object.keys(S.chars)); H.addChar(gm, { owner: 'p' }); const h = S.chars[Object.keys(S.chars).find(k => !had.has(k))], up = lvl * 8;
@@ -28,7 +28,7 @@ function fight(heroes, foes) {
     const live = Object.values(S.chars), liveF = live.filter(f => f.enemy && f.hp > 0), liveH = heroes.filter(h => h.hp > 0), a = S.chars[current()];
     if (!liveF.length || !liveH.length || !a) break;
     acts[a.id] = (acts[a.id] || 0) + 1;
-    if (a.enemy) { H.ai(gm); continue; }
+    if (a.enemy) { if (process.env.SIMDBG && a.boss) process.stderr.write(`boss hp ${Math.round(100*a.hp/a.hpMax)}% aura ${a.aura}/${a.auraMax} lim ${a.limit} dom ${!!a.skills.find(k=>S.skills[k].dom)}\n`); H.ai(gm); continue; }
     // heróis: Limite se cheio, cura quem está mal, poção em emergência, senão a skill mais forte que puder pagar no inimigo mais ferido
     const sks = a.skills.map(k => [k, S.skills[k]]).filter(([, s]) => s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100) && !a.st.silence && !a.st.fury);
     const hurt = heroes.filter(h => !h.dead && h.hp < h.hpMax * .45).sort((x, y) => x.hp - y.hp)[0], weak = liveF.sort((x, y) => x.hp - y.hp)[0], pot = Object.keys(a.inv).find(k => S.items[k]?.eff === 'hp');
@@ -38,6 +38,7 @@ function fight(heroes, foes) {
     else if (a.hp < a.hpMax * .3 && pot) H.use(gm, { id: a.id, item: pot, target: a.id });
     else H.act(gm, { id: a.id, skill: dmg && Math.random() < .65 ? dmg[0] : 'atk', target: weak.id });
   }
+  if (process.env.SIMDOM) globalThis.__dom = (globalThis.__dom || 0) + Object.values(S.chars).filter(c => c.domUsed).length;
   const win = !Object.values(S.chars).some(f => f.enemy && f.hp > 0) && heroes.some(h => h.hp > 0);
   return { win, rounds: Math.max(...heroes.map(h => acts[h.id] || 0)), dead: heroes.filter(h => h.dead).length };
 }
@@ -52,4 +53,21 @@ if (MODE === 'boss') {
   for (const size of [3, 4]) for (const lvl of [0, 2]) run(`${size} heróis nível ${lvl} · chefe gerado`, () => { const hs = party(size, lvl); H.foeGen(gm, { el: ['kagutsuchi', 'atlas', 'tsukuyomi', 'indra'][Math.floor(Math.random() * 4)], role: ['bruto', 'conjurador'][Math.floor(Math.random() * 2)], rank: 'chefe' }); return [hs, foesNow()]; });
   for (const [id, b] of Object.entries(S.bestiary).filter(([, b]) => b.boss)) for (const lvl of [0, 2]) run(`4 heróis nível ${lvl} · ${b.name}`, () => { const hs = party(4, lvl); H.bSpawn(gm, { id }); return [hs, foesNow()]; });
 }
+if (MODE === 'armas') { // dano do ataque básico por tempo, no motor real: herói com 55 em tudo contra dois alvos de AGI 70 e armadura 2
+  const AR = globalThis.ARMAS, refs = AR.NIVEIS.map((n, l) => { const k = 'ref' + l; S.items[k] = { name: 'ref', type: 'arma', wt: 'lamina', power: 10 + n.p, el: '', price: 0 }; return k; });
+  const dpt = k => { let d = 0, t = 0;
+    for (let i = 0; i < N; i++) {
+      reset(); H.addChar(gm, { owner: 'p' }); H.addChar(gm, { enemy: true }); H.addChar(gm, { enemy: true }); const [h, ...fs] = Object.values(S.chars);
+      for (const a in h.attrs) h.attrs[a] = 55; h.inv[k] = 1; h.equip.arma = k; fs.forEach(f => { f.attrs.AGI = 70; f.armor = 2; f.bon.hpMax = 9999; f.bon.sanMax = 999; derive(f); f.hp = f.hpMax; f.san = f.sanMax; });
+      derive(h); h.hp = h.hpMax; h.san = h.sanMax; H.battle(gm, { on: true }); for (const x in S.battle.ticks) S.battle.ticks[x] = 1e6; S.battle.ticks[h.id] = 0;
+      const before = fs.reduce((a, f) => a + f.hp + f.san, 0); H.act(gm, { id: h.id, skill: 'atk', target: fs[0].id });
+      d += before - fs.reduce((a, f) => a + f.hp + f.san, 0); t += S.battle.ticks[h.id];
+    }
+    return d / t; };
+  const base = refs.map(dpt);
+  out('arma'.padEnd(30) + 'tipo     categoria  nív  poder  motor  régua');
+  for (const [k, w] of Object.entries(S.items).filter(([k, i]) => i.type === 'arma' && !k.startsWith('ref')).sort((a, b) => a[1].wt.localeCompare(b[1].wt)))
+    out(`${w.name.padEnd(30)}${w.wt.padEnd(9)}${(w.cat || '').padEnd(11)}${String(AR.lvlOf(w)).padStart(3)}${String(w.power).padStart(7)}${String(Math.round(100 * dpt(k) / base[AR.lvlOf(w)])).padStart(6)}%${String(AR.rel(w)).padStart(6)}%`);
+}
+if (process.env.SIMDOM) out("Domínios abertos: " + (globalThis.__dom || 0));
 process.exit(0);

@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "audit": "node tools/audit.js",
     "start": "node server.js",
     "test": "node --test tools/test.js",
-    "sim": "node tools/sim.js"
+    "sim": "node tools/sim.js",
+    "ui": "node tools/ui-smoke.js"
   },
   "dependencies": {
     "three": "^0.187.0",
