@@ -166,5 +166,26 @@ function fx() {
     else setTimeout(() => { const mineT = role === 'player' && mine(cur); fxAdd(`banner ${mineT ? 'me' : ''}`, mineT ? 'Seu turno' : 'Turno de ' + esc(cur.name), 1100, `--c:${esc(cur.color)}`); if (mineT) navigator.vibrate?.([60, 40, 60]); }, later);
   }
   lastCur = cur?.id ?? null;
-  fxWatch();
+  fxWatch(); gainWatch();
+}
+
+// ===== ganhos do jogador fora do combate: XP, ouro, skill nova e item novo viram um selo animado no topo =====
+// (no fim da batalha a tela de resultado já mostra tudo isso, então ali fica quieto)
+let gainPrev = null;
+function gainWatch() {
+  if (role !== 'player' || !S) return;
+  const my = Object.values(S.chars).filter(c => !c.enemy && mine(c)), now = {};
+  for (const c of my) now[c.id] = { xp: c.xp, gold: c.gold, sk: [...(c.skills || [])], inv: { ...c.inv } };
+  const quiet = !!document.querySelector('.result'), prev = gainPrev; gainPrev = now;
+  if (!prev || quiet) return;
+  let n = 0;
+  for (const c of my) { const p = prev[c.id]; if (!p) continue;
+    const out = [];
+    for (const k of c.skills || []) if (!p.sk.includes(k)) out.push(['sk', 'Nova skill', SK(k)?.name || k]);
+    if (c.xp > p.xp) out.push(['xp', 'Experiência', `+${c.xp - p.xp} XP`]);
+    if (c.gold !== p.gold) out.push(['gold', 'Ouro', `${c.gold > p.gold ? '+' : '−'}${Math.abs(c.gold - p.gold)}`]);
+    for (const [k, q] of Object.entries(c.inv)) if (q > (p.inv[k] || 0)) out.push(['it', 'Item', `${S.items[k]?.name || k}${q - (p.inv[k] || 0) > 1 ? ' ×' + (q - (p.inv[k] || 0)) : ''}`]);
+    for (const [k, l, v] of out.slice(0, 4)) { const i = n++;
+      setTimeout(() => { fxAdd('gain g-' + k, `<small>${esc(c.name)} · ${l}</small><b>${esc(v)}</b>`, 2800, `--i:${i % 4}`); if (!snd.mute) tone(k === 'sk' ? 880 : 660, .14, { type: 'triangle', g: .08, to: k === 'sk' ? 1320 : 990 }); }, i * 320); }
+  }
 }
