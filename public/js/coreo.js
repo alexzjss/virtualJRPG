@@ -24,6 +24,9 @@ const SFXC = {
   ko: () => { thud(.4, 260, .6); tone(320, .7, { type: 'sawtooth', to: 55, g: .11 }); },
   start: () => { thud(.18, 170, .9); thud(.18, 170, .9, 'lowpass', .16); thud(.12, 2600, .25, 'highpass', .32); [392, 523, 659, 784].forEach((f, i) => tone(f, .8, { type: 'sawtooth', g: .05, delay: .34 + i * .02 })); },
   threat: () => { tone(82, 1, { type: 'sawtooth', g: .11 }); tone(87, 1, { type: 'sawtooth', g: .09 }); thud(.35, 130, .55); },
+  perfect: () => [1319, 1568, 2093].forEach((f, i) => tone(f, .2, { type: 'triangle', g: .1, delay: i * .06 })),
+  bf: () => { thud(.3, 90, .85); thud(.16, 3200, .4, 'highpass'); tone(120, .45, { type: 'sawtooth', to: 38, g: .12 }); },
+  chq: () => { thud(.25, 140, .7); tone(220, .35, { type: 'square', to: 880, g: .07 }); },
   win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i > 4 ? .7 : .16, { type: 'square', g: .07, delay: i * .11 })),
 };
 const sfxc = k => { if (snd.mute || !SFXC[k]) return; try { SFXC[k](); } catch {} };
@@ -80,6 +83,19 @@ function knockout(id) { // nocaute: corte em diagonal, o cartão cai e apaga
   el.classList.add('kofall');
   fxAdd('kofx', `<i></i><b>${c.enemy ? 'Abatido' : 'Caído'}</b>`, 1000, fxPos(el, .45)); sfxc('ko');
 }
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CHOQUE!, BLACK FLASH!
+  fxl.querySelector('.seal')?.remove();
+  if (kind !== 'bom') fxAdd('flash' + (kind === 'bf' ? ' dark' : ''), '', 260);
+  fxAdd(`seal ${kind}`, `<b>${esc(txt)}</b>`, 1100); sfxc(kind === 'perf' ? 'perfect' : kind === 'bf' ? 'bf' : kind === 'chq' ? 'chq' : 'weak');
+}
+function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do ataque, contra-ataque, Choque e Black Flash
+  const grade = acts.find(e => e.fx.cg), bf = acts.find(e => e.fx.bf), ctr = acts.find(e => e.fx.ctr), chq = acts.find(e => e.fx.chq);
+  if (bf) { if (stage && !calm()) stage.classList.add('shake'); seal('bf', 'BLACK FLASH!'); }
+  else if (grade) seal(grade.fx.cg, grade.fx.cg === 'perf' ? 'PERFEITO!' : 'BOM!');
+  if (ctr) setTimeout(() => seal('ctr', 'CONTRA!'), 250);
+  if (chq) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 400); } seal('chq', 'CHOQUE!'); }
+}
 function impact(acts) {
   const f0 = acts[0].fx, a = S.chars[f0.a], big = (f0.lim || f0.dom) && a;
   if (big) { cutscene(a, f0); setTimeout(() => strikeFx(acts, f0, a), 1050); } else strikeFx(acts, f0, a);
@@ -93,6 +109,7 @@ function strikeFx(acts, f0, a) {
   if (au && !f0.dom) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); au.classList.add(f0.el && f0.el !== 'fis' || f0.heal ? 'cast' : 'lunge'); }
   const crit = acts.find(e => e.fx.crit), weak = acts.find(e => e.fx.w);
   if (crit && stage) stage.classList.add('shake');
+  comandoFx(acts, stage);
   if (crit || weak) setTimeout(() => cutIn(crit ? 'crit' : 'weak', a, S.chars[(crit || weak).fx.id]), 180);
   if (f0.dom) return;
   acts.forEach((e, i) => setTimeout(() => {
@@ -101,7 +118,7 @@ function strikeFx(acts, f0, a) {
     if (!el) return;
     el.style.setProperty('--fx', ELC[f.el] || '#fff');
     if (f.dmg) { el.classList.add('hit'); fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); } else if (f.heal) el.classList.add('mendfx'); else if (f.miss) el.classList.add('dodge');
-    const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? 'Errou' : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
+    const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
     if (num) fxAdd(`float ${f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : ''}`, num, 1250, fxPos(el, .22) + `;--fx:${ELC[f.el] || '#e4002b'}`);
     if (/QUEBROU!/.test(e.text)) setTimeout(() => shatter(el), 120);
     if (koHold.has(f.id)) setTimeout(() => knockout(f.id), 260);

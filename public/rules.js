@@ -191,10 +191,27 @@
   }
   const fxText = l => (l || []).map(fxOne).join(' · ');
   const FM = { atk: 'dano', def: 'redução de dano', agi: 'velocidade', hit: 'acerto', crit: 'crítico', bf: 'chance de Black Flash', atkP: 'poder do ataque básico', heal: 'cura' };
-  const modText = m => Object.entries(m || {}).map(([k, v]) => k === 'atkP' ? `+${v} ${FM[k]}` : `${pct(v)} ${FM[k] || k}`).join(', ');
+  // chaves de `mod` dos comandos de ação: cada uma com a sua unidade
+  const FMX = { cw: v => `${v > 0 ? '+' : ''}${v} ms na janela Bom do golpe no tempo`, cp: v => `${v > 0 ? '+' : ''}${v} ms na janela Perfeita do golpe no tempo`, mx: v => `+${v} golpe extra ao martelar`, cz: v => `+${v}% na faixa Perfeita ao segurar`,
+    ma: v => `+${v}% no ponto fraco da mira`, esq: v => `+${v} ms na zona de esquiva`, par: v => `+${v} ms na zona de aparar`, chq: v => `−${v}% nos apertos do Choque`, rit: v => `+${v} ms de tolerância nas setas e notas`,
+    ctr: v => `+${v}% no contra-ataque de várias batidas`, rn: v => `+${v} pontos de semelhança nas runas` };
+  const modText = m => Object.entries(m || {}).map(([k, v]) => FMX[k] ? FMX[k](v) : k === 'atkP' ? `+${v} ${FM[k]}` : `${pct(v)} ${FM[k] || k}`).join(', ');
   const formText = f => `por ${f.dur} turnos: ${modText(f.m)}${Object.keys(f.dr || {}).length ? ' · drena ' + Object.entries(f.dr).map(([r, v]) => `${v}${r === 'hp' ? '% ' : ' '}${RESN[r]}`).join(' e ') + ' por turno' : ''}${f.ret ? ` · quem erra você perde ${f.ret}% do tempo` : ''}${f.end?.length ? ' · ao acabar: ' + fxText(f.end).replace(/o alvo perde/g, 'perde') : ''}`;
   const ON = { start: 'No início da batalha', turn: 'No início do seu turno', low: 'Ao cair para 30% de HP (1× por batalha)', kill: 'Ao derrubar um inimigo', crit: 'Ao acertar um crítico', weak: 'Ao acertar uma fraqueza', hurt: 'Ao ser ferido', fall: 'Ao receber um golpe fatal (1× por batalha)', heal: 'Ao curar alguém', miss: 'Ao errar', ally: 'Quando um aliado cai' };
   const SCN = { atk: 'no ataque básico', mental: 'em dano mental', heal: 'em curas', area: 'em área', req: 'nas técnicas de arma', form: 'transformado', circ: 'em rituais' };
+  const RUNA_N = { circulo: 'um círculo', triangulo: 'um triângulo', estrela: 'uma estrela', espiral: 'uma espiral', raio: 'um raio', onda: 'uma onda' };
+  const cmdText = s => { // o que o comando de ataque da técnica pede e rende
+    const dmg = s.kind === 'dmg' || s.kind === 'mental';
+    if (s.cmd === 'tempo') { const w = g.RULES.CMD.tempoWin(s, {}); return `Golpe no tempo: aperte quando o anel fechar (Bom ×1,2 · Perfeito ×1,4, janela de ${w.cp} ms)${s.bf ? `. Só o Perfeito dispara o Black Flash: ×2,5 e devolve 25% da Aura` : ''}`; }
+    if (s.cmd === 'martelar') return `Martelar: aperte o máximo de vezes em 2 s e ganhe até +${s.mx || 0} golpe${s.mx > 1 ? 's' : ''}`;
+    if (s.cmd === 'segurar') return 'Segurar e soltar: segure e solte na faixa (Bom ×1,3 · Perfeito ×1,6); passar do topo estoura e deixa você Exposto';
+    if (s.cmd === 'seq') return `Sequência ${s.seq}: uma seta por batida; ${s.hits > 1 ? 'os golpes normais são o mínimo' : 'cada seta certa soma um golpe de 50%'}; todas certas: golpe final${s.fin ? ` de ${s.fin} de poder` : ''}`;
+    if (s.cmd === 'ritmo') return `Ritmo: ${s.nt || 6} notas; cada nota certa soma ${dmg ? '+10% de dano' : s.kind === 'heal' && s.power > 0 ? '+10% de cura e +1 turno' : '+1 turno'}; todas: Perfeito`;
+    if (s.cmd === 'mira') return 'Mira: clique no ponto fraco; acertou = crítico e −2 na Quebra';
+    if (s.cmd === 'runa') return `Runa: desenhe ${RUNA_N[s.rn] || 'o símbolo'} em 4 s; ≥ 60% de semelhança é Bom, ≥ 85% é Perfeito${dmg ? ' (×1,2 e ×1,4)' : '; Bom: +1 turno e ×1,2 em cura e escudo; Perfeito: não cobra a Sanidade'}`;
+    if (s.cmd === 'choque') return 'Choque: contra golpe anunciado de alvo único, aperte C e martele; vencer devolve o golpe ×1,3 e deixa o inimigo Exposto, perder leva ×1,3';
+    return '';
+  };
   // linhas extras da descrição (o resto — poder, custo, elemento — a interface já mostra)
   function extra(s, sk) {
     const o = [];
@@ -210,8 +227,11 @@
     if (s.fx?.length && s.kind !== 'passive') o.push((s.kind === 'form' ? 'ao assumir: ' : '') + fxText(s.fx));
     if (s.summon) o.push(`invoca ${s.summon}`);
     if (s.rea) o.push(reaText(s));
-    if (s.bf) o.push(`Black Flash: 01-${s.bf} no d100 (+bônus de Black Flash) vira ×2,5 e devolve 25% da Aura`);
-    if (s.par) o.push(`Aparar: no turno do inimigo aparece o botão; aperte nos últimos ${s.par} ms. Só golpe de alvo único e não mental; custa ${s.cost ?? s.c ?? 0} de Aura por tentativa, 1×/rodada. Certo: anula o golpe, +${s.power || 0} Aura, +10 de Limite e abala a Quebra do atacante. Fora do tempo: +50% de dano e Exposto`);
+    if (s.tel) o.push('golpe anunciado ⚠: abre a janela de Esquiva em quem for o alvo');
+    if (s.cmd) o.push(cmdText(s));
+    if (s.pf?.length && s.cmd) o.push('no Perfeito: ' + fxText(s.pf));
+    if (s.bf && !s.cmd) o.push(`Black Flash: 01-${s.bf} no d100 (+bônus de Black Flash) vira ×2,5 e devolve 25% da Aura`);
+    if (s.par) o.push(`Aparar: quando um golpe vem em você aparece o anel; Espaço nos últimos ${s.par} ms apara (golpe de alvo único e não mental; custa ${s.cost ?? s.c ?? 0} de Aura, 1×/rodada). Certo: anula o golpe, +${s.power || 0} Aura, +10 de Limite, abala a Quebra e deixa o atacante Exposto. Cedo demais: você fica Exposto. Aparar todas as batidas de um golpe múltiplo devolve um contra-ataque`);
     if (s.combo) o.push(`combo: ×${s.cm || 1.4} logo depois de ${s.combo.split('|').join(' ou ')}`);
     if (s.trio) o.push(`técnica em trio: dois aliados com "${s.trio.join('" e "')}" gastam o próximo turno junto`);
     if (s.dom) o.push(`Expansão de Domínio por ${s.dom.dur} turnos (gasta toda a Aura, exige metade dela; Exausto ao fim): aliados ${modText(s.dom.ally) || '—'} · inimigos ${modText(s.dom.foe) || '—'}${s.dom.tick ? ' · inimigos ganham ' + (ST[s.dom.tick] || s.dom.tick) + ' a cada turno' : ''}`);

@@ -1176,3 +1176,11 @@ test('batidas: Leitura de Combo sobe o contra-ataque de ×1,5 para ×2', async (
     fixR(0, () => H.ai(gm)); const C = S.battle.cmd; for (let i = 0; i < 3; i++) { C.at = Date.now() - C.beats[i] + 100; H.def(ana, { id: h.id }); } e.hpMax = e.hp = 99999; waitCmd(); return 99999 - e.hp; };
   const a = run(false), b = run(true); assert.ok(a > 0 && Math.abs(b / a - 2 / 1.5) < .12, `${b}/${a}`);
 });
+
+test('descrição: nó com comando mostra a linha do comando e o ⚠; bf mostra a janela do Perfeito em ms; as chaves novas de mod têm texto', () => {
+  const E = RU.extra;
+  assert.match(E({ kind: 'dmg', cmd: 'tempo', bf: 5 }, null), /Perfeito ×1,4, janela de 70 ms.*Black Flash/); assert.match(E({ kind: 'dmg', cmd: 'martelar', mx: 4 }, null), /até \+4 golpes/);
+  assert.match(E({ kind: 'dmg', cmd: 'seq', seq: '↑→↓', fin: 20 }, null), /Sequência ↑→↓.*golpe final de 20/); assert.match(E({ kind: 'dmg', tel: 1 }, null), /golpe anunciado ⚠/);
+  assert.match(E({ kind: 'util', cmd: 'runa', rn: 'espiral', circ: 4 }, null), /uma espiral.*não cobra a Sanidade/); assert.match(E({ kind: 'dmg', cmd: 'tempo', pf: [{ t: 'st', k: 'bleed', n: 2, ch: 100 }] }, null), /no Perfeito: /);
+  assert.match(E({ kind: 'passive', mod: { cw: 60, cp: 15, mx: 1, ctr: 50 } }, null), /\+60 ms na janela Bom.*\+1 golpe extra.*\+50% no contra-ataque/); assert.match(E({ kind: 'dmg', par: 300, cost: 4, power: 3 }, null), /Exposto/);
+});

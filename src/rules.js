@@ -495,7 +495,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
   extra += hitFx(a, s, t, { d, stat, blk });
   if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
-  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}) } });
+  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}) } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
   if (w) a.bt.wkNow = true;
   if (crit) trig(a, 'crit', t);
@@ -551,7 +551,7 @@ function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (g
       else log(t.name, `apara mais uma batida de ${s.name}!`, 'ok', { fx });
       applySt(a, 'exposed', 2); return 'ok'; // 2: o atacante gasta 1 no próprio fim de turno
     }
-    if (v === 'esq') { log(t.name, `ESQUIVA ${s.name} de ${a.name}!`, 'ok', { fx }); return 'ok'; }
+    if (v === 'esq') { log(t.name, `ESQUIVA ${s.name} de ${a.name}!`, 'ok', { fx: { ...fx, par: undefined, esq: 1 } }); return 'ok'; }
     if (v === 'cedo') { applySt(t, 'exposed', 1); if (!C.tel) { log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad'; } log(t.name, `erra o tempo da esquiva e fica exposto!`, 'bad'); }
     return '';
   }
