@@ -1234,8 +1234,13 @@ test('cinemáticos: clampCmd sanea NaN/Infinity, e limita seq e ritmo (nt + nív
 });
 test('cinemáticos: resultLines usa mods, proximidade e rótulo sem dano', () => {
   const C = RU.CMD, M = { cmd: 'martelar', kind: 'dmg', mx: 4 };
-  assert.ok(C.resultLines(M, { g: 'otimo', n: 5, acc: 1 }, C.cmdEffect(M, { g: 'otimo', n: 5 }), { mx: 1 }).lines.includes('5/5 apertos'));
-  assert.ok(C.resultLines(M, { g: 'bom', n: 2, acc: .5 }, C.cmdEffect(M, { g: 'bom', n: 2 })).lines.includes('2/4 apertos'));
+  const ml = (s, c, mods) => C.resultLines(s, c, C.cmdEffect(s, c), mods).lines;
+  assert.ok(ml(M, { g: 'bom', n: 2, acc: .5 }).includes('8/16 apertos') && ml(M, { g: 'bom', n: 2, acc: .5 }).includes('+2 golpes'), 'meta 16 no nível fácil; n são golpes extras');
+  assert.ok(ml({ ...M, rq: { FOR: 50 } }, { g: 'bom', n: 2, acc: .5 }).includes('12/24 apertos'), 'meta 24 no difícil'); assert.ok(ml({ ...M, mt: 10 }, { g: 'bom', n: 2, acc: .5 }).includes('5/10 apertos'));
+  assert.ok(!ml(M, { g: 'otimo', n: 5, acc: .8 }, { mx: 1 }).some(l => /^5\/4/.test(l)));
+  assert.match(RU.extra({ kind: 'dmg', cmd: 'tempo', rq: { FOR: 50 } }, null), /Perfeito ×1,5/); assert.match(RU.extra({ kind: 'dmg', cmd: 'tempo' }, null), /Perfeito ×1,4/);
+  assert.match(RU.extra({ kind: 'dmg', cmd: 'martelar', mx: 4, rq: { FOR: 50 } }, null), /meta de 24 apertos/); assert.match(RU.extra({ kind: 'dmg', cmd: 'runa', rn: 'circulo' }, null), /errar rende ×0,85/);
+  assert.equal(C.clampCmd({ cmd: 'ritmo' }, { g: 'perf', n: 99 }, {}).n, 6, 'ritmo sem nt usa o padrão 6');
   const T = { cmd: 'tempo', kind: 'dmg' }; assert.ok(C.resultLines(T, { g: 'bom', n: 0, acc: .5 }, C.cmdEffect(T, { g: 'bom' }), { cp: 10 }).lines.includes('faltaram 10 ms'), 'bom 140, acc .5 -> 70 ms; perfeito 60');
   const Ru = { cmd: 'runa', kind: 'util', rn: 'circulo' }; const r = C.resultLines(Ru, { g: 'erro', n: 0, acc: .52 }, C.cmdEffect(Ru, { g: 'erro' }));
   assert.ok(r.lines.includes('×0,85 no efeito') && r.lines.includes('semelhança 52%'), r.lines.join('|')); assert.ok(!r.lines.some(l => l.includes('de dano')));

@@ -202,14 +202,15 @@
   const RUNA_N = { circulo: 'um círculo', triangulo: 'um triângulo', estrela: 'uma estrela', espiral: 'uma espiral', raio: 'um raio', onda: 'uma onda' };
   const cmdText = s => { // o que o comando de ataque da técnica pede e rende
     const dmg = s.kind === 'dmg' || s.kind === 'mental';
-    if (s.cmd === 'tempo') { const w = g.RULES.CMD.tempoWin(s, {}); return `Golpe no tempo: aperte quando o anel fechar (Bom ×1,2 · Ótimo ×1,3 · Perfeito ×1,4, janela de ${w.cp} ms no Perfeito; errar rende ×0,85)${s.bf ? `. Só o Perfeito dispara o Black Flash: ×2,5 e devolve 25% da Aura` : ''}`; }
-    const T = g.RULES.CMD.tune(s, {}), hard = g.RULES.CMD.tier(s) === 2;
+    const CM = g.RULES.CMD, mt = (k, i) => String(CM.MULT[k][i]).replace('.', ','), pi = CM.tier(s) === 2 ? 3 : 2;
+    if (s.cmd === 'tempo') { const w = CM.tempoWin(s, {}); return `Golpe no tempo: aperte quando o anel fechar (Bom ×${mt('tempo', 0)} · Ótimo ×${mt('tempo', 1)} · Perfeito ×${mt('tempo', pi)}, janela de ${w.cp} ms no Perfeito; errar rende ×0,85)${s.bf ? `. Só o Perfeito dispara o Black Flash: ×2,5 e devolve 25% da Aura` : ''}`; }
+    const T = CM.tune(s, {});
     if (s.cmd === 'martelar') return `Martelar: aperte o máximo de vezes em 2 s (meta de ${T.martelarMeta} apertos) e ganhe até +${s.mx || 0} golpe${s.mx > 1 ? 's' : ''}; ≥ 75% é Ótimo, menos de 35% erra (×0,85)`;
-    if (s.cmd === 'segurar') return `Segurar e soltar: segure e solte na faixa (Bom ×1,3 · Ótimo ×1,45 · Perfeito ×${hard ? '1,7' : '1,6'}, faixa Perfeita de ${T.segurar.perf}%); soltar fora dela erra (×0,85); passar do topo estoura e deixa você Exposto`;
+    if (s.cmd === 'segurar') return `Segurar e soltar: segure e solte na faixa (Bom ×${mt('segurar', 0)} · Ótimo ×${mt('segurar', 1)} · Perfeito ×${mt('segurar', pi)}, faixa Perfeita de ${T.segurar.perf}%); soltar fora dela erra (×0,85); passar do topo estoura e deixa você Exposto`;
     if (s.cmd === 'seq') return `Sequência ${s.seq}: uma seta por batida (tolerância de ±${T.seqTol} ms); ${s.hits > 1 ? 'os golpes normais são o mínimo' : 'cada seta certa soma um golpe de 50%'}; ≥ 75% é Ótimo; todas certas: golpe final${s.fin ? ` de ${s.fin} de poder` : ''}; errar quase tudo rende ×0,85`;
-    if (s.cmd === 'ritmo') return `Ritmo: ${T.ritmoNotas} notas (±${T.ritmoTol} ms); cada nota certa soma ${dmg ? '+10% de dano' : s.kind === 'heal' && s.power > 0 ? '+10% de cura e +1 turno' : '+1 turno'}; ≥ 75% é Ótimo, todas: Perfeito`;
+    if (s.cmd === 'ritmo') return `Ritmo: ${T.ritmoNotas} notas (±${T.ritmoTol} ms); cada nota certa soma ${dmg ? '+10% de dano' : s.kind === 'heal' && s.power > 0 ? '+10% de cura e +1 turno' : '+1 turno'}; ≥ 75% é Ótimo, todas: Perfeito${dmg ? '; errar quase tudo rende ×0,85' : ''}`;
     if (s.cmd === 'mira') return `Mira: clique no ponto fraco (${T.mira}% da tela); acertou = crítico e −2 na Quebra; errar rende ×0,85`;
-    if (s.cmd === 'runa') return `Runa: desenhe ${RUNA_N[s.rn] || 'o símbolo'} em 4 s; ≥ ${T.runa.bom}% de semelhança é Bom, ≥ ${T.runa.otimo}% é Ótimo, ≥ ${T.runa.perf}% é Perfeito${dmg ? ` (×1,2 · ×1,3 · ×${hard ? '1,5' : '1,4'})` : '; Bom ou melhor: +1 turno e ×1,2 em cura e escudo; Perfeito: não cobra a Sanidade'}`;
+    if (s.cmd === 'runa') return `Runa: desenhe ${RUNA_N[s.rn] || 'o símbolo'} em 4 s; ≥ ${T.runa.bom}% de semelhança é Bom, ≥ ${T.runa.otimo}% é Ótimo, ≥ ${T.runa.perf}% é Perfeito${dmg ? ` (×${mt('runa', 0)} · ×${mt('runa', 1)} · ×${mt('runa', pi)}; errar rende ×0,85)` : '; Bom ou melhor: +1 turno e ×1,2 em cura e escudo; Perfeito: não cobra a Sanidade'}`;
     if (s.cmd === 'choque') return 'Choque: contra golpe anunciado de alvo único, aperte C e martele; vencer devolve o golpe ×1,3 e deixa o inimigo Exposto, perder leva ×1,3';
     return '';
   };
@@ -272,6 +273,8 @@
       if (left <= par) return canParry ? 'par' : esq > 0 ? 'esq' : 'late';
       return esq > 0 && left <= par + esq ? 'esq' : 'cedo';
     },
+    // multiplicador de dano [Bom, Ótimo, Perfeito, Perfeito no nível difícil]; erro é sempre ×0,85
+    MULT: { tempo: [1.2, 1.3, 1.4, 1.5], segurar: [1.3, 1.45, 1.6, 1.7], runa: [1.2, 1.3, 1.4, 1.5] },
     GRADES: ['', 'erro', 'bom', 'otimo', 'perf'], GRADE_NAME: { erro: 'ERROU', bom: 'BOM', otimo: 'ÓTIMO', perf: 'PERFEITO' },
     // nível do nó = maior requisito: fácil < 20, médio 20–49, difícil ≥ 50
     tier(s) { const m = Math.max(0, ...Object.values(s?.rq || {}).map(Number).filter(Number.isFinite)); return m >= 50 ? 2 : m >= 20 ? 1 : 0; },
@@ -303,7 +306,7 @@
     clampCmd(s, cmd, mods = {}) {
       const z = { g: '', n: 0, acc: 0 };
       if (!s?.cmd || s.cmd === 'choque' || !cmd || typeof cmd !== 'object') return z;
-      const cnt = { martelar: (s.mx || 0) + (mods.mx || 0), seq: s.seq?.length || 0, ritmo: s.nt ? CMD.tune(s, mods).ritmoNotas : 0 }[s.cmd] ?? 0, G = CMD.GRADES;
+      const cnt = { martelar: (s.mx || 0) + (mods.mx || 0), seq: s.seq?.length || 0, ritmo: CMD.tune(s, mods).ritmoNotas }[s.cmd] ?? 0, G = CMD.GRADES;
       let g = G.includes(cmd.g) ? cmd.g : '';
       const n = Math.max(0, Math.min(cnt, Math.floor(+cmd.n) || 0)); let acc = +cmd.acc; acc = !Number.isFinite(acc) ? 0 : s.cmd === 'segurar' && acc < 0 ? -1 : Math.max(0, Math.min(1, acc));
       if (cnt && g) { const f = CMD.gradeFrac(n / cnt, true); if (G.indexOf(f) < G.indexOf(g)) g = f; } // nas de contagem o grau nunca passa do que a fração permite
@@ -314,20 +317,20 @@
       const e = { g: c?.g || '', mult: 1, extra: 0, extraMult: 1, fin: 0, pf: false, bf: false, crit: false, brk: 0, estouro: false, turns: 0, healMult: 1, noSan: false };
       if (!s?.cmd || !c) return e;
       const gr = c.g, erro = gr === 'erro', bom = gr === 'bom', ot = gr === 'otimo', perf = gr === 'perf', hard = CMD.tier(s) === 2, dmg = s.kind === 'dmg' || s.kind === 'mental';
-      const by = (b, o, p, ph) => erro ? .85 : bom ? b : ot ? o : perf ? (hard ? ph : p) : 1; // multiplicador por grau; no nível difícil o Perfeito rende mais
-      if (s.cmd === 'tempo') { e.mult = by(1.2, 1.3, 1.4, 1.5); if (perf) { e.pf = true; e.bf = s.bf > 0; } }
+      const M = CMD.MULT[s.cmd] || [], by = () => erro ? .85 : bom ? M[0] : ot ? M[1] : perf ? M[hard ? 3 : 2] : 1; // multiplicador por grau; no nível difícil o Perfeito rende mais
+      if (s.cmd === 'tempo') { e.mult = by(); if (perf) { e.pf = true; e.bf = s.bf > 0; } }
       else if (s.cmd === 'martelar') { e.extra = erro ? 0 : c.n; e.pf = perf; if (erro) e.mult = .85; }
-      else if (s.cmd === 'segurar') { if (c.acc < 0) e.estouro = true; else { e.mult = by(1.3, 1.45, 1.6, 1.7); e.pf = perf; } }
+      else if (s.cmd === 'segurar') { if (c.acc < 0) e.estouro = true; else { e.mult = by(); e.pf = perf; } }
       else if (s.cmd === 'seq') { if (!(s.hits > 1)) { e.extra = c.n; e.extraMult = .5; } if (perf) { e.fin = s.fin || Math.round(s.power * 1.5); e.pf = true; } if (erro) e.mult = .85; }
       else if (s.cmd === 'ritmo') { e.pf = perf; if (dmg) e.mult = erro ? .85 : 1 + .1 * c.n; else { e.turns = c.n; if (s.kind === 'heal' && s.power > 0) e.healMult = 1 + .1 * c.n; } }
       else if (s.cmd === 'mira') { if (bom || ot || perf) { e.crit = true; e.brk = 2; } e.pf = perf; if (erro) e.mult = .85; }
-      else if (s.cmd === 'runa') { if (dmg) { e.mult = by(1.2, 1.3, 1.4, 1.5); e.pf = perf; } else { if (bom || ot || perf) { e.turns = 1; e.healMult = 1.2; } e.noSan = perf; if (erro) e.mult = .85; } }
+      else if (s.cmd === 'runa') { if (dmg) { e.mult = by(); e.pf = perf; } else { if (bom || ot || perf) { e.turns = 1; e.healMult = 1.2; } e.noSan = perf; if (erro) e.mult = .85; } }
       return e;
     },
     // o que mostrar depois da nota: título do grau e linhas (o que rendeu + quanto faltou para o Perfeito)
     resultLines(s, c, e, mods = {}) {
       const t = CMD.tune(s, mods), L = [], f = v => String(+v.toFixed(2)).replace('.', ','), g = c?.g || '', dmg = s?.kind === 'dmg' || s?.kind === 'mental';
-      const cnt = s?.cmd === 'martelar' ? (s.mx || 0) + (mods.mx || 0) : s?.cmd === 'seq' ? (s.seq?.length || 0) : s?.cmd === 'ritmo' ? t.ritmoNotas : 0;
+      const cnt = s?.cmd === 'seq' ? (s.seq?.length || 0) : s?.cmd === 'ritmo' ? t.ritmoNotas : 0;
       if (e.mult !== 1) L.push(`×${f(e.mult)} ${dmg ? 'de dano' : 'no efeito'}`);
       if (e.extra > 0) L.push(`+${e.extra} golpe${e.extra > 1 ? 's' : ''}`);
       if (e.fin) L.push('golpe final');
@@ -338,7 +341,8 @@
       if (e.estouro) L.push('a carga estourou');
       if (g && g !== 'perf' && !e.estouro) { // proximidade do Perfeito (acc do tempo = 1 − erro/janela Bom; da runa = semelhança 0..1)
         if (s.cmd === 'tempo' && c.acc > 0) L.push(`faltaram ${Math.max(0, Math.round((1 - c.acc) * t.tempo.bom - t.tempo.perf))} ms`);
-        else if (cnt) L.push(`${c.n}/${cnt} ${s.cmd === 'martelar' ? 'apertos' : s.cmd === 'seq' ? 'setas' : 'notas'}`);
+        else if (s.cmd === 'martelar') L.push(`${Math.round((c.acc || 0) * t.martelarMeta)}/${t.martelarMeta} apertos`); // acc = fração da meta de apertos; n são os golpes extras
+        else if (cnt) L.push(`${c.n}/${cnt} ${s.cmd === 'seq' ? 'setas' : 'notas'}`);
         else if (s.cmd === 'runa') L.push(`semelhança ${Math.round(c.acc * 100)}%`);
       }
       return { title: CMD.GRADE_NAME[g] || '', lines: L };
