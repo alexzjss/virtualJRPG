@@ -17,7 +17,7 @@ function party(size, lvl) {
     for (const a in h.attrs) h.attrs[a] = 40 + up; Object.assign(h.attrs, { [a1]: 62 + up, [a2]: 52 + up, AGI: Math.max(h.attrs.AGI, 50 + up), CON: Math.max(h.attrs.CON, 46 + up) });
     h.vinc = [el]; h.arma = [10, 14, 19][lvl]; h.armor = [0, 2, 4][lvl]; h.bon.hpMax = lvl * 12; h.bon.auraMax = lvl * 6;
     h.skills = [...ids(el, 0, [1, 4, 7][lvl]), ...ids(el, 3, [0, 2, 4][lvl]), byName('Golpe Pesado'), ...(lvl ? [byName('Golpe Giratório')] : [])].filter(Boolean);
-    h.inv[item(lvl ? 'Tônico Forte' : 'Tônico')] = 1 + lvl;
+    h.inv[item(lvl ? 'Líquido Dourado do Sanatório' : 'Poção')] = 1 + lvl;
     return h;
   });
 }
