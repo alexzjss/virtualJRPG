@@ -40,12 +40,12 @@ export const CARTAS = {
   // ---------- Indra ----------
   indra: [
     [ // Cartas de Indra: ataques
-      { n: "Tiro de Indra", k: "dmg", d: "Um disparo de energia pura carregado com Indra.", xp: 10, a: "INT", p: 6, c: 2, ct: 60 },
+      { n: "Tiro de Indra", k: "dmg", d: "Um disparo de energia pura carregado com Indra.", xp: 10, a: "INT", p: 6, c: 3, ct: 60 },
       { n: "Selo de Indra", k: "dmg", d: "Um selo de Indra no corpo do alvo, que descarrega depois.", xp: 10, a: "INT", p: 6, c: 2, fx: "seal 14 2" },
       { n: "Disparo Elétrico", k: "dmg", d: "Um disparo carregado eletricamente: perfura e espalha corrente na área afetada.", xp: 15, a: "INT", p: 17, c: 4, ct: 70, fx: "pierce 60; st para 1 30%" },
       { n: "Núcleo de Indra", k: "dmg", d: "Uma esfera de raio na palma da mão, disparada no primeiro contato com um condutor.", xp: 25, a: "INT", p: 22, c: 8, st: "para", rq: { INT: 50 } },
       { n: "Núcleo de Indra: Nível 2", k: "passive", d: "O núcleo agora explode em raios ao acertar e solta o Núcleo de Corte.", xp: 30, amp: "Núcleo de Indra", up: { p: 6, fx: "chain 1 .7" }, pre: "Núcleo de Indra" },
-      { n: "Núcleo de Corte", k: "dmg", d: "Dano elétrico cortante rápido ao longo do trajeto traçado pelo Núcleo de Indra.", xp: 20, a: "INT", p: 9, c: 1, ct: 50, hits: 2, pre: "Núcleo de Indra: Nível 2" },
+      { n: "Núcleo de Corte", k: "dmg", d: "Dano elétrico cortante rápido ao longo do trajeto traçado pelo Núcleo de Indra.", xp: 20, a: "INT", p: 9, c: 3, ct: 50, hits: 2, pre: "Núcleo de Indra: Nível 2" },
       { n: "Chave de Indra", k: "dmg", d: "O corpo coberto de Indra avança numa carga e descarrega em impacto elétrico, empurrando o alvo.", xp: 30, a: "AGI", p: 13, c: 5, fx: "push 40; chain 2 .6" },
       { n: "Chave de Indra: Nível 2", k: "passive", d: "O impacto empurra mais longe e a descarga atinge mais inimigos.", xp: 35, amp: "Chave de Indra", up: { p: 4, fx: "push 70; chain 4 .6" }, pre: "Chave de Indra" },
       { n: "Lâmina de Indra", k: "dmg", d: "Uma lâmina de eletricidade estável, extensível e transferível por todo o corpo.", xp: 35, a: "INT", p: 21, c: 7, ct: 70, st: "para", rq: { INT: 55 } },
@@ -71,12 +71,12 @@ export const CARTAS = {
   // ---------- Fuhaku ----------
   fuhaku: [
     [ // Cartas de Fuhaku: ataques
-      { n: "Pulso de Fuhaku", k: "dmg", d: "Um pulso curto de Fuhaku, capaz de ferir e mover objetos.", xp: 10, a: "DES", p: 6, c: 1, ct: 50, fx: "push 20" },
+      { n: "Pulso de Fuhaku", k: "dmg", d: "Um pulso curto de Fuhaku, capaz de ferir e mover objetos.", xp: 10, a: "DES", p: 6, c: 2, ct: 50, fx: "push 20" },
       { n: "Selo de Fuhaku", k: "dmg", d: "Um selo de vento comprimido no alvo, que estoura depois.", xp: 10, a: "DES", p: 6, c: 2, fx: "seal 14 2" },
       { n: "Corrente de Vento", k: "dmg", d: "Fuhaku entre as mãos, lançado como uma corrente veloz e de impacto.", xp: 15, a: "DES", p: 13, c: 3, ct: 70, fx: "push 25" },
-      { n: "Empurrão", k: "dmg", d: "Um empurrão de vento direto à frente, que arrasta o alvo.", xp: 15, a: "DES", p: 9, c: 1, ct: 60, fx: "push 45" },
-      { n: "Tentáculo de Vento", k: "dmg", d: "Uma corrente maleável e extensível, até 4 metros, até 3 vezes seguidas.", xp: 25, a: "DES", p: 5, c: 2, ct: 70, hits: 3 },
-      { n: "Atirar Vento", k: "dmg", d: "Uma Aura de Fuhaku em torno de um objeto: ele é lançado com muito mais força e velocidade.", xp: 20, a: "DES", p: 12, c: 1, ct: 60, fx: "push 20" },
+      { n: "Empurrão", k: "dmg", d: "Um empurrão de vento direto à frente, que arrasta o alvo.", xp: 15, a: "DES", p: 9, c: 3, ct: 60, fx: "push 45" },
+      { n: "Tentáculo de Vento", k: "dmg", d: "Uma corrente maleável e extensível, até 4 metros, até 3 vezes seguidas.", xp: 25, a: "DES", p: 5, c: 4, ct: 70, hits: 3 },
+      { n: "Atirar Vento", k: "dmg", d: "Uma Aura de Fuhaku em torno de um objeto: ele é lançado com muito mais força e velocidade.", xp: 20, a: "DES", p: 10, c: 3, ct: 60, fx: "push 20" },
       { n: "Wakaze", k: "dmg", d: "Uma esfera de vento puro, cheia de energia cinética, que explode ao acertar.", xp: 30, a: "DES", p: 31, c: 10, fx: "push 30", rq: { DES: 50 } },
       { n: "Wakaze: Nível 2", k: "passive", d: "A esfera cresce e a explosão de vento se alarga.", xp: 35, amp: "Wakaze", up: { p: 7, area: true }, pre: "Wakaze" },
       { n: "Wakaze: Estilo Criogênico", k: "dmg", d: "A esfera ganha um frio rotacional e se estilhaça no impacto, espalhando o gelo.", xp: 60, a: "DES", p: 26, c: 12, ct: 130, fx: "st frozen 1 50%; st wet 2", pre: "Wakaze", rq: { DES: 55 } },
