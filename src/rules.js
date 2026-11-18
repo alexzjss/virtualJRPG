@@ -549,7 +549,7 @@ function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devol
   if (!ts.length) return null;
   const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, { beats, fin } = finPlan(a, hits, tel, beat);
   const z = Object.fromEntries(ts.map(t => { const n = parNode(t), mo = modsOf(t, null); return [t.id, { par: n ? n.par + mo.par : 0, esq: esq ? D.esq + mo.esq : 0, cost: n?.cost || 0, canP: canPar(t) }]; })); // zonas de cada alvo, para a tela desenhar
-  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, fin, tel, esq, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  const C = { foe: a.id, nm: s.name, at: Date.now(), w: beats[beats.length - 1], beats, fin, tel, esq, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
   if (tel && !s.area && ts.length === 1 && chqSkill(ts[0])) C.chqOk = [ts[0].id]; // Choque de poderes: só golpe anunciado de alvo único
   return C;
 }

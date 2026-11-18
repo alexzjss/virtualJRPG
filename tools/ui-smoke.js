@@ -501,6 +501,24 @@ try {
     go({ t: 'cmdSkip' }); push();
     await until(() => !S.battle.cmd, 'a janela fecha');
     await until(async () => !(await ana.locator('.stage-cmd').count()), 'o anel some da tela');
+    // Task 9: no PC (palco 3D) o anel é o .qte3d sobre o recorte do herói alvo, com a faixa do golpe e o retrato do alvo marcado
+    // reduzir movimento: a câmera vai direto (a renderização por software do teste desenha ~2 quadros/s no close-up 3D e a transição não chegaria a tempo)
+    { await bia.emulateMedia({ reducedMotion: 'reduce' }); mikhail.owner = 'bia'; mikhail.hp = mikhail.hpMax; mikhail.st = {}; S.battle.ticks[minion.id] = -1; push(); check(current() === minion.id, 'vez do inimigo (PC)');
+      const g0 = DEF.grace; DEF.grace = 8000; go({ t: 'act', id: minion.id, skill: 'atk', target: mikhail.id }); DEF.grace = g0;
+      check(!!S.battle.cmd && S.battle.cmd.tgs.includes(mikhail.id), 'ataque à mão abre a janela para a Mikhail');
+      await until(() => vis(bia, '.qte3d button.def'), 'anel .qte3d na tela da Bia (PC)');
+      check(!(await bia.locator('.stage-cmd').count()), 'no PC o palco de tela cheia não abre');
+      check(/ALVO: Mikhail/i.test(await txt(bia, '.hudw .band')) && /·/.test(await txt(bia, '.hudw .band')), 'faixa "{inimigo} · {golpe}" e "ALVO: Mikhail"');
+      check(await bia.locator(`.hud-party .pm.tg[data-tgt="${mikhail.id}"]`).count() === 1 && await vis(bia, '.hudw.dim'), 'retrato do alvo marcado (tg) e HUD apagada');
+      // o anel se ancora no recorte da Mikhail (centro do recorte, preso dentro da tela) e a câmera vai ao ombro dela; medido sem depender de quadros
+      check(await bia.evaluate(id => { const q = document.querySelector('.qte3d'), r = PALCO3D.rectOf(id); if (!q || !r) return false; const rs = parseFloat(q.style.getPropertyValue('--rs')), x = Math.max(rs / 2, Math.min(innerWidth - rs / 2, r.left + r.width / 2));
+        return Math.abs(parseFloat(q.style.left) - x) < 2; }, mikhail.id), 'o anel se ancora no recorte da Mikhail');
+      await bia.locator('.qte3d button.def').dispatchEvent('pointerdown');
+      await until(() => (S.battle.cmd?.p[mikhail.id] || []).length > 0, 'o aperto no PC chega ao servidor como nota');
+      check(await until(() => bia.evaluate(id => { const w = document.querySelector('.p3d .world'), F = PALCO3D.formation(Object.values(S.chars).filter(c => c.id in S.battle.ticks && !c.enemy).map(c => c.id), Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.enemy).map(c => c.id)), v = PALCO3D.cameraFor({ kind: 'hero', at: F.get(id) });
+        return w.style.transform.replace(/\s/g, '') === `translate3d(${v.tx}px,${v.ty}px,${v.tz}px)rotateY(${v.ry}deg)`; }, mikhail.id), 'câmera no ombro do alvo', 1500), 'na janela de defesa a câmera vai ao ombro da Mikhail');
+      go({ t: 'cmdSkip' }); push(); await until(() => !S.battle.cmd, 'a janela fecha (PC)');
+      await until(async () => !(await bia.locator('.qte3d').count()), 'o anel 3D some'); await bia.emulateMedia({ reducedMotion: 'no-preference' }); }
     // ataque: técnica com Golpe no tempo abre o minigame; pular manda a ação sem nota e o golpe sai normal
     const k = Object.keys(S.skills).find(x => { const q = S.skills[x]; return q.cmd === 'tempo' && q.kind === 'dmg' && !q.limit && !q.area && q.res === 'aura' && (q.cost || 0) <= 20; });
     shinkai.skills = [...new Set([...shinkai.skills, k])]; shinkai.aura = shinkai.auraMax; push();

@@ -20,9 +20,15 @@ const HUD = (() => {
     const icons = o.table ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Chat" aria-pressed="${chatOpen}">${ico('chat')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
     const menu = navOpen && !o.table ? `<nav class="hud-menu" aria-label="Páginas">${chips(PAGES, (k, l) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${ico(k)}<span>${k === 'mesa' ? 'Batalha' : l}</span></button>`)}</nav>` : '';
     return `<div class="hud-tr">${icons}${menu}${fieldBar()}<div class="hlog" aria-live="polite">${lines.map(l => `<div><b>${esc(l.who)}</b> ${esc(l.text)}</div>`).join('')}</div></div>`; };
+  // vez do inimigo: faixa "{INIMIGO} · {GOLPE}" e "ALVO: {HERÓI}" por 1,6 s quando a janela de defesa abre (o relógio é o deste navegador)
+  let bandK = '', bandT = 0;
+  const faixa = () => { const C = S.battle.cmd; if (!C) { bandK = ''; return ''; }
+    const k = C.foe + ':' + C.at; if (k !== bandK) { bandK = k; bandT = performance.now(); setTimeout(() => typeof render === 'function' && render(), 1650); }
+    if (performance.now() - bandT > 1600) return ''; const f = S.chars[C.foe], alvos = (C.tgs || []).map(id => S.chars[id]?.name).filter(Boolean);
+    return `<div class="band" role="status" style="--c:${esc(f?.color || '#e4002b')}"><b>${esc(f?.name || 'Inimigo')} · ${esc(C.nm || 'Ataque')}</b>${alvos.length ? `<small>ALVO: ${esc(alvos.join(', '))}</small>` : ''}</div>`; };
   const grupo = (inB, cur) => `<div class="hud-party" aria-label="Grupo">${inB.filter(c => !c.enemy).map(c => {
     const hp = pct(c.hp, c.hpMax), au = Math.round(10 * Math.max(0, c.aura) / (c.auraMax || 1)), form = c.st.form && c.form && SK(c.form);
-    return `<div class="pm ${c === cur ? 'now' : ''} ${c.id === tgt ? 'tg' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" style="--c:${esc(c.color)}" title="${esc(c.name)}">
+    return `<div class="pm ${c === cur ? 'now' : ''} ${c.id === tgt || S.battle.cmd?.tgs?.includes(c.id) ? 'tg' : ''} ${S.battle.cmd?.tgs?.includes(c.id) ? 'dtg' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" style="--c:${esc(c.color)}" title="${esc(c.name)}">
       <i class="ink"></i><div class="por">${photo(c, 'p')}</div>
       <div class="hlim ${c.limit >= 100 ? 'full' : ''}" title="Limite ${c.limit}%"><i style="height:${pct(c.limit, 100)}%"></i></div>
       <div class="pst">${c.hp > 0 ? stIcons(c) : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}${c.st.defUp ? '<span>Defendendo</span>' : ''}${form ? `<span>Forma: ${esc(form.name)}</span>` : ''}</div>
@@ -77,7 +83,7 @@ const HUD = (() => {
     // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
     html({ actorId = null, dim = false, unread = 0, table = false } = {}) {
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table };
-      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8))}${topo(o)}${grupo(inB, cur)}${dicas(o, inB, cur)}${alvo()}</div>`;
+      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8))}${topo(o)}${grupo(inB, cur)}${dicas(o, inB, cur)}${alvo()}${faixa()}</div>`;
     },
   };
 })();

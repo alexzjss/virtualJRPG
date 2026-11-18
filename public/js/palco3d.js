@@ -67,7 +67,7 @@
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
   const els = new Map(); // id -> { el, img, mini, sh, hpb, bad: [], key... }
-  let lastF = null, camLock = null; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
+  let lastF = null, camLock = null, fastT = 0; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
   const el = (tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
   const ensure = () => {
     if (root) return;
@@ -104,6 +104,8 @@
     const cur = S.chars[timeline(1)[0]], at = id => F.get(id) || { x: 0, z: 0 };
     if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', at: cur ? at(cur.id) : undefined, to: F.get(local.zoom) };
     if (!cur) return { kind: 'hero', at: { x: -430, z: 0 } };
+    const dt = cur.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
+    if (dt) return { kind: 'hero', at: at(dt), fast: true };
     if (cur.enemy) return { kind: 'foe', at: at(cur.id) };
     if (local.aim && F.has(local.aim)) return { kind: 'aim', at: at(cur.id), to: F.get(local.aim) };
     return { kind: 'hero', at: at(cur.id) };
@@ -149,9 +151,10 @@
     return ch;
   };
   const camera = F => {
-    const v = camLock || cameraFor(view(F)), k = `${v.tx},${v.ty},${v.tz},${v.ry}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
+    const v0 = view(F), v = camLock || cameraFor(v0), k = `${v.tx},${v.ty},${v.tz},${v.ry}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
     if (!camLock) world.dataset.cam = tr; // o enquadramento do turno (a fumaça confere a volta depois da investida)
     if (k === camKey) return; camKey = k; world.style.transform = tr;
+    if (!camLock && v0.fast) { world.classList.add('fast'); clearTimeout(fastT); fastT = setTimeout(() => !camLock && world.classList.remove('fast'), 500); } // o anel de defesa dura ~1,3 s: a câmera não pode levar 1,1 s para chegar
   };
 
   P.sync = h => {

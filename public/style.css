@@ -1239,6 +1239,11 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .ot.hl{border-color:var(--gold);box-shadow:0 0 0 2px #000,0 0 14px var(--gold);transform:translateX(8px)}
 .ot.ghost{border-style:dashed;border-color:#fffc;opacity:.62;pointer-events:none}.ot.ghost b{position:absolute;right:4px;bottom:2px;font:400 13px var(--disp);color:#fff;z-index:2;letter-spacing:1px;text-shadow:0 0 4px #000}
 .ot-why{margin:2px 0 0 10px;width:200px;font:600 12px var(--body,sans-serif);color:var(--gold);text-shadow:0 1px 3px #000}
+.hudw .band{position:absolute;left:50%;top:calc(150px * var(--hk,.85));transform:translateX(-50%) skewX(-10deg);padding:8px 40px;background:#000;border-left:8px solid var(--c,#e4002b);border-right:8px solid var(--c,#e4002b);text-align:center;pointer-events:none;animation:bandin .3s cubic-bezier(.2,1.4,.4,1) both;z-index:5}
+.hudw .band b{display:block;font:900 italic calc(34px * var(--hk,.85))/1.1 Anton,Barlow,sans-serif;letter-spacing:2px;text-transform:uppercase;color:#fff}.hudw .band small{display:block;font:800 calc(16px * var(--hk,.85))/1.2 'Barlow Condensed',Barlow,sans-serif;letter-spacing:3px;color:var(--red,#e4002b)}
+@keyframes bandin{from{opacity:0;transform:translateX(-50%) skewX(-10deg) scaleX(1.6)}}
+.hudw .pm.dtg{animation:dtg .5s steps(2) infinite}@keyframes dtg{50%{filter:brightness(1.6) drop-shadow(0 0 10px var(--red,#e4002b))}}
+@media(prefers-reduced-motion:reduce){.hudw .band,.hudw .pm.dtg{animation:none}}
 .p3d .bb.hl{filter:drop-shadow(0 0 10px var(--gold)) brightness(1.15)}
 .ot.now::before{content:"AGORA";position:absolute;right:4px;bottom:2px;font:400 13px var(--disp);color:var(--gold);z-index:2;letter-spacing:1px}
 .ot img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block}
