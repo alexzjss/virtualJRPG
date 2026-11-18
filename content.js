@@ -82,15 +82,24 @@ export function buildSkills(sk) {
     return [...trunk, ...A, ...B, ...chain(deg + (capB ? 4 : -4), r0 + (capB ? 6 : 7), [nodes[9]], null, at((capB ? B : A).at(-1)))];
   };
   const M = TREE.marcial.branches, fis = k => used.get(k) === 'fis';
+  // linha de variações (ramo com `de`): sai da técnica base, para fora do centro, uma casa atrás da outra. A 1ª casa é a livre mais próxima da base (até 6 casas), ligada a ela mesmo sem encostar.
+  const line = (br, el, label) => { const id = Object.keys(G).find(i => G[i].name === br.de); if (!id) throw new Error('grade: linha sem a técnica ' + br.de); const bx = G[id].gx, by = G[id].gy;
+    const a = Math.atan2(by - CY, bx - CX), tx = bx + 2 * Math.cos(a), ty = by + 2 * Math.sin(a); let best = null;
+    for (let x = bx - 6; x <= bx + 6; x++) for (let y = by - 6; y <= by + 6; y++) if (free(x, y)) { const d = (x - tx) ** 2 + (y - ty) ** 2; if (!best || d < best[2]) best = [x, y, d]; }
+    if (!best) throw new Error('grade sem espaço para a linha de ' + br.de);
+    const mk = o => node(o, el, label ? { br: label } : {}), s0 = put(best[0], best[1], mk(br[0]), [bx, by]);
+    return [s0.join(','), ...chain(a * 180 / Math.PI, Math.hypot(bx - CX, by - CY) + 2, br.slice(1).map(mk), null, s0)];
+  };
   // tronco Marcial: ramo 0 no centro, estilos de arma e ramos novos em raios, treinos nas casas livres junto ao centro
   // núcleo Marcial (centro e o anel em volta): aberto a todos, sem exigir vizinho aprendido; dele se anda para o resto do tronco
   put(C, C, node(M[0][0], 'fis', { open: 1 }));
   around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 }), [C, C]));
-  const rays = M.slice(2); // M[1] são os treinos; as armas saíram para TREE.armas
+  const rays = M.slice(2).filter(b => !b.de); // M[1] são os treinos; as armas saíram para TREE.armas
   rays.forEach((br, i) => chain(i * 360 / rays.length + 360 / ORDER.length / 2, 2, br.map(o => node(o, 'fis')), fis));
   const train = M[1].map(o => node(o, 'fis'));
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
     if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift(), around(x, y).find(p => used.get(p.join(',')) === 'fis'));
+  M.filter(b => b.de).forEach(b => line(b, 'fis'));
   // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó, aberta a quem tem o Vínculo, sem exigir vizinho); depois um ramo de cada setor por vez,
   // para nenhum setor cercar o vizinho. Um ramo em que todo nó exige arma vira uma trilha por tipo de arma.
   const SEC = 360 / ORDER.length, R0 = 13, RING = 10, SLOT = [0, -1, 1, -2, 2], W = SEC / 5.2, cells = {};
@@ -99,6 +108,7 @@ export function buildSkills(sk) {
   for (let b = 1; b < most; b++) ORDER.forEach((el, i) => {
     const br = TREE[el].branches[b];
     if (!br) return;
+    if (br.de) { cells[el][b] = line(br, el, el + '-' + b); return; }
     const ring = Math.floor(b / 5), deg = i * SEC + SLOT[b % 5] * W, mk = o => node(o, el, { br: el + '-' + b });
     const tip = ring ? new Set(cells[el][b - 5].slice().sort((p, q) => dist(q) - dist(p)).slice(0, 3)) : new Set(cells[el][0].slice(0, 5));
     const anchor = k => tip.has(k), r0 = ring ? R0 + ring * RING : R0 + 2;

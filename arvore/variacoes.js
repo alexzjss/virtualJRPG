@@ -78,8 +78,9 @@ const VAR = {
 export function variar(TREE) {
   const all = Object.values(TREE).flatMap(t => t.branches), byName = new Map(all.flat().map(s => [s.n, s]));
   for (const [n, f] of Object.entries(CMD)) { const s = byName.get(n); if (!s) throw new Error(`Leva 7: nó "${n}" não existe`); Object.assign(s, f); }
-  for (const [base, vs] of Object.entries(VAR)) {
-    const br = all.find(b => b.some(s => s.n === base)); if (!br) throw new Error(`Leva 7: base "${base}" não existe`);
-    br.splice(br.findIndex(s => s.n === base) + 1, 0, ...vs);
+  for (const [base, vs] of Object.entries(VAR)) { // as variações entram na linha da técnica (criada em posicao.js ou aqui), uma atrás da outra
+    let L = all.find(b => b.de === base);
+    if (!L) { const t = Object.values(TREE).find(t => t.branches.some(b => b.some(s => s.n === base))); if (!t) throw new Error(`Leva 7: base "${base}" não existe`); L = []; L.de = base; t.branches.push(L); }
+    L.push(...vs);
   }
 }

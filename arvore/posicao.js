@@ -67,7 +67,7 @@ export const VIZ = {
 };
 
 export function posicionar(TREE) {
-  const forte = new Set(FORTES), ja = new Set(Object.keys(VIZ));
+  const forte = new Set(FORTES), ja = new Set(Object.keys(VIZ)), novas = [];
   const M = TREE.marcial.branches; // o ramo 0 do Marcial é o centro fixo (1 nó + 8 em volta): a vizinha do Golpe Pesado vai para os treinos, postos junto ao centro
   M[1].unshift(VIZ['Golpe Pesado']);
   for (const t of Object.values(TREE)) for (const b of t.branches) {
@@ -80,6 +80,9 @@ export function posicionar(TREE) {
     const ord = [...b].sort((x, y) => (x === keep ? -1 : y === keep ? 1 : 0) || rank.get(x) - rank.get(y) || b.indexOf(x) - b.indexOf(y));
     const out = [], done = new Set(), put = s => { if (done.has(s)) return; for (const p of pres(s)) if (ord.includes(p)) put(p); done.add(s); out.push(s); };
     ord.forEach(put);
-    b.length = 0; for (const s of out) { b.push(s); if (VIZ[s.n]) b.push(VIZ[s.n]); }
+    b.length = 0; for (const s of out) { b.push(s); if (VIZ[s.n] && t === TREE.armas) b.push(VIZ[s.n]); } // armas: a vizinha fica no ramo; nos demais ela vai para a linha da técnica
+    if (t !== TREE.armas) for (const s of out) if (VIZ[s.n] && s.n !== 'Golpe Pesado') novas.push([t, s.n]);
   }
+  // cada técnica ganha uma linha própria (ramo com `de`): sai da técnica base e vai para fora do centro, só com as variações dela
+  for (const [t, base] of novas) { const L = [VIZ[base]]; L.de = base; t.branches.push(L); }
 }
