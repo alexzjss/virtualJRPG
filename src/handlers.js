@@ -5,10 +5,11 @@ import { ATTRS, BBG, CAMP, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TI
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
 import { kick, push, tell, tell0 } from './net.js';
-import { derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun } from './rules.js';
+import { manualPlan, runPlan, derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun } from './rules.js';
 function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo executa o plano guardado
-  if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) { const plan = planOf(C, a); if (C.chq) chqResolve(a, plan, C); else aiRun(a, plan); } } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
+  if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) { const plan = planOf(C, a); if (C.chq) chqResolve(a, plan, C); else runPlan(a, plan); } } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
 }
+function openCmd(C, plan, a) { S.battle.cmd = C; cmdPlan = plan; cmdFor = C; cmdTimer = setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }, C.w + RU.CMD.DEF.grace + 50); }
 let cmdPlan = null, cmdFor = null, cmdTimer = null; // plano do inimigo que espera a janela de defesa fechar (fica fora do estado enviado aos clientes)
 const planOf = (C, a) => { if (cmdFor !== C || !cmdPlan) { cmdPlan = aiPlan(a); cmdFor = C; } return cmdPlan; }; // janela salva sem o plano (servidor reiniciado): planeja de novo, uma vez
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
@@ -217,8 +218,7 @@ const H = {
     const plan = aiPlan(a); if (plan?.ia && iaExtra(a, plan.ia)) return; // Defender, Concentrar e Domínio agem na hora (não são golpes)
     if (plan) plan.ia = null; const C = plan && defWindow(a, plan);
     if (!C) return aiRun(a, plan);
-    S.battle.cmd = C; cmdPlan = plan; cmdFor = C;
-    cmdTimer = setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }, C.w + RU.CMD.DEF.grace + 50);
+    openCmd(C, plan, a);
   },
   cmdSkip(c) { const C = S.battle.cmd; if (c.role === 'gm' && C && S.chars[C.foe]) fireCmd(C, S.chars[C.foe]); }, // o mestre não quer esperar a janela: o golpe sai já
   tel(c, m) { // o mestre liga ou desliga um golpe anunciado na ficha do inimigo (ou do bestiário)
@@ -239,11 +239,11 @@ const H = {
     const ch = S.chars[m.id], C = S.battle.cmd, D = RU.CMD.DEF; if (!C || !ch || ch.enemy || ch.hp <= 0 || !can(c, ch) || !C.tgs.includes(ch.id) || C.chq?.id === ch.id) return;
     const notes = C.p[ch.id], now = Date.now(), i = C.beats.findIndex((b, k) => notes[k] === undefined && now <= C.at + b + D.grace); if (i < 0) return;
     const n = parNode(ch), mods = modsOf(ch, null), canP = !!n && (C.paid[ch.id] || canPar(ch)), left = C.at + C.beats[i] - now;
-    let g = RU.CMD.gradeDef(left, (n?.par || 0) + mods.par, C.tel ? D.esq + mods.esq : 0, canP); if (g === 'late') return;
+    let g = RU.CMD.gradeDef(left, (n?.par || 0) + mods.par, (C.esq ?? C.tel) ? D.esq + mods.esq : 0, canP); if (g === 'late') return;
     const fi = C.fin?.[i]; // o anel falso vale primeiro; só sem ele a direção da esquiva é conferida
     if (fi?.fake != null && Math.abs(now - (C.at + fi.fake)) <= 120) g = 'cedo'; // caiu no anel falso
     else if (g === 'esq' && fi?.dir && m.dir !== fi.dir) g = 'cedo'; // esquiva para o lado errado
-    if (canP && !C.paid[ch.id] && (g === 'par' || (g === 'cedo' && !C.tel))) { ch.aura -= n.cost || 0; ch.parT = 1; C.paid[ch.id] = true; } // paga a Aura na hora, uma vez por golpe
+    if (canP && !C.paid[ch.id] && (g === 'par' || (g === 'cedo' && !(C.esq ?? C.tel)))) { ch.aura -= n.cost || 0; ch.parT = 1; C.paid[ch.id] = true; } // paga a Aura na hora, uma vez por golpe
     notes[i] = g;
   },
   ini(c, m) { // mestre ajusta a fila: adiantar, atrasar, tirar ou incluir na batalha
@@ -259,7 +259,12 @@ const H = {
   act(c, m) {
     const a = S.chars[current()];
     if (!S.battle.active || !a || a.id !== m.id || !can(c, a)) return;
-    doAct(a, m, c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0); // bônus ou penalidade dado pelo mestre ao aprovar
+    const mod = c.role === 'gm' || c.appr ? int(m.mod, -100, 100) : 0; // bônus ou penalidade dado pelo mestre ao aprovar
+    if (a.enemy && c.role === 'gm') { // golpe do inimigo escolhido à mão: abre a janela de defesa antes, como na IA
+      if (S.battle.cmd) return; const plan = manualPlan(a, m, mod), C = plan && defWindow(a, plan);
+      if (C) return openCmd(C, plan, a);
+    }
+    doAct(a, m, mod);
   },
   pslot(c, m) { // liga ou desliga uma passiva ativa (só no acampamento ou pelo mestre, fora de batalha)
     const ch = S.chars[m.id];

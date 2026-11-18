@@ -534,11 +534,12 @@ function finPlan(a, hits, tel, beat) {
 function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devolve null se ninguém pode se defender
   const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), D = RU.CMD.DEF;
   if (!s || !plan.tgs.length || !['dmg', 'mental'].includes(s.kind) || s.fx?.some(f => f.t === 'sure')) return null;
-  const tel = telOf(a, plan.skill), ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (tel || (parryable(a, s, t, {}, false) && canPar(t))));
+  const tel = telOf(a, plan.skill), esq = tel || plan.skill === 'atk'; // Esquiva: golpe anunciado ou ataque básico; o resto (Choque, Perfeito, direção) segue só no anunciado
+  const ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (esq || (parryable(a, s, t, {}, false) && canPar(t))));
   if (!ts.length) return null;
   const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, { beats, fin } = finPlan(a, hits, tel, beat);
-  const z = Object.fromEntries(ts.map(t => { const n = parNode(t), mo = modsOf(t, null); return [t.id, { par: n ? n.par + mo.par : 0, esq: tel ? D.esq + mo.esq : 0, cost: n?.cost || 0, canP: canPar(t) }]; })); // zonas de cada alvo, para a tela desenhar
-  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, fin, tel, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
+  const z = Object.fromEntries(ts.map(t => { const n = parNode(t), mo = modsOf(t, null); return [t.id, { par: n ? n.par + mo.par : 0, esq: esq ? D.esq + mo.esq : 0, cost: n?.cost || 0, canP: canPar(t) }]; })); // zonas de cada alvo, para a tela desenhar
+  const C = { foe: a.id, at: Date.now(), w: beats[beats.length - 1], beats, fin, tel, esq, perf, z, tgs: ts.map(t => t.id), p: Object.fromEntries(ts.map(t => [t.id, []])), paid: {}, done: {} };
   if (tel && !s.area && ts.length === 1 && chqSkill(ts[0])) C.chqOk = [ts[0].id]; // Choque de poderes: só golpe anunciado de alvo único
   return C;
 }
@@ -550,11 +551,11 @@ function chqMeta(a, plan, hero, key) { // meta de apertos: força do golpe do in
 }
 function chqResolve(a, plan, C) { // o cabo de guerra fechou: quem apertou mais decide o golpe
   const hero = S.chars[C.chq.id], key = C.chq.skill, won = C.chq.n >= C.chq.meta;
-  if (!hero || hero.hp <= 0) return aiRun(a, plan);
+  if (!hero || hero.hp <= 0) return runPlan(a, plan);
   if (won) {
     log(hero.name, `CHOQUE! ${hero.name} vence o duelo de poderes e devolve o golpe de ${a.name}!`, 'ok', { fx: { id: hero.id, a: a.id, s: SK(key).name, el: SK(key).el, chq: 1 } });
     strike(hero, effSkill(hero, key), a, null, 0, { mult: 1.3 }); applySt(a, 'exposed', 2); endTurn(a.id, 100);
-  } else { log(hero.name, `CHOQUE perdido: o golpe de ${a.name} passa por cima!`, 'bad', { fx: { id: hero.id, chq: 1 } }); C.xmult = 1.3; aiRun(a, plan); }
+  } else { log(hero.name, `CHOQUE perdido: o golpe de ${a.name} passa por cima!`, 'bad', { fx: { id: hero.id, chq: 1 } }); C.xmult = 1.3; runPlan(a, plan); }
 }
 function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'bad' (golpe sai +50%) ou ''
   const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
@@ -566,7 +567,7 @@ function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (g
       applySt(a, 'exposed', 2); return 'ok'; // 2: o atacante gasta 1 no próprio fim de turno
     }
     if (v === 'esq') { log(t.name, `ESQUIVA ${s.name} de ${a.name}!`, 'ok', { fx: { ...fx, par: undefined, esq: 1 } }); return 'ok'; }
-    if (v === 'cedo') { applySt(t, 'exposed', 1); if (!C.tel) { log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad'; } log(t.name, `erra o tempo da esquiva e fica exposto!`, 'bad'); }
+    if (v === 'cedo') { applySt(t, 'exposed', 1); if (!(C.esq ?? C.tel)) { log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad'; } log(t.name, `erra o tempo da esquiva e fica exposto!`, 'bad'); }
     return '';
   }
   if (!parryable(a, s, t, o, sure)) return '';
@@ -738,6 +739,14 @@ function aiRun(a, plan) {
   if (!doAct(a, { skill: plan.skill, target: plan.target })) { if (!doAct(a, { skill: 'atk', target: plan.tgt })) endTurn(a.id); }
 }
 const aiAct = a => aiRun(a, aiPlan(a));
+// golpe escolhido à mão pelo mestre: o mesmo formato de plano, para a janela de defesa abrir antes (null se não é golpe em alguém)
+function manualPlan(a, m, mod) {
+  const skill = m.skill || 'atk', s = skill === 'atk' ? basicOf(a) : SK(skill), t = S.chars[m.target];
+  if (!s || !t || !['dmg', 'mental'].includes(s.kind) || s.tg === 'self' || (skill !== 'atk' && (!(a.skills || []).includes(skill) && !wSk(a).includes(skill) || cantUse(a, effSkill(a, skill))))) return null;
+  const tgs = s.area ? battlers().filter(o => o.hp > 0 && o.enemy !== a.enemy).map(o => o.id) : [t.id];
+  return { skill, target: t.id, tgt: t.id, tgs, ia: null, manual: { m, mod } };
+}
+const runPlan = (a, plan) => plan?.manual ? doAct(a, plan.manual.m, plan.manual.mod) : aiRun(a, plan);
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
   color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
@@ -815,4 +824,4 @@ function rollExpr(expr) {
   return { text: parts.join(''), shown: shown.join(' '), total };
 }
 
-export { cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, finPlan, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { manualPlan, runPlan, cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, finPlan, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

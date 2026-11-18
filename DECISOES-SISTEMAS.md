@@ -105,3 +105,4 @@ Martelar, Segurar e soltar, Sequência, Ritmo do instrumento, Mira em ponto frac
 - **Fintas na defesa** (servidor: `finPlan`, `C.fin` paralelo a `C.beats`): só elites (30% das batidas) e chefes (todas; combos irregulares e direção ←/→ da esquiva em golpe anunciado). Anel falso = apertar ali é "cedo"; o tempo do impacto é sempre o do servidor.
 - `C.beats` continuou `number[]`; as fintas ficam em `C.fin` para não quebrar o resto.
 - Adiado para as próximas levas: QTE/Girar/Corte, Limite em 3 fases, série de Perfeitos, comandos em centenas de nós, filtro/ícone na mandala, Praticar e painel da mesa.
+- (2026-11-18) A janela de defesa também abre quando o mestre escolhe o golpe do inimigo à mão, e o **ataque básico** abre Esquiva para todo alvo (antes só o golpe anunciado). Choque e Perfeito de chefe seguem só no anunciado.

@@ -178,9 +178,9 @@ um ramo de 7 nós cada (Aparar temático, revide, Marca ou Técnica Reversa e um
 Spec: `docs/superpowers/specs/2026-11-17-comandos-de-acao-design.md`. Substitui o Aparar e o Black Flash descritos na Leva 3.
 
 ### Defesa (janela `S.battle.cmd`, medida no servidor)
-- Quando o inimigo age (botão IA), o servidor escolhe antes a técnica e o alvo (`aiPlan`) e abre a janela **só para o alvo**:
-  golpe anunciado (`tel: 1` no nó ou na lista `telK` da ficha) abre Esquiva para todo alvo; golpe físico de alvo único não anunciado abre só
-  Aparar, para quem tem o nó e Aura. O golpe sai quando a janela fecha (`aiRun`). O mestre pode pular a espera (`cmdSkip`).
+- Quando o inimigo age, pelo botão IA ou com o golpe escolhido à mão pelo mestre (`manualPlan`), o servidor fixa antes a técnica e o alvo e abre a janela **só para o alvo**:
+  golpe anunciado (`tel: 1` no nó ou na lista `telK` da ficha) e **ataque básico** abrem Esquiva para todo alvo (`C.esq`); outro golpe físico de alvo único abre só
+  Aparar, para quem tem o nó e Aura. Choque, Perfeito de chefe e direção da esquiva continuam só no golpe anunciado (`C.tel`). O golpe sai quando a janela fecha (`aiRun`). O mestre pode pular a espera (`cmdSkip`).
 - Uma tecla só. Anel de 1100 ms. Nos últimos `par` ms (+200 de folga) **apara**; nos 450 ms antes disso **esquiva** (grátis, sem limite, só em golpe anunciado);
   mais cedo: errou (herói Exposto; sem golpe anunciado ainda leva +50%). Aparar certo: anula o golpe, +Aura, +10 de Limite, −1 de Quebra e **o inimigo fica Exposto**.
 - Golpe de várias batidas: uma batida por golpe (700 ms de intervalo), nota por batida, Aura cobrada uma vez. Todas aparadas: **contra-ataque** (básico ×1,5).
