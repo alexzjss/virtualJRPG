@@ -13,7 +13,7 @@ let cmdPlan = null, cmdTimer = null; // plano do inimigo que espera a janela de 
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
-const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet']);
+const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear']);
 
 const H = {
   addChar(c, m) {
@@ -28,6 +28,7 @@ const H = {
     Object.assign(S, prev, keep);
     log('Mestre', 'desfez a última ação.');
   },
+  logClear(c) { if (c.role === 'gm') S.log = []; }, // mestre apaga o chat e o histórico de todos
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
     const ch = getCh(c, m.id), f = String(m.f);
