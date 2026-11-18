@@ -193,7 +193,7 @@
       case 'brand': return `Marca de Caça ${f.n}t${to} (outro aliado a detona)`;
       case 'pop': return `detona a Marca de Caça: ×${f.m} se foi outro aliado que marcou (metade do bônus se foi você)`;
       case 'every': return `a cada ${f.n}º uso na luta: ×${f.m}`;
-      case 'rs': return `Ressonância: ×${f.m} se o último a agir foi ${f.k === 'any' ? 'um aliado' : 'um aliado com técnica de ' + (globalThis.RULES?.PATRON?.[f.k] || f.k)} no mesmo alvo`;
+      case 'rs': return `Ressonância: ×${f.m} se o último a agir foi ${f.k === 'any' ? 'um aliado' : 'um aliado com técnica de ' + (globalThis.RULES?.PATRON?.[f.k] || f.k)} no mesmo alvo (em cura e suporte, basta o aliado anterior)`;
       case 'ovr': return 'Sacrifício: sem Aura, paga o que falta com 2 HP por ponto e causa +30%';
       case 'clone': return `cria ${f.n} clone${f.n > 1 ? 's' : ''} (cada um leva ${f.p}% do seu HP atual e causa metade do dano)`;
       default: return f.t;

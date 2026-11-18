@@ -442,7 +442,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (s.kind === 'heal' || s.kind === 'util') {
     const fallen = t.hp <= 0; let txt = '';
     if (s.kind === 'heal') {
-      const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1) * (1 + ma.heal / 100) * (o.cx?.healMult || 1)));
+      const v = Math.max(1, Math.round((s.power + Math.floor(stat / R.healDiv)) * (t.st.curse ? .5 : 1) * (1 + ma.heal / 100) * (o.cx?.healMult || 1) * (a.bt?.rsHeal || 1)));
       const before = t.hp; t.hp = Math.min(t.hpMax, t.hp + v); delete t.dying; healBody(t, v); tally(a, 'heal', t.hp - before); txt = `cura ${v} HP`;
       if (t === a && vows(a).includes('corpo')) breakVow(a, 'corpo', 'curou a si mesmo');
     }
@@ -646,6 +646,8 @@ function doAct(a, m, bonus = 0) {
   for (const pr of prs) { pr.p[pr.ps.res] -= pr.ps.cost; bump(pr.p.id, delay(pr.p)); }
   if (prs.length) log(a.name, `e ${prs.map(pr => pr.p.name).join(' e ')} executam juntos ${s.name}!`, 'ok');
   let more = false; a.bt ??= {}; a.bt.wkNow = false;
+  const rsF = !off && s.fx?.find(f => f.t === 'rs'), L = S.battle.lastAct; // Ressonância em cura/suporte: basta o aliado anterior ter usado o Vínculo pedido
+  if (rsF && L && L.id !== a.id && L.enemy === a.enemy && (rsF.k === 'any' || L.el === rsF.k)) { a.bt.rsNow = new Set(ts.map(x => x.id)); a.bt.rsHeal = rsF.m; }
   if (cx?.g) log(a.name, `${s.name}: ${RU.CMD.GRADE_NAME[cx.g] || ''}!`, 'ok');
   const aim = !s.area && off && PARTS.includes(m.aim) ? m.aim : (cx?.crit && !s.area && off && ts.length === 1 && ts[0].weakPart) || null; // a Mira certa pega o ponto fraco do chefe
   if (cx?.brk) for (const t of ts) { const bt = brkHit(t, cx.brk, a); if (bt) log(a.name, bt.trim(), 'ok'); }
@@ -672,7 +674,7 @@ function doAct(a, m, bonus = 0) {
   if (a.bt.rsNow) { log(a.name, `RESSONÂNCIA! ${s.name} vibra junto com o golpe de ${S.chars[S.battle.lastAct.id]?.name || 'um aliado'}.`, 'ok'); if (s.rx) for (const t of ts) if (a.bt.rsNow.has(t.id) && t.hp > 0) { const x = s.rx.map(f => fx1(a, s, t, f, { stat })).join(''); if (x) log(a.name, x.trim(), 'ok'); } }
   const ec = off && prevSk && prevSk !== s.name && s.fx?.find(f => f.t === 'echo'), pk = ec && (a.skills || []).find(k => S.skills[k]?.name === prevSk), ps = pk && effSkill(a, pk);
   if (ps && !['heal', 'util', 'form', 'passive'].includes(ps.kind) && !ps.limit) { const t = ts.find(x => x.hp > 0 && !x.dead); if (t) { log(a.name, `ECO: ${ps.name} se repete (${ec.p}%).`, 'ok'); more = strike(a, { ...ps, name: ps.name + ' (eco)', fx: (ps.fx || []).filter(f => f.t !== 'turn' && f.t !== 'echo') }, t, null, bonus, { plus, mult: ec.p / 100, nochain: true }) || more; } }
-  delete a.bt.evNow; delete a.bt.ovrNow; delete a.bt.popNow; delete a.bt.rsNow;
+  delete a.bt.evNow; delete a.bt.ovrNow; delete a.bt.popNow; delete a.bt.rsNow; delete a.bt.rsHeal;
   if (off) S.battle.lastAct = { id: a.id, enemy: a.enemy, el: s.el, t: ts.map(x => x.id) };
   a.lastSk = s.name;
   if (s.summon) summonOf(a, s);
