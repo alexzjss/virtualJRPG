@@ -98,4 +98,10 @@ Falta ver com gente de verdade:
 - Conforto da câmera (enjoo, velocidade) e se a investida de 1,4 s cansa em lutas longas.
 - O anel de defesa sobre o recorte: tamanho, legibilidade e se dá tempo de reagir com a câmera chegando junto.
 - Imagens reais (PNG transparente) com o editor de enquadre, e o tamanho na cena com chefes grandes.
+
+### Palco segue o grid
+Spec em `docs/superpowers/specs/2026-11-18-palco-grid-design.md`, plano em `docs/superpowers/plans/2026-11-18-palco-grid.md` (6 tarefas, todas feitas). A posição de cada combatente no palco vem do token no grid da cena: o eixo heróis→inimigos (`RULES.axisOf`, gravado em `S.battle.ax` ao ligar a batalha; o mestre refaz no botão **Reenquadrar**) vira profundidade (900 a 2600 px) e a perpendicular vira a lateral (±1000 px). Quem está sem posição ocupa slots de reserva do seu lado, e recortes colados se afastam (mínimo de 230 px). Os recortes deslizam em 0,6 s; a investida dura de 300 a 700 ms conforme a distância. No chão há grade (respeita "Grade visível"), anel colorido sob cada recorte e, ao mirar, a linha do atacante ao alvo com a distância em casas (Chebyshev) e em metros (se a cena tem escala). O minimapa fica abaixo da ordem dos turnos: o jogador arrasta os próprios tokens, o mestre todos, a tela da mesa só lê; recolhe pelo título ou pela tecla M (para o mestre só pelo título, porque M já abre o mapa).
+Decisões do dono: proporcional comprimido; eixo automático fixado ao ligar a batalha (mexer token não gira o palco); sem posição usa os slots da formação; facing como antes (herói de costas, inimigo de frente); o inimigo na vez anda metade do caminho até os heróis.
+Falta ver com gente de verdade: o conforto da grade no chão em perspectiva, e se o eixo fixo incomoda em lutas que mudam de lado (o mestre reenquadra à mão).
+
 Armadilhas de teste: no Chromium sem GPU do `npm run ui` o close-up 3D desenha ~2 quadros/s, então transições de câmera quase não andam; os testes medem o pedido de câmera e a âncora do anel, não o quadro final (o bloco do anel no PC emula "reduzir movimento"). A checagem "o aperto chega ao servidor como nota" do celular é instável também na base.

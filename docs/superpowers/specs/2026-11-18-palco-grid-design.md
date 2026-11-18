@@ -1,6 +1,6 @@
 # Palco 3D segue o grid — design
 
-Data: 2026-11-18 · Status: aguardando aprovação
+Data: 2026-11-18 · Status: implementado
 
 ## Por quê
 
