@@ -1454,6 +1454,26 @@ test('scrub repassa imagens de batalha do inimigo', async () => {
   const { scrub } = await import('../src/net.js'); reset(); const e = mk(gm, { enemy: true, name: 'X' }); Object.assign(e, { imgF: '/uploads/x.png', imgS: 2 });
   const p = scrub(e); assert.equal(p.imgF, '/uploads/x.png'); assert.equal(p.imgS, 2);
 });
+test('palco 3D (navegador): formação, câmera e imagem de reserva', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  const F = P.formation(['a', 'b', 'c', 'd', 'e'], ['x', 'y', 'z', 'w', 'v', 'u']);
+  assert.deepEqual(F.get('a'), { x: -430, z: 0 }); assert.ok(F.get('e').z < F.get('a').z - 200); // 5º herói na 2ª fileira
+  assert.ok([...'xyzwv'].every(k => F.get(k).z <= -1400)); assert.ok(F.get('u').z < F.get('x').z - 250);
+  assert.deepEqual(P.cameraFor({ kind: 'hero', at: { x: -430, z: 0 } }), { tx: 320, ty: 0, tz: 560, ry: -6 });
+  assert.equal(P.cameraFor({ kind: 'foe', at: { x: 40, z: -1500 } }).tz, 180);
+  assert.equal(P.imgSrc({ imgF: '/f.png', img: '/i.png' }, 'f').url, '/f.png');
+  assert.equal(P.imgSrc({ imgF: '', img: '/i.png' }, 'f').url, '/i.png');
+  assert.equal(P.imgSrc({ imgF: '/f.png', img: '/i.png' }, 'f', ['/f.png']).url, '/i.png'); // campo ruim ignorado
+  assert.equal(P.imgSrc({ imgP: '', imgF: '/f.png' }, 'p').url, '/f.png');
+  const s = P.imgSrc({ name: 'Ana', color: '#ff0000', imgF: '', img: '' }, 'b'); assert.ok(s.fallback && s.url.startsWith('data:image/svg+xml'));
+});
+test('carregar save: fixChar sanea imagens de batalha (texto, escala 0.5..2.5, enquadre objeto)', async () => {
+  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, { name: 'Shin' }); Object.assign(h, { imgF: 5, imgB: null, imgP: {}, imgS: 99, imgK: 'x' });
+  const e = mk(gm, { enemy: true, name: 'Oni' }); Object.assign(e, { imgS: 'abc', imgK: [1] });
+  migrate(false);
+  assert.deepEqual([h.imgF, h.imgB, h.imgP, h.imgS, h.imgK], ['', '', '', 2.5, {}]); assert.equal(e.imgS, 1);
+  h.imgS = 0.1; migrate(false); assert.equal(h.imgS, 0.5);
+});
 test('skPin: limite de 6 e migração corta saves com mais', () => {
   reset(); const h = mk(ana, { name: 'P' }); h.skills = Object.keys(S.skills).slice(0, 9);
   h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 6);

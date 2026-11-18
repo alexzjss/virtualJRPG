@@ -119,7 +119,8 @@ function fixChar(ch, id, live) {
   const arr = (k, ok) => { ch[k] = Array.isArray(ch[k]) ? [...new Set(ch[k].filter(ok))] : []; }, obj = k => { if (!isObj(ch[k])) ch[k] = {}; }, str = v => typeof v === 'string';
   ch.id = id; ch.enemy = !!ch.enemy; ch.name = String(ch.name ?? '?').slice(0, 30) || '?'; ch.owner = ch.enemy ? '' : String(ch.owner ?? '').slice(0, 30);
   if (!/^#[0-9a-f]{6}$/i.test(ch.color)) ch.color = ch.enemy ? '#e60012' : '#00b7ff';
-  if (!str(ch.img)) ch.img = '';
+  for (const k of ['img', 'imgF', 'imgB', 'imgP']) if (!str(ch[k])) ch[k] = '';
+  ch.imgS = Math.min(2.5, Math.max(0.5, fin(ch.imgS, 1))); if (!isObj(ch.imgK)) ch.imgK = {};
   const at = isObj(ch.attrs) ? ch.attrs : {}; ch.attrs = Object.fromEntries(ATTRS.map(a => [a, Math.min(100, Math.max(1, Math.round(fin(at[a], ch.enemy ? 50 : 40))))]));
   arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str); arr('skPin', str); ch.skPin = ch.skPin.slice(0, 6);
   ch.skUse = isObj(ch.skUse) ? Object.fromEntries(Object.entries(ch.skUse).filter(([, n]) => Number.isInteger(n) && n > 0)) : {};

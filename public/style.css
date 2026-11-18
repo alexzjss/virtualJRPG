@@ -1181,3 +1181,25 @@ details.mais>.row{margin:8px 10px}
 /* ---- desempenho: sem movimento (preferência do sistema) e telas estreitas (menos camadas) ---- */
 @media(prefers-reduced-motion:reduce){.bbfx,.bbfx::before,.bbfx::after,.bbfx b,.bbfx s,.clima::before,.clima::after,.bbthumb::before{animation:none!important}}
 @media(max-width:700px){.stage:not(.bb-sombrio) .bbfx b,.stage .bbfx s,.clima::after{display:none}.stage.boss-turn .bbfx{animation:none}}
+
+/* ================= PALCO 3D DA BATALHA (palco3d.js): o mundo fica fixo no body; o .stage3d no #app só marca o retângulo ================= */
+.stage3d{position:relative;height:62vh;min-height:300px;background:#050506}.stage3d.full{height:calc(100vh - 60px)}.gstage>.stage3d{flex:1;min-height:0;height:auto}
+.p3d{position:fixed;z-index:10;overflow:hidden;background:#050506;user-select:none;pointer-events:none}
+.p3d .cam{position:absolute;inset:0;perspective:1000px;perspective-origin:50% 40%;overflow:hidden}
+.p3d .world{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 62%;transition:transform 1.1s cubic-bezier(.65,0,.2,1)}
+.p3d .atw,.p3d .units,.p3d .p3d-scn{position:absolute;left:50%;top:62%;transform-style:preserve-3d}
+.p3d .bbplane{position:absolute;left:-3600px;top:-2000px;width:7200px;height:2600px;transform:translateZ(-2600px);overflow:hidden;background:linear-gradient(180deg,#1a2238 0%,#3b3550 40%,#2a2a22 75%,#0e130f 100%) center/cover}
+.p3d .bbplane.img{background-size:cover;background-position:center;filter:saturate(1.05) brightness(.8)}
+body .p3d .bbplane.stage{display:block;min-height:0;height:2600px;background:#050506}
+.p3d .ground{position:absolute;left:-3000px;top:-3000px;width:6000px;height:6000px;transform:rotateX(90deg);
+ background:radial-gradient(closest-side,#3a3a2a 0%,#1b1d17 45%,transparent 75%),repeating-linear-gradient(0deg,#ffc93c0d 0 2px,transparent 2px 160px),repeating-linear-gradient(90deg,#ffc93c0d 0 2px,transparent 2px 160px)}
+.p3d .fog{position:absolute;left:-3000px;top:-700px;width:6000px;height:800px;transform:translateZ(-1900px);background:linear-gradient(180deg,transparent,#c9b9a033 70%,transparent);pointer-events:none}
+.p3d .bb{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;outline:0;transform:translate3d(calc(var(--x,0)*1px),0,calc(var(--z,0)*1px)) translate(-50%,-100%);transition:transform .45s cubic-bezier(.4,0,.2,1),filter .3s}
+.p3d .bb img{display:block;height:var(--h,300px);width:auto;filter:drop-shadow(0 18px 18px #000a)}
+.p3d .bb .shadow{position:absolute;left:10%;right:10%;bottom:-14px;height:28px;border-radius:50%;background:#000a;filter:blur(6px);z-index:-1}
+.p3d .bb.tgt img,.p3d .bb:focus-visible img{filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 18px #ffc93c) drop-shadow(0 18px 18px #000a)}
+.p3d .bb.ko{filter:grayscale(1) brightness(.45);opacity:.7}
+.p3d .bb .mini{position:absolute;left:50%;top:-34px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.p3d .mini .sh{font:600 20px var(--cond,sans-serif);color:#cfe3ff;text-shadow:0 0 6px #6fa8ff}
+.p3d .mini .hp{display:block;width:120px;height:7px;background:#000;border:1px solid #fff4}.p3d .mini .hp i{display:block;height:100%;background:var(--red,#e4002b);transition:width .4s}
+@media(prefers-reduced-motion:reduce){.p3d .world,.p3d .bb{transition-duration:.01s}}
