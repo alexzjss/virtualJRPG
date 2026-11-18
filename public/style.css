@@ -1203,3 +1203,5 @@ body .p3d .bbplane.stage{display:block;min-height:0;height:2600px;background:#05
 .p3d .mini .sh{font:600 20px var(--cond,sans-serif);color:#cfe3ff;text-shadow:0 0 6px #6fa8ff}
 .p3d .mini .hp{display:block;width:120px;height:7px;background:#000;border:1px solid #fff4}.p3d .mini .hp i{display:block;height:100%;background:var(--red,#e4002b);transition:width .4s}
 @media(prefers-reduced-motion:reduce){.p3d .world,.p3d .bb{transition-duration:.01s}}
+.stage3d>.fbar{position:absolute;left:1vw;right:1vw;top:.5rem;margin:0;z-index:15;pointer-events:none;text-shadow:0 1px 3px #000}.stage3d>.fbar span{background:rgba(0,0,0,.55)}
+body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw}

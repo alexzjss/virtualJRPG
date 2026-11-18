@@ -10,7 +10,7 @@ const koHold = new Map(), hpPrev = new Map(), stPrev = new Map(), fxMarks = []; 
 let threatUntil = 0, enterUntil = 0;
 const skByName = n => Object.values(S.skills || {}).find(s => s.name === n);
 const fxAdd = (cls, html, ms, style = '') => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; if (style) d.style.cssText = style; fxl.append(d); setTimeout(() => d.remove(), ms); return d; };
-const unitEl = id => app.querySelector(`.unit[data-tgt="${id}"]`) || app.querySelector(`.tok[data-id="${id}"]`);
+const unitEl = id => document.querySelector(`.p3d .bb[data-tgt="${id}"]`) || app.querySelector(`.unit[data-tgt="${id}"]`) || app.querySelector(`.tok[data-id="${id}"]`);
 const fxPos = (el, y = .32) => { const r = el.getBoundingClientRect(); return `left:${r.left + r.width / 2}px;top:${r.top + r.height * y}px;--uw:${r.width}px`; };
 const mark = (sel, cls, ms) => fxMarks.push({ sel, cls, until: performance.now() + ms });
 const face = c => c?.img ? `<img src="${esc(c.img)}" alt="">` : `<span>${c ? esc(c.enemy ? KANJI[mainEl(c)] : c.name.slice(0, 1).toUpperCase()) : ''}</span>`;
@@ -153,8 +153,8 @@ function results(e) { // fim da batalha: XP, ouro, espólios e o que cada herói
 function fxState() { // reaplica o que um redesenho apagaria: KO adiado, palco ameaçador, abertura e marcas temporárias
   const now = performance.now(), st = app.querySelector('.stage');
   st?.classList.toggle('threat', now < threatUntil); st?.classList.toggle('enter', now < enterUntil);
-  for (const [id, until] of koHold) { if (now > until) { koHold.delete(id); continue; } app.querySelector(`.unit[data-tgt="${id}"]`)?.classList.remove('ko'); }
-  for (let i = fxMarks.length - 1; i >= 0; i--) { const m = fxMarks[i]; if (now > m.until) { fxMarks.splice(i, 1); continue; } app.querySelectorAll(m.sel).forEach(el => el.classList.add(m.cls)); }
+  for (const [id, until] of koHold) { if (now > until) { koHold.delete(id); continue; } document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.remove('ko'); }
+  for (let i = fxMarks.length - 1; i >= 0; i--) { const m = fxMarks[i]; if (now > m.until) { fxMarks.splice(i, 1); continue; } document.querySelectorAll(m.sel).forEach(el => el.classList.add(m.cls)); }
 }
 function fx() {
   const news = seen == null ? [] : S.log.filter(e => e.n > seen), B = S.battle, cur = B.active ? S.chars[timeline(1)[0]] : null;

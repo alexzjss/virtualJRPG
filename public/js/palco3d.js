@@ -105,7 +105,7 @@
       let u = els.get(c.id); if (!u) { u = mkUnit(c); els.set(c.id, u); }
       const p = F.get(c.id), z = p.z + (c === cur && c.enemy ? 900 : 0), pos = p.x + ',' + z;
       if (u.pos !== pos) { u.pos = pos; u.el.style.setProperty('--x', p.x); u.el.style.setProperty('--z', z); }
-      const h = Math.round((c.enemy ? 380 : 300) * (Number.isFinite(+c.imgS) ? +c.imgS : 1)) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
+      const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u);
       setCls(u, 'ko', c.hp <= 0); setCls(u, 'cur', c === cur); setCls(u, 'tgt', c.id === tgt);
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
