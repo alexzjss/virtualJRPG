@@ -78,4 +78,4 @@ Pendências:
 - Testar com gente de verdade: latência (a janela é medida no servidor, com 200 ms de folga), o anel no celular e a tecla C do Choque sem teclado.
 - Revisar nó a nó com o usuário os 45 nós da Leva 4, como os outros ramos.
 - A nota dos minigames de ataque vem do navegador (o servidor só limita `g`, `n` e `acc`); numa mesa entre amigos isso basta, mas não é à prova de trapaça.
-- Testes instáveis conhecidos (também na base): "leva 3 Marca desperta" (~15%) e "leva 2 cargas".
+- Testes instáveis conhecidos (também na base) "leva 3 Marca desperta" e "leva 2 cargas": corrigidos (a vida voltava presa em 1; o combo dependia do dado).

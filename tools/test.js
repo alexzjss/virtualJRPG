@@ -850,8 +850,8 @@ test('leva 2: reações disparam no turno do inimigo, uma por rodada, pagando o 
 test('leva 2: cargas acumulam e explodem; combo multiplica o golpe seguinte', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); e.hpMax = e.hp = 9999; e.attrs.AGI = 1; h.attrs.INT = 90; h.aura = 99;
   h.skills = [sk('Faísca Acumulada'), sk('Descarga Total'), sk('Raio Bifurcado')]; H.battle(gm, { on: true });
-  const go = n => { while (current() !== h.id) H.next(gm); H.act(ana, { id: h.id, skill: sk(n), target: e.id }); };
-  // o combo só conta num golpe que acerta: repete o par até sair (a chance de errar seis vezes seguidas é desprezível)
+  const go = n => { while (current() !== h.id) H.next(gm); fixR(.3, () => H.act(ana, { id: h.id, skill: sk(n), target: e.id })); };
+  // o combo só conta num golpe que acerta: dados fixos (0,3 acerta sem crítico)
   for (let i = 0; i < 6 && !S.log.some(l => /COMBO!/.test(l.text)); i++) { go('Faísca Acumulada'); go('Raio Bifurcado'); }
   assert.ok(S.log.some(l => /COMBO!/.test(l.text)));
   h.stk.carga = 3; go('Descarga Total'); assert.equal(h.stk.carga, 0);
@@ -968,7 +968,7 @@ test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e c
   assert.ok(bf, 'Black Flash sai no Perfeito'); assert.ok(h.aura > 0, 'devolve Aura');
   reset(); const m = mk(ana, {}), f = mk(gm, { enemy: true }); m.skills = [sk('Marca Rubra')]; m.pslots = [...m.skills]; derive(m); const hp0 = m.hpMax, san0 = m.sanMax;
   H.battle(gm, { on: true }); m.hp = m.hpMax; f.attrs.FOR = 95; S.battle.ticks[f.id] = -1;
-  for (let i = 0; i < 50 && !m.st.mark; i++) { if (m.hp > m.hpMax * .35) m.hp = Math.ceil(m.hpMax * .35); S.battle.ticks[f.id] = -1; H.act(gm, { id: f.id, skill: 'atk', target: m.id }); m.hp = Math.max(m.hp, 1); }
+  for (let i = 0; i < 50 && !m.st.mark; i++) { m.hp = Math.ceil(m.hpMax * .35); /* a cada tentativa: um golpe que derruba não deixa a vida presa em 1 */ S.battle.ticks[f.id] = -1; H.act(gm, { id: f.id, skill: 'atk', target: m.id }); m.hp = Math.max(m.hp, 1); }
   assert.ok(m.st.mark, 'Marca desperta'); assert.ok(m.hpMax < hp0 && m.sanMax < san0, 'cicatriz no HP e Sanidade máx.');
   assert.ok(modsOf(m).atk >= 30);
   H.battle(gm, { on: false }); H.rest(gm, { long: true }); assert.equal(m.hpMax, hp0); assert.equal(m.sanMax, san0);
