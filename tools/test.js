@@ -1299,3 +1299,14 @@ test('cinemáticos: o servidor aplica Erro e Ótimo no ataque e anuncia a nota',
   assert.ok(!S.skills[kPlain].cmd, 'Faísca não tem comando'); const p0 = hit(kPlain), p1 = hit(kPlain, { g: 'perf', n: 0, acc: 1 });
   assert.equal(p1.dmg, p0.dmg, 'sem cmd na técnica a nota é ignorada'); assert.equal(p1.fx.length, 0); assert.ok(!/PERFEITO|ÓTIMO|ERROU/.test(p1.txt));
 });
+// ---------- Leva 5: Ordo Realitas ----------
+test('Ordo: Loucura (mad) cresce com a Sanidade que falta e os 82 nós entram na grade', () => {
+  const key = sk('Valer-se do Caos');
+  const hit = san => { reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h); h.skills = [key]; e.hpMax = e.hp = 9999;
+    H.battle(gm, { on: true }); S.battle.ticks[h.id] = -1; h.aura = 99; h.san = san === 'max' ? h.sanMax : Math.ceil(h.sanMax * san); fixR(.3, () => H.act(ana, { id: h.id, skill: key, target: e.id })); return e.hpMax - e.hp; };
+  const cheio = hit('max'), meio = hit(.5);
+  assert.ok(cheio > 10, 'dano base mensurável');
+  assert.ok(meio > cheio * 1.2, `com metade da Sanidade o golpe vale mais (${meio} vs ${cheio})`);
+  for (const n of ['Máquina de Matar', 'Oficial Comandante', 'Medo Tangível', 'Presente do Caos', 'Ser Aterrorizante', 'Técnica Sublime']) assert.ok(sk(n), n + ' existe na grade');
+  assert.match(RU.extra({ kind: 'dmg', fx: [{ t: 'mad', m: 1.5 }] }, null) || '', /Sanidade que falta/);
+});

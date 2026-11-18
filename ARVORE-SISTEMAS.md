@@ -3,7 +3,7 @@
 Referência das mecânicas que a árvore usa e de como escrever um nó. As regras ficam em `src/rules.js` (combate), `public/rules.js`
 (requisitos, nomes e a descrição mostrada na tela, iguais para servidor e navegador) e `content.js` (montagem da grade).
 
-## Estrutura (1187 nós)
+## Estrutura (1187 nós na base; +82 da Leva 5)
 
 | Bloco | Ramos | Nós | Acesso |
 |---|---|---|---|
@@ -212,3 +212,13 @@ No editor do mestre, "Liga a" recebe nomes separados por `|` e grava as ligaçõ
 A tela desenha a árvore como mandala em canvas (`public/js/mandala.js`): `wx, wy` = grade em escala (`MANDALA_U` = 96 por casa),
 cada linha é uma ligação. Afastado, os setores viram selos; de perto, esferas com nome, XP e ícone, selo 鎖 de requisito, portão ⛩
 na trilha antes de nó travado e névoa nos secretos.
+
+## Leva 5: Ordo Realitas (`arvore/ordo.js`, 82 nós)
+Habilidades de classe e de trilha de *Ordem Paranormal RPG* e de *Sobrevivendo ao Horror*, adaptadas ao combate por turnos (ação extra → `haste`/`turn`;
+reação com PE → `rea`; PE → Aura; Sanidade continua Sanidade). O Ocultismo-ritual do livro já existia em `oculto.js`; aqui entra o resto.
+- **Marcial (6 ramos):** Aniquilador (arma favorita, Técnica Secreta/Sublime, Limite *Máquina de Matar*) · Comandante de Campo e Operações Especiais (ações extras, Limite *Oficial Comandante*) ·
+  Guerreiro e Tropa de Choque (revide, provocar, *Potência Máxima*) · Atirador de Elite e Infiltrador · Médico de Campo, Negociador e Técnico · Sobrevivente.
+- **Ocultismo (4 ramos):** Conduíte e Flagelador (`pay: { hp }` troca Aura por vida; Limite *Medo Tangível*) · Graduado, Intuitivo e Lâmina Paranormal ·
+  Poderes dos elementos (Sangue, Morte, Conhecimento, Energia) · Possuído e os quatro Presentes.
+- **Mecânica nova `mad N` (Loucura):** dano ×(1 + N × fração da Sanidade que falta ao usuário), no mesmo molde de `rage`. Usada nos nós de Medo e de Caos (*Canalizar o Medo*, *Lâmina do Medo*, *Valer-se do Caos*...).
+- Não portado: o que depende de perícias, inventário, investigação e perseguição (Carteirada, Eu Conheço um Cara, Preparado para Tudo, Terapia...), por não ter equivalente no combate.

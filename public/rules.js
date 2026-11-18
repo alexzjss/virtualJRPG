@@ -115,7 +115,7 @@
   // fx: 'st burn 3 60%; drain hp 30; shield 12 self' → lista de efeitos. Alvo opcional: self | ally | foes | tgt (padrão: o alvo da skill).
   // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
   const FXTO = new Set(['self', 'ally', 'foes', 'tgt']);
-  const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], pierce: ['p'], chain: ['n', 'm'], stack: ['k', 'n'], burst: ['k', 'm'],
+  const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], mad: ['m'], pierce: ['p'], chain: ['n', 'm'], stack: ['k', 'n'], burst: ['k', 'm'],
     push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], scar: ['r', 'p'], clone: ['n', 'p'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
   const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 }, clone: { n: 1, p: 20 } };
   const FXTXT = new Set(['k', 'r']);
@@ -164,6 +164,7 @@
       case 'per': return `${pct(f.p)} de dano por turno de ${ST[f.k] || f.k} no alvo`;
       case 'stack': return f.k === 'doenca' ? `acumula 1 estágio da Doença em você (máx. ${f.n}): +8% de dano por estágio e, do 3º em diante, o corpo definha a cada turno` : `acumula 1 ${STK[f.k][0]} em você (máx. ${f.n}): +${STK[f.k][1]}% de dano por carga nas técnicas que a usam`;
       case 'burst': return `consome todas as cargas de ${STK[f.k][0]}: ×(1 + ${f.m} por carga)`;
+      case 'mad': return `dano cresce com a Sanidade que falta (até ×${1 + f.m})`;
       case 'rage': return `dano cresce com o HP que falta (até ×${1 + f.m})`;
       case 'pierce': return `ignora ${f.p}% da armadura`;
       case 'sure': return 'não pode ser esquivado';

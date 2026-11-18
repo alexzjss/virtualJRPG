@@ -320,6 +320,7 @@ function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por
     if (f.t === 'vs' && (f.k === 'neg' ? RU.NEG.some(k => t.st[k]) : f.k === 'demon' ? t.enemy && t.cat !== 'humano' : t.st[f.k])) m *= f.m;
     if (f.t === 'per' && t.st[f.k]) m *= 1 + f.p / 100 * t.st[f.k];
     if (f.t === 'rage') m *= 1 + f.m * (1 - a.hp / (a.hpMax || 1));
+    if (f.t === 'mad' && a.sanMax) m *= 1 + f.m * (1 - Math.max(0, a.san) / a.sanMax); // Loucura: quanto menos Sanidade, mais forte
     if (f.t === 'stack') m *= 1 + RU.STK[f.k][1] / 100 * (a.stk?.[f.k] || 0);
     if (f.t === 'burst') m *= 1 + f.m * (a.stk?.[f.k] || 0);
   }
