@@ -22,7 +22,7 @@ function unit(c, cur) {
 }
 // condições no palco: ícone (kanji) que pulsa quando a condição age; o nome completo fica na dica
 const STK = { possess: '憑', curse: '呪', frozen: '氷', marked: '印', down: '倒', burn: '炎', bleed: '血', poison: '毒', rad: '核', stun: '眩', sleep: '眠', para: '痺', silence: '黙', atkUp: '攻', atkDn: '攻', defUp: '守', defDn: '守', agiUp: '速', agiDn: '速', fear: '恐', fury: '怒', confuse: '乱',
-  shield: '盾', wet: '濡', oil: '油', broken: '砕', regen: '癒', taunt: '挑', guarded: '護', counter: '返', reflect: '鏡', evade: '避', stealth: '隠', focus: '集', exposed: '露', exaus: '疲', seal: '封', blind: '盲', root: '根', charge: '溜', form: '変', endure: '耐', dread: '畏' };
+  shield: '盾', wet: '濡', oil: '油', broken: '砕', regen: '癒', taunt: '挑', guarded: '護', counter: '返', reflect: '鏡', evade: '避', stealth: '隠', focus: '集', exposed: '露', exaus: '疲', seal: '封', blind: '盲', root: '根', charge: '溜', form: '変', endure: '耐', dread: '畏', disarm: '掠' };
 const STGOOD = new Set(['atkUp', 'defUp', 'agiUp', 'shield', 'regen', 'taunt', 'guarded', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'charge', 'form', 'endure']);
 const stIcons = c => [sanSt(c) && `<i class="sti bad" title="${esc(sanSt(c))}: sanidade baixa pesa em todas as rolagens">狂</i>`, ...Object.entries(c.st).map(([k, n]) => { const nm = k === 'shield' && c.shield ? ST[k] + ' ' + c.shield : (ST[k] || k) + (n < 90 ? ' · ' + n : '');
   return `<i class="sti ${STGOOD.has(k) ? 'good' : /Dn$/.test(k) ? 'bad dn' : /Up$/.test(k) ? '' : 'bad'} ${/Up$/.test(k) ? 'up' : ''}" data-st="${esc(k)}" title="${esc(nm + (STD[k] ? ': ' + STD[k] : ''))}" aria-label="${esc(nm)}">${STK[k] || esc((ST[k] || k).slice(0, 1))}${n < 90 ? `<sub>${n}</sub>` : ''}</i>`; })].filter(Boolean).join('');

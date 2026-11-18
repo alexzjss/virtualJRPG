@@ -95,3 +95,21 @@ Chefes depois da Quebra (4 heróis, nível 0/2): Ifrit 46/49 · Leviatã 81/81 �
 Id interno `radiacao` renomeado para `hiruko`, com migração do estado salvo.
 
 Serafim Caído (revisto na frente de IA dos inimigos): 76% / 89% no nível 0 / 2 com Defender (.2) e `arma -4 / hp 0,6`. Dentro da faixa de 46-89%. Ponto em aberto encerrado.
+
+## Revisão 2026-11-17 · Leva 1: Marcial + Armas
+- Motor: estado **Desarmado** (`st disarm N`). Usado em Desarmar, Desarme, Laçada (40%) e Golpe do Mestre Duelista.
+- Marcas: Xeque-Mate e Ponto Cego detonam Marcado (`det marked`).
+- Requisitos: o 1º nó de cada ramo de tipo de arma exige a raiz primordial da sua categoria (`pre`); o nó final de cada ramo exige o 3º nó do ramo irmão (topo pede 2 ramos). Foco e instrumento não têm categoria.
+- Balanço (p ≈ 2,6×custo, ajustado por golpes/área/tempo): nerf em Esquiva Flanqueada 22→15, Pancada Forte custo 2→4, Jab de Rua 12→9, Tiro Certeiro 13→10, Dedo-Pistola 22→18; buff em Chicote Frenético 7→12, Kata das Cinco Formas e Forma Contínua 10→16, Dança da Lança Serpente 10→15, Combo do Duelista 9→14, Selo Rápido 6→10, Saraivada Cerrada 8→11, Roda de Facas 8→10, Desarmar 8→12.
+- Leva 3 (Aura/Ocultismo/Ordo) abaixo.
+
+## Revisão 2026-11-17 · Leva 2: Vínculos
+- Ramos rápidos (tempo 50-60%) pagavam pouco: custo sobe em Fagulha Veloz 2→3, Arco Curto 3→5, Estalo Relâmpago 4→6, Passo do Trovão 8→10, Corrente Contínua 6→8, Tiro de Indra 2→3; Núcleo de Fuhaku (custo 1) sobe: Pulso 2, Empurrão 3, Atirar Vento 3 (poder 12→10), Tentáculo 4, Núcleo de Corte 3. Shukketsu: Corte Venoso e Gota Carmesim custo 3→5.
+- Picos de 15 XP (poder 26-28 → 22): Chama Concentrada, Bloco Rolante, Punho de Rocha, Raio Esférico, Postura do Falcão, Mão Justiceira, Lâmina de Sombra, Dor Compartilhada.
+- Nome cumpre o que promete: Muralha de Fogo dá Defesa+ a si, Quebra-Escudo remove bônus/escudo, Gelo na Espinha congela (25%).
+- Efeitos novos: Fraqueza Rubra desarma (30%); Lua Negra detona Marcado (combo com Marca da Lua).
+- Debuffers de área com poder baixo foram mantidos: o valor está na condição.
+
+## Revisão 2026-11-17 · Leva 3: Aura, Ocultismo e Ordo
+- Já estavam quase todos na curva; só outliers: Presente do Caos custo 10→15, Shukoudan 2→3, Jan-Ken: Papel! poder 17→15, Manipular o Fluxo poder 4→8.
+- Efeitos novos: Corrente do Juramento detona Marcado (combo com Corrente Radiestésica); Agulha Inibidora (30%) e Arremessar Destroços (25%) desarmam.

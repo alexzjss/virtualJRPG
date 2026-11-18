@@ -58,7 +58,7 @@ export const LEVA5 = {
     ],
     [ // Sobrevivente (Sobrevivendo ao Horror)
       P('Durão', 'Quem sobreviveu até aqui aguenta mais do que parece.', 15, { bon: 'hpMax 12' }),
-      { n: 'Pancada Forte', k: 'dmg', d: 'Um golpe de desespero, sem técnica nenhuma, que funciona.', xp: 15, a: 'FOR', p: 12, c: 2 },
+      { n: 'Pancada Forte', k: 'dmg', d: 'Um golpe de desespero, sem técnica nenhuma, que funciona.', xp: 15, a: 'FOR', p: 12, c: 4},
       { n: 'Correria Desesperada', k: 'util', d: 'Quando tudo dá errado, correr é uma tática.', xp: 20, a: 'AGI', c: 3, tg: 'self', fx: 'st agiUp 2 self; st evade 1 self' },
       P('Instinto de Fuga', 'Ao ser ferido, o corpo já se afasta do próximo golpe antes da cabeça.', 25, { on: 'hurt', ch: 40, fx: 'st evade 1 self' }),
       { n: 'Soluções Improvisadas', k: 'util', d: 'Uma cadeira, um cinto e uma ideia: dá para atravessar mais uma sala.', xp: 25, a: 'INT', c: 4, tg: 'self', fx: 'res hp 6 self; st defUp 2 self' },
@@ -106,7 +106,7 @@ export const LEVA5 = {
       { n: 'Presente da Obsessão', k: 'heal', d: 'Sangue: um golpe de adrenalina cura a carne e nubla a cabeça.', xp: 55, a: 'CON', p: 30, c: 6, tg: 'self', pay: { san: 2 }, fx: 'st atkUp 3 self', pre: 'Ele Me Ensina' },
       { n: 'Presente do Tempo', k: 'util', d: 'Morte: um turno que ninguém viu, no fim da contagem.', xp: 60, a: 'INT', c: 8, tg: 'self', pay: { san: 3 }, fx: 'turn; haste 60 self', pre: 'Ele Me Ensina' },
       { n: 'Presente do Saber', k: 'util', d: 'Conhecimento: reescreve um pedaço de si por uma luta inteira.', xp: 55, a: 'INT', c: 7, tg: 'self', fx: 'st atkUp 3 self; st focus 4 self; gain aura 8 self', pre: 'Ele Me Ensina' },
-      { n: 'Presente do Caos', k: 'dmg', d: 'Energia: o caos escapa da pele em fios de eletricidade que escolhem sozinhos.', xp: 60, a: 'INT', p: 38, c: 10, area: true, pay: { san: 4 }, fx: 'chain 2 .8; mad 1.2', rq: { INT: 55 }, pre: 'Ele Me Ensina' },
+      { n: 'Presente do Caos', k: 'dmg', d: 'Energia: o caos escapa da pele em fios de eletricidade que escolhem sozinhos.', xp: 60, a: 'INT', p: 38, c: 15, area: true, pay: { san: 4 }, fx: 'chain 2 .8; mad 1.2', rq: { INT: 55 }, pre: 'Ele Me Ensina' },
       { n: 'Ser Aterrorizante', k: 'form', d: 'A entidade passa a morar no corpo todo: a forma humana é só a casca.', xp: 70, a: 'CON', c: 6, fm: 'dur 4; atk 25; def 20; hit 10; dr aura 3; end lose san 6', rq: { CON: 50 }, pre: 'As Sombras Dentro de Mim' },
     ],
   ],

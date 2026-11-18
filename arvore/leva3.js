@@ -10,7 +10,7 @@ export const LEVA3 = {
       { n: 'Guarda Atenta', k: 'passive', d: 'Os olhos nunca largam as mãos do inimigo.', xp: 10, mod: 'def 5; hit 5' },
       { n: 'Riposte da Guarda', k: 'dmg', d: 'O contragolpe que nasce da guarda: curto, seco e na brecha.', xp: 15, a: 'DES', p: 17, c: 5, ct: 70, fx: 'vs exposed 1.5; brk 1' },
       PAR('Aparar Firme', 'O braço aguenta o tranco e a janela parece maior.', 15, 350, 4, 3, { pre: 'Aparar' }),
-      { n: 'Desarme', k: 'dmg', d: 'Um giro de pulso que arranca a força do golpe inimigo.', xp: 20, a: 'DES', p: 16, c: 6, fx: 'st atkDn 2; strip' },
+      { n: 'Desarme', k: 'dmg', d: 'Um giro de pulso que arranca a força do golpe inimigo.', xp: 20, a: 'DES', p: 16, c: 6, fx: 'st atkDn 2; st disarm 1 50%; strip' },
       { n: 'Ritmo de Duelo', k: 'passive', d: 'Cada aparada acerta o compasso da luta.', xp: 25, on: 'hurt', ch: 30, fx: 'gain aura 3' },
       PAR('Aparada Perfeita', 'Uma guarda que espera o golpe como quem espera uma nota.', 30, 450, 5, 5, { pre: 'Aparar Firme', rq: { DES: 50 } }),
       { n: 'Contra-Ritmo', k: 'dmg', d: 'A resposta vem antes do inimigo recolher a arma.', xp: 40, a: 'DES', p: 28, c: 9, ct: 60, fx: 'vs exposed 1.6; push 30', rq: { DES: 52 } },

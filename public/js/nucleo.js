@@ -55,7 +55,7 @@ const loginForm = msg => { // gm: só a chave; jogador: login e senha; mesa: con
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const send = o => ws.readyState === 1 && ws.send(JSON.stringify(o));
 const mine = c => gm || (role === 'player' && c.owner === name);
-const eq = (c, slot) => S.items[c.equip[slot]];
+const eq = (c, slot) => slot === 'arma' && c.st?.disarm ? undefined : S.items[c.equip[slot]];
 const lvl = (c, k) => { const d = c.body[k] || 0; return d >= c.hpMax * .3 ? 2 : d >= c.hpMax * .15 ? 1 : 0; };
 const at = (c, a) => c.attrs[a] + (eq(c, 'acess')?.attr === a ? eq(c, 'acess').power : 0) + (eq(c, 'arma')?.mod ? ARMAS.kv(eq(c, 'arma').mod).a[a] || 0 : 0) - 10 * PARTS.filter(k => BODY[k].includes(a) && lvl(c, k) === 2).length;
 // técnicas da arma: 'w:<item>:<n>' (mesmo esquema do servidor)
