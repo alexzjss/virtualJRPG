@@ -265,3 +265,6 @@ com a mediana das técnicas antigas da mesma faixa (XP, área, mental, Limite); 
 Na Leva 8 ficaram fora de ×0,5 a ×1,6 só técnicas de ganho adiado (selo, eco, contador, controle). Regras que saíram disso: multi-golpe tem
 poder mínimo 7 por golpe (a armadura conta em cada um) e a 4ª variação com ganho condicional sai com ×1,5 de poder.
 `tools/sim.js` voltou a rodar: a janela de esquiva/aparar da Leva 4 travava a vez dos inimigos (agora é pulada) e os ramos dos heróis são achados pelo índice original (`ob`).
+Luta inteira: `L8=mix node tools/sim.js 150 enc` dá ao grupo padrão 2 a 4 técnicas da Leva 8 (Ressonância + Caça) por herói e a IA dos heróis passa a pesar
+Ressonância e Marca na escolha (poder × multiplicador, no alvo onde vale mais). Ganho medido: de 0 a +9% de vitória nos encontros (média ~+3%), igual a aprender
+técnicas novas. `L8=1` monta heróis só com Leva 8 e eles perdem para o grupo padrão: esses ramos completam o Vínculo, não o substituem.

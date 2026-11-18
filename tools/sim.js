@@ -7,7 +7,10 @@ const { H, S, R, current, derive, genFoe, partyRef, fitBoss, spawn } = await imp
 const gm = { role: 'gm' }, N = +process.argv[2] || 300, MODE = process.argv[3] || 'base', out = s => process.stdout.write(s + '\n');
 const byName = n => Object.keys(S.skills).find(k => S.skills[k].name === n), item = n => Object.keys(S.items).find(k => S.items[k].name === n);
 const TREE = (await import('../tree.js')).TREE, ids = (el, b, n) => (TREE[el].branches.find(x => !x.de && x[0]?.ob === b) || TREE[el].branches[b]).slice(0, n).map(o => byName(o.n)); // ob: índice do ramo antes da reorganização (arvore/ordem.js)
+const L8 = process.env.L8 ? (await import('../arvore/leva8.js')).LEVA8 : null; // L8=1: só técnicas da Leva 8 (Ressonância + Caça) no lugar das do Vínculo · L8=mix: grupo padrão + 2 a 4 técnicas da Leva 8 por herói
 console.log = () => {};
+// valor esperado da técnica: poder × Ressonância (aliado acabou de acertar o alvo com o Vínculo pedido) × Marca a detonar; escolhe o alvo onde vale mais
+const best = (a, s, fs, weak) => { const L = S.battle.lastAct; let v = s.power || 0, t = weak; for (const e of fs) { let m = 1; for (const f of s.fx || []) { if (f.t === 'rs' && L && L.id !== a.id && !L.enemy && (f.k === 'any' || L.el === f.k) && L.t.includes(e.id)) m *= f.m; if (f.t === 'pop' && e.st.brand) m *= f.m; } if ((s.power || 0) * m > v) { v = (s.power || 0) * m; t = e; } } return [v, t]; };
 const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
 // grupo de heróis por nível: 0 = recém-criado, 1 = algumas sessões, 2 = veterano. O 4º herói é curandeiro de Amaterasu.
 const VINC = [['indra', 'AGI', 'INT'], ['fuhaku', 'DES', 'INT'], ['hiruko', 'CON', 'FOR'], ['amaterasu', 'SAB', 'CAR']];
@@ -16,7 +19,8 @@ function party(size, lvl) {
     const had = new Set(Object.keys(S.chars)); H.addChar(gm, { owner: 'p' }); const h = S.chars[Object.keys(S.chars).find(k => !had.has(k))], up = lvl * 8;
     for (const a in h.attrs) h.attrs[a] = 40 + up; Object.assign(h.attrs, { [a1]: 62 + up, [a2]: 52 + up, AGI: Math.max(h.attrs.AGI, 50 + up), CON: Math.max(h.attrs.CON, 46 + up) });
     h.vinc = [el]; h.arma = [10, 14, 19][lvl]; h.armor = [0, 2, 4][lvl]; h.bon.hpMax = lvl * 12; h.bon.auraMax = lvl * 6;
-    h.skills = [...ids(el, 0, [1, 4, 7][lvl]), ...ids(el, 3, [0, 2, 4][lvl]), byName('Golpe Pesado'), ...(lvl ? [byName('Golpe Giratório')] : [])].filter(Boolean);
+    const nv = [1, 6, 11][lvl], mix = process.env.L8 === 'mix', k8 = [0, 1, 2][lvl], l8 = L8 && mix ? [...ids(el, 0, [1, 4, 7][lvl]), ...ids(el, 3, [0, 2, 4][lvl]), ...[...L8[el][0].slice(0, k8), ...L8[el][3].slice(0, k8)].map(o => byName(o.n))] : L8 && [...L8[el][0].slice(0, Math.ceil(nv / 2)), ...L8[el][3].slice(0, Math.floor(nv / 2))].map(o => byName(o.n));
+    h.skills = [...(l8 || [...ids(el, 0, [1, 4, 7][lvl]), ...ids(el, 3, [0, 2, 4][lvl])]), byName('Golpe Pesado'), ...(lvl ? [byName('Golpe Giratório')] : [])].filter(Boolean);
     h.inv[item(lvl ? 'Líquido Dourado do Sanatório' : 'Poção')] = 1 + lvl;
     return h;
   });
@@ -32,11 +36,11 @@ function fight(heroes, foes) {
     // heróis: Limite se cheio, cura quem está mal, poção em emergência, senão a skill mais forte que puder pagar no inimigo mais ferido
     const sks = a.skills.map(k => [k, S.skills[k]]).filter(([, s]) => s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100) && !a.st.silence && !a.st.fury);
     const hurt = heroes.filter(h => !h.dead && h.hp < h.hpMax * .45).sort((x, y) => x.hp - y.hp)[0], weak = liveF.sort((x, y) => x.hp - y.hp)[0], pot = Object.keys(a.inv).find(k => S.items[k]?.eff === 'hp');
-    const lim = sks.find(([, s]) => s.limit), heal = sks.filter(([, s]) => s.kind === 'heal' && s.power > 0).sort((x, y) => y[1].power - x[1].power)[0], dmg = sks.filter(([, s]) => s.kind !== 'heal' && !s.limit).sort((x, y) => y[1].power - x[1].power)[0];
+    const lim = sks.find(([, s]) => s.limit), heal = sks.filter(([, s]) => s.kind === 'heal' && s.power > 0).sort((x, y) => y[1].power - x[1].power)[0], dmg = sks.filter(([, s]) => s.kind !== 'heal' && !s.limit).map(([k, s]) => [k, s, ...best(a, s, liveF, weak)]).sort((x, y) => y[2] - x[2])[0];
     if (lim) H.act(gm, { id: a.id, skill: lim[0], target: weak.id });
     else if (hurt && heal) H.act(gm, { id: a.id, skill: heal[0], target: hurt.id });
     else if (a.hp < a.hpMax * .3 && pot) H.use(gm, { id: a.id, item: pot, target: a.id });
-    else H.act(gm, { id: a.id, skill: dmg && Math.random() < .65 ? dmg[0] : 'atk', target: weak.id });
+    else H.act(gm, { id: a.id, skill: dmg && Math.random() < .65 ? dmg[0] : 'atk', target: (dmg && dmg[3] || weak).id });
   }
   if (process.env.SIMDOM) globalThis.__dom = (globalThis.__dom || 0) + Object.values(S.chars).filter(c => c.domUsed).length;
   const win = !Object.values(S.chars).some(f => f.enemy && f.hp > 0) && heroes.some(h => h.hp > 0);
