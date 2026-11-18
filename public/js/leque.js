@@ -12,20 +12,25 @@ const LEQUE = (() => {
   const skSel = () => pick.k === 'sk' ? SK(pick.id) : null;
   const bothSides = () => skSel()?.kind === 'util'; // utilidade pode mirar aliado (buff, limpeza) ou inimigo (debuff): ←/→ alcançam os dois lados
   const allySide = () => pick.k === 'it' || selfSk(skSel()) || skSel()?.kind === 'heal';
-  // alvos possíveis do que está escolhido, da esquerda para a direita na tela (←/→ andam por eles)
+  // lado natural do que está escolhido: dano no inimigo de pé, cura e item no próprio lado, utilidade em qualquer um de pé
+  const natural = o => !!cx && (selfSk(skSel()) ? o.id === cx.actor.id : bothSides() ? o.hp > 0 : allySide() ? o.enemy === cx.actor.enemy : o.enemy !== cx.actor.enemy && o.hp > 0);
+  // alvos possíveis: todos na mesa (os dois lados, caídos e invocações; o jogador não vê o inimigo furtivo), da esquerda para a direita na tela (←/→ andam por eles)
   const cands = () => {
     if (!cx) return [];
     const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB, PALCO3D.frameNow(inB));
-    const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => bothSides() ? o.hp > 0 : allySide() ? o.enemy === cx.actor.enemy : o.enemy !== cx.actor.enemy && o.hp > 0);
+    const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => gm || o.enemy === cx.actor.enemy || !o.st?.stealth);
     return l.sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0));
   };
-  const fit = () => { // a mira abre num alvo do lado certo (inimigo ou aliado)
-    const l = cands(); if (!l.length) return;
-    if (!l.some(o => o.id === tgt)) { tgt = (allySide() ? l.find(o => o.id === cx.actor.id) || l[0] : l[0]).id; aim = null; }
+  const fit = () => { // a mira abre num alvo do lado natural (inimigo ou aliado)
+    const l = cands(); if (!l.length) return; const nat = l.filter(natural);
+    if (!nat.some(o => o.id === tgt)) { const n = allySide() ? nat.find(o => o.id === cx.actor.id) || nat[0] : nat[0]; tgt = (n || l[0]).id; aim = null; }
   };
+  let armed = null; // alvo fora do lado natural já avisado: o segundo Enter (ou clique) confirma
+  const offSide = () => { const t = S.chars[tgt]; return !!t && !natural(t); };
+  const sideStep = () => { const l = cands(), t = S.chars[tgt]; if (!l.length) return; const o = l.find(x => x.enemy !== !!t?.enemy); if (o) { tgt = o.id; aim = null; render(); } }; // Tab: pula para o outro lado
   const canAim = () => { const s = skSel(), t = S.chars[tgt]; return !!t && pick.k !== 'it' && !(s && (s.area || ['heal', 'util', 'form'].includes(s.kind) || selfSk(s))); };
   const why = () => { const c = cx.actor, s = skSel(), t = S.chars[tgt]; return !t && !selfSk(s) ? 'Escolha um alvo' : s && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : ''; };
-  const confirm = () => { const w = why(); if (w) return toast(w, 'no'); goAct(cx.actor.id); };
+  const confirm = () => { const w = why(); if (w) return toast(w, 'no'); if (offSide() && armed !== tgt) { armed = tgt; return render(); } armed = null; goAct(cx.actor.id); };
   const go = (mode, f) => { if (f) from = f; state.mode = mode; state.sel = 0; if (mode === 'aim') fit(); render(); };
   const back = () => {
     if (state.mode === 'aim') { if (aimOpen) { aimOpen = false; aim = null; } else state.mode = from; }
@@ -96,7 +101,7 @@ const LEQUE = (() => {
       if (!my || wait || S.battle.cmd) return '';
       if (gmO && donoOn(c) && gmOpen !== tk) return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox"><button type="button" class="lq-gm-open" data-lq="gmopen" title="${esc(c.owner)} está conectado: o leque fica recolhido até você pedir">Agir por ${esc(c.name)}</button></div></div>`;
       const inB = battlers();
-      if (!inB.some(o => o.id === tgt) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0)) { const f = inB.find(o => o.enemy !== c.enemy && o.hp > 0); if (f) { tgt = f.id; aim = null; } } // na sua vez já vem mirado no primeiro inimigo de pé
+      if (!inB.some(o => o.id === tgt) || (state.mode !== 'aim' && S.chars[tgt].enemy && S.chars[tgt].hp <= 0)) { const f = inB.find(o => o.enemy !== c.enemy && o.hp > 0); if (f) { tgt = f.id; aim = null; } } // na sua vez já vem mirado no primeiro inimigo de pé
       const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
       if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { ...ATK };
       const t = S.chars[tgt], s = skSel(), it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma'), mode = state.mode;
@@ -120,9 +125,10 @@ const LEQUE = (() => {
         const cur2 = pick.k === 'sk' && s, w = cur2 && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
         if (cur2) h += `<div class="lq-sum"><b>${esc(s.name)}</b><small>${esc(desc(s))}</small>${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
       } else if (mode === 'aim') {
-        const label = it ? it.name : s ? s.name : ARMAS.prof(wp).atkN || 'Ataque', w = why();
-        h += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b><small>${w ? `<span class="why">${esc(w)}</span> · ` : ''}← → escolhem o alvo · clique de novo no alvo confirma · Esc volta</small></div>`;
-        h += stroke('go', '⏎', esc(askL('act', 'Agir')), '', 430, 600, { on: !w, blk: !!w });
+        const label = it ? it.name : s ? s.name : ARMAS.prof(wp).atkN || 'Ataque', w = why(); if (armed !== tgt) armed = null;
+        const off = offSide() && !w ? (t.enemy === c.enemy ? (t.id === c.id ? 'em si mesmo' : 'fogo amigo') : 'ajuda o inimigo') : '';
+        h += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b>${off ? `<small class="offside">⚠ ${off}${armed ? ': Enter de novo confirma' : ''}</small>` : ''}<small>${w ? `<span class="why">${esc(w)}</span> · ` : ''}← → escolhem o alvo · Tab troca de lado · clique de novo no alvo confirma · Esc volta</small></div>`;
+        h += stroke('go', '⏎', armed ? 'Confirmar mesmo assim' : esc(askL('act', 'Agir')), '', 430, 600, { on: !w, blk: !!w });
         if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24, on: aimOpen });
         if (canAim() && aimOpen) h += `<div class="lq-aim">${aimBox()}</div>`;
         const allies = battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0);
@@ -151,6 +157,8 @@ const LEQUE = (() => {
     },
     // clicar numa skill da lista abre a mira (as setas ↑↓ só andam pela lista, sem avançar)
     picked() { if (!cx || state.mode !== 'all') return false; go('aim', 'all'); return true; },
+    // clique num ponto do minimapa: na mira, escolhe o alvo (de novo, confirma)
+    pickTgt(id) { if (!cx || !cx.my || cx.wait || state.mode !== 'aim' || !cands().some(o => o.id === id)) return false; if (id === tgt) confirm(); else { tgt = id; aim = null; render(); } return true; },
     // clicar num recorte já mirado confirma a ação
     clickTgt(id) { if (!cx || !cx.my || cx.wait || state.mode !== 'aim' || id !== tgt || !cands().some(o => o.id === id)) return false; confirm(); return true; },
     // teclado da batalha no PC; devolve true se tratou a tecla
@@ -191,6 +199,7 @@ const LEQUE = (() => {
         const n = six(c).length, s0 = state.sel; if (s0 === 6 || !n) return true; const to = k === 'ArrowRight' ? (s0 >= 3 ? s0 - 3 : s0) : (s0 < 3 ? s0 + 3 : s0);
         state.sel = to < n ? to : n > 3 ? n - 1 : s0; render(); return true; // sem a mesma linha na outra coluna: vai para o último dela
       }
+      if (k === 'Tab' && mode === 'aim') { sideStep(); return true; }
       if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'aim') {
         const l = cands(); if (!l.length) return true;
         const i = l.findIndex(o => o.id === tgt); tgt = l[(i + (k === 'ArrowLeft' ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id; aim = null; render(); return true;

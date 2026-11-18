@@ -38,16 +38,26 @@
       if (!moved) break; }
     return M;
   };
-  // câmera: translate3d(tx,ty,tz) rotateY(ry) aplicado ao mundo
+  // câmera: translate3d(tx,ty,tz) rotateY(ry) aplicado ao mundo (o giro é em volta da origem do mundo, depois vem a translação)
+  // CSS rotateY(θ): x' = x·cosθ + z·sinθ, z' = −x·sinθ + z·cosθ
+  const PERSP = 1000, rotP = (p, ry) => { const r = ry * Math.PI / 180, c = Math.cos(r), s = Math.sin(r); return { x: p.x * c + p.z * s, z: -p.x * s + p.z * c }; };
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
-    if (v.kind === 'zoom') r = { tx: -t.x, ty: -40, tz: -t.z - 420, ry: 0 };
+    if (v.kind === 'table') { // ombro de quem age, olhando o centro de todos; recua até caber a mesa (quem fica atrás do ombro não conta)
+      const pts = (v.pts && v.pts.length ? v.pts : [a]), C = pts.reduce((m, p) => ({ x: m.x + p.x / pts.length, z: m.z + p.z / pts.length }), { x: 0, z: 0 });
+      let dx = C.x - a.x, dz = C.z - a.z; if (Math.hypot(dx, dz) < 60) { dx = 0; dz = v.foe ? 1 : -1; }
+      const SX = -200, ZF = 420, k = ((v.w || 1440) / 2 * .82) / PERSP, L = Math.hypot(dx, dz); // ombro: quem age fica à esquerda (SX) e o centro da mesa no meio da tela
+      const ry = Math.round((Math.atan2(dx, -dz) + Math.asin(clamp(SX / Math.max(L, 1), -.6, .6))) * 1800 / Math.PI) / 10, A = rotP(a, ry);
+      const tx = SX - A.x, tz0 = ZF - A.z; let b = 0;
+      for (const p of pts) { const q = rotP(p, ry); if (q.z > A.z + 300) continue; b = Math.max(b, q.z + tz0 - PERSP + Math.abs(q.x + tx) / k); }
+      b = clamp(Math.ceil(b / 10) * 10, 0, 1400);
+      r = { tx, ty: Math.round(b * .08), tz: tz0 - b, ry };
+    } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry); r = { tx: -T.x, ty: -40, tz: -T.z - 420, ry }; }
     else if (v.kind === 'aim') r = { tx: -(a.x * .55 + t.x * .45) - 120, ty: 0, tz: -a.z + 380, ry: a.x < 0 ? -4 : 4 };
     else if (v.kind === 'foe') r = { tx: -a.x * .3, ty: 0, tz: 180, ry: 0 };
     else r = { tx: -a.x - 110, ty: 0, tz: -a.z + 560, ry: a.x < 0 ? -6 : 6 };
-    return { tx: n0(r.tx), ty: n0(r.ty), tz: n0(r.tz), ry: n0(r.ry) };
+    return { tx: n0(Math.round(r.tx)), ty: n0(r.ty), tz: n0(Math.round(r.tz)), ry: n0(r.ry) };
   };
-
   // ----- figura padrão (silhueta) e ordem de reserva das imagens -----
   const svgUrl = s => 'data:image/svg+xml;utf8,' + encodeURIComponent(s), xesc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
   const kanjiOf = c => { try { return KANJI[mainEl(c)] || '武'; } catch { return '武'; } }; // KANJI e mainEl vêm do palco.js (no Node não existem)
@@ -69,8 +79,8 @@
     return { url: silhouette(c, false), fallback: true };
   };
 
-  // no palco a câmera fica atrás do grupo: herói aparece de costas, inimigo de frente
-  const unitKind = c => c?.enemy ? 'f' : 'b';
+  // herói olha para os inimigos (−z): de costas se a câmera olha para o mesmo lado (|ry| ≤ 90), senão de frente; inimigo só tem frente
+  const unitKind = (c, ry = 0) => c?.enemy ? 'f' : Math.abs(((ry % 360) + 540) % 360 - 180) <= 90 ? 'b' : 'f';
 
   // enquadre (imgK) da imagem própria: x, y em fração da altura da figura (−1..1) e z de 0,5 a 3; nunca na silhueta de reserva
   // frente/costas: a figura tem altura var(--h) e gira pelos pés; retrato: deslocamento em % do próprio quadro, a partir do centro
@@ -100,12 +110,12 @@
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
-  const P = { rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { rotP, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let floor = null, rl = null, rb = null, floorKey = '', root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
   const els = new Map(); // id -> { el, img, mini, sh, hpb, bad: [], key... }
-  let lastF = null, lastFr = null, camLock = null, fastT = 0; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
+  let lastF = null, lastFr = null, camLock = null, fastT = 0, camRy = 0; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
   const el = (tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
   const ensure = () => {
     if (root) return;
@@ -140,18 +150,15 @@
   };
 
   const view = F => {
-    const cur = S.chars[timeline(1)[0]], at = id => F.get(id) || { x: 0, z: 0 };
-    if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', at: cur ? at(cur.id) : undefined, to: F.get(local.zoom) };
-    if (!cur) return { kind: 'hero', at: { x: -430, z: 0 } };
-    const dt = cur.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
-    if (dt) return { kind: 'hero', at: at(dt), fast: true };
-    if (cur.enemy) return { kind: 'foe', at: at(cur.id) };
-    if (local.aim && F.has(local.aim)) return { kind: 'aim', at: at(cur.id), to: F.get(local.aim) };
-    return { kind: 'hero', at: at(cur.id) };
+    const cur = S.chars[timeline(1)[0]], at = id => F.get(id) || { x: 0, z: 0 }, pts = [...F.values()], w = root?.clientWidth || 1440;
+    const tbl = id => ({ kind: 'table', at: at(id), pts, w, foe: !!S.chars[id]?.enemy });
+    const dt = cur?.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
+    const base = !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { ...tbl(dt), fast: true } : tbl(cur.id); // a mira não move a câmera: a mesa fica toda à vista
+    if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', to: F.get(local.zoom), ry: cameraFor(base).ry };
+    return base;
   };
-
   const setCls = (u, k, on) => { if (u.cls[k] !== on) { u.cls[k] = on; u.el.classList.toggle(k, on); } };
-  const setImg = u => { const k = unitKind(u.c), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
+  const setImg = u => { const k = unitKind(u.c, camRy), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e); el('i', 'ring', e);
@@ -179,11 +186,11 @@
   };
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
-    const fr = frameNow(inB), F = formation(inB, fr);
+    const fr = frameNow(inB), F = formation(inB, fr), V = new Map(); // V: onde cada um aparece agora (o inimigo da vez já avançou)
     for (const [id, u] of els) if (!inB.some(c => c.id === id)) { u.el.remove(); els.delete(id); }
     for (const c of inB) {
       let u = els.get(c.id); if (!u) { u = mkUnit(c); els.set(c.id, u); }
-      const p = F.get(c.id), adv = c === cur && c.enemy, x = adv ? Math.round(p.x / 2) : p.x, z = adv ? Math.round(p.z / 2) : p.z, pos = x + ',' + z; // inimigo na vez anda metade do caminho até os heróis
+      const p = F.get(c.id), adv = c === cur && c.enemy, x = adv ? Math.round(p.x / 2) : p.x, z = adv ? Math.round(p.z / 2) : p.z, pos = x + ',' + z; V.set(c.id, { x, z }); // inimigo na vez anda metade do caminho até os heróis
       if (u.pos !== pos && !u.lunging) { u.pos = pos; u.el.style.setProperty('--x', x); u.el.style.setProperty('--z', z); }
       const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u); { const col = colorOf(c); if (u.col !== col) { u.col = col; u.el.style.setProperty('--c', col); } }
@@ -192,7 +199,7 @@
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
         if (u.mini !== m + w) { u.mini = m + w; u.sh.textContent = m; u.sh.hidden = !m; u.hpi.style.width = w; } }
     }
-    lastF = F; lastFr = fr; chao(fr, F, cur); return F;
+    lastF = F; lastFr = fr; chao(fr, F, cur); return V;
   };
   // alvo que some (removido, caído ou oculto): a mira vai para o próximo inimigo de pé e o zoom fecha; devolve se algo mudou
   const vivo = id => { const c = S.chars[id]; return !!c && id in S.battle.ticks && c.hp > 0 && !c.dead; };
@@ -200,14 +207,15 @@
   const heal = () => {
     let ch = false;
     if (local.zoom && sumiu(local.zoom)) { local.zoom = null; ch = true; }
-    if (tgt && (!S.chars[tgt] || !(tgt in S.battle.ticks) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0))) { const f = Object.values(S.chars).find(c => c.enemy && vivo(c.id)); if (f) { tgt = f.id; aim = null; ch = true; } }
+    if (tgt && (!S.chars[tgt] || !(tgt in S.battle.ticks) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0 && !(typeof LEQUE !== 'undefined' && LEQUE.aimTarget() === tgt)))) { /* caído só sai do alvo fora da mira */ const f = Object.values(S.chars).find(c => c.enemy && vivo(c.id)); if (f) { tgt = f.id; aim = null; ch = true; } }
     if (local.aim && sumiu(local.aim)) local.aim = S.chars[tgt] && !sumiu(tgt) ? tgt : null; // a mira local é refeita a cada desenho: não pede outro
     return ch;
   };
   const camera = F => {
     const v0 = view(F), v = camLock || cameraFor(v0), k = `${v.tx},${v.ty},${v.tz},${v.ry}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
     if (!camLock) world.dataset.cam = tr; // o enquadramento do turno (a fumaça confere a volta depois da investida)
-    if (k === camKey) return; camKey = k; world.style.transform = tr;
+    if (k === camKey) return; camKey = k; world.style.transform = tr; world.style.setProperty('--bry', v.ry + 'deg'); // os recortes giram de volta: sempre de frente para a câmera
+    if (unitKind({}, v.ry) !== unitKind({}, camRy)) { camRy = v.ry; for (const u of els.values()) if (u.c) setImg(u); } else camRy = v.ry;
     if (!camLock && v0.fast) { world.classList.add('fast'); clearTimeout(fastT); fastT = setTimeout(() => !camLock && world.classList.remove('fast'), 500); } // o anel de defesa dura ~1,3 s: a câmera não pode levar 1,1 s para chegar
   };
 
@@ -227,10 +235,10 @@
     if (!a || !to || !from || fromId === toId || !root || root.style.display === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return res();
     const z0 = +a.el.style.getPropertyValue('--z') || from.z, dz = Math.sign(z0 - to.z) || 1, dx = Math.sign(from.x - to.x) || -1;
     const tx = to.x + 140 * dx, tz = to.z + 260 * dz, ms = lungeMs(Math.hypot(tx - (+a.el.style.getPropertyValue('--x') || from.x), tz - z0));
-    camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to } : { kind: 'hero', at: to }); world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(F);
+    camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to, ry: camRy } : { kind: 'table', at: to, pts: [...F.values()], w: root.clientWidth }); world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(F);
     a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--lg', ms + 'ms'); a.el.style.setProperty('--x', tx); a.el.style.setProperty('--z', tz);
     setTimeout(res, ms);
-    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; camLock = null; if (lastF && root.style.display !== 'none') { units(); camera(lastF); } setTimeout(() => { world.classList.remove('fast'); world.style.removeProperty('--lg'); }, ms); }, ms + LG_HOLD);
+    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; camLock = null; if (lastF && root.style.display !== 'none') camera(units()); setTimeout(() => { world.classList.remove('fast'); world.style.removeProperty('--lg'); }, ms); }, ms + LG_HOLD);
   });
   // impacto no recorte: tremida curta (classe hurt por 450 ms)
   P.shake = id => { const u = els.get(id); if (!u) return; u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };

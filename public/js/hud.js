@@ -45,8 +45,8 @@ const HUD = (() => {
     if (body === hovBB) return; hovBB = body;
     if (!(body && LEQUE.hover(body))) handNow(); }); // na mira, passar o mouse troca o alvo (o render chama handNow)
   const topo = (o) => { const lines = S.log.filter(l => !l.to).slice(-3);
-    const icons = o.table ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Chat" aria-pressed="${chatOpen}">${ico('chat')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
-    const menu = navOpen && !o.table ? `<nav class="hud-menu" aria-label="Páginas">${chips(PAGES, (k, l) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${ico(k)}<span>${k === 'mesa' ? 'Batalha' : l}</span></button>`)}</nav>` : '';
+    const icons = o.table || o.gm ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Chat" aria-pressed="${chatOpen}">${ico('chat')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
+    const menu = navOpen && !o.table && !o.gm ? `<nav class="hud-menu" aria-label="Páginas">${chips(PAGES, (k, l) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${ico(k)}<span>${k === 'mesa' ? 'Batalha' : l}</span></button>`)}</nav>` : '';
     return `<div class="hud-tr">${icons}${menu}${fieldBar()}<div class="hlog" aria-live="polite">${lines.map(l => `<div><b>${esc(l.who)}</b> ${esc(l.text)}</div>`).join('')}</div></div>`; };
   // minimapa: o mapa da cena em ponto pequeno, logo abaixo da ordem dos turnos; arrastar o próprio ponto move o token (o servidor confere o dono)
   // recolhe pelo título "Mapa" ou pela tecla M (para o mestre, M já abre a visão do mapa: só o título)
@@ -61,10 +61,13 @@ const HUD = (() => {
       return `<i class="mk ${c.enemy ? 'foe' : 'hero'} ${c.id === cur ? 'now' : ''} ${c.hp > 0 ? '' : 'ko'} ${drag ? 'drag' : ''}" data-mk="${c.id}" style="--x:${(c.x + m.ox + .5) / m.cols * 100}%;--y:${(c.y + m.oy + .5) / m.rows * 100}%;--c:${esc(c.color)}" title="${esc(c.name)}"></i>`; }).join('');
     return `<div class="hud-mini ${miniOpen ? '' : 'off'}" data-mini><button type="button" class="mt" data-a="miniT" aria-expanded="${miniOpen}">Mapa${gm ? '' : ' <span class="key">M</span>'}</button><div class="mm" style="aspect-ratio:${m.ar || m.cols / m.rows};${bg}">${m.grid === false ? '' : `<span class="mg" style="background-size:${100 / m.cols}% ${100 / m.rows}%"></span>`}${dots}</div></div>`; };
   let mkDrag = null;
-  document.addEventListener('pointerdown', e => { const d = e.target.closest?.('.hud-mini .mk.drag'); if (!d || e.button) return; e.preventDefault(); mkDrag = { id: d.dataset.mk, box: d.parentElement }; });
+  document.addEventListener('pointerdown', e => { const d = e.target.closest?.('.hud-mini .mk.drag'); if (!d || e.button) return; e.preventDefault(); mkDrag = { id: d.dataset.mk, box: d.parentElement, x: e.clientX, y: e.clientY }; });
+  // clique (sem arrastar) num ponto do minimapa durante a mira escolhe o alvo
+  document.addEventListener('click', e => { const d = e.target.closest?.('.hud-mini .mk:not(.drag)'); if (d) LEQUE.pickTgt(d.dataset.mk); });
   document.addEventListener('pointermove', e => { if (!mkDrag) return; const b = document.querySelector(`.hud-mini .mk[data-mk="${mkDrag.id}"]`)?.parentElement || mkDrag.box, r = b.getBoundingClientRect(), d = b.querySelector(`.mk[data-mk="${mkDrag.id}"]`);
     if (d) { d.style.setProperty('--x', Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)) + '%'); d.style.setProperty('--y', Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100)) + '%'); } });
-  const mkEnd = e => { if (!mkDrag) return; const k = mkDrag; mkDrag = null; const m = S.scenes[S.scene], b = document.querySelector(`.hud-mini .mk[data-mk="${k.id}"]`)?.parentElement || k.box;
+  const mkEnd = e => { if (!mkDrag) return; const k = mkDrag; mkDrag = null;
+    if (e.type === 'pointerup' && Math.hypot(e.clientX - k.x, e.clientY - k.y) < 5) { if (!LEQUE.pickTgt(k.id) && typeof render === 'function') render(); return; } const m = S.scenes[S.scene], b = document.querySelector(`.hud-mini .mk[data-mk="${k.id}"]`)?.parentElement || k.box;
     if (e.type === 'pointerup' && m && b?.isConnected) { const r = b.getBoundingClientRect();
       const x = Math.max(0, Math.floor((e.clientX - r.left) / r.width * m.cols - m.ox)), y = Math.max(0, Math.floor((e.clientY - r.top) / r.height * m.rows - m.oy));
       send({ t: 'move', id: k.id, x: Math.min(x, Math.ceil(m.cols) - 1), y: Math.min(y, Math.ceil(m.rows) - 1) }); }
@@ -104,6 +107,10 @@ const HUD = (() => {
   const alvos = () => { const L = LEQUE.aimList(); if (!L.length) return '';
     return `<div class="hud-tgts" role="listbox" aria-label="Alvos"><span class="key" aria-hidden="true">←</span>${L.map(c => { const on = c.id === tgt, p = pct(c.hp, c.hpMax);
       return `<button type="button" class="ta ${c.enemy ? 'foe' : 'hero'} ${on ? 'on' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" role="option" aria-selected="${on}" style="--c:${esc(c.color)}">${on ? `<span class="tah">${HAND}</span>` : ''}<b>${esc(c.name)}</b><small>${c.enemy && !gm ? p + '%' : `${c.hp}/${c.hpMax}`}</small><i class="tahp"><i style="width:${p}%"></i></i></button>`; }).join('')}<span class="key" aria-hidden="true">→</span></div>`; };
+  // pedidos dos jogadores no palco do mestre: aprovar (Enter) ou negar (Del) sem abrir a barra lateral
+  const pedidos = () => { const rs = Object.entries(S.reqs || {}).sort((a, b) => a[1].n - b[1].n); if (!rs.length) return '';
+    return `<div class="hud-req" aria-label="Pedidos">${rs.slice(0, 4).map(([id, r], i) => { const c = S.chars[r.ch];
+      return `<div class="hrq" style="--c:${esc(c?.color || '#888')}"><small>${esc(r.by)}</small><b>${esc(c?.name || '?')}</b><span>${esc(r.text)}</span><div><button type="button" class="ok" data-a="rqOk" data-id="${id}">Aprovar${i ? '' : ' <kbd>Enter</kbd>'}</button><button type="button" class="no" data-a="rqNo" data-id="${id}">Negar${i ? '' : ' <kbd>Del</kbd>'}</button></div></div>`; }).join('')}${rs.length > 4 ? `<small class="more">+${rs.length - 4} na barra lateral</small>` : ''}</div>`; };
   // ficha do inimigo: HP (em % para o jogador, números para o mestre), escudo da Quebra, fraquezas só do que foi descoberto e condições; full (zoom) acrescenta golpes e o efeito da Quebra
   const MAIN5 = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku'];
   const sheet = (id, { full = false, preview = '' } = {}) => {
@@ -126,11 +133,8 @@ const HUD = (() => {
       + `<div class="hud-sheet" data-sid="${id}" style="${ok ? `left:${pos.l}px;top:${pos.t}px` : 'opacity:0'}">${sheet(id, { full: zoom, preview: LEQUE.preview(c) })}</div>`; };
   return {
     sheet, miniT,
-    // mestre: só a barra do topo e a ficha do alvo (o leque dele vem separado)
-    // com o leque aberto, também a lista de alvos e a fileira de comandos do ator (a mesma do jogador)
-    gm() { const a = alvo(), x = LEQUE.ctx(), inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
-      const br = x?.shown ? `<div class="hud-br">${alvos()}${cmds(x.actor, x.cur, inB, true)}</div>` : '';
-      return `<div class="hudw gmh">${a}${br}${miniMapa()}</div>`; },
+    // mestre: a mesma HUD do jogador (html com gm), com o ator vindo do leque dele e a fila de pedidos no canto inferior esquerdo
+    gm() { return this.html({ gm: true }); },
     // coloca a ficha ao lado do recorte (à direita; à esquerda se não couber; presa entre top 110 e 560); a câmera leva ~1,1 s, então é chamada de novo depois
     place() {
       handNow();
@@ -141,9 +145,10 @@ const HUD = (() => {
       Object.assign(w.style, { left: l + 'px', top: t + 'px', opacity: '' }); pos = { id: w.dataset.sid, l, t };
     },
     // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
-    html({ actorId = null, dim = false, unread = 0, table = false } = {}) {
-      const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table };
-      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${table ? '' : alvos() + cmds(S.chars[actorId], cur, inB)}${grupo(inB, cur)}</div>${alvo()}${faixa()}</div>`;
+    html({ actorId = null, dim = false, unread = 0, table = false, gm: gmO = false } = {}) {
+      const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table, gm: gmO }, x = gmO ? LEQUE.ctx() : null;
+      const cm = table ? '' : gmO ? (x?.shown ? alvos() + cmds(x.actor, x.cur, inB, true) : '') : alvos() + cmds(S.chars[actorId], cur, inB);
+      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''} ${gmO ? 'gmh' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${cm}${grupo(inB, cur)}</div>${alvo()}${faixa()}${gmO ? pedidos() : ''}</div>`;
     },
   };
 })();

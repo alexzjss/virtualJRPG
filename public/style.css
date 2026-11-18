@@ -1199,7 +1199,7 @@ body .p3d .bbplane.stage{display:block;min-height:0;height:2600px;background:#05
 .p3d .rangeln{position:absolute;left:0;top:0;height:16px;margin-top:-8px;transform-origin:0 50%;background:repeating-linear-gradient(90deg,#ffd84a 0 36px,transparent 36px 60px);opacity:.85;pointer-events:none}
 .p3d .rangelb{position:absolute;left:0;top:0;padding:.25em .8em;font:700 34px var(--cond,sans-serif);color:#fff;background:#000b;border:2px solid #ffd84a;border-radius:99px;white-space:nowrap;pointer-events:none}
 .p3d .fog{position:absolute;left:-3000px;top:-700px;width:6000px;height:800px;transform:translateZ(-1900px);background:linear-gradient(180deg,transparent,#c9b9a033 70%,transparent);pointer-events:none}
-.p3d .bb{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;outline:0;transform:translate3d(calc(var(--x,0)*1px),0,calc(var(--z,0)*1px)) translate(-50%,-100%);transition:transform .6s cubic-bezier(.4,0,.2,1),filter .3s}
+.p3d .bb{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;outline:0;transform-origin:50% 100%;transform:translate3d(calc(var(--x,0)*1px),0,calc(var(--z,0)*1px)) translate(-50%,-100%) rotateY(calc(var(--bry,0deg) * -1));transition:transform .6s cubic-bezier(.4,0,.2,1),filter .3s}
 .p3d .bb img{display:block;height:var(--h,300px);width:auto;transform-origin:50% 100%;filter:drop-shadow(0 18px 18px #000a)}
 .p3d .bb .shadow{position:absolute;left:10%;right:10%;bottom:-14px;height:28px;border-radius:50%;background:#000a;filter:blur(6px);z-index:-1}
 .p3d .bb:focus-visible img{filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 18px #ffc93c) drop-shadow(0 18px 18px #000a)}
@@ -1395,7 +1395,6 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 
 /* minimapa da batalha (hud.js): abaixo da ordem dos turnos; no mestre, canto superior esquerdo */
 .hud-mini{width:180px;margin-top:8px;pointer-events:auto;background:#000a;border:1px solid #fff3;padding:4px;position:relative}
-.hudw.gmh>.hud-mini{position:absolute;left:12px;top:12px;transform:scale(var(--hk,.85));transform-origin:0 0;margin:0}
 .hud-mini .mt{display:flex;justify-content:space-between;width:100%;font:700 13px var(--cond,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:none;border:0;padding:2px 4px;cursor:pointer}
 .hud-mini .mt .key{opacity:.7}.hud-mini.off .mm{display:none}
 .hud-mini .mm{position:relative;width:100%;background-color:#10131a;background-repeat:no-repeat;overflow:hidden;touch-action:none}
@@ -1403,3 +1402,11 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .hud-mini .mk{position:absolute;left:var(--x);top:var(--y);width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:var(--c,#fff);border:2px solid #000;box-shadow:0 0 0 1px #fff6}
 .hud-mini .mk.foe{border-radius:2px;transform:rotate(45deg)}.hud-mini .mk.now{box-shadow:0 0 0 2px #fff,0 0 8px 2px var(--c,#fff);z-index:2}.hud-mini .mk.ko{opacity:.35}
 .hud-mini .mk.drag{cursor:grab}.hud-mini .mk.drag::after{content:"";position:absolute;inset:-6px}
+
+/* palco do mestre: fila de pedidos dos jogadores no canto inferior esquerdo (hud.js) */
+.hud-req{left:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;width:300px;transform:scale(var(--hk,.85));transform-origin:0 100%}
+.hrq{background:#0b0b0df2;border-left:4px solid var(--c);padding:6px 10px;display:grid;grid-template-columns:auto 1fr;gap:0 8px;font:600 13px var(--cond);animation:hlin .3s}
+.hrq small{grid-column:1/-1;color:var(--dim)}.hrq b{font:400 17px var(--disp);letter-spacing:1px;text-transform:uppercase}.hrq span{color:var(--paper);align-self:center}
+.hrq div{grid-column:1/-1;display:flex;gap:6px;margin-top:4px}.hrq button{min-height:0;padding:3px 10px;font:600 13px var(--cond)}.hrq .ok{background:var(--gold);color:#000}.hrq kbd{font-size:10px;opacity:.7}
+.hud-req .more{color:var(--dim);font:600 12px var(--cond)}
+.lq-sum .offside{color:#ffc93c;font-size:15px}

@@ -30,7 +30,7 @@ app.addEventListener('keydown', e => { // elementos clicáveis que não são <bu
 });
 // confirma a ação escolhida (botão Agir do celular, Enter e clique no alvo do PC): o minigame de ataque, se houver, abre antes de mandar
 function goAct(id) { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
-  { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } const msg = pick.k === 'it' ? { t: 'use', id: id, item: pick.id, target: tgt } : { t: 'act', id: id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = ''; if (typeof LEQUE !== 'undefined') LEQUE.reset();
+  const msg = pick.k === 'it' ? { t: 'use', id: id, item: pick.id, target: tgt } : { t: 'act', id: id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = ''; if (typeof LEQUE !== 'undefined') LEQUE.reset();
   const who = S.chars[id], s1 = msg.t === 'act' ? SK(msg.skill) : null;
   if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && !gm && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
   send(msg);

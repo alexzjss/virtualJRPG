@@ -1477,6 +1477,14 @@ test('palco 3D (navegador): formação, câmera e imagem de reserva', async () =
   assert.equal(P.frame(RU.axisOf([{ x: 5, y: 5 }, { x: 5, y: 5, enemy: true }]), 10, 10).D, 900); // centros iguais: sem NaN
   assert.deepEqual(P.cameraFor({ kind: 'hero', at: { x: -430, z: 0 } }), { tx: 320, ty: 0, tz: 560, ry: -6 });
   assert.equal(P.cameraFor({ kind: 'foe', at: { x: 40, z: -1500 } }).tz, 180);
+  { // câmera de mesa: o olhar gira para o centro de todos e todos ficam no quadro (quem está atrás do ombro não conta)
+    const pts = [{ x: -430, z: 0 }, { x: 330, z: 60 }, { x: 0, z: -1500 }, { x: 900, z: -1300 }], v = P.cameraFor({ kind: 'table', at: pts[0], pts, w: 1440 });
+    const C = { x: pts.reduce((m, p) => m + p.x, 0) / 4, z: pts.reduce((m, p) => m + p.z, 0) / 4 }, A = P.rotP(pts[0], v.ry), Cr = P.rotP(C, v.ry);
+    assert.ok(Math.abs(Cr.x + v.tx) < 3 && Cr.z < A.z && A.x + v.tx < -150, 'o centro fica à frente, no meio da tela, e quem age à esquerda'); assert.ok(v.ry > 0, 'gira para a direita, onde está a mesa');
+    for (const p of pts) { const q = P.rotP(p, v.ry), z = q.z + v.tz; if (q.z > A.z) continue; assert.ok(z < 1000 && Math.abs((q.x + v.tx) * 1000 / (1000 - z)) <= 720, 'no quadro: ' + JSON.stringify(p)); }
+    const f = P.cameraFor({ kind: 'table', at: { x: 0, z: -1500 }, pts, w: 1440, foe: true }); assert.ok(Math.abs(f.ry) > 90, 'inimigo olha de volta para os heróis');
+    assert.equal(P.unitKind({}, f.ry), 'f'); assert.equal(P.unitKind({ enemy: true }, f.ry), 'f'); assert.equal(P.unitKind({}, 30), 'b');
+  }
   assert.equal(P.imgSrc({ imgF: '/f.png', img: '/i.png' }, 'f').url, '/f.png');
   assert.equal(P.imgSrc({ imgF: '', img: '/i.png' }, 'f').url, '/i.png');
   assert.equal(P.imgSrc({ imgF: '/f.png', img: '/i.png' }, 'f', ['/f.png']).url, '/i.png'); // campo ruim ignorado
