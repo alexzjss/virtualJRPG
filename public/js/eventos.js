@@ -107,7 +107,7 @@ app.addEventListener('click', e => {
   if (d.a === 'planClear') { lsSet('vj.plan.' + d.id, []); return render(); }
   if (d.a === 'planSave') { const n = prompt('Nome da build?'); if (!n) return; lsSet('vj.builds', [...lsGet('vj.builds', []).filter(b => b.name !== n), { name: n.slice(0, 40), nodes: lsGet('vj.plan.' + d.id, []) }].slice(-12)); return render(); }
   if (d.a === 'braveT') { braveOn = !braveOn; return render(); }
-  if (d.a === 'go') { if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
+  if (d.a === 'go') { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
     { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } const msg = pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = '';
     const who = S.chars[d.id], s1 = msg.t === 'act' ? SK(msg.skill) : null;
     if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
@@ -255,7 +255,7 @@ document.addEventListener('keydown', e => {
     return render();
   }
   if (e.target.matches('input,textarea,select')) return;
-  if (!gm && S.battle.active && sub === 'sk' && innerWidth > 700 && skKey(e)) { e.preventDefault(); return; } // seletor de skills: filtro por letras e Shift+F fixa
+  if (!gm && S.battle.active && !S.battle.cmd && app.querySelector('.cmd.mine .skw') && skKey(e)) { e.preventDefault(); return; } // seletor de skills: filtro por letras e Shift+F fixa
   if (gm && (e.key === 'Enter' || e.key === 'Delete')) { const first = Object.entries(S.reqs).sort((a, b) => a[1].n - b[1].n)[0]; if (first) { e.preventDefault(); return send(e.key === 'Enter' ? { t: 'reqOk', id: first[0], ...reqUi[first[0]] } : { t: 'reqNo', id: first[0] }); } }
   if (e.key === 'Enter' && !gm && S.battle.active) { const go = app.querySelector('.cmd.mine .cmd-go .go:not(:disabled)'); if (go && !e.target.matches('button')) { e.preventDefault(); go.click(); return; } } // na sua vez, Enter age
   if (e.key === 'Enter') { const c = app.querySelector('.chat'); if (c) { e.preventDefault(); c.focus(); } return; }
@@ -271,7 +271,7 @@ document.addEventListener('keydown', e => {
   }
   if (!gm && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { // anda na lista de skills/itens
     const os = [...app.querySelectorAll('.cmd .alist .opt:not(:disabled)')]; if (!os.length) return;
-    e.preventDefault(); const i = os.findIndex(o => o.classList.contains('on')); os[(i + (e.key === 'ArrowUp' ? os.length - 1 : 1) + (i < 0 && e.key === 'ArrowDown' ? os.length - 1 : 0)) % os.length].click(); return;
+    e.preventDefault(); const i = os.findIndex(o => o.classList.contains('on')); os[(i + (e.key === 'ArrowUp' ? os.length - 1 : 1) + (i < 0 && e.key === 'ArrowDown' ? os.length - 1 : 0)) % os.length].click(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return;
   }
   if (e.key >= '1' && e.key <= '9') app.querySelectorAll(gm ? '.gcmd .p5i' : '.cmd .p5m .p5i')[e.key - 1]?.click();
 });

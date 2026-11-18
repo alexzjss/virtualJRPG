@@ -48,7 +48,7 @@ function skKey(e) {
   skQ = q;
   const t = S.chars[tgt], flat = skGroups(c, t, q).flatMap(g => g.items);
   if (flat.length && !(pick.k === 'sk' && flat.some(x => x.id === pick.id))) pick = { k: 'sk', id: flat[0].id };
-  render(); return true;
+  render(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return true;
 }
 {
   const css = document.createElement('style');
@@ -72,6 +72,7 @@ function skKey(e) {
 .skpn>b{font:400 20px var(--disp);letter-spacing:.5px;text-transform:uppercase;line-height:1.1}.skpn>small{color:var(--dim);font-size:12px}.skpn>p{margin:2px 0;font-size:12.5px;line-height:1.4}
 .skst{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px}.skst div{background:var(--ink2);padding:3px 6px;font-size:12.5px}.skst em{display:block;font-style:normal;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
 .skpin{margin-top:4px;align-self:flex-start;color:var(--gold)}
+.cmd.p5 .p5t.thin .tgs{gap:4px}.cmd.p5 .p5t.thin .tg{flex:0 1 auto;min-height:0;padding:3px 10px;flex-direction:row;align-items:center;gap:8px}.cmd.p5 .p5t.thin .tg b{font-size:13px;white-space:nowrap}.cmd.p5 .p5t.thin .tg .bar{width:44px;flex:none}
 .pl.pg-mesa .cmd.p5 .alist.skl{max-height:min(40vh,360px)}
 @media(max-width:1100px){.cmd.p5 .skw{grid-template-columns:minmax(0,1fr) 200px}}`;
   document.head.appendChild(css);

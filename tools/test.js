@@ -1431,3 +1431,8 @@ test('lore: golpe de inimigo em herói não grava nada', () => {
   reset(); delete S.lore; const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.weak = ['fis']; e.attrs.AGI = 95; h.attrs.AGI = 1;
   H.battle(gm, { on: true }); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: h.id })); assert.equal(Object.keys(S.lore || {}).length, 0);
 });
+test('lore malformado (importado) não quebra a tela dos jogadores', () => {
+  reset(); mk(ana, {}); const e = mk(gm, { enemy: true }); e.weak = ['fuhaku']; H.battle(gm, { on: true });
+  S.lore = { [e.tpl || e.name]: { w: { x: 1 }, r: 'fis' } };
+  assert.deepEqual(view(ana).chars[e.id].weak, []); delete S.lore;
+});
