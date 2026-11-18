@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { DATA, FILE, OF } from './config.js';
-import { ATTRS, EL, EXTRA, it, sk } from './consts.js';
+import { ATTRS, CLIMA, EL, EXTRA, it, sk } from './consts.js';
 
 
 // ---------- estado ----------
@@ -66,7 +66,7 @@ Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, user
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
-for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; sc.gather ??= []; }
+for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; sc.clima ??= ''; sc.gather ??= []; }
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 if (isNew) S.itemsV = ITEMS_V; else migrateItems();
 fixShape();
@@ -110,7 +110,7 @@ function fixShape() {
     if (!Array.isArray(sc.shop.stock)) sc.shop.stock = [];
     sc.shop.open = !!sc.shop.open;
     if (sc.cam !== null && !isObj(sc.cam)) sc.cam = null;
-    for (const k of ['bg', 'bbg']) if (typeof sc[k] !== 'string') sc[k] = '';
+    for (const k of ['bg', 'bbg']) if (typeof sc[k] !== 'string') sc[k] = ''; if (!CLIMA.includes(sc.clima)) sc.clima = '';
     sc.fogOn = !!sc.fogOn;
   }
   if (S.chase && !(isObj(S.chase) && isObj(S.chase.a) && isObj(S.chase.b))) S.chase = null;

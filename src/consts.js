@@ -22,7 +22,8 @@ const ITYPES = ['cons', 'arma', 'armadura', 'acess', 'mat', 'mun'], WT = ['', ..
 // partes do corpo: atributos penalizados (−10 cada enquanto crítica), status ao ficar crítica, penalidade para mirar, peso no sorteio
 const BODY = { head: [['INT', 'SAB'], 'stun', 30, 6], torso: [['CON'], 'bleed', 0, 40], armL: [['FOR', 'DES'], 'atkDn', 15, 15], armR: [['FOR', 'DES'], 'atkDn', 15, 15], legL: [['AGI'], 'agiDn', 15, 12], legR: [['AGI'], 'agiDn', 15, 12] };
 const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: 'braço esq.', armR: 'braço dir.', legL: 'perna esq.', legR: 'perna dir.' };
-const BBG = ['rubro', 'noite', 'floresta', 'brasa', 'gelo', 'vazio', 'santuario', 'tempestade'];
+const BBG = ['rubro', 'noite', 'floresta', 'brasa', 'gelo', 'vazio', 'santuario', 'tempestade', 'sangue', 'morte', 'conhecimento', 'energia', 'medo', 'estrelas', 'ruinas', 'abismo', 'entardecer', 'nuvens', 'sombrio', 'aurora'];
+const CLIMA = ['', 'chuva', 'neblina', 'cinzas', 'neve', 'brasas']; // clima visual da cena, sobreposto a qualquer fundo (não confundir com RU.CLIMA, o clima mecânico da batalha)
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR', 'po']); // campos numéricos que só o mestre altera
 const EXTRA = { ofi: [], po: 0, pof: [], up: {}, dia: [], rrUsed: 0, vinc: [], aw: [], nen: '', body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
@@ -40,4 +41,4 @@ const FOIL = { kagutsuchi: 'susanoo', susanoo: 'indra', atlas: 'fuhaku', indra: 
 const ELCOL = { fis: '#8d8478', kagutsuchi: '#c2410c', susanoo: '#1d6fa5', atlas: '#8a6a3a', indra: '#b89400', fuhaku: '#2f8f6b', amaterasu: '#b8a44a', tsukuyomi: '#5b3fb0', shukketsu: '#8f0019', hiruko: '#5a8f00' };
 const NUM = { xpR: 1, goldR: 1, arma: 1, armor: 1, gold: 1, po: 1, hp: 1, aura: 1, san: 1, x: 1, y: 1 };
 
-export { ATTRS, BBG, BODY, CAMP, CTRL, DOT, EFF, EL, ELCOL, EXTRA, FOIL, GMF, ITYPES, KINDS, NEW, NUM, PARTS, PL, R, RESN, ROLES, ROLE_N, SCH, STK, STN, TIER, VN, WT, it, sk };
+export { ATTRS, BBG, BODY, CAMP, CLIMA, CTRL, DOT, EFF, EL, ELCOL, EXTRA, FOIL, GMF, ITYPES, KINDS, NEW, NUM, PARTS, PL, R, RESN, ROLES, ROLE_N, SCH, STK, STN, TIER, VN, WT, it, sk };

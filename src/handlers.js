@@ -1,7 +1,7 @@
 import { BASICS, ITEMS_V, VEHICLES, buildItems, buildSkills } from '../content.js';
 import { BASE, addLimit, aiAct, allDown, allOut, applySt, at, at0, bondAdd, breakVow, can, current, d100, delay, doAct, doDefend, doFocus, endTurn, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, newChar, normSlots, ofiSync, okUrl, onMap, partyRef, passive, pick, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, trig, usable, vows } from './rules.js';
 import { S, log, newScene } from './state.js';
-import { ATTRS, BBG, CAMP, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TIER, VN, it, sk } from './consts.js';
+import { ATTRS, BBG, CAMP, CLIMA, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TIER, VN, it, sk } from './consts.js';
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
 import { kick, push, tell, tell0 } from './net.js';
@@ -138,6 +138,7 @@ const H = {
     sc.rows = Math.max(1, Math.round(sc.cols / sc.ar * 1000) / 1000);
     if (m.f === 'bg') sc.bg = okUrl(m.v) ? m.v : '';
     if (m.f === 'bbg') sc.bbg = BBG.includes(m.v) || okUrl(m.v) ? m.v : ''; // fundo da batalha: tema pronto, imagem própria ou '' (usa o mapa)
+    if (m.f === 'clima') sc.clima = CLIMA.includes(m.v) ? m.v : ''; // clima visual sobreposto: '' (nenhum) ou um da lista
     if (m.f === 'name') sc.name = String(m.v).slice(0, 30) || '?';
     if (m.f === 'fogOn') sc.fogOn = !!m.v;
     if (m.f === 'note') sc.note = String(m.v).slice(0, 3000);

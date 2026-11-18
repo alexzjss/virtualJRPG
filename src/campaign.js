@@ -6,7 +6,7 @@ import { fixMedia } from './media.js';
 import { seed } from './seed.js';
 import { int, newChar, okUrl, prep, rid } from './rules.js';
 import { H, NOUNDO, undoStack } from './handlers.js';
-import { ATTRS, BBG, EL, ITYPES, NEW, PARTS, R, SCH, STK, TIER } from './consts.js';
+import { ATTRS, BBG, CLIMA, EL, ITYPES, NEW, PARTS, R, SCH, STK, TIER } from './consts.js';
 import { blocked, ipOf, penalize, same } from './auth.js';
 import { hooks, push } from './net.js';
 
@@ -48,7 +48,7 @@ function cleanCampaign(o) {
   }
   for (const sc of Object.values(o.scenes || {})) {
     for (const k of ['bg', 'music']) if (!okUrl(sc[k])) sc[k] = '';
-    if (!BBG.includes(sc.bbg) && !okUrl(sc.bbg)) sc.bbg = '';
+    if (!BBG.includes(sc.bbg) && !okUrl(sc.bbg)) sc.bbg = ''; if (!CLIMA.includes(sc.clima)) sc.clima = '';
     sc.note = str(sc.note, 3000);
     sc.pins = sc.pins && typeof sc.pins === 'object' ? Object.fromEntries(Object.entries(sc.pins).filter(([id, p]) => okKey(id) && p && typeof p === 'object').map(([id, p]) => [id, { x: int(p.x, 0, 99), y: int(p.y, 0, 99), text: str(p.text, 60), gm: !!p.gm }])) : {};
   }
