@@ -1472,6 +1472,13 @@ test('palco 3D (navegador): formação, câmera e imagem de reserva', async () =
   assert.equal(P.imgSrc({ imgP: '', imgF: '/f.png' }, 'p').url, '/f.png');
   const s = P.imgSrc({ name: 'Ana', color: '#ff0000', imgF: '', img: '' }, 'b'); assert.ok(s.fallback && s.url.startsWith('data:image/svg+xml'));
 });
+test('previewSlot: posição de volta pela soma de tempo, empate pela ordem e aviso de aproximação', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  const t = { me: 0, a: 30, b: 60, c: 90 };
+  assert.deepEqual(P.previewSlot(t, 'me', 70, ['me', 'a', 'b', 'c']), { pos: 2, approx: false });
+  assert.equal(P.previewSlot(t, 'me', 61, ['me', 'a', 'b', 'c']).approx, true);
+});
+
 test('carregar save: fixChar sanea imagens de batalha (texto, escala 0.5..2.5, enquadre objeto)', async () => {
   const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, { name: 'Shin' }); Object.assign(h, { imgF: 5, imgB: null, imgP: {}, imgS: 99, imgK: 'x' });
   const e = mk(gm, { enemy: true, name: 'Oni' }); Object.assign(e, { imgS: 'abc', imgK: [1] });

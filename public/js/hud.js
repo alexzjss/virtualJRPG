@@ -6,8 +6,16 @@ const HUD = (() => {
   const photo = (c, k) => `<img src="${esc(PALCO3D.imgSrc(c, k).url)}" alt="" draggable="false">`;
   const pct = (a, b) => Math.round(Math.max(0, Math.min(100, 100 * a / (b || 1))));
   const hint = (k, label, attrs = '', cls = '') => `<div class="hk ${cls}" ${attrs}>${k === '' ? '' : `<span class="key">${k}</span>`}${label}</div>`;
-  const ordem = (tl) => `<div class="hud-order" aria-label="Ordem dos turnos">${tl.map((id, i) => { const c = S.chars[id];
-    return `<div class="ot ${c.enemy ? 'foe' : 'hero'} ${i ? '' : 'now'}" data-o="${id}" title="${esc(c.name)}">${photo(c, 'p')}</div>`; }).join('')}</div>`;
+  let hlO = null; // retrato/recorte destacado pelo mouse (o #app é redesenhado, o recorte não)
+  // prévia ao vivo: onde o herói da vez volta na fila com a ação destacada (retrato fantasma "VOCÊ" e linha de motivo)
+  const ordem = (tl) => { const pv = LEQUE.timeCost(), sl = pv && PALCO3D.previewSlot(S.battle.ticks, pv.actor.id, pv.cost, tl), gAt = sl ? Math.min(sl.pos + 1, tl.length) : -1;
+    const ghost = sl ? `<div class="ot ghost ${pv.actor.enemy ? 'foe' : 'hero'}" aria-hidden="true">${photo(pv.actor, 'p')}<b>VOCÊ</b></div>` : '';
+    const rows = tl.map((id, i) => { const c = S.chars[id];
+      return `${i === gAt ? ghost : ''}<div class="ot ${c.enemy ? 'foe' : 'hero'} ${i ? '' : 'now'} ${id === hlO ? 'hl' : ''}" data-o="${id}" title="${esc(c.name)}">${photo(c, 'p')}</div>`; }).join('') + (gAt >= tl.length ? ghost : '');
+    return `<div class="hud-order" aria-label="Ordem dos turnos">${rows}${sl ? `<div class="ot-why">◆ ${esc(pv.name)}: ${sl.approx ? '≈' : 'você volta em'} ${sl.pos + 1}º</div>` : ''}</div>`; };
+  // passar o mouse num retrato acende o recorte no palco e vice-versa (classe hl)
+  const hl = id => { hlO = id; document.querySelectorAll('.ot.hl,.bb.hl').forEach(e => e.classList.remove('hl')); if (!id) return; document.querySelectorAll(`.ot[data-o="${id}"],.bb[data-tgt="${id}"]`).forEach(e => e.classList.add('hl')); };
+  document.addEventListener('mouseover', e => { const u = e.target.closest?.('.ot[data-o],.bb[data-tgt]'); hl(u ? u.dataset.o || u.dataset.tgt : null); });
   const topo = (o) => { const lines = S.log.filter(l => !l.to).slice(-3);
     const icons = o.table ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Chat" aria-pressed="${chatOpen}">${ico('chat')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
     const menu = navOpen && !o.table ? `<nav class="hud-menu" aria-label="Páginas">${chips(PAGES, (k, l) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${ico(k)}<span>${k === 'mesa' ? 'Batalha' : l}</span></button>`)}</nav>` : '';

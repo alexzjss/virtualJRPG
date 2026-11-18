@@ -61,6 +61,20 @@ const LEQUE = (() => {
       const af = skAff(s, t);
       return `${s.name} · P${s.power} · ${af === 'w' ? '▲ FRACO · −1 escudo' : af === 'r' ? '▼ resiste' : af === '?' ? '? não testado' : 'neutro'}`;
     },
+    // custo de tempo (mesma conta de endTurn em src/rules.js:369/695) da skill/item destacado ou escolhido, para a prévia da ordem; só para quem age agora
+    timeCost() {
+      if (!cx || !cx.my || cx.wait || cx.gm || !(cx.actor.id in S.battle.ticks)) return null;
+      const c = cx.actor, mode = state.mode, wp = eq(c, 'arma'), t = S.chars[tgt];
+      let s = null, name = ARMAS.prof(wp).atkN || 'Ataque', ct = ARMAS.prof(wp).ct || 100;
+      const id = mode === 'skills' && state.sel < 6 ? six(c)[state.sel] : (mode === 'all' || mode === 'aim') && pick.k === 'sk' ? pick.id : null;
+      if (id && SK(id)) { s = SK(id); name = s.name; ct = s.ct || 100; }
+      else if (mode === 'items' || (mode === 'aim' && pick.k === 'it')) { const k = mode === 'items' ? Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons')[state.sel]?.[0] : pick.id; if (!S.items[k]) return null; name = S.items[k].name; ct = 100; }
+      else if (mode === 'menu' && state.sel > 0) return null; // Skills/Itens no menu ainda não escolheram nada
+      const haste = s?.fx?.find(f => f.t === 'haste' && f.to === 'self');
+      const fraco = !!(s && s.power > 0 && ['dmg', 'mental'].includes(s.kind) && t?.enemy !== c.enemy && t?.weak?.includes(s.el)); // só a fraqueza que o jogador já vê
+      const dly = Math.round(delay(c) / (c.boss ? 2 : 1)); // delay() (nucleo.js) espelha o de src/rules.js:103 sem os modificadores de passivas
+      return { actor: c, name, cost: Math.round(dly * Math.round(ct * (haste ? 1 - haste.v / 100 : 1) * (fraco ? .75 : 1)) / 100) };
+    },
     // clicar num inimigo fora da mira dá zoom nele (de novo, sai)
     zoomClick(id) { const c = S.chars[id]; if (!cx || state.mode === 'aim' || !c?.enemy || c.hp <= 0 || !(id in S.battle.ticks)) return false; if (cx.my) { tgt = id; aim = null; } setZoom(PALCO3D.local.zoom === id ? null : id); return true; },
     aimTarget() { return cx && cx.my && !cx.wait && state.mode === 'aim' ? tgt : null; },

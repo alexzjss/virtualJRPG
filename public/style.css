@@ -1236,6 +1236,10 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .ot::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 55%,var(--side) 100%)}
 .ot.foe{--side:#e4002b88;border-color:#e4002b99}.ot.hero{--side:#ffc93c55}
 .ot.now{width:140px;height:80px;border-color:var(--gold);box-shadow:0 0 0 2px #000,4px 4px 0 var(--red)}
+.ot.hl{border-color:var(--gold);box-shadow:0 0 0 2px #000,0 0 14px var(--gold);transform:translateX(8px)}
+.ot.ghost{border-style:dashed;border-color:#fffc;opacity:.62;pointer-events:none}.ot.ghost b{position:absolute;right:4px;bottom:2px;font:400 13px var(--disp);color:#fff;z-index:2;letter-spacing:1px;text-shadow:0 0 4px #000}
+.ot-why{margin:2px 0 0 10px;width:200px;font:600 12px var(--body,sans-serif);color:var(--gold);text-shadow:0 1px 3px #000}
+.p3d .bb.hl{filter:drop-shadow(0 0 10px var(--gold)) brightness(1.15)}
 .ot.now::before{content:"AGORA";position:absolute;right:4px;bottom:2px;font:400 13px var(--disp);color:var(--gold);z-index:2;letter-spacing:1px}
 .ot img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block}
 .hud-tr{right:104px;top:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:620px;transform:scale(var(--hk,.85));transform-origin:100% 0}

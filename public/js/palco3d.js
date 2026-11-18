@@ -51,8 +51,18 @@
     return [...fix, ...top].slice(0, 6);
   };
 
+  // onde o ator volta na fila se gastar `cost` de tempo: tick de volta = ticks[ator] + cost; pos = quantos dos outros agem antes dele (1 = logo depois do atual); empate pela ordem de `order`
+  // approx: o vizinho mais próximo está a menos de 5% do custo (a previsão pode errar por pouco)
+  const previewSlot = (ticks, actorId, cost, order) => {
+    const T = (ticks[actorId] ?? 0) + cost, ix = id => { const i = order.indexOf(id); return i < 0 ? 1e9 : i; }, me = ix(actorId);
+    const others = Object.keys(ticks).filter(id => id !== actorId);
+    const pos = others.filter(id => ticks[id] < T || (ticks[id] === T && ix(id) < me)).length;
+    const near = others.length ? Math.min(...others.map(id => Math.abs(ticks[id] - T))) : Infinity;
+    return { pos, approx: near < cost * .05 };
+  };
+
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
-  const P = { formation, cameraFor, imgSrc, pickSix, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { formation, cameraFor, imgSrc, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
