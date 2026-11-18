@@ -93,7 +93,7 @@ try {
     check(await until(() => ana.locator('.cmd.mine').count(), 'turno da Ana destacado'), 'turno destacado');
     check(await ana.locator('.cmd-go .go').isEnabled() === true, 'Agir já vem mirado no primeiro inimigo de pé (mira automática na sua vez)');
     check(await until(() => vis(bia, '.hudw.dim'), 'HUD apagado fora da vez'), 'Bia (PC) deveria ver o HUD apagado fora da vez');
-    check(/Vez de Shinkai/i.test(await txt(bia, '.hud-bl')) && !(await vis(bia, '.lq .stroke')), 'Bia não deveria ver o leque na vez da Shinkai');
+    check(/Vez de Shinkai/i.test(await txt(bia, '.hud-cmd')) && !(await vis(bia, '.lq .stroke')), 'Bia não deveria ver o leque na vez da Shinkai');
     await shot(ana, 'batalha'); await shot(bia, 'batalha'); await shot(mesa, 'batalha'); await shot(gmP, 'batalha');
   });
 
@@ -102,9 +102,12 @@ try {
     check(await anaD.locator('.p3d .bb[data-tgt]').count() >= 4, 'palco 3D com recortes');
     check(await anaD.locator('.hud-party .pm').count() >= 2, 'grupo no canto');
     check(await anaD.locator('.hud-order .ot').count() >= 4 && await vis(anaD, '.hud-order .ot.now'), 'ordem dos turnos no canto');
+    check(/SHINKAI/i.test(await txt(anaD, '.hud-order .ot.now .otn')) && await anaD.locator('.hud-order .ot .otn').count() >= 4, 'ordem estilo FFX: plaquetas com nome, a da vez no topo');
+    check(await anaD.evaluate(() => { const c = document.querySelector('.hud-br .hud-cmd'), p = document.querySelector('.hud-br .hud-party'); if (!c || !p) return false; const a = c.getBoundingClientRect(), b = p.getBoundingClientRect(); return a.bottom <= b.top + 2 && a.right > innerWidth * .6; }), 'comandos de turno no canto inferior direito, acima do grupo');
+    check(!(await vis(anaD, '.hud-tgts')), 'sem lista de alvos fora da mira');
     check(await anaD.locator('.cmd').count() === 0, 'o painel antigo não aparece no PC');
     check(!(await vis(anaD, '.top .tnav')) && await vis(anaD, '.hud-tr [data-a=navT]') && await vis(anaD, '.hud-tr [data-a=chatT]'), 'em batalha: sem barra de páginas, com ☰ e chat no HUD');
-    check(await vis(anaD, '.hud-bl [data-a=defend]') && await vis(anaD, '.hud-bl [data-a=braveT]') && await vis(anaD, '.hud-bl [data-a=next]'), 'dicas de Defender, Coragem e Passar');
+    check(await vis(anaD, '.hud-cmd [data-a=defend]') && await vis(anaD, '.hud-cmd [data-a=braveT]') && await vis(anaD, '.hud-cmd [data-a=next]'), 'dicas de Defender, Coragem e Passar');
     await shot(anaD, 'palco3d');
     { const ids = shinkai.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'); shinkai.skPin = ids.slice(0, 1); shinkai.skUse = Object.fromEntries(ids.slice(1, 7).map((k, i) => [k, 9 - i])); push(); await sleep(300); } // fixada e mais usadas para as 6
     await anaD.keyboard.press('2'); await until(() => anaD.locator('.sk6').count(), 'tela das 6 skills');
@@ -122,6 +125,16 @@ try {
     await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sk6').count()), 'seis → menu'), 'Esc das 6 volta ao menu');
     check(await anaD.evaluate(() => pick.k === 'atk'), 'de volta ao menu a escolha é Atacar');
     await anaD.keyboard.press('1'); check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1, 'um alvo marcado'), 'Atacar entra na mira com 1 alvo');
+    // lista de alvos e mão ☞ (a mão é o único marcador; passar o mouse troca o alvo sem mover a câmera; o clique confirma)
+    check(await vis(anaD, '.hud-tgts .ta.on .tah') && await anaD.locator('.hud-tgts .ta').count() >= 2, 'na mira, lista de alvos no canto com a mão no atual');
+    check(await until(() => anaD.evaluate(() => { const h = document.querySelector('.hand'), t = document.querySelector('.p3d .bb.tgt'); if (!h || !t || getComputedStyle(h).opacity === '0') return false; const a = h.getBoundingClientRect(), r = t.getBoundingClientRect(); return h.textContent === S.chars[tgt].name && Math.abs((a.top + a.bottom) / 2 - (r.top + r.height * .38)) < 60 && (a.right <= r.left + 6 || a.left >= r.right - 6); }), 'mão ao lado do alvo'), 'a mão aponta o alvo mirado, com o nome');
+    { const t0 = await anaD.evaluate(() => tgt), cam0 = await anaD.evaluate(() => PALCO3D.local.aim), o = await anaD.evaluate(t => [...document.querySelectorAll('.p3d .bb.foe:not(.ko)')].map(e => e.dataset.tgt).find(id => id !== t), t0);
+      await anaD.locator(`.p3d .bb[data-tgt="${o}"] .bbi`).dispatchEvent('mouseover');
+      check(await until(() => anaD.evaluate(o => tgt === o && document.querySelector('.hand b')?.textContent === S.chars[o].name, o), 'hover troca o alvo'), 'passar o mouse noutro inimigo troca o alvo e leva a mão');
+      check(await anaD.evaluate(c => PALCO3D.local.aim === c, cam0), 'a troca pelo mouse não move a câmera');
+      check(await vis(anaD, `.hud-tgts .ta.on[data-tgt="${o}"]`), 'a lista acompanha o alvo do mouse');
+      await anaD.locator('.p3d .bb.tgt').first().dispatchEvent('mouseover'); await anaD.keyboard.press('ArrowRight'); await sleep(150);
+      check(await anaD.evaluate(() => PALCO3D.local.aim === tgt), '←/→ movem a câmera de novo'); }
     await shot(anaD, 'mira');
     // ficha do alvo, barra do topo, zoom e alvo que some (Task 6)
     check(await until(() => vis(anaD, '.hud-sheet .sheet'), 'ficha do alvo'), 'com a mira aberta a ficha do alvo está visível');
@@ -192,11 +205,11 @@ try {
     check(toTurn(shinkai.id), 'vez da Shinkai'); await myTurn(anaD, shinkai.id, 'leque da Ana (aprovação ligada)');
     await anaD.keyboard.press('1'); await anaD.keyboard.press('Enter');
     await until(() => Object.keys(S.reqs).length, 'o pedido de ação chega ao mestre');
-    await until(() => vis(anaD, '.hud-bl .pend'), 'selo "Aguardando o mestre"');
-    check(/Aguardando o mestre/i.test(await txt(anaD, '.hud-bl .pend')), 'o selo cita o pedido');
-    push(); await sleep(350); check(await vis(anaD, '.hud-bl .pend') && !(await vis(anaD, '.lq .stroke')), 'o selo sobrevive a um push() e o leque some enquanto espera');
+    await until(() => vis(anaD, '.hud-cmd .pend'), 'selo "Aguardando o mestre"');
+    check(/Aguardando o mestre/i.test(await txt(anaD, '.hud-cmd .pend')), 'o selo cita o pedido');
+    push(); await sleep(350); check(await vis(anaD, '.hud-cmd .pend') && !(await vis(anaD, '.lq .stroke')), 'o selo sobrevive a um push() e o leque some enquanto espera');
     await anaD.keyboard.press('Escape'); await until(() => !Object.keys(S.reqs).length, 'Esc cancela o pedido (reqNo)');
-    await until(async () => !(await vis(anaD, '.hud-bl .pend')), 'o selo some');
+    await until(async () => !(await vis(anaD, '.hud-cmd .pend')), 'o selo some');
     S.auto.act = true; push();
     await anaD.context().close(); // o palco 3D pesa na renderização por software: a Ana do PC sai para não atrasar os blocos seguintes
   });
@@ -206,8 +219,10 @@ try {
     go({ t: 'ini', k: 'set', id: foe.id, v: 0 }); check(current() === foe.id || toTurn(foe.id), 'vez do inimigo'); await until(() => gmP.locator('[data-a="ai"].stroke').count(), 'leque do mestre na vez do inimigo');
     check(await nGm() === 0, 'barra antiga some no PC');
     check(await gmP.locator('[data-a="ai"].stroke').count() === 1, 'mestre tem IA decide no leque');
+    check(await vis(gmP, '.hud-br .hud-cmd [data-a=defend]') && await vis(gmP, '.hud-br .hud-cmd [data-a=next]') && await gmP.locator('.lq .stroke[data-lq=next]').count() === 0, 'mestre: Defender/Passar na fileira do canto, não no leque');
     check(await gmP.locator('.lq .stroke[data-lq=atk]').count() === 1 && await gmP.locator('.lq-gm-open').count() === 0, 'inimigo: Atacar no leque e sem botão recolhido');
     await gmP.keyboard.press('1'); check(await until(async () => await gmP.locator('.lq-sum').count() === 1, 'mira do mestre'), 'Atacar abre a mira');
+    check(await vis(gmP, '.hud-br .hud-tgts .ta.on'), 'mestre: lista de alvos na mira');
     const sa = S.seq; await gmP.keyboard.press('Enter'); await until(() => S.seq > sa, 'ataque do inimigo pelo leque do mestre');
     await gmP.keyboard.press('Escape'); go({ t: 'ini', k: 'set', id: foe.id, v: 1e6 });
     check(toTurn(shinkai.id), 'vez da Shinkai'); await until(() => gmP.locator('.lq-gm-open').count(), 'leque do herói recolhido (dono conectado)');
@@ -309,9 +324,9 @@ try {
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
     check(toTurn(mikhail.id), 'vez da Mikhail para o Ataque Total'); const pg = bia; // a vez de quem tem tela aberta (o Thomas não tem)
-    await until(async () => await pg.locator('.hud-bl [data-a=allOut]').count(), 'Ataque Total liberado com todos Derrubados');
+    await until(async () => await pg.locator('.hud-cmd [data-a=allOut]').count(), 'Ataque Total liberado com todos Derrubados');
     const hp1 = bossCh.hp + minion.hp;
-    await pg.locator('.hud-bl [data-a=allOut]').dispatchEvent('click'); // a dica pulsa sem parar: o clique vai direto nela
+    await pg.locator('.hud-cmd [data-a=allOut]').dispatchEvent('click'); // a dica pulsa sem parar: o clique vai direto nela
     await until(() => /ATAQUE TOTAL|Ataque Total/i.test(battleLog()), 'registro do Ataque Total');
     await until(() => bossCh.hp + minion.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');

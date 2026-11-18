@@ -4,13 +4,35 @@
 (g => {
   const POS_H = [[-430, 0], [330, 60], [610, -120], [90, -200]], COLS_F = 5; // heróis: 4 por fileira; inimigos: arco de 5
   const n0 = v => v + 0; // evita -0
-  // posição (x, z) de cada combatente; a 2ª fileira fica atrás da 1ª
-  const formation = (heroIds, foeIds) => {
-    const M = new Map();
-    heroIds.forEach((id, i) => { const [x, z] = POS_H[i % 4]; M.set(id, { x, z: z - 260 * Math.floor(i / 4) }); });
-    const C = Math.min(COLS_F, foeIds.length), mid = (C - 1) / 2;
-    foeIds.forEach((id, i) => { const col = i % COLS_F, row = Math.floor(i / COLS_F), d = mid ? Math.abs(col - mid) / mid : 0; // d: 0 no centro, 1 nas pontas
-      M.set(id, { x: n0(Math.round((col - mid) * 370 + 185 * row)), z: n0(Math.round(-1450 - 200 * d - 300 * row)) }); });
+  // ----- grid → mundo -----
+  const MIN_SEP = 230, clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  // fr: eixo da batalha (ax) + escala; a profundidade entre os grupos fica entre 900 e 2600 px
+  const frame = (ax, cols, rows) => { const d = ax?.d || 0, D = clamp(d * 260, 900, 2600); return { a: ax?.a || 0, cx: ax?.cx || 0, cy: ax?.cy || 0, k: d > 0 ? D / d : 260, D, cols, rows }; };
+  // origem no centro dos heróis; z = -along * k (inimigos ao fundo), x = perp * k (a direita do eixo vai para +x)
+  const toWorld = (gx, gy, fr) => {
+    const dx = gx - fr.cx, dy = gy - fr.cy, c = Math.cos(fr.a), s = Math.sin(fr.a), along = dx * c + dy * s, perp = -dx * s + dy * c;
+    return { x: n0(Math.round(clamp(perp * fr.k, -1000, 1000))), z: n0(Math.round(clamp(-along * fr.k, -fr.D - 900, 400))) };
+  };
+  // posição (x, z) de cada combatente: do grid; sem posição, slot de reserva do seu lado; depois separa quem ficou colado
+  const formation = (chars, fr) => {
+    const M = new Map(), ids = [];
+    let ih = 0, ie = 0;
+    const placed = c => c.x != null && c.y != null;
+    for (const c of chars) { if (placed(c)) M.set(c.id, toWorld(c.x, c.y, fr)); ids.push(c.id); }
+    const nFoe = chars.filter(c => c.enemy && !placed(c)).length, C = Math.min(COLS_F, nFoe), mid = (C - 1) / 2;
+    for (const c of chars) {
+      if (placed(c)) continue;
+      if (!c.enemy) { const i = ih++, [x, z] = POS_H[i % 4]; M.set(c.id, { x, z: n0(z - 260 * Math.floor(i / 4)) }); }
+      else { const i = ie++, col = i % COLS_F, row = Math.floor(i / COLS_F), d = mid ? Math.abs(col - mid) / mid : 0;
+        M.set(c.id, { x: n0(Math.round((col - mid) * 370 + 185 * row)), z: n0(Math.round(-fr.D - 200 * d - 300 * row)) }); }
+    }
+    for (let pass = 0; pass < 8; pass++) { let moved = false;
+      for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+        const a = M.get(ids[i]), b = M.get(ids[j]), dz = a.z - b.z; if (Math.hypot(a.x - b.x, dz) >= MIN_SEP) continue;
+        const need = Math.sqrt(MIN_SEP * MIN_SEP - dz * dz), gap = Math.ceil((need - Math.abs(a.x - b.x)) / 2), dir = a.x <= b.x ? -1 : 1; // a para a esquerda, a menos que já esteja à direita
+        a.x = n0(a.x + dir * gap); b.x = n0(b.x - dir * gap); moved = true;
+      }
+      if (!moved) break; }
     return M;
   };
   // câmera: translate3d(tx,ty,tz) rotateY(ry) aplicado ao mundo
@@ -73,12 +95,12 @@
   };
 
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
-  const P = { formation, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
   const els = new Map(); // id -> { el, img, mini, sh, hpb, bad: [], key... }
-  let lastF = null, camLock = null, fastT = 0; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
+  let lastF = null, lastFr = null, camLock = null, fastT = 0; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
   const el = (tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
   const ensure = () => {
     if (root) return;
@@ -136,12 +158,12 @@
   };
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
-    const F = formation(inB.filter(c => !c.enemy).map(c => c.id), inB.filter(c => c.enemy).map(c => c.id));
+    const sc = S.scenes[S.scene] || {}, fr = frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows), F = formation(inB, fr);
     for (const [id, u] of els) if (!inB.some(c => c.id === id)) { u.el.remove(); els.delete(id); }
     for (const c of inB) {
       let u = els.get(c.id); if (!u) { u = mkUnit(c); els.set(c.id, u); }
-      const p = F.get(c.id), z = p.z + (c === cur && c.enemy ? 900 : 0), pos = p.x + ',' + z;
-      if (u.pos !== pos && !u.lunging) { u.pos = pos; u.el.style.setProperty('--x', p.x); u.el.style.setProperty('--z', z); }
+      const p = F.get(c.id), adv = c === cur && c.enemy, x = adv ? Math.round(p.x / 2) : p.x, z = adv ? Math.round(p.z / 2) : p.z, pos = x + ',' + z; // inimigo na vez anda metade do caminho até os heróis
+      if (u.pos !== pos && !u.lunging) { u.pos = pos; u.el.style.setProperty('--x', x); u.el.style.setProperty('--z', z); }
       const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u);
       u.el.classList.toggle('ko', c.hp <= 0); if (c.hp > 0) u.el.classList.remove('kofall'); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
@@ -149,7 +171,7 @@
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
         if (u.mini !== m + w) { u.mini = m + w; u.sh.textContent = m; u.sh.hidden = !m; u.hpi.style.width = w; } }
     }
-    lastF = F; return F;
+    lastF = F; lastFr = fr; return F;
   };
   // alvo que some (removido, caído ou oculto): a mira vai para o próximo inimigo de pé e o zoom fecha; devolve se algo mudou
   const vivo = id => { const c = S.chars[id]; return !!c && id in S.battle.ticks && c.hp > 0 && !c.dead; };

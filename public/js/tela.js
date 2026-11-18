@@ -73,7 +73,7 @@ function render() {
   app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody,.skl').forEach((el, i) => el.scrollTop = scr[i] || 0);
   { const sc2 = S.scenes[S.scene]; if (sc2.cam && sc2.cam.n !== lastCam) { const w = mapEl()?.offsetWidth; if (w) { lastCam = sc2.cam.n; Object.assign(view, { z: sc2.cam.z, x: sc2.cam.fx * w, y: sc2.cam.fy * w }); applyView(); } } } // vista fixada pelo mestre
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
-  PALCO3D.local.aim = LEQUE.aimTarget(); // a câmera enquadra o alvo enquanto o leque está na mira
+  PALCO3D.local.aim = LEQUE.camTarget(); // a câmera enquadra o alvo enquanto o leque está na mira (a troca pelo mouse não a move)
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
   fx();
 }

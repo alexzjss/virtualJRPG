@@ -1462,9 +1462,19 @@ test('pickSix: fixadas primeiro, depois as mais usadas, até 6, sem repetir e s�
 });
 test('palco 3D (navegador): formação, câmera e imagem de reserva', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
-  const F = P.formation(['a', 'b', 'c', 'd', 'e'], ['x', 'y', 'z', 'w', 'v', 'u']);
-  assert.deepEqual(F.get('a'), { x: -430, z: 0 }); assert.ok(F.get('e').z < F.get('a').z - 200); // 5º herói na 2ª fileira
-  assert.ok([...'xyzwv'].every(k => F.get(k).z <= -1400)); assert.ok(F.get('u').z < F.get('x').z - 250);
+  const fr = P.frame({ a: 0, cx: 1, cy: 3, d: 8 }, 20, 10);
+  assert.equal(fr.D, 2080);
+  const F = P.formation([{ id: 'h', x: 1, y: 3 }, { id: 'e', x: 9, y: 3, enemy: true }, { id: 'f', x: 9, y: 0, enemy: true }], fr);
+  assert.deepEqual(F.get('h'), { x: 0, z: 0 }); assert.equal(F.get('e').z, -2080);
+  assert.ok(F.get('f').x < F.get('e').x);                                            // y menor = esquerda do eixo
+  const far = P.formation([{ id: 'h', x: 0, y: 0 }, { id: 'e', x: 79, y: 40, enemy: true }], P.frame({ a: .47, cx: .5, cy: .5, d: 88 }, 80, 45));
+  assert.ok(far.get('e').z >= -3500 && Math.abs(far.get('e').x) <= 1000);            // mapa enorme: satura
+  const same = P.formation([{ id: 'a', x: 2, y: 2 }, { id: 'b', x: 2, y: 2 }], P.frame({ a: 0, cx: 2, cy: 2, d: 0 }, 10, 10));
+  assert.ok(Math.abs(same.get('a').x - same.get('b').x) >= 230);                       // colisão separa
+  const off = P.formation([{ id: 'h', x: 1, y: 3 }, { id: 'n', x: null, y: null }], fr);
+  assert.ok(Math.hypot(off.get('n').x - off.get('h').x, off.get('n').z - off.get('h').z) >= 230); // sem posição: slot livre
+  assert.ok(!Object.is(F.get('h').x, -0));
+  assert.equal(P.frame(RU.axisOf([{ x: 5, y: 5 }, { x: 5, y: 5, enemy: true }]), 10, 10).D, 900); // centros iguais: sem NaN
   assert.deepEqual(P.cameraFor({ kind: 'hero', at: { x: -430, z: 0 } }), { tx: 320, ty: 0, tz: 560, ry: -6 });
   assert.equal(P.cameraFor({ kind: 'foe', at: { x: 40, z: -1500 } }).tz, 180);
   assert.equal(P.imgSrc({ imgF: '/f.png', img: '/i.png' }, 'f').url, '/f.png');

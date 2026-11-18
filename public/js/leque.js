@@ -4,7 +4,7 @@
 // Posições em coordenadas de 1440×860 (a câmera sempre põe o herói no mesmo lugar); o CSS escala tudo pelo --hk.
 const LEQUE = (() => {
   const state = { mode: 'menu', sel: 0 }; // mode: menu | skills (as 6 fixadas, tarefa 5) | all (lista inteira) | items | aim
-  let from = 'menu', listFrom = 'menu', turnKey = '', cx = null, gmOpen = ''; // from: de onde a mira veio (Esc volta para lá); listFrom: de onde a lista completa veio (as 6 ou o menu); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
+  let from = 'menu', listFrom = 'menu', turnKey = '', cx = null, gmOpen = '', hovTgt = null, camId = null; // hovTgt: alvo escolhido pelo mouse (não move a câmera); camId: alvo que a câmera enquadra // from: de onde a mira veio (Esc volta para lá); listFrom: de onde a lista completa veio (as 6 ou o menu); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
   const donoOn = c => !c.enemy && !!c.owner && (S.online || []).includes(String(c.owner).toLowerCase()); // o jogador dono do herói está conectado (o mestre só age por ele se quiser)
   const ATK = { k: 'atk', id: 'atk' };
   const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
@@ -79,10 +79,19 @@ const LEQUE = (() => {
     // clicar num inimigo fora da mira dá zoom nele (de novo, sai)
     zoomClick(id) { const c = S.chars[id]; if (!cx || state.mode === 'aim' || !c?.enemy || c.hp <= 0 || !(id in S.battle.ticks)) return false; if (cx.my) { tgt = id; aim = null; } setZoom(PALCO3D.local.zoom === id ? null : id); return true; },
     aimTarget() { return cx && cx.my && !cx.wait && state.mode === 'aim' ? tgt : null; },
+    // quem está no leque agora (shown: as pinceladas estão na tela, não recolhidas nem escondidas)
+    ctx() { return cx; },
+    // candidatos da lista de alvos do canto: só com a mira aberta
+    aimList() { return cx && cx.shown && this.aimTarget() && !S.battle.cmd ? cands() : []; },
+    // passar o mouse num candidato durante a mira troca o alvo (a mão vai junto; o clique confirma)
+    hover(id) { if (!cx || !cx.shown || !this.aimTarget() || id === tgt || !cands().some(o => o.id === id)) return false; tgt = id; aim = null; hovTgt = id; render(); return true; },
+    // alvo que a câmera enquadra: a troca pelo mouse não move a câmera (senão o palco andaria sob o mouse e trocaria de novo); teclado e clique movem
+    camTarget() { const a = this.aimTarget(); if (!a) { camId = null; return null; }
+      if (tgt !== hovTgt || !camId || !cands().some(o => o.id === camId)) camId = a; return camId; },
     // opts.gm: leque do mestre para quem está na vez (herói ou inimigo), no lugar da barra .gcmd
     html(c, cur, opts = {}) {
       const [, rq] = myReq() || [], my = cur === c, wait = !!(rq && rq.ch === c.id), gmO = !!opts.gm;
-      cx = { actor: c, cur, my, wait, gm: gmO };
+      cx = { actor: c, cur, my, wait, gm: gmO, shown: false };
       const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; gmOpen = ''; PALCO3D.local.zoom = null; if (gmO) { const f = battlers().find(o => o.enemy !== c.enemy && o.hp > 0); if (f) tgt = f.id; } }
       if (!my || wait || S.battle.cmd) return '';
       if (gmO && donoOn(c) && gmOpen !== tk) return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox"><button type="button" class="lq-gm-open" data-lq="gmopen" title="${esc(c.owner)} está conectado: o leque fica recolhido até você pedir">Agir por ${esc(c.name)}</button></div></div>`;
@@ -95,9 +104,9 @@ const LEQUE = (() => {
       let h = '';
       if (mode === 'menu') {
         const M = [['atk', 1, 'Atacar', esc(ARMAS.prof(wp).atkN || 'Ataque'), wpnLine(wp, c)], ['sk', 2, 'Skills', sks.length + wsks.length], ['it', 3, 'Itens', cons.length]];
-        h += [2, 1, 0].map((k, j) => stroke(M[k][0], M[k][1], M[k][2], M[k][3], 650 + j * 40, 410 + j * 78, { on: sel === k, title: M[k][4] })).join('');
+        h += [2, 1, 0].map((k, j) => stroke(M[k][0], M[k][1], M[k][2], M[k][3], 650 + j * 40, 340 + j * 78, { on: sel === k, title: M[k][4] })).join('');
         if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24 });
-        if (gmO) { h += stroke('next', '7', 'Passar', '', 150, 440, { r: 4, fs: 24 }); if (c.enemy) h += stroke('ai', 'I', 'IA decide', '', 610, 332, { a: 'ai' }); }
+        if (gmO && c.enemy) h += stroke('ai', 'I', 'IA decide', '', 610, 262, { a: 'ai' }); // Passar e os outros comandos de turno estão na fileira do canto (hud.js)
       } else if (mode === 'items') {
         h += cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, 600 + j * 36, 400 + j * 76, { v: k, on: sel === j, fs: 24 })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
       } else if (mode === 'skills') {
@@ -105,7 +114,7 @@ const LEQUE = (() => {
         const one = (i, big) => { const id = S6[i], s2 = SK(id), off = blocked(c, s2, id) ? blockWhy(c, s2, id) : '', af = skAff(s2, t), a = af ? `<span class="af ${af === 'r' ? 'r' : af === '?' ? 'q' : ''}">${AF[af]}</span>` : '', e = `<span class="el" style="--e:${ELC[s2.el] || '#888'}"></span>`;
           return `<div class="stroke ${big ? 'big' : ''} ${sel === i ? 'on' : ''} ${off ? 'blk' : ''}" role="button" data-lq="skp" data-sk="${esc(id)}" data-v="${esc(id)}" ${off ? `title="${esc(off)}"` : ''}>${big ? `${dia(s2)}<div class="sk6n">${c.skPin?.includes(id) ? '<span class="star">★</span>' : ''}${e}${esc(s2.name)} ${a}</div><div class="t">${esc(KIND[s2.kind] || s2.kind)} · ${esc(EL[s2.el] || s2.el)}${s2.power ? ` · Poder ${s2.power}` : ''}${af === 'w' ? ' · <span class="w">▲ alvo fraco</span>' : ''}</div><p>${esc(desc(s2))}</p>${off ? `<div class="why">Bloqueada: ${esc(off)}</div>` : ''}` : `${e}${esc(s2.name)} ${a}${dia(s2)}`}</div>`; };
         h += `<div class="sk6">${[3, 4, 5].filter(i => i < S6.length).map((i, j) => `<div class="sk6p" style="left:${560 + j * 14}px;top:${330 + j * 66}px">${one(i, 0)}</div>`).join('')}${[0, 1, 2].filter(i => i < S6.length).map((i, j) => `<div class="sk6p" style="left:${920 + j * 14}px;top:${230 + j * 128}px">${one(i, 1)}</div>`).join('')}</div>`;
-        h += stroke('all', 'T', 'Todas as skills…', String(usables(c).length), 600, 530, { on: sel === 6, r: -6, fs: 20 });
+        h += stroke('all', 'T', 'Todas as skills…', String(usables(c).length), 600, 505, { on: sel === 6, r: -6, fs: 20 });
       } else if (mode === 'all') {
         h += `<div class="lq-all">${skPane(c, t, { bare: true })}</div>`;
         const cur2 = pick.k === 'sk' && s, w = cur2 && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
@@ -113,12 +122,13 @@ const LEQUE = (() => {
       } else if (mode === 'aim') {
         const label = it ? it.name : s ? s.name : ARMAS.prof(wp).atkN || 'Ataque', w = why();
         h += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b><small>${w ? `<span class="why">${esc(w)}</span> · ` : ''}← → escolhem o alvo · clique de novo no alvo confirma · Esc volta</small></div>`;
-        h += stroke('go', '⏎', esc(askL('act', 'Agir')), '', 730, 566, { on: !w, blk: !!w });
+        h += stroke('go', '⏎', esc(askL('act', 'Agir')), '', 430, 600, { on: !w, blk: !!w });
         if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24, on: aimOpen });
         if (canAim() && aimOpen) h += `<div class="lq-aim">${aimBox()}</div>`;
         const allies = battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0);
         if (allies.length && !allySide() && cands().some(o => o.enemy)) h += stroke('pass', 'P', 'Fraqueza passa a vez', esc(passTo ? S.chars[passTo]?.name || '' : 'ninguém'), 150, 430, { r: 4, fs: 20 });
       }
+      cx.shown = true;
       return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox mode-${mode}">${h}</div></div>`;
     },
     // clique numa pincelada
@@ -161,8 +171,8 @@ const LEQUE = (() => {
       if (mode === 'all' && skKey(e)) return true; // letras filtram a lista; Shift+F fixa
       if (/^[1-3]$/.test(k) && mode === 'menu') { click(['atk', 'sk', 'it'][k - 1]); return true; }
       if (e.target.matches?.('button') && (k === 'Enter' || k === ' ')) return false; // o botão focado já age no clique
-      if (cx.gm && /^[4-8]$/.test(k)) { if (k === '7' && mode === 'menu') click('next'); return true; } // o mestre não tem as dicas de Defender, Coragem e afins
       if (cx.gm && /^[iI]$/.test(k) && mode === 'menu' && c.enemy) { click('ai'); return true; }
+      // 4–8: a fileira do canto (jogador e mestre)
       if (/^[4-8]$/.test(k)) { hint({ 4: 'defend', 5: 'focus', 6: 'braveT', 7: 'next', 8: 'allOut' }[k]); return true; }
       if (/^[qQ]$/.test(k) && canAim() && mode !== 'all' && mode !== 'items' && mode !== 'skills') { click('aim'); return true; }
       if (/^[tT]$/.test(k) && mode !== 'aim') { click('all'); return true; }
