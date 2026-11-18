@@ -96,7 +96,8 @@
 
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
-  const P = { frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
+  const P = { lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
@@ -201,15 +202,16 @@
     requestAnimationFrame(place); clearTimeout(settle); settle = setTimeout(place, 400); // a página ainda anima a entrada (a posição final só vem depois)
   };
   // investida: a câmera corre até o alvo (0,45 s) e o recorte de quem age avança até a frente dele; resolve no impacto e volta sozinho
-  const LG_MS = 450, LG_HOLD = 500; // ida, pausa no alvo (o número nasce aqui), volta de 0,45 s: ~1,4 s no total
+  const LG_HOLD = 500; // pausa no alvo (o número nasce aqui); ida e volta duram lungeMs(distância)
   P.lunge = (fromId, toId) => new Promise(res => {
     const a = els.get(fromId), F = lastF, to = F?.get(toId), from = F?.get(fromId);
     if (!a || !to || !from || fromId === toId || !root || root.style.display === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return res();
     const z0 = +a.el.style.getPropertyValue('--z') || from.z, dz = Math.sign(z0 - to.z) || 1, dx = Math.sign(from.x - to.x) || -1;
-    camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to } : { kind: 'hero', at: to }); world.classList.add('fast'); camera(F);
-    a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--x', to.x + 140 * dx); a.el.style.setProperty('--z', to.z + 260 * dz);
-    setTimeout(res, LG_MS);
-    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; camLock = null; if (lastF && root.style.display !== 'none') { units(); camera(lastF); } setTimeout(() => world.classList.remove('fast'), LG_MS); }, LG_MS + LG_HOLD);
+    const tx = to.x + 140 * dx, tz = to.z + 260 * dz, ms = lungeMs(Math.hypot(tx - (+a.el.style.getPropertyValue('--x') || from.x), tz - z0));
+    camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to } : { kind: 'hero', at: to }); world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(F);
+    a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--lg', ms + 'ms'); a.el.style.setProperty('--x', tx); a.el.style.setProperty('--z', tz);
+    setTimeout(res, ms);
+    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; camLock = null; if (lastF && root.style.display !== 'none') { units(); camera(lastF); } setTimeout(() => { world.classList.remove('fast'); world.style.removeProperty('--lg'); }, ms); }, ms + LG_HOLD);
   });
   // impacto no recorte: tremida curta (classe hurt por 450 ms)
   P.shake = id => { const u = els.get(id); if (!u) return; u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };

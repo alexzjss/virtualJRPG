@@ -99,6 +99,7 @@ app.addEventListener('click', e => {
   if (d.a === 'skRotR') return MANDALA.rotate(1);
   if (d.a === 'skTab') { skTab = d.v; lsSet('vj.skTab', d.v); return render(); }
   if (d.a === 'skDrawer') { skDrawer = !skDrawer; return render(); }
+  if (d.a === 'reframe') return send({ t: 'battleReframe' });
   if (d.a === 'navT') { navOpen = !navOpen; return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'chatSend') return sayChat(e.target.closest('.chatin').querySelector('input'));

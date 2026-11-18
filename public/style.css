@@ -616,6 +616,7 @@ button.pulse{animation:pulse 1.1s ease-in-out infinite}@keyframes pulse{50%{box-
 .fbar span{padding:.15rem .55rem;border:1px solid currentColor;border-radius:99px;opacity:.9}
 .fbar .chain b{display:inline-block;vertical-align:middle;width:5.5rem;height:.5rem;margin:0 .35rem;border-radius:99px;background:linear-gradient(90deg,#f5c518 var(--p),rgba(255,255,255,.18) var(--p))}
 .fbar .dom{color:#ff7a59;font-weight:600}
+.fbar .reframe{pointer-events:auto;cursor:pointer;font:inherit;color:inherit;background:rgba(0,0,0,.55);padding:.15rem .55rem;border:1px solid currentColor;border-radius:99px}.fbar .reframe:hover{background:#fff2}
 .brk,.rit{font-size:.7rem;letter-spacing:.04em;opacity:.9}
 .brk{color:#ffd24a}
 .rhythm{display:flex;flex-wrap:wrap;gap:.4rem;margin:.4rem 0}
@@ -1194,7 +1195,7 @@ body .p3d .bbplane.stage{display:block;min-height:0;height:2600px;background:#05
 .p3d .ground{position:absolute;left:-3000px;top:-3000px;width:6000px;height:6000px;transform:rotateX(90deg);
  background:radial-gradient(closest-side,#3a3a2a 0%,#1b1d17 45%,transparent 75%),repeating-linear-gradient(0deg,#ffc93c0d 0 2px,transparent 2px 160px),repeating-linear-gradient(90deg,#ffc93c0d 0 2px,transparent 2px 160px)}
 .p3d .fog{position:absolute;left:-3000px;top:-700px;width:6000px;height:800px;transform:translateZ(-1900px);background:linear-gradient(180deg,transparent,#c9b9a033 70%,transparent);pointer-events:none}
-.p3d .bb{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;outline:0;transform:translate3d(calc(var(--x,0)*1px),0,calc(var(--z,0)*1px)) translate(-50%,-100%);transition:transform .45s cubic-bezier(.4,0,.2,1),filter .3s}
+.p3d .bb{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;outline:0;transform:translate3d(calc(var(--x,0)*1px),0,calc(var(--z,0)*1px)) translate(-50%,-100%);transition:transform .6s cubic-bezier(.4,0,.2,1),filter .3s}
 .p3d .bb img{display:block;height:var(--h,300px);width:auto;transform-origin:50% 100%;filter:drop-shadow(0 18px 18px #000a)}
 .p3d .bb .shadow{position:absolute;left:10%;right:10%;bottom:-14px;height:28px;border-radius:50%;background:#000a;filter:blur(6px);z-index:-1}
 .p3d .bb:focus-visible img{filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 18px #ffc93c) drop-shadow(0 18px 18px #000a)}
@@ -1213,7 +1214,7 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .p3d .bb .bbi{position:relative;transform-origin:50% 100%}
 .p3d .bb.cast .bbi{animation:bbcast .7s ease-out}@keyframes bbcast{35%{transform:translateY(-6%) scale(1.14)}}
 .p3d .bb.lunge .bbi{animation:bblunge .55s cubic-bezier(.3,1.6,.5,1)}@keyframes bblunge{40%{transform:translateY(-4%) scale(1.16)}}
-.p3d .bb.hit .bbi{animation:bbhit .5s}.p3d .bb.hurt{filter:brightness(1.6)}.p3d .world.fast{transition-duration:.45s}.p3d .bb.lunging{transition-duration:.45s;z-index:3}@keyframes bbhit{15%{transform:translateX(-5%) rotate(-3deg);filter:brightness(2.2)}40%{transform:translateX(4%) rotate(2deg)}65%{transform:translateX(-2%)}}
+.p3d .bb.hit .bbi{animation:bbhit .5s}.p3d .bb.hurt{filter:brightness(1.6)}.p3d .world.fast{transition-duration:var(--lg,.45s)}.p3d .bb.lunging{transition-duration:var(--lg,.45s);z-index:3}@keyframes bbhit{15%{transform:translateX(-5%) rotate(-3deg);filter:brightness(2.2)}40%{transform:translateX(4%) rotate(2deg)}65%{transform:translateX(-2%)}}
 .p3d .bb.dodge .bbi{animation:bbdodge .5s ease-out}@keyframes bbdodge{35%{transform:translateX(12%) rotate(4deg);opacity:.7}}
 .p3d .bb.kofall .bbi{animation:bbkofall .8s cubic-bezier(.5,0,.8,.4) both}@keyframes bbkofall{0%{filter:brightness(3) saturate(0)}25%{filter:brightness(1.6)}100%{filter:grayscale(1) brightness(.45);transform:rotate(-3deg) translateY(3%)}}
 .p3d .bb.mendfx .bbi{animation:bbmend .8s ease-out}@keyframes bbmend{30%{filter:drop-shadow(0 0 24px #3ddc84) brightness(1.4)}}

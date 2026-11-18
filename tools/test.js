@@ -1530,3 +1530,7 @@ test('battle: grava o eixo ao ligar; reenquadrar só o mestre', () => {
   H.battleReframe(ana); assert.equal(S.battle.ax.a, 0);
   H.battleReframe(gm); assert.ok(S.battle.ax.a < 0);
 });
+test('lungeMs: duração da investida cresce com a distância e satura', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  assert.equal(P.lungeMs(0), 300); assert.equal(P.lungeMs(1000), 370); assert.equal(P.lungeMs(9000), 700);
+});
