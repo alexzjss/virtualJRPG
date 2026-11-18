@@ -1504,3 +1504,19 @@ test('palco 3D: herói aparece de costas (imgB, senão silhueta de costas) e ini
   assert.equal(P.imgSrc(h, P.unitKind(h)).url, '/b.png'); assert.match(P.imgFit(h, 'b', P.imgSrc(h, 'b')), /scale\(2\)/);
   const s = P.imgSrc({ ...h, imgB: '' }, 'b'); assert.ok(s.fallback, 'sem costas: silhueta, não a frente'); assert.equal(P.imgFit({ ...h, imgB: '' }, 'b', s), '');
 });
+test('axisOf: eixo heróis→inimigos, padrão sem inimigos e centros iguais', () => {
+  const A = RU.axisOf;
+  const r = A([{ x: 1, y: 2 }, { x: 1, y: 4 }, { x: 9, y: 3, enemy: true }]);
+  assert.equal(r.a, 0); assert.equal(r.cx, 1); assert.equal(r.cy, 3); assert.equal(r.d, 8);
+  assert.ok(Math.abs(A([{ x: 5, y: 9 }, { x: 5, y: 1, enemy: true }]).a + Math.PI / 2) < 1e-3); // inimigos acima
+  assert.deepEqual(A([{ x: 2, y: 2 }, { x: null, y: null, enemy: true }]), { a: 0, cx: 2, cy: 2, d: 0 });
+  assert.equal(A([{ x: 3, y: 3 }, { x: 3, y: 3, enemy: true }]).d, 0);
+});
+test('battle: grava o eixo ao ligar; reenquadrar só o mestre', () => {
+  reset(); const h = mk(gm, { name: 'H' }), e = mk(gm, { name: 'E', enemy: true });
+  for (const o of [h, e]) H.place(gm, { id: o.id }); H.move(gm, { id: h.id, x: 1, y: 5 }); H.move(gm, { id: e.id, x: 6, y: 5 });
+  H.battle(gm, { on: true }); assert.equal(S.battle.ax.a, 0);
+  H.move(gm, { id: e.id, x: 1, y: 0 }); assert.equal(S.battle.ax.a, 0); // mover não gira
+  H.battleReframe(ana); assert.equal(S.battle.ax.a, 0);
+  H.battleReframe(gm); assert.ok(S.battle.ax.a < 0);
+});

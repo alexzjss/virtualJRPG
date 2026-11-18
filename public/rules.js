@@ -359,5 +359,14 @@
       return { title: CMD.GRADE_NAME[g] || '', lines: L };
     },
   };
-  g.RULES = { KIT, hasKit, CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  // eixo da batalha no grid: direção dos heróis para os inimigos (radianos), centro dos heróis e distância entre os centros (em casas). Ignora quem não está no mapa.
+  const axisOf = chars => {
+    const on = chars.filter(c => c && c.x != null && c.y != null), mid = l => ({ x: l.reduce((a, c) => a + c.x, 0) / l.length, y: l.reduce((a, c) => a + c.y, 0) / l.length });
+    const hs = on.filter(c => !c.enemy), fs = on.filter(c => c.enemy), F = fs.length ? mid(fs) : null;
+    const H = hs.length ? mid(hs) : F ? { x: F.x - 3, y: F.y } : { x: 0, y: 0 };
+    const d = F ? Math.hypot(F.x - H.x, F.y - H.y) : 0;
+    if (!F || d < .5) return { a: 0, cx: H.x + 0, cy: H.y + 0, d: 0 };
+    return { a: Math.round(Math.atan2(F.y - H.y, F.x - H.x) * 1e4) / 1e4 + 0, cx: H.x + 0, cy: H.y + 0, d: Math.round(d * 1e4) / 1e4 };
+  };
+  g.RULES = { axisOf, KIT, hasKit, CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

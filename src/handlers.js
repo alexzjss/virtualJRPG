@@ -260,6 +260,7 @@ const H = {
     }
     S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
     if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
+    if (m.on) S.battle.ax = RU.axisOf(Object.keys(S.battle.ticks).map(k => S.chars[k])); // eixo do palco 3D: fixo até o mestre reenquadrar
     if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
     if (m.on) { // ganchos de ofício: emboscada, canção, armadilha e companheiros
       const hs = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(o => o && !o.enemy), emb = Math.max(0, ...hs.map(h => OF.hook(h, 'emb'))), T = S.battle.ticks;
@@ -269,6 +270,11 @@ const H = {
       hs.forEach(spawnCompanions); trapStart();
     }
     log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
+  },
+  battleReframe(c) {
+    if (c.role !== 'gm' || !S.battle.active) return;
+    S.battle.ax = RU.axisOf(Object.keys(S.battle.ticks).map(k => S.chars[k]));
+    log('Mestre', 'palco reenquadrado.');
   },
   // comandos de ritmo: Defender (Coragem), Concentrar (Tensão) e Ataque Total
   defend(c, m) {
