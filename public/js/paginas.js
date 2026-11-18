@@ -17,7 +17,10 @@ let skAdj = null, skAdjS = null; const skDij = new WeakMap(); // ligações da �
 function skPath(N, own, mineV, xpOf, target) {
   if (!own.size) return null;
   if (skAdjS !== S.skills || skAdj.length !== N.length) { const ix = new Map(N.map(([id], i) => [id, i])), loose = N.map(([, a]) => !Number.isFinite(a.wx));
-    skAdj = N.map(([id, a], i) => [...new Set([...(a.ln || []).map(j => ix.get(j)).filter(j => j != null), ...N.flatMap(([jd, b], j) => j !== i && (loose[i] || loose[j]) && RULES.linked(a, b, id, jd) && (a.el === b.el || a.el === 'fis' || b.el === 'fis') ? [j] : [])])]);
+    // ln já traz as ligações; só os nós sem posição (loose) precisam testar RULES.linked contra todos: O(soltos × N), não O(N²)
+    const A = N.map(([, a]) => new Set((a.ln || []).map(j => ix.get(j)).filter(j => j != null))), ok = (i, j) => { const [id, a] = N[i], [jd, b] = N[j]; return RULES.linked(a, b, id, jd) && (a.el === b.el || a.el === 'fis' || b.el === 'fis'); };
+    loose.forEach((l, i) => { if (l) for (let j = 0; j < N.length; j++) if (j !== i) { if (ok(i, j)) A[i].add(j); if (ok(j, i)) A[j].add(i); } });
+    skAdj = A.map(x => [...x]);
     skAdjS = S.skills; }
   // as distâncias partem de todos os nós aprendidos e não dependem do alvo: um Dijkstra por renderização (own é novo a cada uma), não um por nó sob o mouse
   let D = skDij.get(own);

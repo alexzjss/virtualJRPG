@@ -42,6 +42,15 @@
   const wrap = n => { const out = []; let l = ''; for (const w of n.split(' ')) { if (l && (l + ' ' + w).length > 13) { out.push(l); l = w; } else l = l ? l + ' ' + w : w; } out.push(l); return out.length > 2 ? [out[0], out.slice(1).join(' ').slice(0, 14) + '…'] : out; };
   const mark = s => s.secret ? '?' : s.back ? '禁' : s.limit ? '極' : s.kind === 'form' ? '変' : s.circ ? '儀' : s.duo ? '双' : s.vow ? '誓' : s.summon ? '召' : ICON[s.kind] || (typeof KANJI !== 'undefined' ? KANJI[s.el] : '•');
 
+  // esfera pronta (degradê + contorno) guardada como imagem: um drawImage por nó em vez de criar um degradê por nó a cada quadro
+  const orbs = new Map();
+  const orb = (x, y, r, s, c, st) => { const rr = Math.max(2, Math.round(r * 2) / 2), shape = s.limit || s.back ? 'l' : s.kind === 'form' ? 'f' : s.kind === 'passive' ? 'p' : 'a', k = c + st + shape + rr + '|' + DPR;
+    let im = orbs.get(k);
+    if (!im) { if (orbs.size > 800) orbs.clear(); const pad = Math.ceil(rr * 1.3 + 3), sz = pad * 2; im = document.createElement('canvas'); im.width = im.height = Math.ceil(sz * DPR); const q = im.getContext('2d'); q.scale(DPR, DPR);
+      const gr = q.createRadialGradient(pad - rr * .35, pad - rr * .35, rr * .1, pad, pad, rr);
+      if (st === 'own') { gr.addColorStop(0, '#ffffff'); gr.addColorStop(.35, c); gr.addColorStop(1, hexA(c, .35)); } else { gr.addColorStop(0, hexA(c, st === 'out' ? .1 : .32)); gr.addColorStop(1, 'rgba(10,10,18,.95)'); }
+      const keep = cx; cx = q; body(pad, pad, rr, s); cx = keep; q.fillStyle = gr; q.fill(); q.strokeStyle = hexA(c, st === 'out' ? .2 : .85); q.lineWidth = Math.max(1, 1.6 * rr / R); q.stroke(); im.pad = pad; orbs.set(k, im); }
+    cx.drawImage(im, x - im.pad, y - im.pad, im.pad * 2, im.pad * 2); };
   function build() { // posições, ligações e selos dos setores; refeito quando as definições ou a lista visível mudam
     P = place(o.skills); if (rot) { const c = Math.cos(rot), n = Math.sin(rot); for (const [id, [x, y]] of P) P.set(id, [x * c - y * n, x * n + y * c]); } E = edges(o.skills, new Set(o.ids));
     const cen = {}; for (const id of o.ids) { const s = o.skills[id], p = P.get(id), c = cen[grp(s)] ||= { x: 0, y: 0, n: 0, ids: [] }; c.x += p[0]; c.y += p[1]; c.n++; c.ids.push(id); }
@@ -49,14 +58,15 @@
     stars = []; for (let i = 0; i < 900; i++) stars.push([(Math.random() * 2 - 1) * bound * 1.25, (Math.random() * 2 - 1) * bound * 1.25, Math.random() * 1.5 + .3, Math.random() * TAU]);
     motes = seals.filter(s => s.el !== 'fis').flatMap(s => Array.from({ length: 14 }, () => [s, Math.random() * TAU, Math.random() * s.r, Math.random() * TAU]));
   }
-  const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = devicePixelRatio || 1; W = Math.max(200, r.width); H = Math.max(200, r.height); if (cv.width === Math.round(W * DPR) && cv.height === Math.round(H * DPR)) return; cv.width = lv.width = Math.round(W * DPR); cv.height = lv.height = Math.round(H * DPR); cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
+  const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = Math.min(1.5, devicePixelRatio || 1); /* acima de 1.5 a nitidez não paga o custo: celulares têm 3× */ W = Math.max(200, r.width); H = Math.max(200, r.height); if (cv.width === Math.round(W * DPR) && cv.height === Math.round(H * DPR)) return; cv.width = lv.width = Math.round(W * DPR); cv.height = lv.height = Math.round(H * DPR); cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
   let lively = true; // o último quadro tinha algo pulsando na tela (nó disponível, rota ou animação)
-  const busy = () => anim.size || o?.route?.length > 1 || lively;
+  let touched = 0; // última interação (arrastar, zoom, voo): até 1,5 s depois desenha a ~30 fps; parado, a pulsação ambiente vai a ~12 fps
+  const busy = () => anim.size || performance.now() - touched < 1500;
 
   function draw(now) {
     raf = 0; if (!cv?.isConnected || !o) return;
     if (document.hidden) { raf = requestAnimationFrame(draw); return; }
-    if (!dirty && now - last < (busy() ? 33 : 100)) { raf = requestAnimationFrame(draw); return; }
+    if (!dirty && now - last < (busy() ? 33 : lively || o.route?.length > 1 ? 80 : 250)) { raf = requestAnimationFrame(draw); return; }
     last = now; dirty = false; const T = now / 1000, far = cam.z < LOD; hg = hover && o.skills[hover] ? grp(o.skills[hover]) : null;
     cx = cx0; cx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // CENSURA TEMPORÁRIA (Hiruko): o que é do ramo Hiruko vai para uma camada à parte, borrada de uma vez só no fim
@@ -116,9 +126,7 @@
     for (const id of o.ids) { const s = o.skills[id], [x, y] = w2s(...P.get(id)); if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
       cen(s.el === CENS); const st = o.state(id), mk = o.marks(id), c = col(s.el), r = r0 * (s.limit || s.back ? 1.25 : 1);
       if (far) { cx.fillStyle = st === 'own' ? c : hexA(c, st === 'out' || st === 'secret' ? .14 : .45); cx.beginPath(); cx.arc(x, y, Math.max(1.2, r * .7), 0, TAU); cx.fill(); continue; }
-      const gr = cx.createRadialGradient(x - r * .35, y - r * .35, r * .1, x, y, r);
-      if (st === 'own') { gr.addColorStop(0, '#ffffff'); gr.addColorStop(.35, c); gr.addColorStop(1, hexA(c, .35)); } else { gr.addColorStop(0, hexA(c, st === 'out' ? .1 : .32)); gr.addColorStop(1, 'rgba(10,10,18,.95)'); }
-      cx.globalAlpha = (mk.dim ? .25 : 1) * (hg && grp(s) !== hg ? .3 : 1); cx.fillStyle = gr; body(x, y, r, s); cx.fill(); cx.strokeStyle = hexA(c, st === 'out' ? .2 : .85); cx.lineWidth = Math.max(1, 1.6 * cam.z); cx.stroke();
+      cx.globalAlpha = (mk.dim ? .25 : 1) * (hg && grp(s) !== hg ? .3 : 1); orb(x, y, r, s, c, st);
       if (st === 'av') { pulse = true; cx.strokeStyle = hexA(c, .5 + .4 * Math.sin(T * 3 + x * .01)); cx.lineWidth = Math.max(1.5, 3 * cam.z); cx.beginPath(); cx.arc(x, y, r * 1.55, 0, TAU); cx.stroke(); }
       if (mk.hit) { cx.strokeStyle = 'rgba(255,240,150,.95)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * 1.9 + Math.sin(T * 4) * 2, 0, TAU); cx.stroke(); }
       if (mk.plan) { cx.fillStyle = '#ffd34d'; cx.font = `${Math.round(r * .8)}px serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('★', x + r, y - r); }
@@ -143,7 +151,7 @@
     const [a1, b1] = s2w(0, 0), [a2, b2] = s2w(W, H); cx.strokeStyle = '#ffffff'; cx.strokeRect(mx0 + mw / 2 + a1 * k, my0 + mw / 2 + b1 * k, (a2 - a1) * k, (b2 - b1) * k);
     raf = requestAnimationFrame(draw);
   }
-  const kick = () => { dirty = true; if (!raf) raf = requestAnimationFrame(draw); };
+  const kick = () => { dirty = true; touched = performance.now(); if (!raf) raf = requestAnimationFrame(draw); };
 
   // ---------- câmera e entrada ----------
   const clampZ = z => Math.min(3, Math.max(.06, z));
