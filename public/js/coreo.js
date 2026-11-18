@@ -154,7 +154,7 @@ function results(e) { // fim da batalha: XP, ouro, espólios e o que cada herói
 function fxState() { // reaplica o que um redesenho apagaria: KO adiado, palco ameaçador, abertura e marcas temporárias
   const now = performance.now(), st = app.querySelector('.stage') || stage3d();
   st?.classList.toggle('threat', now < threatUntil); st?.classList.toggle('enter', now < enterUntil);
-  for (const [id, until] of koHold) { if (now > until) { koHold.delete(id); continue; } document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.remove('ko'); }
+  for (const [id, until] of koHold) { if (now > until) { koHold.delete(id); if (S.chars[id]?.hp <= 0) document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.add('ko'); continue; } document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.remove('ko'); }
   for (let i = fxMarks.length - 1; i >= 0; i--) { const m = fxMarks[i]; if (now > m.until) { fxMarks.splice(i, 1); continue; } document.querySelectorAll(m.sel).forEach(el => el.classList.add(m.cls)); }
 }
 function fx() {
@@ -169,8 +169,8 @@ function fx() {
   if (B.active) for (const c of Object.values(S.chars)) { if (!(c.id in B.ticks) && !c.dead) continue; const was = hpPrev.get(c.id); if (was > 0 && c.hp <= 0 && seen != null) koHold.set(c.id, performance.now() + wait + 2600); hpPrev.set(c.id, c.hp); }
   else hpPrev.clear();
   // condições novas entram com um pulo; dano contínuo e regeneração fazem o ícone pulsar
-  for (const c of Object.values(S.chars)) { const ks = Object.keys(c.st || {}), was = stPrev.get(c.id); if (was && seen != null) ks.filter(k => !was.includes(k)).forEach(k => mark(`.unit[data-tgt="${c.id}"] .sti[data-st="${k}"]`, 'new', 700)); stPrev.set(c.id, ks); }
-  news.filter(e => e.fx && !e.fx.a).forEach(e => mark(`.unit[data-tgt="${e.fx.id}"] .sti`, 'tick', 800));
+  for (const c of Object.values(S.chars)) { const ks = Object.keys(c.st || {}), was = stPrev.get(c.id); if (was && seen != null) ks.filter(k => !was.includes(k)).forEach(k => mark(`.unit[data-tgt="${c.id}"] .sti[data-st="${k}"],.pm[data-tgt="${c.id}"] .sti[data-st="${k}"]`, 'new', 700)); stPrev.set(c.id, ks); }
+  news.filter(e => e.fx && !e.fx.a).forEach(e => mark(`.unit[data-tgt="${e.fx.id}"] .sti,.pm[data-tgt="${e.fx.id}"] .sti`, 'tick', 800));
   seen = S.seq;
   fxState(); applyCine(false); // um redesenho no meio da cena mantém o enquadramento
   if (B.active && wasActive === false) intro();

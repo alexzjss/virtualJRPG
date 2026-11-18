@@ -66,6 +66,7 @@ try {
   const ana = await open('ana', '/player', { login: { n: 'ana', p: '1234' }, phone: true });
   const bia = await open('bia', '/player', { login: { n: 'bia', p: '1234' } });
   const mesa = await open('mesa', '/table', { login: { n: 'mestre', p: 'chave' } });
+  const anaD = await open('ana-pc', '/player', { login: { n: 'ana', p: '1234' } }); // a mesma Ana no computador: HUD e leque do palco 3D (a `ana` acima é o celular, que mantém o painel antigo)
 
   await section('exploração: telas sem batalha', async () => {
     await until(async () => (await mesa.locator('#app').innerHTML()).length > 500, 'mesa desenhada');
@@ -80,14 +81,69 @@ try {
   go({ t: 'battle', on: true });
   for (const f of foesOf()) go({ t: 'ini', k: 'set', id: f.id, v: 1e6 }); // inimigos só agem quando o roteiro quiser: Derrubado e Quebra não expiram
   const tgBtn = (p, id) => p.locator(`.cmd .tg[data-tgt="${id}"]`);
+  // jogador no PC (leque no teclado): espera a vez, mira num alvo com ←/→ e confirma com Enter
+  const myTurn = (p, id, msg) => until(async () => (await p.evaluate(() => S.battle.order[0])) === id && await vis(p, '.lq .stroke'), msg || `leque de ${p.who}`); // espera o estado novo chegar (o desenho velho ainda tem o leque da vez anterior)
+  const aimAt = async (p, id) => { for (let i = 0; i < 8; i++) { if (await p.locator(`.p3d .bb.tgt[data-tgt="${id}"]`).count()) return true; await p.keyboard.press('ArrowRight'); await sleep(120); } return false; };
+  const atkAt = async (p, id, what) => { await p.keyboard.press('1'); check(await aimAt(p, id), `${p.who}: mirar ${what}`); const n = S.seq; await p.keyboard.press('Enter'); await until(() => S.seq > n, `ataque em ${what}`); };
 
   await section('batalha: tela do jogador abre no turno certo', async () => {
     await until(() => vis(ana, '.cmd'), 'comandos de batalha da Ana');
     check(current() === shinkai.id, 'Shinkai (AGI 95) deveria abrir a fila');
     check(await until(() => ana.locator('.cmd.mine').count(), 'turno da Ana destacado'), 'turno destacado');
     check(await ana.locator('.cmd-go .go').isEnabled() === true, 'Agir já vem mirado no primeiro inimigo de pé (mira automática na sua vez)');
-    check(/aguarde/i.test(await txt(bia, '.cmd-go .go')), 'Bia deveria ver "Aguarde a sua vez"');
+    check(await until(() => vis(bia, '.hudw.dim'), 'HUD apagado fora da vez'), 'Bia (PC) deveria ver o HUD apagado fora da vez');
+    check(/Vez de Shinkai/i.test(await txt(bia, '.hud-bl')) && !(await vis(bia, '.lq .stroke')), 'Bia não deveria ver o leque na vez da Shinkai');
     await shot(ana, 'batalha'); await shot(bia, 'batalha'); await shot(mesa, 'batalha'); await shot(gmP, 'batalha');
+  });
+
+  await section('batalha no PC: palco 3D, HUD e leque no teclado', async () => {
+    await myTurn(anaD, shinkai.id, 'leque da Ana no PC');
+    check(await anaD.locator('.p3d .bb[data-tgt]').count() >= 4, 'palco 3D com recortes');
+    check(await anaD.locator('.hud-party .pm').count() >= 2, 'grupo no canto');
+    check(await anaD.locator('.hud-order .ot').count() >= 4 && await vis(anaD, '.hud-order .ot.now'), 'ordem dos turnos no canto');
+    check(await anaD.locator('.cmd').count() === 0, 'o painel antigo não aparece no PC');
+    check(!(await vis(anaD, '.top .tnav')) && await vis(anaD, '.hud-tr [data-a=navT]') && await vis(anaD, '.hud-tr [data-a=chatT]'), 'em batalha: sem barra de páginas, com ☰ e chat no HUD');
+    check(await vis(anaD, '.hud-bl [data-a=defend]') && await vis(anaD, '.hud-bl [data-a=braveT]') && await vis(anaD, '.hud-bl [data-a=next]'), 'dicas de Defender, Coragem e Passar');
+    await shot(anaD, 'palco3d');
+    await anaD.keyboard.press('2'); check(await anaD.locator('[data-lq="all"], .skl').count() > 0, 'Skills abre a lista');
+    await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.skl').count()), 'Esc fecha a lista'), 'Esc volta ao menu');
+    await anaD.keyboard.press('1'); check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1, 'um alvo marcado'), 'Atacar entra na mira com 1 alvo');
+    await shot(anaD, 'mira');
+    const n = S.seq; await anaD.keyboard.press('Enter');
+    await until(() => S.log.some(l => l.n > n && l.who === 'Shinkai'), 'Enter manda a ação');
+    // condições aparecem sobre o recorte (e nos retratos do grupo)
+    minion.st.burn = 3; shinkai.st.burn = 3; push();
+    await until(() => vis(anaD, `.p3d .bb[data-tgt="${minion.id}"] .sti[data-st=burn]`), 'condição do inimigo sobre o recorte');
+    await until(() => vis(anaD, `.pm[data-tgt="${shinkai.id}"] .sti[data-st=burn]`), 'condição do herói no grupo');
+    delete minion.st.burn; delete shinkai.st.burn; push();
+    // as animações do coreo não podem tirar o recorte do lugar (X1): o .bb só posiciona, quem anima é o .bbi
+    const pos = await anaD.evaluate(id => { const e = document.querySelector(`.p3d .bb[data-tgt="${id}"]`); e.classList.add('ko', 'kofall', 'hit', 'cast', 'dodge', 'lunge');
+      const an = getComputedStyle(e).animationName, bi = getComputedStyle(e.querySelector('.bbi')).animationName; e.classList.remove('ko', 'kofall', 'hit', 'cast', 'dodge', 'lunge'); return { an, bi }; }, minion.id);
+    check(pos.an === 'none' && pos.bi !== 'none', 'a animação roda no .bbi, não no .bb');
+    minion.hp = 0; push(); await sleep(3100); push(); // o coreo segura o ko por ~2,6 s esperando o golpe; sem golpe, o próximo desenho o repõe
+    await until(() => anaD.locator(`.p3d .bb.ko[data-tgt="${minion.id}"]`).count(), 'KO: o recorte cai');
+    check(await anaD.evaluate(id => { const e = document.querySelector(`.p3d .bb[data-tgt="${id}"]`); e.classList.add('kofall'); const a = getComputedStyle(e).animationName; e.classList.remove('kofall'); return a; }, minion.id) === 'none', 'o recorte caído continua posicionado pelo .bb (o kofall anima só o interior)');
+    minion.hp = minion.hpMax; push(); await until(async () => !(await anaD.locator('.p3d .bb.ko').count()), 'o recorte levanta quando volta a viver');
+    // Domínio escurece o palco 3D também no jogador do PC
+    S.battle.dom = { by: mikhail.id, side: false, name: 'Domínio PC', ttl: 3, ally: [], foe: [], pow: 50 }; push();
+    await until(() => vis(anaD, '.stage3d.dom-on .domfx'), 'Domínio escurece o palco do PC'); delete S.battle.dom; push();
+    // Review Focus 4: dona de dois heróis, o leque é do que está na vez
+    mikhail.owner = 'ana'; push();
+    check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => anaD.locator(`.pm.now[data-tgt="${mikhail.id}"]`).count(), 'retrato da Mikhail na vez');
+    check(await until(() => anaD.locator('.lq[aria-label*="Mikhail"] .stroke').count(), 'leque da Mikhail'), 'dona de dois heróis: o leque é do herói da vez');
+    mikhail.owner = 'bia'; push();
+    // Review Focus 5: com aprovação ligada o selo "Aguardando o mestre" aparece, sobrevive a um push() e Esc manda reqNo
+    S.auto.act = false; push();
+    check(toTurn(shinkai.id), 'vez da Shinkai'); await myTurn(anaD, shinkai.id, 'leque da Ana (aprovação ligada)');
+    await anaD.keyboard.press('1'); await anaD.keyboard.press('Enter');
+    await until(() => Object.keys(S.reqs).length, 'o pedido de ação chega ao mestre');
+    await until(() => vis(anaD, '.hud-bl .pend'), 'selo "Aguardando o mestre"');
+    check(/Aguardando o mestre/i.test(await txt(anaD, '.hud-bl .pend')), 'o selo cita o pedido');
+    push(); await sleep(350); check(await vis(anaD, '.hud-bl .pend') && !(await vis(anaD, '.lq .stroke')), 'o selo sobrevive a um push() e o leque some enquanto espera');
+    await anaD.keyboard.press('Escape'); await until(() => !Object.keys(S.reqs).length, 'Esc cancela o pedido (reqNo)');
+    await until(async () => !(await vis(anaD, '.hud-bl .pend')), 'o selo some');
+    S.auto.act = true; push();
+    await anaD.context().close(); // o palco 3D pesa na renderização por software: a Ana do PC sai para não atrasar os blocos seguintes
   });
 
   await section('faixa de clima, Cadeia e Domínio', async () => {
@@ -120,7 +176,7 @@ try {
     check(await noise(ana, () => { S.battle.chain.h = 100; }) > 0, 'Cadeia cheia deveria tocar o acorde');
     check(await vis(ana, '.fbar .chain.full'), 'Cadeia cheia deveria ganhar a classe full');
     check(await noise(mesa, () => { S.battle.dom = { by: mikhail.id, side: false, name: 'Domínio Teste', ttl: 3, ally: [], foe: [], pow: 50 }; }) > 0, 'Domínio abrindo deveria tocar na mesa');
-    check(await vis(mesa, '.stage.dom-on .domfx'), 'mesa: o palco deveria escurecer com o Domínio');
+    check(await vis(mesa, '.stage3d.dom-on .domfx'), 'mesa: o palco deveria escurecer com o Domínio');
     check(await noise(mesa, () => { delete S.battle.dom; }) > 0, 'Domínio acabando deveria tocar na mesa');
     // som desligado: nada toca
     await ana.click('[data-a=meT]'); await ana.click('.pop [data-a=mute]');
@@ -168,21 +224,21 @@ try {
     check(!!minion.st.down, 'inimigo fraco deveria ficar Derrubado');
     check(/passa a vez|Passar a Vez|entrega/i.test(battleLog()) || current() === mikhail.id, 'registro da passagem de vez');
     // chefe: barra de Quebra
-    check(await vis(mesa, '.brk'), 'mesa: barra de Quebra do chefe ausente');
-    check(/◆◆◆/.test(await txt(mesa, '.unit.foe .brk')), 'Quebra cheia no começo');
+    const brkSh = `.p3d .bb[data-tgt="${bossCh.id}"] .sh`; // a Quebra do chefe é o escudo ◆n no mini do recorte
+    check(await vis(mesa, brkSh), 'mesa: barra de Quebra do chefe ausente');
+    check(new RegExp('◆' + brk0 + '$').test((await txt(mesa, brkSh)).trim()), 'Quebra cheia no começo');
     for (let i = 0; i < 8 && !(bossCh.brk.cur < brk0 || bossCh.st.broken); i++) {
-      check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia'); await tgBtn(bia, bossCh.id).click();
-      const n = S.seq; await click(bia, '.cmd-go .go', 'Agir (Mikhail no chefe)'); await until(() => S.seq > n, 'ataque da Mikhail');
+      check(toTurn(mikhail.id), 'vez da Mikhail'); await myTurn(bia, mikhail.id, 'turno da Bia'); await atkAt(bia, bossCh.id, 'o chefe');
     }
     check(bossCh.brk.cur < brk0 || bossCh.st.broken, 'fraqueza no chefe deveria reduzir a Quebra');
-    await until(async () => !/◆◆◆/.test(await txt(mesa, '.unit.foe .brk')) || /Quebrado/i.test(await mesa.locator('.unit.foe').first().innerText()), 'mesa mostra a Quebra reduzida');
+    await until(async () => !!bossCh.st.broken || !new RegExp('◆' + brk0 + '$').test((await txt(mesa, brkSh)).trim()), 'mesa mostra a Quebra reduzida');
     await shot(mesa, 'quebra');
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
     check(toTurn(mikhail.id), 'vez da Mikhail para o Ataque Total'); const pg = bia; // a vez de quem tem tela aberta (o Thomas não tem)
-    await until(async () => await pg.locator('.p5m [data-a=allOut]').isEnabled(), 'Ataque Total liberado com todos Derrubados');
+    await until(async () => await pg.locator('.hud-bl [data-a=allOut]').count(), 'Ataque Total liberado com todos Derrubados');
     const hp1 = bossCh.hp + minion.hp;
-    await pg.locator('.p5m [data-a=allOut]').dispatchEvent('click'); // o botão pulsa sem parar: o clique vai direto nele
+    await pg.locator('.hud-bl [data-a=allOut]').dispatchEvent('click'); // a dica pulsa sem parar: o clique vai direto nela
     await until(() => /ATAQUE TOTAL|Ataque Total/i.test(battleLog()), 'registro do Ataque Total');
     await until(() => bossCh.hp + minion.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');
@@ -190,23 +246,23 @@ try {
 
   await section('armas: técnicas da arma no grupo Arma de Skills e ataque básico pela arma', async () => {
     for (const f of [bossCh, minion]) { delete f.st.down; delete f.st.broken; } push();
-    check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia');
-    check(/DES/.test(await txt(bia, '.alist .opt')), 'Atacar: o ataque do revólver deveria mostrar DES');
-    await click(bia, '.cmd [data-sub=sk]', 'aba Skills'); // no PC a Arma é um grupo dentro de Skills
-    await until(async () => /Leque do Pistoleiro/i.test(await txt(bia, '.alist')), 'técnica do Revólver .38 no grupo Arma de Skills');
-    await click(bia, '.alist .opt[data-v^="w:"]', 'técnica da arma'); await tgBtn(bia, minion.id).click();
+    check(toTurn(mikhail.id), 'vez da Mikhail'); await myTurn(bia, mikhail.id, 'turno da Bia');
+    check(/DES/.test(await bia.locator('.stroke[data-lq=atk]').getAttribute('title')), 'Atacar: o ataque do revólver deveria mostrar DES');
+    await bia.keyboard.press('2'); // no PC a Arma é um grupo dentro de Skills
+    await until(async () => /Leque do Pistoleiro/i.test(await txt(bia, '.skl')), 'técnica do Revólver .38 no grupo Arma de Skills');
+    await click(bia, '.skl .opt[data-v^="w:"]', 'técnica da arma'); check(await aimAt(bia, minion.id), 'mirar o inimigo com a técnica da arma');
     await shot(bia, 'arma');
-    const n = S.seq; await click(bia, '.cmd-go .go', 'Agir com a técnica da arma');
+    const n = S.seq; await bia.keyboard.press('Enter');
     await until(() => S.log.slice(-6).some(l => /Leque do Pistoleiro/.test(l.text)), 'técnica da arma executada');
   });
 
   await section('armas: escudo bloqueia na tela e instrumento aparece com técnicas de grupo', async () => {
     const torre = Object.keys(S.items).find(k => S.items[k].name === 'Escudo de Torre'), violino = Object.keys(S.items).find(k => S.items[k].name === 'Violino');
     thomas.inv[torre] = 1; thomas.equip.arma = torre; mikhail.inv[violino] = 1; mikhail.equip.arma = violino; push();
-    check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia');
-    await click(bia, '.cmd [data-sub=sk]', 'Skills com o violino');
-    await until(async () => /Melodia de Coragem/i.test(await txt(bia, '.alist')), 'violino básico mostra a técnica de grupo (a 2ª vem nas categorias acima de básica)');
-    await bia.locator('.cmd [data-sub=""]').first().click().catch(() => bia.locator('.cmd [data-sub=atk]').first().click().catch(() => {}));
+    check(toTurn(mikhail.id), 'vez da Mikhail'); await myTurn(bia, mikhail.id, 'turno da Bia');
+    await bia.keyboard.press('2');
+    await until(async () => /Melodia de Coragem/i.test(await txt(bia, '.skl')), 'violino básico mostra a técnica de grupo (a 2ª vem nas categorias acima de básica)');
+    await bia.keyboard.press('Escape');
     await shot(bia, 'instrumento');
     thomas.equip.arma = torre; push();
     await until(async () => (await gmP.evaluate(() => 1)) === 1, 'estado estável');

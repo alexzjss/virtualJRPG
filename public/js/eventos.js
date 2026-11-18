@@ -28,6 +28,13 @@ app.addEventListener('keydown', e => { const el = e.target; if (!el.dataset?.edi
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('span[data-a],[data-tab],[data-node],[data-tgt],[data-open],[data-aim]')) { e.preventDefault(); e.target.click(); }
 });
+// confirma a ação escolhida (botão Agir do celular, Enter e clique no alvo do PC): o minigame de ataque, se houver, abre antes de mandar
+function goAct(id) { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
+  { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } const msg = pick.k === 'it' ? { t: 'use', id: id, item: pick.id, target: tgt } : { t: 'act', id: id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = ''; if (typeof LEQUE !== 'undefined') LEQUE.reset();
+  const who = S.chars[id], s1 = msg.t === 'act' ? SK(msg.skill) : null;
+  if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
+  send(msg);
+}
 const sayChat = el => { if (el?.value.trim()) { send({ t: 'chat', text: el.value, secret }); el.value = ''; } };
 app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.chat) sayChat(e.target); if (e.key === 'Enter' && e.target.dataset.rqtxt) { e.preventDefault(); send({ t: 'reqOk', id: e.target.dataset.rqtxt, ...reqUi[e.target.dataset.rqtxt] }); } });
 app.addEventListener('focusout', e => {
@@ -41,6 +48,7 @@ app.addEventListener('click', e => {
   if (e.target.closest('.edin')) return;
   const edt = e.target.closest('[data-edit]');
   if (edt && gm) { editing = { id: edt.dataset.id, f: edt.dataset.edit }; editFocus = true; return render(); }
+  const lq = e.target.closest('.stroke[data-lq],.hk[data-lq]'); if (lq) return LEQUE.click(lq.dataset.lq, lq.dataset.v); // pincelada do leque (PC)
   const d = e.target.closest('[data-a]')?.dataset, u = e.target.closest('[data-tgt]'), tb = e.target.closest('[data-tab]');
   if (tb) { tabs[tb.dataset.id] = tb.dataset.tab; return render(); }
   const op = e.target.closest('[data-open]');
@@ -56,9 +64,9 @@ app.addEventListener('click', e => {
   const ftb = e.target.closest('[data-ftab]');
   if (ftb) { ftab[ftb.dataset.id] = ftb.dataset.ftab; return render(); }
   const pgb = e.target.closest('[data-pg]'), sl = e.target.closest('[data-sel]');
-  if (pgb) { pg = pgb.dataset.pg; if (innerWidth < 1000) chatOpen = false; scrollTo(0, 0); return render(); }
+  if (pgb) { pg = pgb.dataset.pg; navOpen = false; if (innerWidth < 1000) chatOpen = false; scrollTo(0, 0); return render(); }
   if (sl) { selCh = sl.dataset.sel; return render(); }
-  if (!d && u) { if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
+  if (!d && u) { if (LEQUE.clickTgt(u.dataset.tgt)) return; if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
   if (d.a === 'openSheet') { if (gm) gOpen('f_' + d.id); else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
@@ -90,12 +98,13 @@ app.addEventListener('click', e => {
   if (d.a === 'skRotR') return MANDALA.rotate(1);
   if (d.a === 'skTab') { skTab = d.v; lsSet('vj.skTab', d.v); return render(); }
   if (d.a === 'skDrawer') { skDrawer = !skDrawer; return render(); }
+  if (d.a === 'navT') { navOpen = !navOpen; return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
   if (d.a === 'chatSend') return sayChat(e.target.closest('.chatin').querySelector('input'));
   if (d.a === 'meT') { meOpen = !meOpen; return render(); }
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
-  if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
+  if (d.a === 'pick') { pick = { k: d.k, id: d.v }; if (LEQUE.picked()) skQ = ''; return render(); }
   if (d.a === 'skPinT') { const ch = S.chars[d.id]; return send({ t: 'skPin', id: d.id, sk: d.v, on: !ch?.skPin?.includes(d.v) }); }
   if (d.a === 'skQx') { skQ = ''; return render(); }
   if (d.a === 'ofiUse') { const u = oUi[d.node] || {}; return send({ t: 'ofiUse', id: d.id, node: d.node, item: u.item, rune: u.rune, el2: u.el2, sig: u.sig, nm: u.nm, target: u.target, part: u.part }); }
@@ -107,11 +116,7 @@ app.addEventListener('click', e => {
   if (d.a === 'planClear') { lsSet('vj.plan.' + d.id, []); return render(); }
   if (d.a === 'planSave') { const n = prompt('Nome da build?'); if (!n) return; lsSet('vj.builds', [...lsGet('vj.builds', []).filter(b => b.name !== n), { name: n.slice(0, 40), nodes: lsGet('vj.plan.' + d.id, []) }].slice(-12)); return render(); }
   if (d.a === 'braveT') { braveOn = !braveOn; return render(); }
-  if (d.a === 'go') { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = d.id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
-    { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } const msg = pick.k === 'it' ? { t: 'use', id: d.id, item: pick.id, target: tgt } : { t: 'act', id: d.id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = '';
-    const who = S.chars[d.id], s1 = msg.t === 'act' ? SK(msg.skill) : null;
-    if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
-    send(msg); return; }
+  if (d.a === 'go') return goAct(d.id);
   if (d.a === 'rollAsk') { rollDlg = { id: d.id, attr: d.attr }; return render(); }
   if (d.a === 'rollX') { rollDlg = null; return render(); }
   if (d.a === 'rollMod') { mods[rollDlg.id] = +d.v; return render(); }
@@ -247,10 +252,11 @@ app.addEventListener('pointerup', drop); app.addEventListener('pointercancel', d
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.target.matches('input,textarea,select,button')) { spaceDown = true; e.preventDefault(); return; }
   if (!S || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (LEQUE.key(e)) { e.preventDefault(); return; } // batalha no PC: leque, dicas e mira (leque.js)
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();
     else if (gm && gui.sheet) gEsc(); // a ficha aberta (janela por cima de tudo) fecha primeiro
-    else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (skQ && sub === 'sk') skQ = ''; else if (aim) aim = null;
+    else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (navOpen) navOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (skQ && sub === 'sk') skQ = ''; else if (aim) aim = null;
     else if (gm) gEsc(); // fecha a ficha aberta ou encolhe o painel largo
     return render();
   }

@@ -2,7 +2,7 @@ let gmWasB = null; // null até o primeiro desenho: abrir a página no meio da b
 function render() {
   const ae = document.activeElement;
   if (drag || wdrag || cdrag || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }
-  pending = false;
+  pending = false; LEQUE.off();
   // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
     sel: ae.tagName + Object.entries(ae.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, x => '-' + x.toLowerCase())}="${CSS.escape(v)}"]`).join('') } : null;
@@ -46,22 +46,23 @@ function render() {
     const parts = b ? battle(true) : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '' })}${cropper()}${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
-    if (b && !wasBattle) pg = 'mesa'; // a batalha começou: leva o jogador para a mesa
+    if (b && !wasBattle) { pg = 'mesa'; if (innerWidth > 700) chatOpen = false; navOpen = false; } // a batalha começou: leva o jogador para a mesa (no PC o chat só abre por cima, quando pedido)
+    const bat3 = b && actor && pg === 'mesa' && innerWidth > 700, unread = chatOpen ? 0 : S.log.filter(l => l.n > chatSeen).length; // bat3: batalha do PC, sem o painel antigo
     wasBattle = b;
     const page = !c ? `<section class="card"><h3>Bem-vindo, ${esc(name)}</h3><p>Você entrou na campanha. O mestre ainda não ligou um personagem à sua conta: assim que ele fizer isso, a ficha aparece aqui sozinha.</p></section>`
       : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'ofi' ? oficiosPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
-      : chaseBar() + (actor ? battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
-    const unread = chatOpen ? 0 : S.log.filter(l => l.n > chatSeen).length, pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
+      : chaseBar() + (actor ? bat3 ? battle(false, HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + LEQUE.html(actor, cur)) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
+    const pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
     if (chatOpen) chatSeen = S.seq;
     lastPg = pg + (c?.id || '');
-    app.innerHTML = `<header class="top"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
+    app.innerHTML = `<header class="top ${bat3 ? 'bat3' : ''}"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
       <nav class="tnav" aria-label="Páginas">${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}" ${pg === k ? 'aria-current="page"' : ''}>${ico(k)}<span>${k === 'mesa' && b ? 'Batalha' : l}</span></button>`)}<button class="tchat ${chatOpen ? 'on' : ''}" data-a="chatT" aria-pressed="${chatOpen}">${ico('chat')}<span>Chat</span>${unread ? `<i class="bdg">${unread > 9 ? '9+' : unread}</i>` : ''}</button></nav>
       <div class="me"><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? `<div class="pop"><button data-a="mute">${snd.mute ? 'Ligar som' : 'Desligar som'}</button><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>` : ''}</div></header>
       ${ctl ? `<div class="peek ctl">Você está <b>jogando por ${esc(asWho)}</b>: o que fizer aqui acontece na hora, sem passar pela fila de pedidos.</div>` : asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
-      <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`;
+      <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg} ${bat3 ? 'bat3' : ''}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`;
     lastReq = (myReq() || [])[0] || null;
-  } else app.innerHTML = `<main>${chaseBar()}${b ? battle() : map() + party()}</main>`;
+  } else app.innerHTML = `<main>${chaseBar()}${b ? battle(false, innerWidth > 700 ? HUD.html({ table: true }) : '') : map() + party()}</main>`;
   if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
   { const maps = skMount ? app.querySelectorAll(`.skmap[data-cid="${skMount.key}"]`) : [], skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes; uma por vez (a última aberta)
     if (skm && skMount) { MANDALA.mount(skm, skMount); skMount.fresh.forEach(id => MANDALA.learned(id)); } }
@@ -70,6 +71,7 @@ function render() {
   app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody,.skl').forEach((el, i) => el.scrollTop = scr[i] || 0);
   { const sc2 = S.scenes[S.scene]; if (sc2.cam && sc2.cam.n !== lastCam) { const w = mapEl()?.offsetWidth; if (w) { lastCam = sc2.cam.n; Object.assign(view, { z: sc2.cam.z, x: sc2.cam.fx * w, y: sc2.cam.fy * w }); applyView(); } } } // vista fixada pelo mestre
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
+  PALCO3D.local.aim = LEQUE.aimTarget(); // a câmera enquadra o alvo enquanto o leque está na mira
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
   fx();
 }

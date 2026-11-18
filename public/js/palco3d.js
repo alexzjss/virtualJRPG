@@ -64,7 +64,8 @@
   };
   const place = () => {
     if (!root || !host || !host.isConnected) return;
-    const r = host.getBoundingClientRect(); Object.assign(root.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    const r = host.getBoundingClientRect(); document.documentElement.style.setProperty('--hk', Math.max(.45, Math.min(r.width / 1440, r.height / 860, 1.6)).toFixed(3)); // escala do HUD e do leque (desenhados para 1440×860)
+    Object.assign(root.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
   };
   const mount = h => {
     if (host !== h) { ro?.disconnect(); host = h; if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(place); ro.observe(h); } }
@@ -92,8 +93,9 @@
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e);
+    u.sts = el('div', 'sts', e); // âncora das condições (.sti): as marcas de condição nova e de efeito contínuo do coreo.js caem aqui
     if (c.enemy) { u.miniEl = el('div', 'mini', e); u.sh = el('b', 'sh', u.miniEl); u.hpb = el('i', 'hp', u.miniEl); u.hpi = el('i', '', u.hpb); }
-    u.img = el('img', '', e); u.img.alt = ''; u.img.draggable = false;
+    u.inner = el('div', 'bbi', e); u.img = el('img', '', u.inner); u.img.alt = ''; // o .bbi é quem anima (cast, hit, dodge, kofall): o .bb só posiciona u.img.draggable = false;
     u.img.addEventListener('error', () => { if (u.url && !u.fb) { u.bad.push(u.url); setImg(u); } }); // imagem quebrada: cai para a próxima reserva
     grp.appendChild(e); return u;
   };
@@ -107,7 +109,8 @@
       if (u.pos !== pos) { u.pos = pos; u.el.style.setProperty('--x', p.x); u.el.style.setProperty('--z', z); }
       const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u);
-      setCls(u, 'ko', c.hp <= 0); setCls(u, 'cur', c === cur); setCls(u, 'tgt', c.id === tgt);
+      u.el.classList.toggle('ko', c.hp <= 0); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
+      { const k = c.hp > 0 ? stIcons(c) : ''; if (u.stk !== k) { u.stk = k; u.sts.innerHTML = k; } } setCls(u, 'tgt', c.id === tgt);
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
         if (u.mini !== m + w) { u.mini = m + w; u.sh.textContent = m; u.sh.hidden = !m; u.hpi.style.width = w; } }
     }

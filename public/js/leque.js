@@ -1,0 +1,136 @@
+// ===== leque de comandos do jogador no PC: pinceladas à direita do herói da vez, no lugar do painel command() =====
+// Menu (1 Atacar, 2 Skills, 3 Itens, Q Mirar parte) → lista (skills ou itens) → mira (escolher o alvo no palco) → Enter age.
+// O estado da escolha continua nos globais do painel antigo (pick, tgt, aim, aimOpen, braveOn, passTo); aqui só vive o passo em que o leque está.
+// Posições em coordenadas de 1440×860 (a câmera sempre põe o herói no mesmo lugar); o CSS escala tudo pelo --hk.
+const LEQUE = (() => {
+  const state = { mode: 'menu', sel: 0 }; // mode: menu | skills (as 6 fixadas, tarefa 5) | all (lista inteira) | items | aim
+  let from = 'menu', turnKey = '', cx = null; // from: de onde a mira veio (Esc volta para lá); cx: quem está no leque agora
+  const ATK = { k: 'atk', id: 'atk' };
+  const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
+  const esq = (a, b) => a - b;
+  const skSel = () => pick.k === 'sk' ? SK(pick.id) : null;
+  const allySide = () => pick.k === 'it' || selfSk(skSel()) || skSel()?.kind === 'heal';
+  // alvos possíveis do que está escolhido, da esquerda para a direita na tela (←/→ andam por eles)
+  const cands = () => {
+    if (!cx) return [];
+    const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB.filter(o => !o.enemy).map(o => o.id), inB.filter(o => o.enemy).map(o => o.id));
+    const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => allySide() ? o.enemy === cx.actor.enemy : o.enemy !== cx.actor.enemy && o.hp > 0);
+    return l.sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0));
+  };
+  const fit = () => { // a mira abre num alvo do lado certo (inimigo ou aliado)
+    const l = cands(); if (!l.length) return;
+    if (!l.some(o => o.id === tgt)) { tgt = (allySide() ? l.find(o => o.id === cx.actor.id) || l[0] : l[0]).id; aim = null; }
+  };
+  const canAim = () => { const s = skSel(), t = S.chars[tgt]; return !!t && pick.k !== 'it' && !(s && (s.area || ['heal', 'util', 'form'].includes(s.kind) || selfSk(s))); };
+  const why = () => { const c = cx.actor, s = skSel(), t = S.chars[tgt]; return !t && !selfSk(s) ? 'Escolha um alvo' : s && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : ''; };
+  const confirm = () => { const w = why(); if (w) return toast(w, 'no'); goAct(cx.actor.id); };
+  const go = (mode, f) => { if (f) from = f; state.mode = mode; state.sel = 0; if (mode === 'aim') fit(); render(); };
+  const back = () => {
+    if (state.mode === 'aim') { if (aimOpen) { aimOpen = false; aim = null; } else { state.mode = from; if (from === 'menu') pick = { ...ATK }; } }
+    else if (skQ) skQ = ''; else state.mode = 'menu';
+    render();
+  };
+  const flat = () => skGroups(cx.actor, S.chars[tgt], skQ).flatMap(g => g.items);
+  const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
+  const hint = n => { const b = app.querySelector(`.hk[data-a=${n}]`); if (b) b.click(); return !!b; }; // as dicas de baixo são botões: o clique passa pelo mesmo caminho do mouse
+
+  const stroke = (lq, key, label, small, x, y, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} style="left:${x}px;top:${y}px;${o.r != null ? `--r:${o.r}deg;` : ''}${o.fs ? `font-size:${o.fs}px` : ''}" ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
+
+  return {
+    state,
+    // limpa tudo (a ação saiu ou a vez mudou)
+    reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; },
+    off() { cx = null; },
+    // alvo da câmera de mira (palco3d.js): só enquanto o leque está na mira
+    aimTarget() { return cx && cx.my && !cx.wait && state.mode === 'aim' ? tgt : null; },
+    html(c, cur) {
+      const [, rq] = myReq() || [], my = cur === c, wait = !!(rq && rq.ch === c.id);
+      cx = { actor: c, cur, my, wait };
+      const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; }
+      if (!my || wait || S.battle.cmd) return '';
+      const inB = battlers();
+      if (!inB.some(o => o.id === tgt) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0)) { const f = inB.find(o => o.enemy !== c.enemy && o.hp > 0); if (f) { tgt = f.id; aim = null; } } // na sua vez já vem mirado no primeiro inimigo de pé
+      const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
+      if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { ...ATK };
+      const t = S.chars[tgt], s = skSel(), it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma'), mode = state.mode;
+      const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : 2));
+      let h = '';
+      if (mode === 'menu') {
+        const M = [['atk', 1, 'Atacar', esc(ARMAS.prof(wp).atkN || 'Ataque'), wpnLine(wp, c)], ['sk', 2, 'Skills', sks.length + wsks.length], ['it', 3, 'Itens', cons.length]];
+        h += [2, 1, 0].map((k, j) => stroke(M[k][0], M[k][1], M[k][2], M[k][3], 650 + j * 40, 410 + j * 78, { on: sel === k, title: M[k][4] })).join('');
+        if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24 });
+      } else if (mode === 'items') {
+        h += cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, 600 + j * 36, 400 + j * 76, { v: k, on: sel === j, fs: 24 })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
+      } else if (mode === 'all') {
+        h += `<div class="lq-all" data-lq="all">${skPane(c, t, { bare: true })}</div>`;
+        const cur2 = pick.k === 'sk' && s, w = cur2 && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
+        if (cur2) h += `<div class="lq-sum"><b>${esc(s.name)}</b><small>${esc(desc(s))}</small>${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
+      } else if (mode === 'aim') {
+        const label = it ? it.name : s ? s.name : ARMAS.prof(wp).atkN || 'Ataque', w = why();
+        h += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b><small>${w ? `<span class="why">${esc(w)}</span> · ` : ''}← → escolhem o alvo · clique de novo no alvo confirma · Esc volta</small></div>`;
+        h += stroke('go', '⏎', esc(askL('act', 'Agir')), '', 730, 566, { on: !w, blk: !!w });
+        if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24, on: aimOpen });
+        if (canAim() && aimOpen) h += `<div class="lq-aim">${aimBox()}</div>`;
+        const allies = battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0);
+        if (allies.length && !allySide() && cands().some(o => o.enemy)) h += stroke('pass', 'P', 'Fraqueza passa a vez', esc(passTo ? S.chars[passTo]?.name || '' : 'ninguém'), 150, 430, { r: 4, fs: 20 });
+      }
+      return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox mode-${mode}">${h}</div></div>`;
+    },
+    // clique numa pincelada
+    click(name, v) {
+      if (!cx || !cx.my || cx.wait) { if (name === 'back') return back(); return; }
+      const c = cx.actor;
+      if (name === 'atk') { pick = { ...ATK }; return go('aim', 'menu'); }
+      if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } return go('all', 'menu'); }
+      if (name === 'it') return go('items', 'menu');
+      if (name === 'item') { pick = { k: 'it', id: v }; return go('aim', 'items'); }
+      if (name === 'aim') return state.mode === 'aim' ? (aimOpen = !aimOpen, aimOpen || (aim = null), render()) : toAim();
+      if (name === 'pass') { const l = ['', ...battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0).map(o => o.id)]; passTo = l[(l.indexOf(passTo) + 1) % l.length]; return render(); }
+      if (name === 'go') return confirm();
+      if (name === 'back') return back();
+    },
+    // clicar numa skill da lista abre a mira (as setas ↑↓ só andam pela lista, sem avançar)
+    picked() { if (!cx || state.mode !== 'all') return false; go('aim', 'all'); return true; },
+    // clicar num recorte já mirado confirma a ação
+    clickTgt(id) { if (!cx || !cx.my || cx.wait || state.mode !== 'aim' || id !== tgt || !cands().some(o => o.id === id)) return false; confirm(); return true; },
+    // teclado da batalha no PC; devolve true se tratou a tecla
+    key(e) {
+      if (!cx || gm || role !== 'player' || innerWidth <= 700 || !S.battle?.active || S.battle.cmd) return false;
+      if (e.target.matches?.('input,textarea,select') || rollDlg || meOpen || navOpen || gridFull || ctx || document.querySelector('.stage-cmd,.result,.dlg-in')) return false;
+      const k = e.key, mode = state.mode, c = cx.actor;
+      if (k === 'Escape') {
+        if (cx.wait) { const [id] = myReq() || []; if (id) send({ t: 'reqNo', id }); return true; }
+        if (!cx.my || mode === 'menu') return false;
+        back(); return true;
+      }
+      if (!cx.my || cx.wait) return false;
+      if (mode === 'all' && skKey(e)) return true; // letras filtram a lista; Shift+F fixa
+      if (/^[1-3]$/.test(k) && mode === 'menu') { click(['atk', 'sk', 'it'][k - 1]); return true; }
+      if (/^[4-8]$/.test(k)) { hint({ 4: 'defend', 5: 'focus', 6: 'braveT', 7: 'next', 8: 'allOut' }[k]); return true; }
+      if (/^[qQ]$/.test(k) && canAim() && mode !== 'all' && mode !== 'items') { click('aim'); return true; }
+      if (/^[tT]$/.test(k) && mode !== 'aim') { click('all'); return true; }
+      if (/^[pP]$/.test(k) && mode === 'aim' && app.querySelector('[data-lq=pass]')) { click('pass'); return true; }
+      if (k === 'ArrowUp' || k === 'ArrowDown') {
+        const d = k === 'ArrowUp' ? 1 : -1; // o leque sobe para os itens: ↑ vai para cima na tela
+        if (mode === 'menu') state.sel = (state.sel + d + 3) % 3;
+        else if (mode === 'items') { const n = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons').length; if (!n) return true; state.sel = (state.sel - d + n) % n; }
+        else if (mode === 'all') { const l = flat(); if (!l.length) return true; const i = l.findIndex(x => pick.k === 'sk' && x.id === pick.id); pick = { k: 'sk', id: l[(i + (d > 0 ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id }; }
+        else return false;
+        render(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return true;
+      }
+      if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'aim') {
+        const l = cands(); if (!l.length) return true;
+        const i = l.findIndex(o => o.id === tgt); tgt = l[(i + (k === 'ArrowLeft' ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id; aim = null; render(); return true;
+      }
+      if (k === 'Enter') {
+        if (mode === 'menu') click(['atk', 'sk', 'it'][state.sel]);
+        else if (mode === 'items') { const e2 = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons')[state.sel]; if (e2) click('item', e2[0]); }
+        else if (mode === 'all') { if (pick.k === 'sk') go('aim', 'all'); }
+        else if (mode === 'aim') confirm();
+        return true;
+      }
+      return false;
+    },
+  };
+  function click(n, v) { return LEQUE.click(n, v); }
+})();

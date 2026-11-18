@@ -20,7 +20,8 @@ function skGroups(c, t, q = '') {
   const G = [{ k: 'atl', label: 'Atalhos', items: [...pins, ...top] }, ...SKG.map(([k, label]) => ({ k, label: k === 'wp' ? `Arma · ${eq(c, 'arma')?.name || ''}` : label, items: all.filter(x => !atl.has(x) && kindOf(x) === k).sort(byCost) }))];
   return G.filter(g => g.items.length);
 }
-function skPane(c, t) {
+const skFiltro = bare => skQ ? `<div class="skf">Filtro: <b>${esc(skQ)}</b><button class="ghost" data-a="skQx" aria-label="Limpar filtro">✕</button></div>` : `<div class="skf dim">Digite para filtrar · <kbd>↑</kbd><kbd>↓</kbd> escolhe${bare ? ' · <kbd>Enter</kbd> confirma' : ''} · <kbd>Shift F</kbd> fixa</div>`;
+function skPane(c, t, o = {}) { // o.bare (leque do PC): só a lista, sem o painel da skill escolhida
   skCur = c;
   const G = skGroups(c, t, skQ), flat = G.flatMap(g => g.items), any = skGroups(c, t).length;
   if (!any) return '<p class="none">Nenhuma skill ativa ainda. Aprenda na página Habilidades.</p>';
@@ -30,12 +31,12 @@ function skPane(c, t) {
     return `<button class="opt skr ${on ? 'on' : ''} ${x.off ? 'off' : ''}" data-a="pick" data-k="sk" data-v="${esc(x.id)}" style="--e:${ELC[x.s.el] || '#888'}" aria-pressed="${on}" ${x.off ? `aria-disabled="true" title="${esc(x.why)}"` : ''}>
       <i class="mk">${x.pin ? '★' : x.used && !x.pin && G[0]?.k === 'atl' && G[0].items.includes(x) ? '↺' : ''}</i><i class="dot"></i><b>${esc(x.s.name)}</b>${a ? `<i class="af ${a[1]}" title="${a[2]}">${a[0]}</i>` : '<i class="af"></i>'}<i class="pw">${x.off ? `<span class="why">${esc(x.why)}</span>` : x.s.power > 0 ? 'P ' + x.s.power : ''}</i><i class="ct">${skCost(x.s)}</i></button>`; };
   const list = G.map(g => `<div class="skg"><em>${esc(g.label)}</em><small>${g.items.length}</small></div>${g.items.map(row).join('')}`).join('') || `<p class="none">Nada com “${esc(skQ)}”.</p>`;
+  if (o.bare) return `<div class="skc bare">${skFiltro(true)}<div class="alist skl" role="listbox" aria-label="Skills">${list}</div></div>`;
   const s = cur?.s, a = cur && AFF[cur.aff];
   const panel = s ? `<div class="skpn" style="--e:${ELC[s.el] || '#888'}"><b>${esc(s.name)}</b><small>${esc(KIND[s.kind] || s.kind)} · ${esc(EL[s.el] || s.el)}${a ? ` · <span class="af ${a[1]}">${a[0]} ${a[2]}</span>` : ''}</small><p>${esc(desc(s))}</p>
     <div class="skst"><div><em>Custo</em>${skCost(s)}</div><div><em>Poder</em>${s.power || '—'}</div><div><em>Alcance</em>${s.area ? 'Área' : selfSk(s) ? 'Em si' : 'Único'}</div><div><em>Usos</em>${cur.used ? cur.used + '× usada' : '—'}${s.uses ? ` · ${s.uses}/batalha` : ''}</div></div>
     ${cur.why ? `<p class="why">${esc(cur.why)}</p>` : ''}<button class="ghost skpin" data-a="skPinT" data-id="${c.id}" data-v="${esc(cur.id)}">${cur.pin ? '★ Desfixar' : '☆ Fixar nos Atalhos'} <kbd>Shift F</kbd></button></div>` : '<div class="skpn"></div>';
-  const fl = skQ ? `<div class="skf">Filtro: <b>${esc(skQ)}</b><button class="ghost" data-a="skQx" aria-label="Limpar filtro">✕</button></div>` : '<div class="skf dim">Digite para filtrar · <kbd>↑</kbd><kbd>↓</kbd> escolhe · <kbd>Shift F</kbd> fixa</div>';
-  return `<div class="skw"><div class="skc">${fl}<div class="alist skl" role="listbox" aria-label="Skills">${list}</div></div>${panel}</div>`;
+  return `<div class="skw"><div class="skc">${skFiltro(o.bare)}<div class="alist skl" role="listbox" aria-label="Skills">${list}</div></div>${panel}</div>`;
 }
 // teclas do seletor (só com Skills aberto e o foco fora de campos de texto): devolve true se tratou
 function skKey(e) {
