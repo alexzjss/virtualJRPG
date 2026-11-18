@@ -6,7 +6,7 @@ process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjsim-'));
 const { H, S, R, current, derive, genFoe, partyRef, fitBoss, spawn } = await import('../server.js');
 const gm = { role: 'gm' }, N = +process.argv[2] || 300, MODE = process.argv[3] || 'base', out = s => process.stdout.write(s + '\n');
 const byName = n => Object.keys(S.skills).find(k => S.skills[k].name === n), item = n => Object.keys(S.items).find(k => S.items[k].name === n);
-const TREE = (await import('../tree.js')).TREE, ids = (el, b, n) => TREE[el].branches[b].slice(0, n).map(o => byName(o.n));
+const TREE = (await import('../tree.js')).TREE, ids = (el, b, n) => (TREE[el].branches.find(x => !x.de && x[0]?.ob === b) || TREE[el].branches[b]).slice(0, n).map(o => byName(o.n)); // ob: índice do ramo antes da reorganização (arvore/ordem.js)
 console.log = () => {};
 const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
 // grupo de heróis por nível: 0 = recém-criado, 1 = algumas sessões, 2 = veterano. O 4º herói é curandeiro de Amaterasu.
@@ -28,7 +28,7 @@ function fight(heroes, foes) {
     const live = Object.values(S.chars), liveF = live.filter(f => f.enemy && f.hp > 0), liveH = heroes.filter(h => h.hp > 0), a = S.chars[current()];
     if (!liveF.length || !liveH.length || !a) break;
     acts[a.id] = (acts[a.id] || 0) + 1;
-    if (a.enemy) { if (process.env.SIMDBG && a.boss) process.stderr.write(`boss hp ${Math.round(100*a.hp/a.hpMax)}% aura ${a.aura}/${a.auraMax} lim ${a.limit} dom ${!!a.skills.find(k=>S.skills[k].dom)}\n`); H.ai(gm); continue; }
+    if (a.enemy) { if (process.env.SIMDBG && a.boss) process.stderr.write(`boss hp ${Math.round(100*a.hp/a.hpMax)}% aura ${a.aura}/${a.auraMax} lim ${a.limit} dom ${!!a.skills.find(k=>S.skills[k].dom)}\n`); H.ai(gm); if (S.battle.cmd) H.cmdSkip(gm); continue; } // a janela de esquiva/aparar (Leva 4) espera um jogador: no simulador o golpe sai já
     // heróis: Limite se cheio, cura quem está mal, poção em emergência, senão a skill mais forte que puder pagar no inimigo mais ferido
     const sks = a.skills.map(k => [k, S.skills[k]]).filter(([, s]) => s && s.kind !== 'passive' && a[s.res] >= s.cost && (!s.limit || a.limit >= 100) && !a.st.silence && !a.st.fury);
     const hurt = heroes.filter(h => !h.dead && h.hp < h.hpMax * .45).sort((x, y) => x.hp - y.hp)[0], weak = liveF.sort((x, y) => x.hp - y.hp)[0], pot = Object.keys(a.inv).find(k => S.items[k]?.eff === 'hp');

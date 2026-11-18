@@ -24,7 +24,7 @@ export const LEVA8A = { marcial: [
     N('Corte do Eclipse', 'Um corte que cai no ponto cego do inimigo.', 'd20/8', 'vs exposed 1.5; st exposed 1'),
     N('Respiração de Bainha', 'Entre um saque e outro, o fôlego volta inteiro.', 'p', '', { on: 'crit', fx: 'gain aura 4' }),
     N('Mil Cortes Depois', 'O inimigo só sangra quando o espadachim já guardou a lâmina.', 'd14/8', 'det bleed 6'),
-    N('Corte Que Não Volta', 'Um saque perfeito: nada fica de pé depois dele.', 'd40/14', 'exec 35 1.6; pierce 70', { cmd: 'tempo', pf: 'st bleed 4' }),
+    N('Corte Que Não Volta', 'Um saque perfeito: nada fica de pé depois dele.', 'd32/14', 'exec 35 1.5; pierce 70', { cmd: 'tempo', pf: 'st bleed 4' }),
   ),
   R('AGI', 'FOR', // Boxe e Muay Thai: pés, quadril e paciência
     N('Jab de Medida', 'Dois toques curtos para medir a distância.', 'd5/2 x2 t60', '', { cmd: 'martelar', mx: 3 }),
@@ -120,7 +120,7 @@ export const LEVA8A = { marcial: [
     N('Golpe da Sombra', 'Do escuro, direto na nuca.', 'd22/8', 'vs exposed 1.4', { cmd: 'tempo', pf: 'exec 30 1.5' }),
     N('Bomba de Fuligem', 'Fuligem negra que cega todos os inimigos.', 'u/5 a', 'st blind 2 60%', { a: 'INT' }),
     N('Fio de Aço', 'Um fio invisível entre as árvores prende quem passa.', 'd10/6 a', 'st root 1 60%'),
-    N('Assassinato Silencioso', 'Ninguém viu, ninguém ouviu. O alvo só caiu.', 'd44/14', 'exec 40 1.8; sure', { cmd: 'tempo', pf: 'turn' }),
+    N('Assassinato Silencioso', 'Ninguém viu, ninguém ouviu. O alvo só caiu.', 'd34/14', 'exec 40 1.6; sure', { cmd: 'tempo', pf: 'turn' }),
   ),
   R('DES', 'AGI', // Gun Kata: o tiro como dança
     N('Saque Cruzado', 'As duas armas saem ao mesmo tempo, cruzando os braços.', 'd5/3 x2 t60', ''),

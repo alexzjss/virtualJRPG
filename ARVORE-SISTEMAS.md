@@ -259,3 +259,9 @@ Os ramos de arma saíram do tronco Marcial para `TREE.armas` (ver ARMAS.md, "Ár
 - **Cada Vínculo (6):** Ressonância (uma técnica para cada outro Vínculo), Primeiros Passos, Assinatura, Caça (Marca, eco, contador), Guarda, Ascensão (forma com Despertar e Limite).
 - **Variações (`arvore/leva8e.js`):** 4 versões de 44 técnicas existentes na linha de cada uma (rápida, larga/pesada, com elemento de outro Vínculo, com mecânica nova). Na Árvore de Armas, que não tem linhas, entram no ramo logo depois da base.
 - Notação compacta em `arvore/l8.js`: `N('Nome', 'descrição', 'd14/5 a x2', 'fx', {extras})`; `R('FOR', 'CON', ...nós)` dá XP e requisito pelo lugar no ramo.
+### Balanceamento (`tools/sim-skills.js`)
+`node tools/sim-skills.js [--novos lista.txt]` usa cada técnica de dano uma vez (atributo 60, 3 bonecos, sorte fixa) e compara o dano por tempo
+com a mediana das técnicas antigas da mesma faixa (XP, área, mental, Limite); `node tools/sim-skills.js <nome>` mede só as que batem com o nome.
+Na Leva 8 ficaram fora de ×0,5 a ×1,6 só técnicas de ganho adiado (selo, eco, contador, controle). Regras que saíram disso: multi-golpe tem
+poder mínimo 7 por golpe (a armadura conta em cada um) e a 4ª variação com ganho condicional sai com ×1,5 de poder.
+`tools/sim.js` voltou a rodar: a janela de esquiva/aparar da Leva 4 travava a vez dos inimigos (agora é pulada) e os ramos dos heróis são achados pelo índice original (`ob`).

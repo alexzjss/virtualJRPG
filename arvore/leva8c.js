@@ -104,7 +104,7 @@ export const LEVA8C = {
     ),
     R('SAB', 'FOR', // Assinatura: a lâmina e o trovão do mar
       N('Corte da Correnteza', 'A lâmina segue a água e corta duas vezes.', 'd6/5 x2', 'st wet 1', { a: 'FOR' }),
-      N('Dança da Água Corrente', 'Um corte que flui de um alvo a outro como rio.', 'd10/6', 'chain 2 .7', { cmd: 'tempo', pf: 'chain 3 .7' }),
+      N('Dança da Água Corrente', 'Um corte que flui de um alvo a outro como rio.', 'd7/6', 'chain 2 .7', { cmd: 'tempo', pf: 'chain 3 .7' }),
       N('Roda d’Água', 'Um giro inteiro com a lâmina molhada.', 'd10/6 a', 'st wet 2', { a: 'FOR' }),
       N('Chuva Cortante', 'Gotas afiadas como agulhas.', 'd5/7 x4', 'st bleed 1 30%', { cmd: 'martelar', mx: 4 }),
       N('Dragão das Águas', 'Um dragão de água morde e arrasta.', 'd20/8', 'push 40; st wet 2', { cmd: 'tempo', pf: 'st frozen 1' }),
@@ -259,8 +259,8 @@ export const LEVA8C = {
       N('Canhão de Trilho', 'Uma moeda acelerada pelo raio atravessa tudo.', 'd28/10 c1', 'pierce 100', { cmd: 'segurar' }),
       N('Tempestade de Agulhas', 'Agulhas de raio em todas as direções.', 'd5/9 x4 a', 'st para 1 20%', { cmd: 'martelar', mx: 4 }),
       N('Corpo de Relâmpago', 'O corpo vira luz por um instante e passa através do golpe.', 'u/4 s', 'st evade 2 self', { a: 'AGI', rea: 'evade 45' }),
-      N('Raio em Corrente', 'O raio salta por todos os inimigos.', 'd16/9', 'chain 4 .75', { a: 'AGI' }),
-      N('Vajra do Rei', 'A arma do rei dos deuses, nas mãos de um caçador.', 'L58', 'burst carga .25; chain 2 .8; pierce 50'),
+      N('Raio em Corrente', 'O raio salta por todos os inimigos.', 'd11/9', 'chain 4 .75', { a: 'AGI' }),
+      N('Vajra do Rei', 'A arma do rei dos deuses, nas mãos de um caçador.', 'L38', 'burst carga .25; chain 2 .8; pierce 50'),
     ),
     R('INT', 'DES', // Caça
       N('Marca de Estática', 'A presa fica carregada: tudo que se aproxima dá choque.', 'd6/3', 'brand 3; st para 1 15%'),

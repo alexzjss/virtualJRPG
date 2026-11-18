@@ -2,7 +2,8 @@
 // Cada lista: rápida/múltipla, larga ou pesada, com o elemento de outro Vínculo (`v2`) e uma com a mecânica nova (Marca, eco, contador).
 import { N } from './l8.js';
 const XPV = [20, 30, 40, 55], RQV = [0, 50, 54, 56];
-const V = (base, A, ...ns) => [base, ns.map((o, i) => ({ ...o, a: o.a || A, xp: o.limit ? 45 + i * 10 : XPV[i], pre: base, ...(RQV[i] ? { rq: { [o.a || A]: RQV[i] } } : {}) }))];
+const COND = /\b(brand|echo|every|seal|pop)\b/; // a 4ª variação com ganho condicional ganha poder: num uso só ela rende pouco (tools/sim-skills.js)
+const V = (base, A, ...ns) => [base, ns.map((o, i) => ({ ...o, ...(i === 3 && o.p && !o.limit && COND.test(o.fx || '') ? { p: Math.round(o.p * 1.5) } : {}), a: o.a || A, xp: o.limit ? 45 + i * 10 : XPV[i], pre: base, ...(RQV[i] ? { rq: { [o.a || A]: RQV[i] } } : {}) }))];
 export const VAR8 = Object.fromEntries([
   // Marcial
   V('Golpe Giratório', 'FOR',

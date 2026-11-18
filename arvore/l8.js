@@ -22,6 +22,7 @@ export function N(n, d, spec, f = '', x = {}) {
     else throw new Error(`Leva 8: marca "${g}" em ${n}`);
   }
   if (f) o[m[1] === 'p' ? 'mod' : m[1] === 'f' ? 'fm' : 'fx'] = f;
+  if (o.hits > 1 && o.p) o.p = Math.max(o.p, 7); // a armadura conta em cada golpe: abaixo de 7 por golpe o multi-golpe não rende (tools/sim-skills.js)
   return { ...o, ...x };
 }
 export function R(A, B, ...ns) {
