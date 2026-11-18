@@ -896,7 +896,7 @@ button.wpn{border-bottom-color:var(--gold)}
 @media(min-width:1000px){.pl.pg-mesa .stage{height:clamp(215px,calc(100vh - 575px),540px)}}
 .p5m li,.p5m li:has(.act){grid-column:auto}.p5i.on{transform:skewX(-12deg) translateX(6px)}.p5i:hover:not(:disabled):not(.on){transform:skewX(-12deg) translateX(4px)}
 .p5i,.p5i.act{min-height:34px;font-size:16px;padding:3px 10px 3px 8px;gap:8px}.p5i.act{font-size:14px}
-.cmd.p5 .cmd-g{grid-template-columns:minmax(190px,.62fr) minmax(250px,.62fr) minmax(0,1.5fr)}
+@media(min-width:1251px){.cmd.p5 .cmd-g{grid-template-columns:minmax(190px,.62fr) minmax(250px,.62fr) minmax(0,1.5fr)}} /* só em tela larga: no tablet e no celular valem as colunas de cima */
 @media(min-width:1000px){.pl.pg-mesa .stage{height:clamp(240px,calc(100vh - 470px),560px)}}
 .cmd.p5 .cmd-h .fbar{margin:0 0 0 auto}.cmd.p5{gap:10px}.cmd.p5 .cmd-go{padding:6px 10px}
 .cmd.p5 .tg{flex:0 1 118px}.p5t{align-items:flex-start}.p5t>small{padding-top:8px}
@@ -1053,3 +1053,5 @@ details.mais>.row{margin:8px 10px}
 .skchips .chip:hover,.skchips .chip:focus-visible{transform:scale(1.12);box-shadow:0 0 12px var(--e)}
 .skchips .chip.mine{border-color:var(--e);box-shadow:0 0 0 2px #0b0b14,0 0 0 3px var(--e)}
 @media(max-width:999px){.skchips{left:170px;right:8px}}
+/* girar a mandala: botões de um caractere só ficavam com 31px no celular (mínimo de toque: 34px) */
+.skhint [data-a=skRotL],.skhint [data-a=skRotR]{min-width:40px}

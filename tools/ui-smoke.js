@@ -114,7 +114,7 @@ try {
     check(await vis(ana, '.unit.ten2') && /Tensão ×2/.test(await txt(ana, '.unit.ten2 .rit')), 'unidade com Tensão 2 deveria ganhar a classe ten2');
     check(await ana.locator('.unit.ten2 .figw').evaluate(e => getComputedStyle(e).animationName) === 'tenGlow', 'Tensão deveria brilhar (animação tenGlow)');
     check(await noise(ana, () => { shinkai.ten = 0; shinkai.brv = -1; }) > 0, 'Dívida de Coragem deveria tocar um som');
-    check(await vis(ana, '.unit.debt') && await vis(ana, '.rhythm [data-a=braveT].debt'), 'Dívida: unidade e botão de Coragem deveriam ficar vermelhos');
+    check(await vis(ana, '.unit.debt') && await vis(ana, '.p5m [data-a=braveT].debt'), 'Dívida: unidade e botão de Coragem deveriam ficar vermelhos');
     check(await ana.locator('.unit.debt .figw').evaluate(e => getComputedStyle(e).animationName) === 'debtPulse', 'Dívida deveria pulsar');
     check(await noise(ana, () => { shinkai.brv = 0; S.battle.chain.h = 40; }) > 0, 'Cadeia subindo deveria tocar um tique');
     check(await noise(ana, () => { S.battle.chain.h = 100; }) > 0, 'Cadeia cheia deveria tocar o acorde');
@@ -133,18 +133,18 @@ try {
 
   await section('Defender, Concentrar e Coragem', async () => {
     check(toTurn(shinkai.id), 'vez da Shinkai');
-    await click(ana, '.rhythm [data-a=defend]', 'Defender');
+    await click(ana, '.p5m [data-a=defend]', 'Defender');
     await until(() => shinkai.brv === 1, 'Coragem 1 após Defender');
-    await until(async () => /Defender 1/i.test(await txt(ana, '.rhythm [data-a=defend]')), 'botão mostra Coragem 1');
-    check(/Coragem 1/i.test(await txt(ana, '.rhythm [data-a=braveT]')), 'botão Coragem mostra 1 ponto');
+    await until(async () => /Defender · 1/i.test(await txt(ana, '.p5m [data-a=defend]')), 'botão mostra Coragem 1');
+    check(/Coragem 1/i.test(await txt(ana, '.p5m [data-a=braveT]')), 'botão Coragem mostra 1 ponto');
     check(toTurn(shinkai.id), 'vez da Shinkai de novo');
-    await click(ana, '.rhythm [data-a=focus]', 'Concentrar');
+    await click(ana, '.p5m [data-a=focus]', 'Concentrar');
     await until(() => shinkai.ten === 1, 'Tensão 1');
-    await until(async () => /×1.5/i.test(await txt(ana, '.rhythm [data-a=focus]')), 'botão mostra ×1.5');
+    await until(async () => /×1.5/i.test(await txt(ana, '.p5m [data-a=focus]')), 'botão mostra ×1.5');
     check(toTurn(shinkai.id), 'vez da Shinkai de novo (2)');
     // Coragem: liga, ataca e age de novo na sequência
-    await tgBtn(ana, minion.id).click(); await click(ana, '.rhythm [data-a=braveT]', 'Coragem');
-    check(await ana.locator('.rhythm [data-a=braveT]').getAttribute('aria-pressed') === 'true', 'Coragem deveria ficar ligada');
+    await tgBtn(ana, minion.id).click(); await click(ana, '.p5m [data-a=braveT]', 'Coragem');
+    check(await ana.locator('.p5m [data-a=braveT]').getAttribute('aria-pressed') === 'true', 'Coragem deveria ficar ligada');
     const brv0 = shinkai.brv, logN = S.seq;
     await click(ana, '.cmd-go .go', 'Agir');
     await until(() => S.log.some(l => l.n > logN && l.who === 'Shinkai'), 'ataque com Coragem foi executado');
@@ -158,9 +158,9 @@ try {
     // o seletor "passar a vez" trava o redesenho enquanto tem foco: precisa aceitar a escolha e soltar o foco
     for (let i = 0; i < 8 && !minion.st.down; i++) { // o golpe pode errar: repete até derrubar
       check(toTurn(shinkai.id), 'vez da Shinkai'); await until(() => vis(ana, '.cmd.mine'), 'turno da Ana');
-      await ana.selectOption('.rhythm select[data-a=passSel]', mikhail.id);
+      await ana.selectOption('.cmd select[data-a=passSel]', mikhail.id);
       await tgBtn(ana, minion.id).click();
-      if (!i) check(await ana.locator('.rhythm select').inputValue() === mikhail.id, 'passar a vez: escolha deveria permanecer após clicar no alvo');
+      if (!i) check(await ana.locator('.cmd select[data-a=passSel]').inputValue() === mikhail.id, 'passar a vez: escolha deveria permanecer após clicar no alvo');
       const n = S.seq; await click(ana, '.cmd-go .go', 'Agir');
       await until(() => S.seq > n, 'ataque executado');
     }
@@ -180,9 +180,9 @@ try {
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
     const hero = S.chars[current()], pg = hero.owner === 'ana' ? ana : bia;
-    await until(async () => await pg.locator('.rhythm [data-a=allOut]').isEnabled(), 'Ataque Total liberado com todos Derrubados');
+    await until(async () => await pg.locator('.p5m [data-a=allOut]').isEnabled(), 'Ataque Total liberado com todos Derrubados');
     const hp1 = bossCh.hp + minion.hp;
-    await click(pg, '.rhythm [data-a=allOut]', 'Ataque Total');
+    await click(pg, '.p5m [data-a=allOut]', 'Ataque Total');
     await until(() => /ATAQUE TOTAL|Ataque Total/i.test(battleLog()), 'registro do Ataque Total');
     await until(() => bossCh.hp + minion.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');
