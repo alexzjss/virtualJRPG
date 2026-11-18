@@ -98,7 +98,7 @@ server.headersTimeout = 20e3; server.requestTimeout = 600e3; // conexões que nu
 const wss = new WebSocketServer({ server, maxPayload: 65536, perMessageDeflate: { threshold: 1024, concurrencyLimit: 4 } }); // o estado tem ~200 KB de JSON repetitivo: comprimido pesa bem menos pelo túnel
 wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('error')
 
-const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, battle: undefined, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
+const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, battle: undefined, enc: undefined, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
 // cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
 // jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
 // fraquezas do inimigo para jogadores: Identificar revela tudo; o acerto revela só o elemento usado (S.lore, por tipo)

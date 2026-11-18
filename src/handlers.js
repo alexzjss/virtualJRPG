@@ -510,7 +510,11 @@ const H = {
     const list = m.list.slice(0, 12).filter(e => e && Object.hasOwn(S.bestiary, e.b)).map(e => ({ b: e.b, tier: Object.hasOwn(TIER, e.tier) ? e.tier : 'normal', n: int(e.n || 1, 1, 12) }));
     if (list.length) S.encounters[rid()] = { name: String(m.name || 'Encontro').slice(0, 40), list };
   },
-  encDel(c, m) { if (c.role === 'gm') delete S.encounters[m.id]; },
+  encDel(c, m) { if (c.role === 'gm') { delete S.encounters[m.id]; for (const sc of Object.values(S.scenes)) if (sc.enc) sc.enc = sc.enc.filter(k => k !== m.id); } },
+  sceneEnc(c, m) { // liga ou desliga um encontro salvo a uma cena (fica à mão no painel da Mesa)
+    const sc = S.scenes[m.scene] || scene(); if (c.role !== 'gm' || !Object.hasOwn(S.encounters, m.id)) return;
+    const l = (sc.enc || []).filter(k => k !== m.id); sc.enc = m.on ? [...l, m.id].slice(-12) : l;
+  },
   encSpawn(c, m) { const e = S.encounters[m.id]; if (c.role === 'gm' && e) { for (const x of e.list) H.bSpawn(c, { id: x.b, tier: x.tier, n: x.n }); log('Mestre', `Encontro: ${e.name}.`); } },
   skTog(c, m) { // o mestre dá ou tira qualquer skill, sem custo; passivas aplicam ou desfazem o bônus
     const ch = getCh(c, m.id), s = S.skills[m.skill];

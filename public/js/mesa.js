@@ -19,7 +19,7 @@ const MESA = (() => {
   const col = (id, sc) => {
     const hs = heroes().filter(c => c.scene === id), foes = Object.values(S.chars).filter(c => c.enemy && c.scene === id && c.x != null && c.hp > 0).length;
     return `<section class="mz-col ${id === S.focus ? 'focus' : ''}" data-mzdrop="${id}">
-      <button class="mz-thumb" data-mz="focus" data-id="${id}" style="${bgOf(sc)}" title="Pôr o foco nesta cena"><span class="mz-tags">${id === S.tv ? '<em class="tv">TV</em>' : ''}${sc.clima ? `<em>${esc(sc.clima)}</em>` : ''}${sc.shop?.open ? '<em>Loja</em>' : ''}${sc.fogOn ? '<em>Névoa</em>' : ''}</span><b>${esc(sc.name)}</b></button>
+      <button class="mz-thumb" data-mz="focus" data-id="${id}" style="${bgOf(sc)}" title="Pôr o foco nesta cena"><span class="mz-tags">${id === S.tv ? '<em class="tv">TV</em>' : ''}${sc.clima ? `<em>${esc(sc.clima)}</em>` : ''}${sc.shop?.open ? '<em>Loja</em>' : ''}${sc.fogOn ? '<em>Névoa</em>' : ''}${(sc.enc || []).length ? `<em title="Encontros preparados">⚔ ${sc.enc.length}</em>` : ''}${sc.note ? '<em title="Tem notas">✎</em>' : ''}</span><b>${esc(sc.name)}</b></button>
       ${badge(id, sc)}
       <div class="mz-meta"><span>${pl(hs.length, 'herói', 'heróis')}</span><span>${pl(foes, 'inimigo', 'inimigos')}</span><span>${pl((sc.exits || []).length, 'saída', 'saídas')}</span></div>
       <div class="mz-drop">${hs.map(hero).join('') || '<small class="mz-empty">arraste heróis para cá</small>'}</div></section>`;
@@ -41,6 +41,10 @@ const MESA = (() => {
     return `<aside class="mz-side"><div><small class="mz-h">Cena em foco</small><h2>${esc(sc.name)}</h2></div>
       <div class="row"><button data-mz="go" data-v="mapa">Editar mapa</button>${sc.battle?.active ? `<button class="own" data-mz="palco" data-id="${id}">Abrir palco</button>` : '<button class="own" data-mz="fight">Iniciar batalha aqui</button>'}${S.tv === id ? '' : `<button data-mz="tv" data-id="${id}">Mostrar na TV</button>`}<button data-mz="dup">Duplicar</button>${hs.length || sc.battle?.active || others.length < 1 ? '' : '<button data-mz="del">Excluir</button>'}</div>
       <div><small class="mz-h">Mapa e saídas</small>${mini(id, sc)}<small class="mz-note">${others.length ? 'Clique numa casa para pôr uma saída; clique numa saída para removê-la.' : 'Crie outra cena para poder ligar as duas por uma saída.'}</small></div>
+      <div><small class="mz-h">Notas e encontros (só você vê)</small>
+        <textarea class="mz-msg mz-note-in" data-map="note" aria-label="Notas secretas desta cena" placeholder="Ganchos, segredos, o que os NPCs sabem…">${esc(sc.note || '')}</textarea>
+        <div class="mz-list">${(sc.enc || []).filter(k => S.encounters?.[k]).map(k => { const e = S.encounters[k]; return `<div class="mz-li enc"><span title="${esc(e.list.map(x => `${x.n}× ${S.bestiary?.[x.b]?.name || '?'}`).join(', '))}">${esc(e.name)} · ${e.list.reduce((a, x) => a + x.n, 0)}</span><button class="own" data-mz="encGo" data-id="${k}" title="Põe os inimigos deste encontro no mapa da cena">Pôr na cena</button><button data-mz="encOff" data-id="${k}" title="Desligar da cena (o encontro continua salvo)">✕</button></div>`; }).join('')}</div>
+        ${Object.keys(S.encounters || {}).some(k => !(sc.enc || []).includes(k)) ? `<label class="mz-note">Preparar encontro <select data-mzf="enc" aria-label="Ligar um encontro salvo a esta cena"><option value="">— escolher —</option>${Object.entries(S.encounters).filter(([k]) => !(sc.enc || []).includes(k)).map(([k, e]) => `<option value="${k}">${esc(e.name)}</option>`).join('')}</select></label>` : Object.keys(S.encounters || {}).length ? '' : '<small class="mz-note">Monte encontros no Bestiário para deixá-los prontos aqui.</small>'}</div>
       <div><small class="mz-h">Pedidos de passagem</small><div class="mz-list">${rq.length ? rq.map(([k, r]) => `<div class="mz-li req"><span>${esc(S.chars[r.ch]?.name || r.by)}: ${esc(r.text)}</span><button class="own" data-a="rqOk" data-id="${k}">Deixar</button><button data-a="rqNo" data-id="${k}">Não</button></div>`).join('') : '<small class="mz-note">Nenhum pedido agora.</small>'}</div>
         <label class="mz-note"><input type="checkbox" data-mz="auto" ${S.auto?.pass ? 'checked' : ''}> Deixar passar sem pedir</label></div>
       <div><small class="mz-h">Quem está aqui</small><div class="mz-list">${hs.map(c => `<div class="mz-li"><span>${esc(c.name)}</span>${c.owner ? `<button data-mz="pov" data-k="${esc(c.owner)}">Ver como</button>` : ''}<button data-mz="out" data-id="${c.id}">Tirar de cena</button></div>`).join('') || '<small class="mz-note">Ninguém. Arraste heróis para a coluna da cena.</small>'}</div></div>
@@ -98,6 +102,8 @@ const MESA = (() => {
     if (d.mz === 'exTo') { MZ.exTo = d.id; return render(); }
     if (d.mz === 'exOk') { send({ t: 'exitAdd', scene: S.focus, ...MZ.ex, to: MZ.exTo, both: MZ.exBoth }); MZ.modal = null; MZ.ex = null; return render(); }
     if (d.mz === 'exDel') return send({ t: 'exitDel', scene: S.focus, id: d.id });
+    if (d.mz === 'encGo') return send({ t: 'encSpawn', id: d.id });
+    if (d.mz === 'encOff') return send({ t: 'sceneEnc', scene: S.focus, id: d.id, on: false });
     if (d.mz === 'pov') { MZ.pov = d.k; return render(); }
     if (d.mz === 'povX') { MZ.pov = null; return render(); }
   };
@@ -109,6 +115,7 @@ const MESA = (() => {
     if (t.dataset.mz === 'exBoth') { MZ.exBoth = t.checked; return; }
     if (t.dataset.mzf === 'pov') { if (t.value) { MZ.pov = t.value; render(); } return; }
     if (t.dataset.mzf === 'offMsg') return send({ t: 'offMsg', v: t.value });
+    if (t.dataset.mzf === 'enc') { if (t.value) send({ t: 'sceneEnc', scene: S.focus, id: t.value, on: true }); return; }
   });
   app.addEventListener('input', e => { if (e.target.dataset?.mzf === 'nn') MZ.nn = e.target.value; });
   app.addEventListener('keydown', e => {

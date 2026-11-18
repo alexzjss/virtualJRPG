@@ -130,3 +130,15 @@ test('cenas: duplicar copia mapa e saídas sem batalha; excluir só cena vazia',
   handle(gm, { t: 'sceneDel', id: B }); assert.ok(S.scenes[B], 'B tem a Bia: não apaga');
   handle(gm, { t: 'sceneDel', id: C }); assert.ok(!S.scenes[C]);
 });
+
+test('encontros da cena: ligar, pôr na cena, não vazar para jogadores e sumir ao apagar o encontro', () => {
+  const { A } = split(); const b0 = Object.keys(S.bestiary)[0];
+  handle(gm, { t: 'encSave', name: 'Emboscada', list: [{ b: b0, tier: 'normal', n: 2 }] }); const e = Object.keys(S.encounters).find(k => S.encounters[k].name === 'Emboscada');
+  handle(gm, { t: 'sceneEnc', scene: A, id: e, on: true }); handle(gm, { t: 'sceneEnc', scene: A, id: e, on: true }); assert.deepEqual(S.scenes[A].enc, [e], 'sem repetir');
+  handle(gm, { t: 'map', f: 'note', v: 'O taverneiro mente.' });
+  const va = view(ana); assert.equal(va.scenes[A].enc, undefined); assert.equal(va.scenes[A].note, undefined); assert.equal(view(gm).scenes[A].note, 'O taverneiro mente.');
+  const n0 = Object.values(S.chars).filter(c => c.enemy && c.scene === A).length; handle(gm, { t: 'encSpawn', id: e });
+  assert.equal(Object.values(S.chars).filter(c => c.enemy && c.scene === A).length, n0 + 2);
+  handle(ana, { t: 'sceneEnc', scene: A, id: e, on: false }); assert.deepEqual(S.scenes[A].enc, [e], 'só o mestre');
+  handle(gm, { t: 'encDel', id: e }); assert.deepEqual(S.scenes[A].enc, []);
+});

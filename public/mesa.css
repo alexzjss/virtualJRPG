@@ -75,3 +75,5 @@
 /* saída no mapa (todas as telas): a casa marcada leva a outra cena */
 .mexit{position:absolute;left:calc(var(--x)*100%/var(--cols));top:calc(var(--y)*100%/var(--rows));width:calc(100%/var(--cols));aspect-ratio:1;border:2px dashed var(--gold);background:#ffc93c22;z-index:2;pointer-events:none}
 .mexit b{position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%);white-space:nowrap;background:var(--gold);color:#000;font:600 11px var(--cond,sans-serif);text-transform:uppercase;padding:1px 5px;box-shadow:0 0 0 2px #000}
+.mz-note-in{margin:0 0 6px;width:100%;box-sizing:border-box;min-height:70px}
+.mz-li.enc{border-left:3px solid var(--red)}
