@@ -983,6 +983,11 @@ const dfx = (names = ['Aparar'], heroes = 1) => { // um inimigo rápido e `heroe
 };
 const openAt = left => { const C = S.battle.cmd; C.at = Date.now() - C.beats[0] + left; return C; }; // põe o impacto da 1ª batida daqui a `left` ms
 const waitCmd = () => fixR(.3, () => H.cmdSkip(gm)); // fecha a janela já, com dados fixos (acerta sem crítico)
+test('remover o inimigo no meio da batalha (na vez dele e com a janela de defesa aberta) não trava a luta', () => {
+  const { hs: [h], e } = dfx(['Aparar']); fixR(0, () => H.ai(gm)); assert.ok(S.battle.cmd, 'janela aberta');
+  H.delChar(gm, { id: e.id }); assert.doesNotThrow(() => { H.cmdSkip(gm); H.def(ana, { id: h.id }); H.ai(gm); H.next(gm); });
+  assert.ok(!S.chars[e.id]); assert.ok(current() === h.id || !S.battle.active, 'a vez segue para quem ficou');
+});
 test('defesa: golpe não anunciado abre só Aparar e só para o alvo', () => {
   const { hs, e } = dfx(['Aparar'], 2); H.ai(gm); const C = S.battle.cmd;
   assert.ok(C && C.foe === e.id && C.tel === false); assert.equal(C.tgs.length, 1);
