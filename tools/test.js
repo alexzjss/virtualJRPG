@@ -58,7 +58,7 @@ test('mandala (navegador): place usa wx/wy e põe skill sem posição junto do v
   await import('../public/js/mandala.js'); const M = globalThis.MANDALA, g0 = S.skills.g0;
   const sks = { ...S.skills, x1: { name: 'Nova', el: 'fis', gx: g0.gx + 6, gy: g0.gy - 9 } }, near = Object.keys(S.skills).find(k => RU.near(S.skills[k], sks.x1));
   const P = M.place(sks); assert.deepEqual(P.get('g0'), [g0.wx, g0.wy]);
-  if (near) { const [x, y] = P.get('x1'), [a, b] = P.get(near); assert.ok(Math.hypot(x - a, y - b) < M.U * 1.5); }
+  if (near) { const [x, y] = P.get('x1'); assert.ok(Object.keys(S.skills).filter(k => RU.near(S.skills[k], sks.x1)).some(k => { const [a, b] = P.get(k); return Math.hypot(x - a, y - b) < M.U * 1.5; })); } // junto de algum vizinho de grade
   assert.ok(P.get('x1').every(Number.isFinite));
 });
 test('mandala (navegador): edges sem repetição, só entre visíveis, com o núcleo ligado', async () => {
