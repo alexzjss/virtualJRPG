@@ -15,7 +15,7 @@ const LEQUE = (() => {
   // alvos possíveis do que está escolhido, da esquerda para a direita na tela (←/→ andam por eles)
   const cands = () => {
     if (!cx) return [];
-    const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB.filter(o => !o.enemy).map(o => o.id), inB.filter(o => o.enemy).map(o => o.id));
+    const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB, PALCO3D.frameNow(inB));
     const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => bothSides() ? o.hp > 0 : allySide() ? o.enemy === cx.actor.enemy : o.enemy !== cx.actor.enemy && o.hp > 0);
     return l.sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0));
   };
@@ -38,7 +38,7 @@ const LEQUE = (() => {
   const flat = () => skGroups(cx.actor, S.chars[tgt], skQ).flatMap(g => g.items);
   const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
   // inimigos de pé, da esquerda para a direita na tela
-  const foes = () => { const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB.filter(o => !o.enemy).map(o => o.id), inB.filter(o => o.enemy).map(o => o.id));
+  const foes = () => { const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB, PALCO3D.frameNow(inB));
     return inB.filter(o => o.enemy && o.hp > 0 && !o.dead).sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0)); };
   const setZoom = id => { if ((PALCO3D.local.zoom || null) === (id || null)) return; PALCO3D.local.zoom = id || null; render(); };
   const zoomStep = d => { const l = foes(); if (!l.length) return; const i = l.findIndex(o => o.id === PALCO3D.local.zoom), n = l[(i + d + l.length) % l.length].id;
