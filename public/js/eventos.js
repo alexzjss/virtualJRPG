@@ -153,6 +153,7 @@ app.addEventListener('click', e => {
   if (d.a === 'copy') return copy(d.k === 'invite' ? inviteText() : accessText(sess.last), d.k === 'invite' ? 'Convite copiado. Cole no grupo dos jogadores.' : 'Acesso copiado. Mande só para esse jogador.');
   if (d.a === 'act' && !(tgt in S.battle.ticks)) return toast('Escolha um alvo clicando em uma unidade.');
   if (d.a === 'act') { const s0 = S.skills[d.skill]; if (S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); }
+  if (d.a === 'delEnemies') { const ids = Object.values(S.chars).filter(c => c.enemy && (d.k !== 'down' || c.hp <= 0)).map(c => c.id); if (!ids.length) return toast('Nenhum inimigo para remover.'); if (confirm(`Remover ${ids.length} inimigo${ids.length > 1 ? 's' : ''}?`)) ids.forEach(id => send({ t: 'delChar', id })); return; }
   if ((d.a === 'delChar' || d.a === 'sceneDel') && !confirm('Excluir?')) return;
   const m = { t: d.a, id: d.id, attr: d.attr, per: d.per, mod: mods[d.id] || 0, secret, enemy: !!d.enemy, on: !!d.on, win: !!d.win, long: !!d.long, skill: d.skill, el: d.el, target: tgt, aim, tier, n: +bf.n || 1, item: d.item, coll: d.coll, k: d.k, w: d.w, f: d.f, v: d.v, node: d.node, rec: d.rec };
   if (d.a === 'bSpawn' && e.shiftKey) m.t = 'bDel';
@@ -246,8 +247,9 @@ document.addEventListener('keydown', e => {
   if (!S || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();
+    else if (gm && gui.sheet) gEsc(); // a ficha aberta (janela por cima de tudo) fecha primeiro
     else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (aim) aim = null;
-    else if (gm) { const f = DOCKS.map(d => dock.act[d]).find(k => k && isWide(k)); if (f) { if (f.startsWith('f_')) gClose(f); else { dock.nar[f] = 1; saveDock(); } } } // fecha a ficha aberta ou encolhe a aba larga
+    else if (gm) gEsc(); // fecha a ficha aberta ou encolhe o painel largo
     return render();
   }
   if (e.target.matches('input,textarea,select')) return;

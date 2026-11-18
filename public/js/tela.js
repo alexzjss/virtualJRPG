@@ -1,4 +1,4 @@
-let gmWasB = null; // null até o primeiro desenho: recarregar a página no meio da batalha não conta como início
+let gmWasB = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
 function render() {
   const ae = document.activeElement;
   if (drag || wdrag || cdrag || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }
@@ -16,7 +16,7 @@ function render() {
     if (reqIn) { lastReqN = newest[1].n; if (!snd.mute) beep(); }
   }
   if (gm) {
-    if (b && gmWasB === false) for (const d of DOCKS) if (isWide(dock.act[d] || '')) dock.act[d] = dock[d].find(k => !isWide(k)) || dock.act[d]; // a batalha começou: tira as abas largas da frente do palco
+    if (b && !gmWasB) gui.view = 'palco'; else if (!b && gmWasB) gui.view = 'mapa'; // a batalha começou: o palco vem para a frente; acabou: volta o mapa
     gmWasB = b;
     // Cena: o que se usa toda hora fica à mostra; mapa, grade, recursos e fundo da batalha ficam em "Mais…" (o aberto fica lembrado)
     const cena = `<div class="row prim">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1" class="own">Iniciar batalha</button>'}</div>
@@ -40,9 +40,8 @@ function render() {
       </details>
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
     dockFix();
-    const fw = DOCKS.map(d => dock.act[d]).filter(k => k?.startsWith('f_'));
-    const body = { ...xWins(), ...Object.fromEntries(fw.map(k => [k, gmSheet(ent(k.slice(2)))])), sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
-    app.innerHTML = `${gmLayout(body, { stage: b ? battle() : '', map: map() })}${reqStrip()}${cropper()}${ctxMenu()}`;
+    const body = { ...xWins(), ...(gui.sheet && ent(gui.sheet.slice(2)) ? { [gui.sheet]: gmSheet(ent(gui.sheet.slice(2))) } : {}), pedidos: gui.R === 'pedidos' && sideOpen('R') ? reqStrip() : '', sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
+    const parts = b ? battle(true) : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '' })}${cropper()}${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) pg = 'mesa'; // a batalha começou: leva o jogador para a mesa

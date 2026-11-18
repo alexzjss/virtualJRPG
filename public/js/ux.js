@@ -124,7 +124,7 @@ function palette() {
   add('Cópia de segurança agora', 'ação', () => send({ t: 'bkNow' })); add('Atalhos e gestos', 'ajuda', showHelp);
   for (const [id, s] of Object.entries(S.scenes)) if (id !== S.scene) add(s.name, 'ir para a cena', () => send({ t: 'sceneGo', id }));
   for (const c of Object.values(S.chars)) add(c.name, c.enemy ? 'ficha de inimigo' : 'ficha', () => openWin('f_' + c.id));
-  add('Restaurar os painéis', 'arranjo', () => { dock = structuredClone(DOCK0); saveDock(); render(); });
+  add('Restaurar os painéis', 'arranjo', () => { gui = structuredClone(GUI0); saveGui(); render(); });
   for (const [k, l] of Object.entries(SFXL)) add(l, 'efeito sonoro', () => send({ t: 'sfx', k }));
   for (const [k, l] of Object.entries(AMBL)) add(l, S.audio?.amb === k ? 'parar ambiência' : 'ambiência', () => send({ t: 'audio', f: 'amb', v: S.audio?.amb === k ? '' : k }));
   for (const [id, t] of Object.entries(S.tracks || {})) add(t.name, 'tocar faixa', () => send({ t: 'audio', f: 'url', v: t.url }));

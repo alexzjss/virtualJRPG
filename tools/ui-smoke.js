@@ -221,7 +221,7 @@ try {
   };
 
   await section('Forja de armas do mestre', async () => {
-    await click(gmP, '.gtab[data-g=tab][data-id=armas]', 'aba Forja de armas');
+    await click(gmP, '.gr[data-g=rail][data-id=armas]', 'painel Forja de armas');
     await until(() => vis(gmP, '.wforge'), 'janela da Forja de armas');
     const tap = sel => gmP.locator(sel).first().dispatchEvent('click'); // a janela pode nascer embaixo de outras: o clique vai direto no botão
     await tap('.wforge [data-a=wfTpl][data-k=machado]');
@@ -264,10 +264,11 @@ try {
     await tap('.wforge [data-a=wfImpGo]');
     const imp = await until(() => Object.values(S.items).find(i => i.name === 'Lâmina Importada'), 'arma importada ao confirmar');
     check(imp && imp.hit === 50 && imp.fx === '', 'importação corrige o que veio fora dos limites');
-    await tap('.gdock.wide [data-g=wide][data-id=armas]'); // encolhe a aba larga de volta para a doca
+    await tap('.gpanel [data-g=wide][data-id=armas]'); // encolhe o painel largo de volta para a lateral
   });
 
   await section('pedido de rolagem: aprovação com Vantagem e Desvantagem', async () => {
+    await click(gmP, '[data-g=rtab][data-id=pedidos]', 'aba Pedidos da barra lateral'); // os pedidos moram numa aba da barra lateral do mestre
     for (const adv of ['adv', 'dis']) {
       await ana.click('[data-pg=mesa]'); await until(() => vis(ana, '.qr button'), 'botões de rolagem da Ana');
       await ana.locator('.qr button').first().click();

@@ -79,3 +79,7 @@ Pendências:
 - Revisar nó a nó com o usuário os 45 nós da Leva 4, como os outros ramos.
 - A nota dos minigames de ataque vem do navegador (o servidor só limita `g`, `n` e `acc`); numa mesa entre amigos isso basta, mas não é à prova de trapaça.
 - Testes instáveis conhecidos (também na base) "leva 3 Marca desperta" e "leva 2 cargas": corrigidos (a vida voltava presa em 1; o combo dependia do dado).
+
+## Tela do mestre, 2ª versão (substitui as docas arrastáveis)
+`public/js/docas.js`: trilho de ícones à esquerda (um painel por vez; clicar no ativo recolhe), barra lateral direita com abas Fichas, Iniciativa, Chat e Pedidos (o selo conta os pedidos), centro com Palco ou Mapa (P, M; Tab fora da batalha), barra de ações da batalha sempre acima do centro, fichas em janela por cima de tudo (Esc fecha primeiro). `[` e `]` recolhem as laterais; abaixo de 1100 px só uma lateral fica aberta. Arranjo em `localStorage.vj_gui` (a chave antiga `vj_dock` deixou de ser lida). Na lista de fichas, inimigos ganharam ✕ e os botões "Remover caídos" e "Remover todos".
+Falta: rodar `npm run ui` (precisa do Playwright; os seletores já foram atualizados para o layout novo) e olhar a tela com o mestre de verdade.

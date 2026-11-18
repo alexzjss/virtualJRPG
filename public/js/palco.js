@@ -27,7 +27,7 @@ const STGOOD = new Set(['atkUp', 'defUp', 'agiUp', 'shield', 'regen', 'taunt', '
 const stIcons = c => [sanSt(c) && `<i class="sti bad" title="${esc(sanSt(c))}: sanidade baixa pesa em todas as rolagens">狂</i>`, ...Object.entries(c.st).map(([k, n]) => { const nm = k === 'shield' && c.shield ? ST[k] + ' ' + c.shield : (ST[k] || k) + (n < 90 ? ' · ' + n : '');
   return `<i class="sti ${STGOOD.has(k) ? 'good' : /Dn$/.test(k) ? 'bad dn' : /Up$/.test(k) ? '' : 'bad'} ${/Up$/.test(k) ? 'up' : ''}" data-st="${esc(k)}" title="${esc(nm + (STD[k] ? ': ' + STD[k] : ''))}" aria-label="${esc(nm)}">${STK[k] || esc((ST[k] || k).slice(0, 1))}${n < 90 ? `<sub>${n}</sub>` : ''}</i>`; })].filter(Boolean).join('');
 const BBG = { rubro: 'Rubro', noite: 'Noite', floresta: 'Floresta', brasa: 'Brasa', gelo: 'Gelo', vazio: 'Vazio', santuario: 'Santuário', tempestade: 'Tempestade' }; // fundos prontos da batalha
-function battle() {
+function battle(split) { // split (só o mestre): devolve { stage, bar } para o centro pôr a barra de ações acima do palco ou do mapa
   const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
   const side = e => { const l = inB.filter(c => !!c.enemy === e), n = l.length, cols = n > 4 ? Math.ceil(n / 2) : Math.max(1, n), w = Math.min(14.5, 43 / cols - 1.3);
     return `<div class="side ${e ? 'foes' : 'heroes'} ${n > 4 ? 'two' : ''}" style="--w:${w.toFixed(2)}cqw">${l.map(c => unit(c, cur)).join('')}</div>`; };
@@ -39,8 +39,10 @@ function battle() {
       <button class="p5i act" data-a="next">${K()}<span>Passar</span></button></nav>${aimBox()}`; };
   const hs = inB.filter(c => !c.enemy && !c.dead), danger = hs.length ? 1 - hs.reduce((a, c) => a + Math.max(0, c.hp) / (c.hpMax || 1), 0) / hs.length + (hs.some(c => c.hp <= 0) ? .25 : 0) + (inB.some(c => c.boss && c.hp > 0) ? .15 : 0) : 0, heat = danger >= .6 ? 2 : danger >= .3 ? 1 : 0;
   const img = sc.bbg && !BBG[sc.bbg] ? sc.bbg : !sc.bbg ? sc.bg : '';
-  return `<section class="stage battle heat-${heat} ${S.battle.dom ? 'dom-on' : ''} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)};--e:${ELC[mainEl(S.chars[id])]}">${i ? '' : '<small>Agora</small>'}<i class="tlp">${S.chars[id].img ? `<img src="${esc(S.chars[id].img)}" alt="">` : S.chars[id].enemy ? KANJI[mainEl(S.chars[id])] : esc(S.chars[id].name.slice(0, 1).toUpperCase())}</i>${esc(S.chars[id].name)}</span>`).join('')}</div>
-    ${S.battle.dom ? '<i class="domfx" aria-hidden="true"></i>' : ''}<div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${S.battle.end === 'won' ? ' · inimigos derrotados' : heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}</section>${gm && cur ? acts(cur) : ''}`;
+  const html = `<section class="stage battle heat-${heat} ${S.battle.dom ? 'dom-on' : ''} ${BBG[sc.bbg] ? 'bb-' + sc.bbg : sc.bbg ? 'bb-img' : ''}" style="${img ? `--bg:url('${esc(img)}')` : ''}"><div class="tl"><em>Ordem${S.battle.n ? `<small>ação ${S.battle.n + 1}</small>` : ''}</em>${tl.map((id, i) => `<span class="${i ? '' : 'cur'} ${S.chars[id].enemy ? 'foe' : ''}" style="--c:${esc(S.chars[id].color)};--e:${ELC[mainEl(S.chars[id])]}">${i ? '' : '<small>Agora</small>'}<i class="tlp">${S.chars[id].img ? `<img src="${esc(S.chars[id].img)}" alt="">` : S.chars[id].enemy ? KANJI[mainEl(S.chars[id])] : esc(S.chars[id].name.slice(0, 1).toUpperCase())}</i>${esc(S.chars[id].name)}</span>`).join('')}</div>
+    ${S.battle.dom ? '<i class="domfx" aria-hidden="true"></i>' : ''}<div class="field">${side(true)}<div class="mid"><small>${esc(sc.name)}${S.battle.end === 'won' ? ' · inimigos derrotados' : heat ? ` · ${heat > 1 ? 'perigo' : 'tensão'}` : ''}</small></div>${side(false)}</div>${role === 'player' ? '' : fieldBar()}</section>`;
+  const bar = gm && cur ? acts(cur) : '';
+  return split ? { stage: html, bar } : html + bar;
 }
 
 function map() {
