@@ -179,10 +179,10 @@ try {
     await shot(mesa, 'quebra');
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
-    const hero = S.chars[current()], pg = hero.owner === 'ana' ? ana : bia;
+    check(toTurn(mikhail.id), 'vez da Mikhail para o Ataque Total'); const pg = bia; // a vez de quem tem tela aberta (o Thomas não tem)
     await until(async () => await pg.locator('.p5m [data-a=allOut]').isEnabled(), 'Ataque Total liberado com todos Derrubados');
     const hp1 = bossCh.hp + minion.hp;
-    await click(pg, '.p5m [data-a=allOut]', 'Ataque Total');
+    await pg.locator('.p5m [data-a=allOut]').dispatchEvent('click'); // o botão pulsa sem parar: o clique vai direto nele
     await until(() => /ATAQUE TOTAL|Ataque Total/i.test(battleLog()), 'registro do Ataque Total');
     await until(() => bossCh.hp + minion.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');
@@ -347,6 +347,38 @@ try {
     await until(async () => !(await ana.locator('.stage-cmd').count()), 'o palco some após close()');
     const w = await ana.evaluate(() => { const s = openStage({ title: 'Celular', tone: 'def' }); const r = document.documentElement.scrollWidth <= innerWidth; s.close(0); return r; });
     check(w, 'o palco não gera rolagem horizontal');
+  });
+
+  await section('comandos de ação: anel de defesa e minigame de ataque', async () => {
+    const auto0 = S.auto.act; S.auto.act = true; go({ t: 'battle', on: true }); push();
+    for (const c of [shinkai, minion]) { c.hp = c.hpMax; c.st = {}; } push();
+    // defesa: o mestre escolhe à mão o ataque básico do inimigo; o anel abre só na tela da Ana e a tecla registra a nota
+    S.battle.ticks[minion.id] = -1; push(); check(current() === minion.id, 'vez do inimigo'); // o inimigo é lento demais para chegar só passando a vez
+    const DEF = globalThis.RULES.CMD.DEF, grace0 = DEF.grace; DEF.grace = 8000; // a janela fecha sozinha em ~1,3 s: no teste ela espera o navegador
+    go({ t: 'act', id: minion.id, skill: 'atk', target: shinkai.id });
+    DEF.grace = grace0;
+    check(!!S.battle.cmd && S.battle.cmd.tgs.includes(shinkai.id), 'ataque à mão abre a janela para a Shinkai');
+    await until(() => vis(ana, '.stage-cmd button.def'), 'anel de defesa na tela da Ana');
+    check(/ESQUIVAR/.test(await txt(ana, '.stage-cmd button.def')), 'ataque básico oferece Esquiva');
+    check(!(await vis(bia, '.stage-cmd button.def')), 'quem não é o alvo não vê o anel');
+    await ana.locator('.stage-cmd button.def').dispatchEvent('pointerdown'); // o botão responde no toque, não no clique
+    await until(() => (S.battle.cmd?.p[shinkai.id] || []).length > 0, 'o aperto chega ao servidor como nota');
+    go({ t: 'cmdSkip' }); push();
+    await until(() => !S.battle.cmd, 'a janela fecha');
+    await until(async () => !(await ana.locator('.stage-cmd').count()), 'o anel some da tela');
+    // ataque: técnica com Golpe no tempo abre o minigame; pular manda a ação sem nota e o golpe sai normal
+    const k = Object.keys(S.skills).find(x => { const q = S.skills[x]; return q.cmd === 'tempo' && q.kind === 'dmg' && !q.limit && !q.area && q.res === 'aura' && (q.cost || 0) <= 20; });
+    shinkai.skills = [...new Set([...shinkai.skills, k])]; shinkai.aura = shinkai.auraMax; push();
+    check(toTurn(shinkai.id), 'vez da Shinkai'); await until(() => vis(ana, '.cmd.mine'), 'turno da Ana');
+    await ana.locator('[data-sub=sk]').first().dispatchEvent('click');
+    await until(() => vis(ana, `.opt[data-k=sk][data-v="${k}"]`), 'técnica com comando na lista');
+    await ana.locator(`.opt[data-k=sk][data-v="${k}"]`).dispatchEvent('click'); await tgBtn(ana, minion.id).dispatchEvent('click');
+    const n = S.seq; await ana.locator('.cmd-go .go').dispatchEvent('click');
+    await until(() => vis(ana, '.stage-cmd .cm'), 'minigame do Golpe no tempo abre');
+    await ana.locator('.stage-cmd .cm-skip').dispatchEvent('click');
+    await until(() => S.log.some(l => l.n > n && l.who === 'Shinkai'), 'pular manda a ação e o golpe sai');
+    await until(async () => !(await ana.locator('.stage-cmd').count()), 'o minigame some da tela');
+    go({ t: 'battle', on: false }); S.auto.act = auto0; push();
   });
 
   // ---------- celular: transbordo, sobreposição e alvos de toque ----------

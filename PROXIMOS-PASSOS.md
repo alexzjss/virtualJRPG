@@ -75,6 +75,7 @@ Ideias que sobraram:
 ## Comandos de ação (Leva 4, sessão `comandos-de-acao`)
 Feito: janela de defesa no servidor (`S.battle.cmd`: Aparar, Esquiva, golpes de várias batidas, contra-ataque, Choque de poderes, Perfeito de chefe), 7 minigames de ataque (`public/js/cmd-ataque.js`), 45 nós novos e 34 marcados em `arvore/leva4.js`, sons e selos na mesa. Spec em `docs/superpowers/specs/2026-11-17-comandos-de-acao-design.md`; mecânicas em `ARVORE-SISTEMAS.md`; demonstração jogável sem servidor em `docs/demo-comandos.html`; `node tools/dev-cmd.js` sobe uma luta de teste (porta 3213).
 Pendências:
+- Spec conferido nome a nome (2026-11-18): as 10 mecânicas, os 45 nós e as marcações estão no jogo; o `npm run ui` cobre o anel de defesa e o minigame de ataque.
 - Testar com gente de verdade: latência (a janela é medida no servidor, com 200 ms de folga), o anel no celular e a tecla C do Choque sem teclado.
 - Revisar nó a nó com o usuário os 45 nós da Leva 4, como os outros ramos.
 - A nota dos minigames de ataque vem do navegador (o servidor só limita `g`, `n` e `acc`); numa mesa entre amigos isso basta, mas não é à prova de trapaça.
