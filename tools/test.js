@@ -7,15 +7,16 @@ const { TREE } = await import('../tree.js');
 const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
-const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; };
+const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false, ticks: {} }; const tc = Object.keys(S.skills).find(k => S.skills[k].name === 'Tiro Certeiro'); if (tc) S.skills[tc].req = ''; /* nos testes ele não depende de arma (no jogo exige uma arma de distância) */ };
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, c.role === 'player' ? { ...m, owner: c.name } : m); /* só o mestre cria; o de jogador nasce com dono */ const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
+const isArm = s => /^armas-/.test(s.br || ''); // Árvore de Armas: bloco isolado (el 'fis', sem ligação com o resto da grade)
 
 test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1330); assert.ok(Object.keys(S.items).length >= 50); });
 test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam todos os seus nós passando só por eles e pelo tronco Marcial', () => {
   const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
   for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
-    const set = ns.filter(s => s.el === el || s.el === 'fis'), start = set.findIndex(s => s.el === el && (s.root || s.br === el + '-0')), seen = new Set([start]), q = [start];
+    const set = ns.filter(s => (s.el === el || s.el === 'fis') && !isArm(s)), start = set.findIndex(s => s.el === el && (s.root || s.br === el + '-0')), seen = new Set([start]), q = [start];
     assert.ok(start >= 0, 'raiz de ' + el);
     while (q.length) { const x = set[q.pop()]; set.forEach((y, i) => { if (!seen.has(i) && Math.max(Math.abs(x.gx - y.gx), Math.abs(x.gy - y.gy)) <= 1) { seen.add(i); q.push(i); } }); }
     assert.deepEqual(set.filter((_, i) => !seen.has(i)).map(s => s.name), [], el);
@@ -27,12 +28,12 @@ test('ligações: simétricas, nunca entre setores diferentes (só com o Marcial
     assert.ok(Array.isArray(s.ln) && s.ln.length, 'sem ligação: ' + s.name);
     assert.equal(new Set(s.ln).size, s.ln.length, s.name);
     for (const j of s.ln) { const o = S.skills[j]; assert.ok(o && o.ln.includes(id), `${s.name} → ${o?.name} não volta`);
-      assert.ok(o.el === s.el || o.el === 'fis' || s.el === 'fis', `${s.name} liga a ${o.name}`); }
+      assert.ok(o.el === s.el || o.el === 'fis' || s.el === 'fis', `${s.name} liga a ${o.name}`); assert.equal(isArm(o), isArm(s), `${s.name} (Armas) liga a ${o.name} fora do bloco`); }
   }
 });
 test('ligações: cada setor alcança todos os seus nós andando só por ln, por ele e pelo Marcial', () => {
   for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
-    const ok = id => [el, 'fis'].includes(S.skills[id].el), start = Object.keys(S.skills).find(id => S.skills[id].el === el && S.skills[id].root), seen = new Set([start]), q = [start];
+    const ok = id => [el, 'fis'].includes(S.skills[id].el) && !isArm(S.skills[id]), start = Object.keys(S.skills).find(id => S.skills[id].el === el && S.skills[id].root), seen = new Set([start]), q = [start];
     assert.ok(start, 'raiz de ' + el);
     while (q.length) for (const j of S.skills[q.pop()].ln || []) if (!seen.has(j) && ok(j)) { seen.add(j); q.push(j); }
     assert.deepEqual(Object.keys(S.skills).filter(id => ok(id) && !seen.has(id)).map(id => S.skills[id].name), [], el);
@@ -755,7 +756,7 @@ test('armas (expansão): distância não sofre contra-ataque, flechas no slot de
   assert.ok(AR.make('sabresg').dupla && AR.make('tonfas').dupla && AR.make('sai').dupla && AR.make('pistolas').dupla);
   // trilhas novas: 10 nós por tipo, com req, postura, reação, maestria e golpe final com requisito 55
   for (const wt of ['pesada', 'foco', 'corrente', 'arremesso', 'arco', 'escudo', 'instrumento']) {
-    const ns = Object.values(S.skills).filter(x => x.req === wt && !L4N.has(x.name)); assert.equal(ns.length, 10, wt); // as técnicas de comando da Leva 4 não contam na trilha de 10
+    const ns = Object.values(S.skills).filter(x => x.br === 'armas-' + wt + '-0'); assert.equal(ns.length, 10, wt); // o ramo clássico do tipo na Árvore de Armas (os outros 2 ramos e as técnicas de comando da Leva 4 não contam)
     assert.ok(ns.some(x => x.kind === 'form') && ns.some(x => x.kind === 'util') && ns.some(x => x.rq && Object.values(x.rq)[0] === 55), wt);
     assert.ok(ns.some(x => x.kind === 'passive' && x.sc === 'wt:' + wt), wt + ': maestria');
   }
@@ -1298,4 +1299,36 @@ test('cinemáticos: o servidor aplica Erro e Ótimo no ataque e anuncia a nota',
   assert.equal(hit(kT, { g: 'bom', n: 0, acc: 0 }).fx[0].cg, 'bom'); assert.equal(hit(kT, { g: 'perf', n: 0, acc: 1 }).fx[0].cg, 'perf');
   assert.ok(!S.skills[kPlain].cmd, 'Faísca não tem comando'); const p0 = hit(kPlain), p1 = hit(kPlain, { g: 'perf', n: 0, acc: 1 });
   assert.equal(p1.dmg, p0.dmg, 'sem cmd na técnica a nota é ignorada'); assert.equal(p1.fx.length, 0); assert.ok(!/PERFEITO|ÓTIMO|ERROU/.test(p1.txt));
+});
+
+// ---------- Árvore de Armas: bloco isolado, requisitos por categoria e por item ----------
+test('Árvore de Armas: bloco isolado na grade, ramos primordiais abertos e ramos dos tipos ancorados nele', () => {
+  const arm = Object.entries(S.skills).filter(([, s]) => isArm(s)), fora = Object.entries(S.skills).filter(([, s]) => !isArm(s));
+  assert.equal(arm.length, TREE.armas.branches.flat().length); assert.ok(arm.every(([, s]) => s.el === 'fis'));
+  const gx = arm.map(([, s]) => s.gx), gy = arm.map(([, s]) => s.gy);
+  for (const [, s] of fora) assert.ok(s.gx < Math.min(...gx) - 2 || s.gx > Math.max(...gx) + 2 || s.gy < Math.min(...gy) - 2 || s.gy > Math.max(...gy) + 2, s.name + ' invade o bloco das Armas');
+  // dentro do bloco tudo se alcança andando por ln a partir dos nós abertos (4 primordiais + os ramos de foco e instrumento)
+  const abertos = arm.filter(([, s]) => s.open).map(([k]) => k); assert.ok(abertos.length >= 4 + 6);
+  for (const c of ['corte', 'esmag', 'perf', 'dist']) assert.ok(arm.some(([, s]) => s.open && s.br === 'armas-prim-' + c), c);
+  const seen = new Set(abertos), q = [...abertos]; while (q.length) for (const j of S.skills[q.pop()].ln) if (!seen.has(j)) { seen.add(j); q.push(j); }
+  assert.deepEqual(arm.filter(([k]) => !seen.has(k)).map(([, s]) => s.name), []);
+  for (const wt of Object.keys(TREE.armas.tipos)) assert.equal(arm.filter(([, s]) => s.ramo && s.br.startsWith('armas-' + wt + '-')).length, 3, wt + ': 3 ramos');
+});
+test('Árvore de Armas: req por categoria (corte, esmag, perf, dist), maestria wc: e reqItem', async () => {
+  const { cantUse, modsOf: mods } = await import('../src/rules.js'); reset();
+  const nome = n => Object.keys(S.items).find(k => S.items[k].name === n), ski = n => S.skills[sk(n)];
+  ski('Tiro Certeiro').req = 'dist'; // reset() o solta para os testes de comando; aqui vale a regra do jogo
+  const h = mk(ana, {}); h.xp = 9999;
+  const arma = n => { h.inv[nome(n)] = 1; h.equip.arma = nome(n); };
+  assert.match(cantUse(h, ski('Talho Profundo')), /Exige Corte/); arma('Katana de Caçador'); assert.equal(cantUse(h, ski('Talho Profundo')), '');
+  assert.match(cantUse(h, ski('Pancada Seca')), /Exige Esmagamento/); assert.match(cantUse(h, ski('Disparo Firme')), /Exige Distância/);
+  arma('Rifle de Ferrolho'); assert.equal(cantUse(h, ski('Disparo Firme')), ''); assert.ok(!/Exige/.test(cantUse(h, ski('Tiro Certeiro')))); arma('Soqueira'); assert.match(cantUse(h, ski('Tiro Certeiro')), /Exige Distância/); arma('Rifle de Ferrolho');
+  assert.match(cantUse(h, ski('Estocada Funda')), /Exige Perfuração/); arma('Lança de Caça'); assert.equal(cantUse(h, ski('Estocada Funda')), '');
+  // maestria de categoria: só vale com arma da categoria
+  const fio = sk('Fio Afiado'); h.skills.push(fio); h.pslots = [fio]; const sem = mods(h, { basic: true }).atk; arma('Katana de Caçador'); assert.equal(mods(h, { basic: true }).atk - sem, 5, 'Fio Afiado: +5 atq com arma de corte'); arma('Lança de Caça'); assert.equal(mods(h, { basic: true }).atk, sem, 'lança não é corte');
+  // reqItem: precisa de item com a tag no inventário; inimigos não pedem
+  const g = ski('Granada de Mão'); assert.equal(g.reqItem, 'explosivo'); assert.match(cantUse(h, g), /Exige Explosivos/);
+  h.inv[nome('Bomba do Feiticeiro')] = 1; assert.equal(cantUse(h, g), ''); delete h.inv[nome('Bomba do Feiticeiro')]; assert.match(cantUse(h, g), /Exige/);
+  const e = mk(gm, { enemy: true }); assert.equal(cantUse(e, g), ''); assert.equal(cantUse(e, ski('Tiro Certeiro')), ''); ski('Tiro Certeiro').req = '';
+  assert.ok(Object.values(S.items).some(i => (i.kit || '').includes('medico')) && Object.values(S.items).some(i => (i.kit || '').includes('armadilha')));
 });

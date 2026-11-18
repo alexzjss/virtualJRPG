@@ -212,3 +212,8 @@ No editor do mestre, "Liga a" recebe nomes separados por `|` e grava as ligaçõ
 A tela desenha a árvore como mandala em canvas (`public/js/mandala.js`): `wx, wy` = grade em escala (`MANDALA_U` = 96 por casa),
 cada linha é uma ligação. Afastado, os setores viram selos; de perto, esferas com nome, XP e ícone, selo 鎖 de requisito, portão ⛩
 na trilha antes de nó travado e névoa nos secretos.
+
+## Árvore de Armas (isolada)
+
+Os ramos de arma saíram do tronco Marcial para `TREE.armas` (ver ARMAS.md, "Árvore de Armas"): bloco à parte na grade, sem ligação com o resto. No Marcial, `branches[0]` é o núcleo, `[1]` os treinos e o resto vem em seguida
+(content.js usa `M.slice(2)` para os raios). `TREE.armas.branches` é a lista plana para as ferramentas que percorrem todas as árvores. Campos novos: `reqItem` (item exigido, tag em `kit` do item), `req` com categoria e `sc: 'wc:<cat>'`; `ramo` marca o 1º nó de um ramo (nome desenhado na mandala).

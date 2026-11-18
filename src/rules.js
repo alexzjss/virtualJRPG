@@ -79,7 +79,7 @@ function normSlots(ch) { // mantém só passivas aprendidas, respeita o limite e
 }
 const passOf = ch => (ch.skills || []).filter(k => { const s = S.skills[k]; return s && s.kind === 'passive' && (!slotted(s) || ch.enemy || ch.summon || !Array.isArray(ch.pslots) || ch.pslots.includes(k)); }).map(k => S.skills[k]);
 const vows = ch => passOf(ch).filter(p => p.vow && !ch.bt?.broken?.[p.vow]).map(p => p.vow);
-const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : sc.startsWith('wt:') ? !!(s.basic || s.req || s.wpn) && wtype(ch) === sc.slice(3) : s.el === sc; // wt:<tipo> = maestria de um tipo de arma
+const inScope = (sc, s, ch) => !sc ? true : sc === 'form' ? !!ch.st?.form : !s ? false : sc === 'circ' ? !!s.circ : sc === 'atk' ? !!s.basic : sc === 'mental' ? s.kind === 'mental' : sc === 'heal' ? s.kind === 'heal' : sc === 'area' ? !!s.area : sc === 'req' ? !!(s.req || s.wpn) : sc.startsWith('wt:') ? !!(s.basic || s.req || s.wpn) && wtype(ch) === sc.slice(3) : sc.startsWith('wc:') ? !!(s.basic || s.req || s.wpn) && !!AR.CAT[sc.slice(3)]?.includes(wtype(ch)) : s.el === sc; // wt:<tipo> = maestria de um tipo de arma
 function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da skill) e da transformação ativa
   const m = { atk: 0, def: 0, agi: 0, hit: 0, crit: 0, atkP: 0, heal: 0, bf: 0, cw: 0, cp: 0, mx: 0, cz: 0, ma: 0, esq: 0, par: 0, chq: 0, rit: 0, ctr: 0, rn: 0 }, add = o => { for (const k in o) m[k] = (m[k] || 0) + o[k]; };
   for (const p of passOf(ch)) if (p.mod && inScope(p.sc, s, ch)) add(p.mod);
@@ -160,7 +160,8 @@ function cantUse(a, s) {
   if (!s || s.kind === 'passive') return 'Passiva';
   if (s.wpn && a.equip?.arma !== s.wpn) return 'Arma não equipada';
   if (s.uses && (a.bt?.wu?.[s.id] || 0) >= s.uses) return 'Esgotada nesta batalha';
-  if (s.req && s.req !== wtype(a)) return 'Exige ' + s.req;
+  if (s.req && !AR.reqOk(s.req, wtype(a)) && !((a.enemy || a.summon) && AR.CAT[s.req])) return 'Exige ' + (AR.CAT_N[s.req] || s.req); // req: um tipo de arma ou uma categoria (corte, esmag, perf, dist); inimigos e invocações não têm arma de inventário
+  if (s.reqItem && !a.enemy && !a.summon && !RU.hasKit(a, S.items, s.reqItem)) return 'Exige ' + (RU.KIT[s.reqItem] || s.reqItem);
   if (!s.basic && (a.st.silence || a.st.fury)) return a.st.silence ? 'Silenciado' : 'Em fúria: só ataca';
   if (s.limit && a.limit < 100) return 'Limite incompleto';
   if (a[s.res] < s.cost) return 'Falta ' + RESN[s.res];
@@ -419,7 +420,7 @@ function redirect(a, t) { // provocar, guarda-costas e furtividade mudam o alvo 
 }
 function ammoFor(a, s) { // munição equipada: balas (armas de fogo) ou flechas (arcos e bestas), por N tiros: elemento, condição e perfuração
   const id = a.equip?.mun, am = S.items[id], wt = wtype(a);
-  if (!am || am.type !== 'mun' || !AR.MUN(wt) || (am.for || 'fogo') !== wt || !(s.basic || s.req === wt || s.wpn) || s.kind === 'mental') return null;
+  if (!am || am.type !== 'mun' || !AR.MUN(wt) || (am.for || 'fogo') !== wt || !(s.basic || (s.req && AR.reqOk(s.req, wt)) || s.wpn) || s.kind === 'mental') return null;
   a.shots ??= {};
   if (!(a.shots[id] > 0)) { if (!(a.inv[id] > 0)) { delete a.equip.mun; return null; } if (--a.inv[id] <= 0) delete a.inv[id]; a.shots[id] = am.shots + OF.hook(a, 'tiros'); log(a.name, `abre um pacote de ${am.name} (${a.shots[id]} tiros).`, ''); }
   a.shots[id]--; return am;

@@ -25,7 +25,7 @@ export const LEVA3 = {
       { n: 'Fôlego Sem Fim', k: 'passive', d: 'O corpo marcado nunca se cansa enquanto a marca arde.', xp: 20, on: 'low', fx: 'gain aura 12; cleanse self' },
       { n: 'Golpe da Marca', k: 'dmg', d: 'Um corte vermelho que só existe com a marca acesa.', xp: 25, a: 'FOR', p: 26, c: 8, fx: 'rage 1; vs demon 1.3' },
       { n: 'Pele Ardente', k: 'passive', d: 'A marca espalha calor pelos músculos.', xp: 30, mod: 'atk 6; agi 6', cs: 'marcado' },
-      { n: 'Lâmina Vermelha', k: 'dmg', d: 'Aperta o cabo até a lâmina ficar rubra: o demônio não se regenera.', xp: 40, a: 'FOR', p: 30, c: 10, fx: 'vs demon 1.4; st bleed 2; strip', rq: { FOR: 52 } },
+      { n: 'Lâmina Vermelha', req: "lamina", k: 'dmg', d: 'Aperta o cabo até a lâmina ficar rubra: o demônio não se regenera.', xp: 40, a: 'FOR', p: 30, c: 10, fx: 'vs demon 1.4; st bleed 2; strip', rq: { FOR: 52 } },
       { n: 'Ver o Mundo Transparente', k: 'form', d: 'O corpo do inimigo fica transparente: músculos, ossos, intenções.', xp: 45, a: 'SAB', c: 10, fm: 'dur 3; hit 25; crit 15; dr hp 3', fx: 'scar san 3 self', rq: { SAB: 52 } },
       { n: 'Dança do Sol Poente', k: 'dmg', d: 'Limite: treze movimentos seguidos, até o último fôlego do caçador.', xp: 80, a: 'FOR', p: 13, c: 0, limit: true, hits: 6, ct: 150, fx: 'rage .8; vs demon 1.3; scar hp 5 self', rq: { FOR: 60 } },
     ],

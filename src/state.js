@@ -1,4 +1,4 @@
-import { ITEMS_V, RENAME, buildItems, buildSkills } from '../content.js';
+import { ITEMS_V, RENAME, buildItems, buildSkills, kitOf } from '../content.js';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -61,7 +61,7 @@ function migrateItems() { // catálogo v5: nomes novos dos consumáveis e equipa
 }
 function migrateB(isNew) {
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
-for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; }
+for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; if (i.kit === undefined && kitOf(i.name)) i.kit = kitOf(i.name); } // kit: tag que cumpre o reqItem das técnicas (o que o mestre já editou fica)
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação

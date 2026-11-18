@@ -14,7 +14,7 @@ export const LEVA4 = {
       P('Olho do Impacto', 'Ver o instante do golpe antes dele existir: as janelas do tempo ficam maiores.', 15, 'cw 60; cp 15', { pre: 'Corte no Compasso' }),
       { n: 'Mil Punhos', k: 'dmg', d: 'Quanto mais rápido o jogador bater, mais socos saem.', xp: 25, a: 'FOR', p: 6, c: 7, hits: 2, req: 'punho', pre: 'Jab', cmd: 'martelar', mx: 6, pf: 'st defDn 2' },
       { n: 'Chicote Frenético', k: 'dmg', d: 'A corrente estala sem parar: cada estalo é mais um golpe.', xp: 20, a: 'DES', p: 7, c: 6, req: 'corrente', pre: 'Chicotada', cmd: 'martelar', mx: 4, pf: 'st para 1' },
-      { n: 'Saraivada', k: 'dmg', d: 'Lâminas atiradas sem pausa, uma atrás da outra.', xp: 20, a: 'DES', p: 6, c: 6, hits: 2, req: 'arremesso', pre: 'Lançamento Duplo', cmd: 'martelar', mx: 4 },
+      { n: 'Saraivada de Lâminas', k: 'dmg', d: 'Lâminas atiradas sem pausa, uma atrás da outra.', xp: 20, a: 'DES', p: 6, c: 6, hits: 2, req: 'arremesso', pre: 'Lançamento Duplo', cmd: 'martelar', mx: 4 },
       P('Punhos Incansáveis', 'O braço não cansa: um golpe a mais em todo martelar.', 25, 'mx 1', { pre: 'Mil Punhos' }),
     ],
     [ // Segurar e soltar e Mira

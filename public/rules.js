@@ -84,6 +84,9 @@
   const nenD = (a, b) => { const d = Math.abs(NEN.indexOf(a) - NEN.indexOf(b)); return Math.min(d, 6 - d); };
   const nenEff = (ch, s) => !s.cat || !ch.nen ? 1 : [1, .8, .6, .4][nenD(ch.nen, s.cat)];
   const xpCost = (ch, s) => !s.cat || !ch.nen ? s.xp : Math.ceil(s.xp * [1, 1.25, 1.5, 2][nenD(ch.nen, s.cat)] / 5) * 5;
+  // itens exigidos por técnicas (campo `reqItem` da skill; o item do catálogo traz a(s) tag(s) em `kit`, separadas por espaço): a técnica só sai com um item da tag no inventário
+  const KIT = { explosivo: 'Explosivos', armadilha: 'Ferragem de armadilha', medico: 'Material médico' };
+  const hasKit = (ch, items, tag) => Object.entries(ch.inv || {}).some(([k, n]) => n > 0 && String(items[k]?.kit || '').split(' ').includes(tag));
   const near = (a, b) => Math.max(Math.abs(a.gx - b.gx), Math.abs(a.gy - b.gy)) <= 1;
   // ligados: um está no ln do outro; skill solta (sem posição na mandala: criada, movida ou importada pelo mestre) também liga pela vizinhança de grade
   const loose = s => !Number.isFinite(s.wx);
@@ -222,6 +225,7 @@
     if (s.hits > 1) o.push(`${s.hits} golpes`);
     if (s.chg) o.push(`concentra ${s.chg} turno${s.chg > 1 ? 's' : ''} antes de soltar`);
     if (s.tg === 'self') o.push('em si mesmo');
+    if (s.reqItem) o.push(`exige ${KIT[s.reqItem] || s.reqItem} no inventário`);
     if (s.nf) o.push('só transformado');
     if (s.circ) o.push(`Ritual de ${s.circ}º círculo`);
     if (s.pay) o.push('custa também ' + Object.entries(s.pay).map(([r, v]) => `${v}${r === 'hp' ? '% do' : ''} ${RESN[r]}`).join(' e '));
@@ -240,7 +244,7 @@
     if (s.duo) o.push(`técnica em dupla: um aliado com "${s.duo}" gasta o próximo turno junto`);
     if (s.vow) o.push(`${VOW[s.vow][0]}: ${VOW[s.vow][1]}`);
     if (s.on) o.push(`${ON[s.on]}${s.ch && s.ch < 100 ? ` (${s.ch}%)` : ''}: ${fxText(s.fx)}`);
-    if (s.mod) o.push(modText(s.mod) + (s.sc ? ' ' + (SCN[s.sc] || (String(s.sc).startsWith('wt:') ? 'com ' + (g.ARMAS?.TIPOS[s.sc.slice(3)]?.n || s.sc.slice(3)).toLowerCase() + ' (básico e técnicas)' : 'com ' + (g.RULES.PATRON[s.sc] || s.sc))) : ''));
+    if (s.mod) o.push(modText(s.mod) + (s.sc ? ' ' + (SCN[s.sc] || (String(s.sc).startsWith('wc:') ? 'com armas de ' + (g.ARMAS?.CAT_N[s.sc.slice(3)] || s.sc.slice(3)).toLowerCase() + ' (básico e técnicas)' : String(s.sc).startsWith('wt:') ? 'com ' + (g.ARMAS?.TIPOS[s.sc.slice(3)]?.n || s.sc.slice(3)).toLowerCase() + ' (básico e técnicas)' : 'com ' + (g.RULES.PATRON[s.sc] || s.sc))) : ''));
     if (s.bon) o.push(Object.entries(s.bon).map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx' })[k] || k}`).join(', '));
     if (s.amp) o.push(`amplia "${s.amp}": ${[s.up?.p && `+${s.up.p} poder`, s.up?.c && `+${s.up.c} custo`, s.up?.san && `+${s.up.san} Sanidade`, s.up?.area && 'passa a ser em área', s.up?.hits && `${s.up.hits} golpes`, s.up?.fx && fxText(s.up.fx)].filter(Boolean).join(', ')}`);
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
@@ -348,5 +352,5 @@
       return { title: CMD.GRADE_NAME[g] || '', lines: L };
     },
   };
-  g.RULES = { CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
+  g.RULES = { KIT, hasKit, CMD, STK, REA, reaText, parseFx, parseForm, fxSrc, formSrc, AFL, VIR, BOND, bondLv, CLIMA, REACT, DOT, CTRL, ST, STD, NEG, POS, VOW, AW, CS, NEN, NENN, nenD, nenEff, xpCost, whyNot, fxText, formText, modText, extra, near, linked, ON, PATRON: { fis: 'Marcial', kagutsuchi: 'Kagutsuchi', susanoo: 'Susanoo', atlas: 'Atlas', indra: 'Indra', fuhaku: 'Fuhaku', amaterasu: 'Amaterasu', tsukuyomi: 'Tsukuyomi', shukketsu: 'Shukketsu', hiruko: 'Hiruko', aura: 'Aura', oculto: 'Ocultismo' } };
 })(globalThis);

@@ -83,6 +83,7 @@ app.addEventListener('click', e => {
   if (d.a === 'camFree') return send({ t: 'map', f: 'cam', v: null });
   if (d.a === 'skReset') return MANDALA.focus('mine');
   if (d.a === 'skCore') return MANDALA.focus('core'); // centraliza no núcleo Marcial
+  if (d.a === 'skArmas') return MANDALA.focus('armas'); // Árvore de Armas (bloco à parte)
   if (d.a === 'skAll') return MANDALA.focus('all');
   if (d.a === 'skTab') { skTab = d.v; lsSet('vj.skTab', d.v); return render(); }
   if (d.a === 'skDrawer') { skDrawer = !skDrawer; return render(); }

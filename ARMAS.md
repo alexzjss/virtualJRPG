@@ -140,3 +140,16 @@ Golpes finais: Queda do Titã, Canal Aberto, Dragão de Ferro, Nuvem de Lâminas
 
 ## Fichas salvas (expansão)
 `S.itemsV = 3`: as Pistolas Gêmeas do catálogo viram arma em par e as flechas entram no catálogo. Skills aprendidas continuam pelo nome (a grade é refeita).
+
+## Árvore de Armas
+
+`TREE.armas = { prim, tipos, branches }` (tree.js; dados em `arvore/armas.js`, `ARMAS_BASE` e `ARMAS`/`ARMAS_NOVAS` em `arvore/marcial.js`). É uma árvore isolada: aberta a todos (el `fis`, sem Vínculo), com os 266 nós fora do tronco Marcial,
+num bloco próprio da grade (centro em 92 casas à direita do Marcial, sem nenhuma ligação `ln` com o resto). `prim`: 4 ramos de categoria (corte, esmag, perf, dist), cujo primeiro nó é `open`.
+`tipos`: 3 ramos por tipo de arma: o clássico (10 nós, antes no Marcial; 1º nó com `ramo`) e 2 de estilo (6 nós). Os ramos de cada tipo brotam da ponta do(s) primordial(is) da categoria dele;
+foco e instrumento (sem categoria) saem direto do centro, com o 1º nó de cada ramo `open`. Nós com `br: 'armas-prim-<cat>'` ou `'armas-<tipo>-<0..2>'`; a mandala dá selo próprio (武) e o botão "Armas" enquadra o bloco.
+
+Categorias (`ARMAS.CAT`): corte = lâmina, arremesso, corrente · esmag = pesada, punho, escudo · perf = lança, arco · dist = fogo, arco, arremesso.
+- `req` aceita um tipo ou uma categoria (`ARMAS.reqOk(req, tipoEmpunhado)`); sem a arma: "Exige Corte" (ou o nome do tipo). Inimigos e invocações são dispensados do `req` de categoria.
+- `sc: 'wc:<cat>'` (passivas): o bônus vale no ataque básico e nas técnicas de arma quando a arma empunhada é da categoria (análogo a `wt:<tipo>`).
+- `reqItem: '<tag>'` (técnicas que usam item físico): só sai com um item do inventário que tenha a tag no campo `kit` do item (`explosivo`, `armadilha`, `medico`; `RULES.KIT`, `RULES.hasKit`). O item não é gasto. Os itens do catálogo trazem `kit` (`KIT_ITENS` em content.js) e saves antigos o recebem por nome em `migrateB`. Editável pelo mestre (colunas "Item exigido" e "Kit").
+- Marcial: `Tiro Certeiro`, `Fogo Cruzado`, `Posição de Tiro` = dist; `Golpe de Coronha` = fogo; `Baioneta Calada` = lança; `Lâmina Vermelha`, `Saudação do Duelista` = lâmina; `Respiração` 1ª a 4ª forma = corte; `Corrente de Ferro Frio` = corrente; explosivos (Granada de Mão, Dinamite, Carga de Demolição, Bomba de Fumaça, Flash, Gás) = `explosivo`; Armadilha de Urso e Fio de Tropeço = `armadilha`; Primeiros Socorros, Bandagem, Torniquete, Morfina, Cirurgia, Adrenalina e Estimulante = `medico`.

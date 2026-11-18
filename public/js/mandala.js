@@ -22,7 +22,8 @@
   const cam = M.cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
   let ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
   const hexA = (h, a) => { const v = parseInt((h || '#ffffff').slice(1), 16); return `rgba(${v >> 16},${v >> 8 & 255},${v & 255},${a})`; };
-  const col = el => (typeof ELC !== 'undefined' && ELC[el]) || '#ffffff';
+  const col = el => (typeof ELC !== 'undefined' && ELC[el === 'armas' ? 'fis' : el]) || '#ffffff';
+  const grp = s => s.br?.startsWith('armas') ? 'armas' : s.el; // a Árvore de Armas é um bloco à parte (el 'fis', sem ligação com o Marcial): ganha o próprio selo
   // IN: largura coberta pela gaveta à direita; o centro da câmera e o minimapa ficam na parte visível
   const VW = () => W - (o?.inset || 0);
   const w2s = (x, y) => [(x - cam.x) * cam.z + VW() / 2, (y - cam.y) * cam.z + H / 2], s2w = (x, y) => [(x - VW() / 2) / cam.z + cam.x, (y - H / 2) / cam.z + cam.y];
@@ -34,7 +35,7 @@
 
   function build() { // posições, ligações e selos dos setores; refeito quando as definições ou a lista visível mudam
     P = place(o.skills); E = edges(o.skills, new Set(o.ids));
-    const cen = {}; for (const id of o.ids) { const s = o.skills[id], p = P.get(id), c = cen[s.el] ||= { x: 0, y: 0, n: 0, ids: [] }; c.x += p[0]; c.y += p[1]; c.n++; c.ids.push(id); }
+    const cen = {}; for (const id of o.ids) { const s = o.skills[id], p = P.get(id), c = cen[grp(s)] ||= { x: 0, y: 0, n: 0, ids: [] }; c.x += p[0]; c.y += p[1]; c.n++; c.ids.push(id); }
     bound = 400; seals = Object.entries(cen).map(([el, c]) => { const x = c.x / c.n, y = c.y / c.n; let r = 0; for (const id of c.ids) { const p = P.get(id); r += Math.hypot(p[0] - x, p[1] - y); bound = Math.max(bound, Math.abs(p[0]), Math.abs(p[1])); } return { el, x, y, r: Math.max(180, r / c.n * 1.3) }; });
     if (!stars.length) for (let i = 0; i < 600; i++) stars.push([(Math.random() * 2 - 1) * 3200, (Math.random() * 2 - 1) * 3200, Math.random() * 1.5 + .3, Math.random() * TAU]);
     motes = seals.filter(s => s.el !== 'fis').flatMap(s => Array.from({ length: 14 }, () => [s, Math.random() * TAU, Math.random() * s.r, Math.random() * TAU]));
@@ -52,11 +53,11 @@
     const bg = cx.createRadialGradient(...w2s(0, 0), 0, ...w2s(0, 0), Math.max(W, H) * .9); bg.addColorStop(0, '#15101c'); bg.addColorStop(1, '#07070d'); cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
     for (const [sx, sy, r, ph] of stars) { const [x, y] = w2s(sx, sy); if (x < 0 || y < 0 || x > W || y > H) continue; cx.fillStyle = `rgba(210,200,255,${.12 + .2 * Math.sin(T * 1.3 + ph)})`; cx.fillRect(x, y, r, r); }
     // fundo de cada setor: halo na cor do patrono, partículas lentas e o kanji grande (selo quando afastado)
-    for (const s of seals) { const [x, y] = w2s(s.x, s.y), r = s.r * cam.z * 1.3, c = col(s.el), mine = s.el === 'fis' || o.mineEls?.has(s.el);
+    for (const s of seals) { const [x, y] = w2s(s.x, s.y), r = s.r * cam.z * 1.3, c = col(s.el), mine = s.el === 'fis' || s.el === 'armas' || o.mineEls?.has(s.el);
       const gr = cx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, hexA(c, mine ? .17 : .08)); gr.addColorStop(1, hexA(c, 0)); cx.fillStyle = gr; cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.fill();
-      cx.save(); cx.globalAlpha = far ? .9 : .1; cx.fillStyle = c; cx.font = `${Math.max(22, r * .75)}px serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(typeof KANJI !== 'undefined' ? KANJI[s.el] || '' : '', x, y); cx.restore();
+      cx.save(); cx.globalAlpha = far ? .9 : .1; cx.fillStyle = c; cx.font = `${Math.max(22, r * .75)}px serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(s.el === 'armas' ? '武' : typeof KANJI !== 'undefined' ? KANJI[s.el] || '' : '', x, y); cx.restore();
       if (far) { cx.strokeStyle = hexA(c, .55); cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, Math.max(26, r * .5), 0, TAU); cx.stroke();
-        cx.fillStyle = hexA(c, .95); cx.font = '600 13px system-ui,sans-serif'; cx.textAlign = 'center'; cx.fillText((typeof PATRON !== 'undefined' ? PATRON[s.el] : s.el) + (mine && s.el !== 'fis' ? ' · seu Vínculo' : ''), x, y + Math.max(26, r * .5) + 16); } }
+        cx.fillStyle = hexA(c, .95); cx.font = '600 13px system-ui,sans-serif'; cx.textAlign = 'center'; cx.fillText((s.el === 'armas' ? 'Armas' : typeof PATRON !== 'undefined' ? PATRON[s.el] : s.el) + (mine && s.el !== 'fis' && s.el !== 'armas' ? ' · seu Vínculo' : ''), x, y + Math.max(26, r * .5) + 16); } }
     for (const [s, a, d, ph] of motes) { const t = T * .15 + ph, [x, y] = w2s(s.x + Math.cos(a + t) * d, s.y + Math.sin(a + t) * d); if (x < 0 || y < 0 || x > W || y > H) continue; cx.fillStyle = hexA(col(s.el), .25 + .2 * Math.sin(T + ph)); cx.beginPath(); cx.arc(x, y, Math.max(1, 2.5 * cam.z), 0, TAU); cx.fill(); }
     // trilhas
     cx.lineCap = 'round';
@@ -88,6 +89,7 @@
       if (id === hover || mk.sel) { cx.strokeStyle = '#ffffff'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * 1.8, 0, TAU); cx.stroke(); }
       const t = anim.get(id); if (t != null) { const k = (now - t) / 700; if (k >= 1.3) anim.delete(id); else { cx.fillStyle = hexA(c, Math.max(0, .8 * (1 - k))); cx.beginPath(); cx.arc(x, y, r * (1 + k * 2.5), 0, TAU); cx.fill(); } }
       if (st === 'secret') { const f = cx.createRadialGradient(x, y, 0, x, y, r * 2.6); f.addColorStop(0, 'rgba(40,36,60,.92)'); f.addColorStop(1, 'rgba(40,36,60,0)'); cx.fillStyle = f; cx.beginPath(); cx.arc(x, y, r * 2.6, 0, TAU); cx.fill(); }
+      if (s.ramo && cam.z > .4 && st !== 'secret') { cx.fillStyle = hexA(c, .95); cx.font = `700 ${Math.round(Math.min(15, 9 + 5 * cam.z))}px system-ui,sans-serif`; cx.textAlign = 'center'; cx.textBaseline = 'alphabetic'; cx.fillText(s.ramo.toUpperCase(), x, y - r - 7); } // nome do ramo (Árvore de Armas)
       const full = cam.z >= .8, named = full || st === 'own' || st === 'av' || id === hover || mk.sel; // com zoom médio, só os nomes que importam
       if (cam.z > .5) { cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = st === 'own' ? '#111' : hexA(c, .95); cx.font = `${Math.round(r * .95)}px serif`;
         cx.fillText(st === 'secret' ? '?' : mk.rq && st !== 'own' ? '鎖' : mark(s), x, y + 1);
@@ -110,8 +112,10 @@
   const fly = (x, y, z) => { const a = { ...cam }, t0 = performance.now(), id = ++flying; (function step() { if (id !== flying) return; const k = Math.min(1, (performance.now() - t0) / 550), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; cam.x = a.x + (x - a.x) * e; cam.y = a.y + (y - a.y) * e; cam.z = a.z * Math.pow(clampZ(z) / a.z, e); kick(); if (k < 1) requestAnimationFrame(step); })(); };
   const zoomAt = (px, py, z) => { const [wx, wy] = s2w(px, py); cam.z = clampZ(z); const [nx, ny] = s2w(px, py); cam.x += wx - nx; cam.y += wy - ny; kick(); };
   const pick = (px, py) => { if (cam.z < LOD) return null; let best = null, bd = Math.max(8, R * 1.3 * cam.z) ** 2; for (const id of o.ids) { const [x, y] = w2s(...P.get(id)), d = (x - px) ** 2 + (y - py) ** 2; if (d < bd) { bd = d; best = id; } } return best; };
-  const fitAll = () => fly(0, 0, Math.min(VW(), H) / (bound * 2.2));
+  const fitAll = () => { const ps = o.ids.map(id => P.get(id)); if (!ps.length) return fly(0, 0, Math.min(VW(), H) / (bound * 2.2)); const x0 = Math.min(...ps.map(p => p[0])), x1 = Math.max(...ps.map(p => p[0])), y0 = Math.min(...ps.map(p => p[1])), y1 = Math.max(...ps.map(p => p[1]));
+    fly((x0 + x1) / 2, (y0 + y1) / 2, Math.min(VW() / Math.max(400, (x1 - x0) * 1.15), H / Math.max(400, (y1 - y0) * 1.15))); }; // enquadra mandala e Árvore de Armas
   M.focus = t => { if (!o) return; if (t === 'all') return fitAll();
+    if (t === 'armas') { const s = seals.find(s => s.el === 'armas'); if (s) fly(s.x, s.y, Math.max(.6, Math.min(cam.z, .9))); return; }
     if (t === 'core') { const p = P.get('g0') || [0, 0]; return fly(p[0], p[1], Math.max(cam.z, .9)); }
     if (t === 'mine') { const own = o.ids.filter(id => o.state(id) === 'own'); if (!own.length) return M.focus('core'); const xs = own.map(id => P.get(id)); return fly(xs.reduce((a, p) => a + p[0], 0) / xs.length, xs.reduce((a, p) => a + p[1], 0) / xs.length, .9); }
     const p = P.get(t); if (p) fly(p[0], p[1], Math.max(cam.z, .9)); };

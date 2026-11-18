@@ -50,11 +50,12 @@ export function expand(o) {
 // Cada ramo é uma corrente de casas vizinhas, então sempre dá para percorrê-lo.
 export const ORDER = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'aura', 'amaterasu', 'tsukuyomi', 'oculto', 'shukketsu', 'hiruko'];
 export function buildSkills(sk) {
-  const N = 111, C = 55, G = {}, used = new Map(); // casa "x,y" → elemento
+  const N = 260, C = 55, G = {}, used = new Map(); // casa "x,y" → elemento (na Árvore de Armas, a zona 'armas')
+  let CX = C, CY = C, zone = null; // centro da grade em uso e zona dos nós postos agora: a Árvore de Armas é um bloco à parte, com centro próprio
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !used.has(x + ',' + y);
   const node = (o, el, extra = {}) => { const { n, k, a, p, c, ...rest } = expand(o); return sk(n, k, a || 'FOR', el, p || 0, c || 0, 0, 0, { ...rest, ...extra }); };
   // put grava o nó na casa e, se houver, a ligação (ln, simétrica) com o nó da casa pai
-  const idAt = new Map(), put = (x, y, s, parent) => { const id = 'g' + Object.keys(G).length; used.set(x + ',' + y, s.el); idAt.set(x + ',' + y, id); G[id] = { ...s, gx: x, gy: y, ln: [] };
+  const idAt = new Map(), put = (x, y, s, parent) => { const id = 'g' + Object.keys(G).length; used.set(x + ',' + y, zone || s.el); idAt.set(x + ',' + y, id); G[id] = { ...s, gx: x, gy: y, ln: [] };
     const pid = parent && idAt.get(parent.join(',')); if (pid && !G[pid].ln.includes(id)) { G[pid].ln.push(id); G[id].ln.push(pid); } return [x, y]; };
   const around = (x, y) => { const o = []; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) o.push([x + dx, y + dy]); return o; };
   const at = k => k.split(',').map(Number), dist = k => Math.hypot(...at(k).map(v => v - C));
@@ -62,11 +63,11 @@ export function buildSkills(sk) {
   const chain = (deg, r0, nodes, anchor, start) => {
     let prev = start || null; const placed = [];
     nodes.forEach((s, i) => {
-      const a = deg * Math.PI / 180, tx = C + (r0 + i) * Math.cos(a), ty = C + (r0 + i) * Math.sin(a);
+      const a = deg * Math.PI / 180, tx = CX + (r0 + i) * Math.cos(a), ty = CY + (r0 + i) * Math.sin(a);
       // cada candidato lembra a casa de onde saiu (o pai da ligação)
       const from = keys => keys.flatMap(k => around(...at(k)).map(p => [...p, at(k)])).filter(p => free(p[0], p[1]));
       let cand = prev ? around(...prev).map(p => [...p, prev]).filter(p => free(p[0], p[1])) : from([...used.keys()].filter(k => anchor(k)));
-      if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === s.el || used.get(k) === 'fis'));
+      if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === (zone || s.el) || (!zone && used.get(k) === 'fis')));
       if (!cand.length) throw new Error('grade sem espaço para ' + s.name);
       const [bx, by, par] = cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0];
       prev = put(bx, by, s, par); placed.push(prev.join(','));
@@ -85,9 +86,9 @@ export function buildSkills(sk) {
   // núcleo Marcial (centro e o anel em volta): aberto a todos, sem exigir vizinho aprendido; dele se anda para o resto do tronco
   put(C, C, node(M[0][0], 'fis', { open: 1 }));
   around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 }), [C, C]));
-  const rays = M.slice(1).filter((_, i) => i !== 4);
+  const rays = M.slice(2); // M[1] são os treinos; as armas saíram para TREE.armas
   rays.forEach((br, i) => chain(i * 360 / rays.length + 360 / ORDER.length / 2, 2, br.map(o => node(o, 'fis')), fis));
-  const train = M[5].map(o => node(o, 'fis'));
+  const train = M[1].map(o => node(o, 'fis'));
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
     if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift(), around(x, y).find(p => used.get(p.join(',')) === 'fis'));
   // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó, aberta a quem tem o Vínculo, sem exigir vizinho); depois um ramo de cada setor por vez,
@@ -104,6 +105,28 @@ export function buildSkills(sk) {
     const groups = br.every(o => o.req) ? Object.values(br.reduce((g, o) => ((g[o.req] ||= []).push(o), g), {})) : [br];
     cells[el][b] = groups.flatMap((g, m) => groups.length > 1 ? chain(deg + (m - (groups.length - 1) / 2) * 2.5, r0, g.map(mk), anchor) : forked(deg, r0, g.map(mk), anchor, b % 2 === 0));
   });
+  // Árvore de Armas: um bloco isolado (sem ligação com o resto) à direita da mandala, com centro próprio. Os 4 ramos primordiais (corte, esmag, perf, dist) saem do centro em
+  // diagonais; os 3 ramos de cada tipo de arma brotam da ponta do(s) primordial(is) da categoria dele (foco e instrumento, sem categoria, saem direto do centro, abertos a todos).
+  const AX = C + 92, AY = C, CAT = globalThis.ARMAS.CAT, TA = TREE.armas;
+  zone = 'armas'; CX = AX; CY = AY;
+  const seed = (deg, r, s) => { // 1º nó sem pai: a casa livre mais perto do ponto (r, deg) em volta do centro
+    const tx = AX + r * Math.cos(deg * Math.PI / 180), ty = AY + r * Math.sin(deg * Math.PI / 180); let best = null;
+    for (let x = AX - r - 3; x <= AX + r + 3; x++) for (let y = AY - r - 3; y <= AY + r + 3; y++) if (free(x, y) && (!best || (x - tx) ** 2 + (y - ty) ** 2 < best[2])) best = [x, y, (x - tx) ** 2 + (y - ty) ** 2];
+    return put(best[0], best[1], s);
+  };
+  const tip = {}, CATD = { corte: 45, dist: 135, perf: 225, esmag: 315 };
+  for (const [cat, br] of Object.entries(TA.prim)) {
+    const s0 = seed(CATD[cat], 2, node(br[0], 'fis', { br: 'armas-prim-' + cat, open: 1 }));
+    tip[cat] = new Set([s0.join(','), ...chain(CATD[cat], 3, br.slice(1).map(o => node(o, 'fis', { br: 'armas-prim-' + cat })), null, s0)].slice(-4));
+  }
+  const TD = { pesada: 300, punho: 330, escudo: 0, lamina: 30, corrente: 60, arremesso: 90, fogo: 125, arco: 165, lanca: 205, foco: 255, instrumento: 285 }, OFF = [0, -12, 12];
+  for (let b = 0; b < 3; b++) for (const [wt, brs] of Object.entries(TA.tipos)) {
+    const cats = Object.keys(CAT).filter(c => CAT[c].includes(wt)), deg = TD[wt] + OFF[b], mk = (o, n) => node(o, 'fis', { br: 'armas-' + wt + '-' + b, ...(!cats.length && !n ? { open: 1 } : {}) });
+    if (!cats.length) { const s0 = seed(deg, 2, mk(brs[b][0], 0)); chain(deg, 3, brs[b].slice(1).map((o, n) => mk(o, n + 1)), null, s0); continue; }
+    const anchor = k => cats.some(c => tip[c].has(k)), nodes = brs[b].map(mk);
+    b ? chain(deg, 10, nodes, anchor) : forked(deg, 10, nodes, anchor, false);
+  }
+  zone = null; CX = C; CY = C;
   // posição na mandala (wx, wy): a própria grade em escala, centrada no núcleo Marcial. Apertar as pétalas em direção ao eixo cruzaria
   // nós de setores vizinhos que se invadem na grade; a forma de pétala vem das ligações (ln), que são o que o mapa desenha.
   for (const s of Object.values(G)) { s.wx = (s.gx - C) * MANDALA_U; s.wy = (s.gy - C) * MANDALA_U; }
@@ -167,8 +190,15 @@ export const WSHOP = {
 };
 const wstock = k => WSHOP[k].map(basicName).filter(Boolean);
 
+// itens que cumprem o `reqItem` das técnicas (tag → nomes do catálogo): o item leva a tag no campo `kit`. Quem já tinha o catálogo salvo recebe a tag pelo nome em migrateB (state.js).
+export const KIT_ITENS = {
+  explosivo: ['Pólvora', 'Bomba do Feiticeiro', 'Frasco de Chamas Carmesim', 'Bomba de Sal Purificado', 'Frasco Roxo'],
+  armadilha: ['Sucata de Ferro'],
+  medico: ['Poção', 'Líquido Dourado do Sanatório', 'Elixir de Flamel', 'Antídoto do TN-1', 'Bálsamo de Hermione', 'Erva Medicinal', 'Remédio do Sanatório', 'Pena de Fênix'],
+};
+export const kitOf = name => Object.keys(KIT_ITENS).filter(k => KIT_ITENS[k].includes(name)).join(' ');
 export function buildItems(it) {
-  const L = [], add = (...a) => L.push(it(...a)), n = PATRON;
+  const L = [], add = (...a) => { const x = it(...a), kit = kitOf(x.name); L.push(kit ? { ...x, kit } : x); }, n = PATRON;
   // consumíveis
   add('Poção', 'cons', 20, { price: 10 }); add('Líquido Dourado do Sanatório', 'cons', 45, { price: 30 }); add('Elixir de Flamel', 'cons', 90, { price: 80 });
   add('Cubo de Shinkai', 'cons', 15, { eff: 'aura', price: 20 }); add('Cristal de Mikhail', 'cons', 35, { eff: 'aura', price: 40 });
