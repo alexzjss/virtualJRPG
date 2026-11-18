@@ -5,7 +5,7 @@
   const DOT = ['burn', 'bleed', 'poison', 'rad'];
   const CTRL = ['stun', 'sleep', 'para', 'frozen', 'possess', 'confuse'];
   const ST = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão',
-    shield: 'Escudo', wet: 'Molhado', oil: 'Oleado', broken: 'Quebrado', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor', mark: 'Marca', disarm: 'Desarmado' };
+    shield: 'Escudo', wet: 'Molhado', oil: 'Oleado', broken: 'Quebrado', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor', mark: 'Marca', disarm: 'Desarmado', brand: 'Marca de Caça' };
   // o que cada condição nova faz (as antigas já são conhecidas na mesa)
   const STD = { shield: 'absorve dano antes do HP', regen: 'recupera HP no início do turno', taunt: 'inimigos só conseguem mirar nele', guarded: 'um guarda-costas recebe os golpes no lugar', counter: 'revida golpes corpo a corpo com um ataque', reflect: 'devolve 30% do dano recebido',
     wet: 'conduz raio e vento (reações elementais)', oil: 'queima e explode com fogo e raio', broken: 'perdeu o turno, sofre +50% de dano e não age até se recompor',
@@ -16,7 +16,7 @@
   // reações: disparam sozinhas no turno do inimigo (1 por rodada, pagando o custo da técnica)
   const REA = { evade: 'esquiva', block: 'bloqueia', absorb: 'absorve', counter: 'revida' };
   const reaText = s => { const r = s.rea; return `reação automática (1×/rodada, paga o custo): ${r.t === 'evade' ? `${r.v}% de esquivar do golpe` : r.t === 'block' ? `bloqueia ${r.v}% do dano` : r.t === 'absorb' ? `absorve ${r.v}% do dano como Aura` : `revida com poder ${r.v}`}`; };
-  const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal', 'disarm'];
+  const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal', 'disarm', 'brand'];
   const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt', 'mark'];
   // Aflições (Sanidade zerada e teste de SAB falho) e Virtudes (crítico): valem até o descanso longo
   const AFL = {
@@ -119,8 +119,8 @@
   // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
   const FXTO = new Set(['self', 'ally', 'foes', 'tgt']);
   const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], mad: ['m'], pierce: ['p'], chain: ['n', 'm'], stack: ['k', 'n'], burst: ['k', 'm'],
-    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], scar: ['r', 'p'], clone: ['n', 'p'], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
-  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 }, clone: { n: 1, p: 20 } };
+    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], scar: ['r', 'p'], clone: ['n', 'p'], echo: ['p'], brand: ['n'], pop: ['m'], every: ['n', 'm'], rs: ['k', 'm'], ovr: [], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
+  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 }, clone: { n: 1, p: 20 }, echo: { p: 50 }, brand: { n: 3 }, pop: { m: 1.6 }, every: { m: 1.8 }, rs: { m: 1.5 } };
   const FXTXT = new Set(['k', 'r']);
   function parseFx(str, where = '') {
     if (!str) return undefined;
@@ -189,6 +189,12 @@
       case 'clima': return `muda o clima para ${CLIMA[f.k]?.[0] || f.k} por ${f.n} rodadas`;
       case 'brk': return `abala a barra de Quebra do alvo em ${f.n}`;
       case 'scar': return `cicatriz: −${f.p}% de ${RESN[f.r]} máx.${to} até o descanso longo`;
+      case 'echo': return `ecoa a técnica usada antes desta com ${f.p}% do poder`;
+      case 'brand': return `Marca de Caça ${f.n}t${to} (outro aliado a detona)`;
+      case 'pop': return `detona a Marca de Caça: ×${f.m} se foi outro aliado que marcou (metade do bônus se foi você)`;
+      case 'every': return `a cada ${f.n}º uso na luta: ×${f.m}`;
+      case 'rs': return `Ressonância: ×${f.m} se o último a agir foi ${f.k === 'any' ? 'um aliado' : 'um aliado com técnica de ' + (globalThis.RULES?.PATRON?.[f.k] || f.k)} no mesmo alvo`;
+      case 'ovr': return 'Sacrifício: sem Aura, paga o que falta com 2 HP por ponto e causa +30%';
       case 'clone': return `cria ${f.n} clone${f.n > 1 ? 's' : ''} (cada um leva ${f.p}% do seu HP atual e causa metade do dano)`;
       default: return f.t;
     }

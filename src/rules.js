@@ -164,7 +164,7 @@ function cantUse(a, s) {
   if (s.reqItem && !a.enemy && !a.summon && !RU.hasKit(a, S.items, s.reqItem)) return 'Exige ' + (RU.KIT[s.reqItem] || s.reqItem);
   if (!s.basic && (a.st.silence || a.st.fury)) return a.st.silence ? 'Silenciado' : 'Em fúria: só ataca';
   if (s.limit && a.limit < 100) return 'Limite incompleto';
-  if (a[s.res] < s.cost) return 'Falta ' + RESN[s.res];
+  if (a[s.res] < s.cost && !(s.res !== 'hp' && s.fx?.some(f => f.t === 'ovr') && a.hp > (s.cost - a[s.res]) * 2)) return 'Falta ' + RESN[s.res]; // Sacrifício: paga com HP
   for (const [r, v] of Object.entries(s.pay || {})) if (r === 'hp' ? a.hp <= Math.ceil(a.hpMax * v / 100) : a[r] < v) return 'Falta ' + RESN[r];
   if (s.kind === 'form' && a.st.exaus) return 'Exausto';
   if (s.nf && !a.st.form) return 'Só transformado';
@@ -299,6 +299,7 @@ function fx1(a, s, t, f, c = {}) {
     case 'brk': return brkHit(t, f.n, a);
     case 'scar': { const k = f.r === 'san' ? 'sanMax' : f.r === 'aura' ? 'auraMax' : 'hpMax', v = Math.max(1, Math.ceil(t[k] * f.p / 100)); (t.scar ??= {})[k] = (t.scar[k] || 0) + v; derive(t); return ` [cicatriz: −${v} ${RESN[k.slice(0, -3)]} máx.]`; }
     case 'clone': return cloneOf(a, s, f);
+    case 'brand': if (t.hp > 0) { t.st.brand = Math.max(t.st.brand || 0, f.n); t.brandBy = a.id; return ` [Marca de Caça de ${a.name}]`; } return '';
     case 'guard': if (t !== a) { t.st.guarded = f.n; t.guardBy = a.id; return ` [${a.name} protege ${t.name}]`; } return '';
   }
   return '';
@@ -314,6 +315,8 @@ function onceFx(a, s, stat) {
   if (txt) log(a.name, `${s.name}:${txt}`, 'ok');
 }
 const hitFx = (a, s, t, c) => (s.fx || []).filter(f => (!f.to || f.to === 'tgt') && !(c.blk && f.t === 'st')).map(f => fx1(a, s, t, f, c)).join('');
+// Ressonância: o último a agir foi um aliado (não você) com técnica do Vínculo pedido (ou 'any'), acertando o mesmo alvo
+const resOk = (a, f, t) => { const L = S.battle?.lastAct; return !!L && L.id !== a.id && L.enemy === a.enemy && (f.k === 'any' || L.el === f.k) && L.t.includes(t.id); };
 function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por turno de condição, fúria do ferido
   let m = 1;
   for (const f of s.fx || []) {
@@ -324,6 +327,12 @@ function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por
     if (f.t === 'mad' && a.sanMax) m *= 1 + f.m * (1 - Math.max(0, a.san) / a.sanMax); // Loucura: quanto menos Sanidade, mais forte
     if (f.t === 'stack') m *= 1 + RU.STK[f.k][1] / 100 * (a.stk?.[f.k] || 0);
     if (f.t === 'burst') m *= 1 + f.m * (a.stk?.[f.k] || 0);
+  }
+  for (const f of s.fx || []) {
+    if (f.t === 'every' && a.bt?.evNow === s.name) m *= f.m; // contador: o N-ésimo uso
+    if (f.t === 'ovr' && a.bt?.ovrNow) m *= 1.3; // Sacrifício
+    if (f.t === 'pop' && t.st.brand) { m *= t.brandBy !== a.id ? f.m : 1 + (f.m - 1) / 2; delete t.st.brand; delete t.brandBy; a.bt ??= {}; a.bt.popNow = 1; }
+    if (f.t === 'rs' && resOk(a, f, t)) { m *= f.m; a.bt ??= {}; (a.bt.rsNow ??= new Set()).add(t.id); }
   }
   if (s.combo && a.lastSk && s.combo.split('|').includes(a.lastSk)) { m *= s.cm || 1.4; a.bt ??= {}; a.bt.combo = 1; }
   return m;
@@ -608,7 +617,10 @@ function doAct(a, m, bonus = 0) {
   if (!t0 || !(t0.id in S.battle.ticks)) return false;
   const cx = !m.release && !a.enemy && s.cmd && m.cmd ? RU.CMD.cmdEffect(s, RU.CMD.clampCmd(s, m.cmd, modsOf(a, s))) : null; // nota do comando de ataque (medida no navegador)
   if (!m.release && !['heal', 'util', 'form'].includes(s.kind) && !s.area && t0.hp <= 0) return false; // não se gasta o turno golpeando quem já caiu
+  const prevSk = a.lastSk; a.bt ??= {};
+  if (!m.release && s.fx?.some(f => f.t === 'every')) { a.bt.ev ??= {}; const n = a.bt.ev[s.name] = (a.bt.ev[s.name] || 0) + 1, ev = s.fx.find(f => f.t === 'every'); if (n % ev.n === 0) { a.bt.evNow = s.name; log(a.name, `${s.name}: ${n}º uso, golpe pleno!`, 'ok'); } }
   if (!m.release) {
+    if (a[s.res] < s.cost && s.fx?.some(f => f.t === 'ovr')) { const miss = s.cost - a[s.res]; a[s.res] = s.cost; a.hp = Math.max(1, a.hp - miss * 2); a.bt.ovrNow = 1; log(a.name, `${s.name}: sacrifica ${miss * 2} HP pela técnica!`, 'bad'); }
     a[s.res] -= s.cost;
     if (s.limit) a.limit = 0;
     if (s.uses) { a.bt ??= {}; a.bt.wu ??= {}; a.bt.wu[m.skill] = (a.bt.wu[m.skill] || 0) + 1; } // golpe com usos por batalha
@@ -656,6 +668,12 @@ function doAct(a, m, bonus = 0) {
   if (ch && off && ts.length === 1) inB.filter(o => o.enemy === ts[0].enemy && o !== ts[0] && o.hp > 0).sort(() => Math.random() - .5).slice(0, ch.n).forEach((o, i) => strike(a, s, o, null, bonus, { mult: ch.m ** (i + 1), plus }));
   onceFx(a, s, stat);
   if (a.bt.combo) { delete a.bt.combo; log(a.name, `COMBO! ${s.name} logo depois de ${a.lastSk}.`, 'ok'); }
+  if (a.bt.popNow) log(a.name, `DETONA a Marca de Caça com ${s.name}!`, 'ok');
+  if (a.bt.rsNow) { log(a.name, `RESSONÂNCIA! ${s.name} vibra junto com o golpe de ${S.chars[S.battle.lastAct.id]?.name || 'um aliado'}.`, 'ok'); if (s.rx) for (const t of ts) if (a.bt.rsNow.has(t.id) && t.hp > 0) { const x = s.rx.map(f => fx1(a, s, t, f, { stat })).join(''); if (x) log(a.name, x.trim(), 'ok'); } }
+  const ec = off && prevSk && prevSk !== s.name && s.fx?.find(f => f.t === 'echo'), pk = ec && (a.skills || []).find(k => S.skills[k]?.name === prevSk), ps = pk && effSkill(a, pk);
+  if (ps && !['heal', 'util', 'form', 'passive'].includes(ps.kind) && !ps.limit) { const t = ts.find(x => x.hp > 0 && !x.dead); if (t) { log(a.name, `ECO: ${ps.name} se repete (${ec.p}%).`, 'ok'); more = strike(a, { ...ps, name: ps.name + ' (eco)', fx: (ps.fx || []).filter(f => f.t !== 'turn' && f.t !== 'echo') }, t, null, bonus, { plus, mult: ec.p / 100, nochain: true }) || more; } }
+  delete a.bt.evNow; delete a.bt.ovrNow; delete a.bt.popNow; delete a.bt.rsNow;
+  if (off) S.battle.lastAct = { id: a.id, enemy: a.enemy, el: s.el, t: ts.map(x => x.id) };
   a.lastSk = s.name;
   if (s.summon) summonOf(a, s);
   if (s.back && a.hp > 0) { a.st[s.back] = 3; log(a.name, `paga o preço do poder proibido [${STN[s.back]}]`, 'bad'); }

@@ -14,6 +14,7 @@ import { LEVA6 } from './arvore/leva6.js';
 import { nivelar } from './arvore/nivel.js';
 import { posicionar } from './arvore/posicao.js';
 import { variar } from './arvore/variacoes.js';
+import { reorganizar } from './arvore/ordem.js';
 import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
 import { ARMAS_ARV } from './arvore/armas.js';
 import { SISTEMAS, AURA_SIN, OCULTO_PONTE, MARCIAL_SIST, MARCIAL_LACOS } from './arvore/sistemas.js';
@@ -740,3 +741,4 @@ posicionar(TREE); // arvore/posicao.js: técnicas já usadas pelos jogadores des
 nivelar(TREE); // arvore/nivel.js: evoluções somadas na base e pisos de custo das técnicas fortes
 marcarComandos(TREE); // Leva 4: comandos de ação nos nós que já existiam
 variar(TREE); // arvore/variacoes.js: comandos nos disparos e golpes rápidos e 3 variações por família
+reorganizar(TREE); // arvore/ordem.js: funde ramos curtos e põe cada setor em colunas temáticas (básico perto do centro)

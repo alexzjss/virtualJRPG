@@ -25,10 +25,11 @@ export function parseDom(str, where = '') {
 const kv = (str, where) => Object.fromEntries(String(str).split(';').map(x => x.trim()).filter(Boolean).map(x => { const [k, v] = x.split(/\s+/); if (Number.isNaN(+v)) throw new Error(`valor inválido "${x}" em ${where}`); return [k, +v]; }));
 // converte um nó dos dados para os campos que o servidor usa
 export function expand(o) {
-  const { fx, fm, mod, bon, up, dom, trio, pf, ...rest } = o, w = o.n, C = globalThis.RULES.CMD;
+  const { fx, fm, mod, bon, up, dom, trio, pf, rx, ...rest } = o, w = o.n, C = globalThis.RULES.CMD;
   const out = { ...rest };
   if (fx) out.fx = parseFx(fx, w);
   if (pf) out.pf = parseFx(pf, w);
+  if (rx) out.rx = parseFx(rx, w); // efeito extra quando a Ressonância dispara
   if (o.cmd != null && !C.KINDS.includes(o.cmd)) throw new Error(`cmd inválido "${o.cmd}" em ${w}`);
   if (o.seq != null && !/^[↑↓←→]{3,7}$/.test(o.seq)) throw new Error(`seq inválida "${o.seq}" em ${w}`);
   if (o.rn != null && !C.RUNES.includes(o.rn)) throw new Error(`rn inválido "${o.rn}" em ${w}`);
@@ -343,7 +344,7 @@ export function buildBestiary(make) {
     ['amaterasu', 'Serafim Caído', 'tsukuyomi', 'SAB', 'armR', { arma: -4, hp: .6, nosup: 1 }], ['tsukuyomi', 'Senhor dos Pesadelos', 'amaterasu', 'INT', 'head', { hp: .7 }], ['shukketsu', 'Condessa Escarlate', 'amaterasu', 'INT', 'torso', { hp: 1.2 }], ['hiruko', 'Filho de Hiruko', 'susanoo', 'INT', 'legR']];
   const PN = { head: 'cabeça', torso: 'torso', armL: 'braço esquerdo', armR: 'braço direito', legL: 'perna esquerda', legR: 'perna direita' };
   // chefes não usam dupla, ritual, Despertar nem invocação; dos ramos novos (7-9) só levam ataques e transformações (sem as que aumentam cura), senão o suporte deixa a luta sem fim
-  const solo = s => !s.duo && !s.trio && !s.dom && !s.v2 && !s.circ && !s.aw && !s.summon && !s.form?.m?.heal && (+String(s.br).split('-')[1] < 6 || ['dmg', 'mental', 'form'].includes(s.kind));
+  const solo = s => !s.duo && !s.trio && !s.dom && !s.v2 && !s.circ && !s.aw && !s.summon && !s.form?.m?.heal && ((s.ob ?? +String(s.br).split('-')[1]) < 6 || ['dmg', 'mental', 'form'].includes(s.kind));
   const ray = el => s => solo(s) && (s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back));
   // IA opcional dos chefes (campo `ia`; ausente = só ataques e transformações): dom = abre a Expansão de Domínio 1× por combate (precisa de metade da Aura);
   // defend / focus = chance por turno de Defender (vida < 40%) e de Concentrar Tensão (vida > 50%). Medido em tools/sim.js; ver DECISOES-SISTEMAS.md.
