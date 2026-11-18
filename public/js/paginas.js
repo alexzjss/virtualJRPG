@@ -13,18 +13,22 @@ let skTab = lsGet('vj.skTab', 'no'), skDrawer = true, skMount = null; const skSe
 const slotted = s => s && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
 const FUNC = { dmg: ['Dano', s => ['dmg', 'mental'].includes(s.kind)], ctrl: ['Controle', s => s.kind !== 'passive' && (RULES.CTRL.includes(s.st) || (s.fx || []).some(f => (f.t === 'st' && RULES.CTRL.includes(f.k)) || f.t === 'push' || f.t === 'seal'))],
   supp: ['Suporte', s => s.kind === 'heal' || (s.kind === 'util' && !(s.fx || []).some(f => f.t === 'shield' || f.t === 'guard'))], tank: ['Defesa', s => (s.fx || []).some(f => ['shield', 'guard', 'cleanse'].includes(f.t) || (f.t === 'st' && ['taunt', 'defUp', 'reflect', 'counter', 'evade'].includes(f.k))) || s.mod?.def > 0], pas: ['Passiva', s => s.kind === 'passive'], form: ['Forma', s => s.kind === 'form'] };
-let skAdj = null, skAdjS = null; // ligações da árvore em índices, para achar o caminho mais barato
+let skAdj = null, skAdjS = null; const skDij = new WeakMap(); // ligações da árvore em índices, para achar o caminho mais barato
 function skPath(N, own, mineV, xpOf, target) {
   if (!own.size) return null;
   if (skAdjS !== S.skills || skAdj.length !== N.length) { const ix = new Map(N.map(([id], i) => [id, i])), loose = N.map(([, a]) => !Number.isFinite(a.wx));
     skAdj = N.map(([id, a], i) => [...new Set([...(a.ln || []).map(j => ix.get(j)).filter(j => j != null), ...N.flatMap(([jd, b], j) => j !== i && (loose[i] || loose[j]) && RULES.linked(a, b, id, jd) && (a.el === b.el || a.el === 'fis' || b.el === 'fis') ? [j] : [])])]);
     skAdjS = S.skills; }
-  const idx = new Map(N.map(([id], i) => [id, i])), dist = N.map(() => Infinity), prev = N.map(() => -1), q = [];
-  N.forEach(([id], i) => { if (own.has(id)) { dist[i] = 0; q.push(i); } });
-  while (q.length) { // Dijkstra simples (custo = XP dos nós ainda não aprendidos)
-    q.sort((a, b) => dist[b] - dist[a]); const u = q.pop();
-    for (const v of skAdj[u]) { const [vid, vs] = N[v]; if (!mineV(vs)) continue; const nd = dist[u] + (own.has(vid) ? 0 : xpOf(vs)); if (nd < dist[v]) { dist[v] = nd; prev[v] = u; q.push(v); } }
-  }
+  // as distâncias partem de todos os nós aprendidos e não dependem do alvo: um Dijkstra por renderização (own é novo a cada uma), não um por nó sob o mouse
+  let D = skDij.get(own);
+  if (!D || D.N !== N) { const idx = new Map(N.map(([id], i) => [id, i])), dist = N.map(() => Infinity), prev = N.map(() => -1), h = [], cost = N.map(([id, s]) => own.has(id) ? 0 : mineV(s) ? xpOf(s) : -1);
+    const push = (d, i) => { h.push([d, i]); let k = h.length - 1; while (k) { const p = (k - 1) >> 1; if (h[p][0] <= h[k][0]) break; [h[p], h[k]] = [h[k], h[p]]; k = p; } };
+    const pop = () => { const top = h[0], last = h.pop(); if (h.length) { h[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < h.length && h[l][0] < h[m][0]) m = l; if (r < h.length && h[r][0] < h[m][0]) m = r; if (m === k) break; [h[m], h[k]] = [h[k], h[m]]; k = m; } } return top; };
+    N.forEach(([id], i) => { if (own.has(id)) { dist[i] = 0; push(0, i); } });
+    while (h.length) { const [d, u] = pop(); if (d > dist[u]) continue; // Dijkstra com heap (custo = XP dos nós ainda não aprendidos)
+      for (const v of skAdj[u]) { if (cost[v] < 0) continue; const nd = d + cost[v]; if (nd < dist[v]) { dist[v] = nd; prev[v] = u; push(nd, v); } } }
+    D = { N, idx, dist, prev }; skDij.set(own, D); }
+  const { idx, dist, prev } = D;
   const t = idx.get(target); if (t == null || !isFinite(dist[t])) return null;
   const path = []; let i = t; for (; i >= 0 && dist[i] > 0; i = prev[i]) path.unshift(N[i]);
   return { path, cost: dist[t], from: i >= 0 ? N[i][0] : null };

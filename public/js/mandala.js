@@ -25,7 +25,7 @@
 
   // ---------- desenho ----------
   const cam = M.cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
-  let disp = 'system-ui,sans-serif', pv = null, ac, rot = 0, hg = null, rings = [], core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
+  let disp = 'system-ui,sans-serif', cx0, lv, lx, lused = false, pv = null, ac, rot = 0, hg = null, rings = [], core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
   const hexA = (h, a) => { const v = parseInt((h || '#ffffff').slice(1), 16); return `rgba(${v >> 16},${v >> 8 & 255},${v & 255},${a})`; };
   const col = el => (typeof ELC !== 'undefined' && ELC[el === 'armas' ? 'fis' : el]) || '#ffffff';
   const grp = s => s.br?.startsWith('armas') ? 'armas' : s.el; // a Árvore de Armas é um bloco à parte (el 'fis', sem ligação com o Marcial): ganha o próprio selo
@@ -49,7 +49,7 @@
     stars = []; for (let i = 0; i < 900; i++) stars.push([(Math.random() * 2 - 1) * bound * 1.25, (Math.random() * 2 - 1) * bound * 1.25, Math.random() * 1.5 + .3, Math.random() * TAU]);
     motes = seals.filter(s => s.el !== 'fis').flatMap(s => Array.from({ length: 14 }, () => [s, Math.random() * TAU, Math.random() * s.r, Math.random() * TAU]));
   }
-  const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = devicePixelRatio || 1; W = Math.max(200, r.width); H = Math.max(200, r.height); cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
+  const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = devicePixelRatio || 1; W = Math.max(200, r.width); H = Math.max(200, r.height); if (cv.width === Math.round(W * DPR) && cv.height === Math.round(H * DPR)) return; cv.width = lv.width = Math.round(W * DPR); cv.height = lv.height = Math.round(H * DPR); cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
   let lively = true; // o último quadro tinha algo pulsando na tela (nó disponível, rota ou animação)
   const busy = () => anim.size || o?.route?.length > 1 || lively;
 
@@ -58,11 +58,14 @@
     if (document.hidden) { raf = requestAnimationFrame(draw); return; }
     if (!dirty && now - last < (busy() ? 33 : 100)) { raf = requestAnimationFrame(draw); return; }
     last = now; dirty = false; const T = now / 1000, far = cam.z < LOD; hg = hover && o.skills[hover] ? grp(o.skills[hover]) : null;
-    cx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    // CENSURA TEMPORÁRIA (Hiruko): desenha o que é do ramo Hiruko com blur. Remover junto com public/js/censura-hiruko.js
-    const CENS = 'hiruko', cen = (on) => { cx.filter = on ? 'blur(6px)' : 'none'; }; cen(false);
+    cx = cx0; cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // CENSURA TEMPORÁRIA (Hiruko): o que é do ramo Hiruko vai para uma camada à parte, borrada de uma vez só no fim
+    // (ctx.filter em cada traço custava um blur por operação e travava a mandala). Remover junto com public/js/censura-hiruko.js
+    const CENS = 'hiruko', cen = on => { const to = on ? lx : cx0; if (to === cx) return; if (on && !lused) { lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, lv.width, lv.height); lx.setTransform(DPR, 0, 0, DPR, 0, 0); lused = true; }
+      to.globalAlpha = cx.globalAlpha; to.lineWidth = cx.lineWidth; to.lineCap = cx.lineCap; to.font = cx.font; to.textAlign = cx.textAlign; to.textBaseline = cx.textBaseline; cx = to; };
+    lused = false;
     const bg = cx.createRadialGradient(...w2s(0, 0), 0, ...w2s(0, 0), Math.max(W, H) * .9); bg.addColorStop(0, '#15101c'); bg.addColorStop(1, '#07070d'); cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
-    for (const [sx, sy, r, ph] of stars) { const [x, y] = w2s(sx, sy); if (x < 0 || y < 0 || x > W || y > H) continue; cx.fillStyle = `rgba(210,200,255,${.12 + .2 * Math.sin(T * 1.3 + ph)})`; cx.fillRect(x, y, r, r); }
+    cx.fillStyle = 'rgb(210,200,255)'; for (const [sx, sy, r, ph] of stars) { const x = (sx - cam.x) * cam.z + VW() / 2, y = (sy - cam.y) * cam.z + H / 2; if (x < 0 || y < 0 || x > W || y > H) continue; cx.globalAlpha = .12 + .2 * Math.sin(T * 1.3 + ph); cx.fillRect(x, y, r, r); } cx.globalAlpha = 1;
     // guias do sphere grid: um anel por nível, a divisória Marcial | Armas no centro e as 11 fatias dos setores em volta
     { const [ox, oy] = w2s(0, 0), n = SECN, z = cam.z, rb = (Math.max(...rings, 0) + 70) * z, cr = Math.max(0, core) * z;
       cx.lineWidth = 1; cx.strokeStyle = 'rgba(170,160,230,.08)'; // núcleo: anéis cinza; fora dele cada fatia tem a cor e o padrão do seu patrono
@@ -131,6 +134,7 @@
         if (named && st !== 'own' && st !== 'secret' && mk.xp != null) { cx.fillStyle = mk.poor ? 'rgba(255,120,120,.9)' : hexA(c, .85); cx.font = `${Math.round(Math.min(12, r * .5))}px system-ui,sans-serif`; cx.fillText(mk.xp + ' XP', x, y + r + fs * (lines.length + .9)); } }
       cx.globalAlpha = 1; }
     cen(false);
+    if (lused) { cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.filter = `blur(${6 * DPR}px)`; cx.drawImage(lv, 0, 0); cx.restore(); lused = false; }
     if (pv && hover && pv.ids.length > 1 && P.get(hover)) { const [x, y] = w2s(...P.get(hover)), t = `${pv.ids.length - 1} ${pv.ids.length > 2 ? 'nós' : 'nó'} · ${pv.cost} XP`; cx.font = `600 13px ${disp}`; const w = cx.measureText(t).width + 16; cx.fillStyle = 'rgba(10,8,20,.92)'; cx.strokeStyle = 'rgba(255,211,77,.9)'; cx.lineWidth = 1; cx.fillRect(x - w / 2, y - R * cam.z - 34, w, 22); cx.strokeRect(x - w / 2, y - R * cam.z - 34, w, 22); cx.fillStyle = '#ffd34d'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(t, x, y - R * cam.z - 22); }
     lively = pulse;
     // minimapa
@@ -189,7 +193,7 @@
 
   // monta (ou reencaixa) o canvas em host. opts: { skills, ids, state(id), marks(id), route, mineEls, key, inset, onPick(id), onHover(id, x, y) }
   M.mount = (h, opts) => {
-    if (!cv) { disp = getComputedStyle(document.documentElement).getPropertyValue('--disp').trim() || disp; cv = document.createElement('canvas'); cv.tabIndex = 0; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'Mandala de habilidades: arraste para mover, roda ou + − para o zoom, setas para andar'); cx = cv.getContext('2d'); }
+    if (!cv) { disp = getComputedStyle(document.documentElement).getPropertyValue('--disp').trim() || disp; cv = document.createElement('canvas'); cv.tabIndex = 0; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'Mandala de habilidades: arraste para mover, roda ou + − para o zoom, setas para andar'); cx = cx0 = cv.getContext('2d'); lv = document.createElement('canvas'); lx = lv.getContext('2d'); }
     const rebuild = !o || o.skills !== opts.skills || o.ids.length !== opts.ids.length || o.ids.some((id, i) => id !== opts.ids[i]);
     if (host !== h) { host = h; h.prepend(cv); if (!ro) { ro = new ResizeObserver(resize); wire(); } ro.disconnect(); ro.observe(h); }
     else if (!h.contains(cv)) h.prepend(cv);
