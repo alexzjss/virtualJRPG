@@ -1417,3 +1417,17 @@ test('skUse: conta a skill do herói quando resolve; não conta ataque básico n
   S.battle.ticks[h.id] = -1; H.act(ana, { id: h.id, skill: 'atk', target: e.id }); assert.equal(Object.keys(h.skUse).length, 1);
   assert.equal(e.skUse, undefined);
 });
+test('lore: acerto em fraqueza ou resistência revela só aquele elemento, para todo inimigo do mesmo tipo', () => {
+  reset(); delete S.lore; const h = mk(ana, {}), e = mk(gm, { enemy: true }), e2 = mk(gm, { enemy: true }); e.name = e2.name = 'Golem';
+  e.weak = ['fuhaku', 'indra']; e2.weak = ['fuhaku', 'indra']; e.resist = ['fis']; e2.resist = ['fis'];
+  assert.deepEqual(view(ana).chars[e2.id].weak, []);
+  h.attrs.AGI = 95; e.attrs.AGI = 1; e2.attrs.AGI = 1; h.skills = [sk('Lâmina de Vento')]; h.aura = 50; H.battle(gm, { on: true });
+  fixR(.3, () => H.act(ana, { id: h.id, skill: sk('Lâmina de Vento'), target: e.id }));
+  assert.deepEqual(S.lore?.Golem?.w, ['fuhaku']);
+  const v = view(ana).chars[e2.id]; assert.deepEqual(v.weak, ['fuhaku']); assert.deepEqual(v.resist, []);
+  e2.known = 2; assert.deepEqual(view(ana).chars[e2.id].resist, ['fis']); assert.deepEqual(view(ana).chars[e2.id].weak, ['fuhaku', 'indra']);
+});
+test('lore: golpe de inimigo em herói não grava nada', () => {
+  reset(); delete S.lore; const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.weak = ['fis']; e.attrs.AGI = 95; h.attrs.AGI = 1;
+  H.battle(gm, { on: true }); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: h.id })); assert.equal(Object.keys(S.lore || {}).length, 0);
+});

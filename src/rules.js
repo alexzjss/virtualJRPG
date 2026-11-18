@@ -472,6 +472,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
   const crit = !!o.cx?.crit || r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down, bf = !mental && s.bf > 0 && !!o.cx?.bf; // Black Flash: só no Perfeito do Golpe no tempo
+  if (!a.enemy && t.enemy && (w || t.resist.includes(s.el))) { const L = (S.lore ??= {})[t.tpl || t.name] ??= { w: [], r: [] }, k = w ? 'w' : 'r'; if (!L[k].includes(s.el)) L[k].push(s.el); } // o grupo descobre no acerto, para todo inimigo do mesmo tipo
   a.bt ??= {}; const wu = (s.basic || s.req || s.wpn) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
   if (olho) a.bt.olho = 1;
