@@ -3,6 +3,7 @@ import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
 const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, finPlan, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
+process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: true, force: true }); } catch {} }); // registrado depois do servidor: roda após a última gravação ao sair
 const { TREE } = await import('../tree.js');
 const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);

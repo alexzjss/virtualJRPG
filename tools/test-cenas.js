@@ -5,6 +5,7 @@ import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjcenas-'));
 const { H, S, current, derive, view, handle } = await import('../server.js');
 const { inScene, adopt } = await import('../src/state.js');
+process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: true, force: true }); } catch {} }); // registrado depois do servidor: roda após a última gravação ao sair
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' }, tv = { role: 'table' };
 const reset = () => {
   S.chars = {}; S.log.length = 0; S.reqs = {}; S.auto.pass = false;

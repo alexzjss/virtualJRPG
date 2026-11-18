@@ -19,7 +19,8 @@ async function boot(data, env = {}) {
   }
   child.kill(); return { p, child, failed: true, out: () => out, stop() {} };
 }
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'vjrede-'));
+const tmps = [], tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'vjrede-')); tmps.push(d); return d; };
+process.on('exit', () => { for (const d of tmps) try { fs.rmSync(d, { recursive: true, force: true }); } catch {} }); // as pastas de dados dos servidores de teste não ficam para trás
 const hello = (p, msg) => new Promise(res => { const ws = new WebSocket(`ws://127.0.0.1:${p}`); ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', ...msg }))); ws.on('message', d => { const m = JSON.parse(d); if (m.t === 'err' || m.t === 'state') { ws.close(); res(m); } }); });
 const poke = (p, key) => new Promise(res => { const ws = new WebSocket(`ws://127.0.0.1:${p}`); ws.on('open', () => { ws.send(JSON.stringify({ t: 'hello', role: 'gm', key })); setTimeout(() => { ws.send(JSON.stringify({ t: 'chat', text: 'oi' })); setTimeout(() => { ws.close(); res(); }, 600); }, 200); }); }); // qualquer ação do mestre grava o estado
 const up = (p, headers, body = PNG, type = 'image/png') => fetch(`http://127.0.0.1:${p}/upload`, { method: 'POST', headers: { 'Content-Type': type, ...headers }, body });
