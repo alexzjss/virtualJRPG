@@ -86,7 +86,7 @@ export function buildSkills(sk) {
   // linha de variações (ramo com `de`): sai da técnica base, para fora do centro, uma casa atrás da outra. A 1ª casa é a livre mais próxima da base (até 6 casas), ligada a ela mesmo sem encostar.
   const line = (br, el, label) => { const id = Object.keys(G).find(i => G[i].name === br.de); if (!id) throw new Error('grade: linha sem a técnica ' + br.de); const bx = G[id].gx, by = G[id].gy;
     const a = Math.atan2(by - CY, bx - CX), tx = bx + 2 * Math.cos(a), ty = by + 2 * Math.sin(a); let best = null;
-    for (let x = bx - 6; x <= bx + 6; x++) for (let y = by - 6; y <= by + 6; y++) if (free(x, y)) { const d = (x - tx) ** 2 + (y - ty) ** 2; if (!best || d < best[2]) best = [x, y, d]; }
+    for (const r of [6, 10, 16]) { for (let x = bx - r; x <= bx + r; x++) for (let y = by - r; y <= by + r; y++) if (free(x, y)) { const d = (x - tx) ** 2 + (y - ty) ** 2; if (!best || d < best[2]) best = [x, y, d]; } if (best) break; } // centro lotado: procura mais longe
     if (!best) throw new Error('grade sem espaço para a linha de ' + br.de);
     const mk = o => node(o, el, label ? { br: label } : {}), s0 = put(best[0], best[1], mk(br[0]), [bx, by]);
     return [s0.join(','), ...chain(a * 180 / Math.PI, Math.hypot(bx - CX, by - CY) + 2, br.slice(1).map(mk), null, s0)];

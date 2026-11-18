@@ -62,7 +62,7 @@ for (const n of nodes) {
   if (n.k === 'passive') continue;
   for (const [nome, efeito, rotulo, elemento] of PROMESSAS) {
     if (!nome.test(n.n) || /^Ritual/.test(n.n) || (elemento && n.el === elemento)) continue;
-    const texto = `${fx(n)} ${n.fm || ''} ${n.st || ''} ${n.k} ${n.tg || ''} ${n.summon || ''} ${n.hits || ''}`;
+    const texto = `${fx(n)} ${n.rx || ''} ${n.fm || ''} ${n.st || ''} ${n.k} ${n.tg || ''} ${n.summon || ''} ${n.hits || ''}`;
     if (!efeito.test(texto) && n.k !== 'heal') add('aviso', 'nome promete', n, `o nome sugere ${rotulo}, mas o nó não tem esse efeito`);
   }
 }

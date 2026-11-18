@@ -3,7 +3,7 @@
 Referência das mecânicas que a árvore usa e de como escrever um nó. As regras ficam em `src/rules.js` (combate), `public/rules.js`
 (requisitos, nomes e a descrição mostrada na tela, iguais para servidor e navegador) e `content.js` (montagem da grade).
 
-## Estrutura (1187 nós na base; +82 da Leva 5)
+## Estrutura (1187 nós na base; +82 da Leva 5; 3266 depois da Leva 8)
 
 | Bloco | Ramos | Nós | Acesso |
 |---|---|---|---|
@@ -236,3 +236,26 @@ Os ramos de arma saíram do tronco Marcial para `TREE.armas` (ver ARMAS.md, "Ár
 - **Pisos de custo** (só sobem): formas pela soma de bônus (≥30: 35 XP, atributo 52, 2 nós do ramo; ≥50: 55/56/4; ≥75: 90/60/6 e Despertar do Vínculo); formas com Despertar ≥120 XP; Domínios 150 XP, atributo 62, 6 nós e Despertar; técnicas em dupla ×1,5 e atributo 55; trio 110 XP, atributo 60 e Lâmina da Irmandade; dano direto pelo poder (≥22: 25 XP · ≥30: 40 · ≥40: 50 · ≥60: 70); Conjuração ×1,4, e Conjurar Arma foi para o meio do ramo (45 XP, INT 55, exige Escudo Conjurado).
 - **Posição das técnicas dos jogadores** (`arvore/posicao.js`, roda antes do nivelamento): nível = lugar no ramo (começo perto do centro). As técnicas já aprendidas pelos jogadores vão para o começo do ramo (puxando o `pre`); as conceitualmente fortes (`FORTES`: Domínios, Cólera/Kai/Inconsciência, golpes-assinatura, dupla e trio) vão para o fim. Cada uma ganha uma linha própria (ramo com `de`, montada em `content.js`) que sai dela para fora do centro, com a vizinha nova (`VIZ`) e as variações da Leva 7 em fila; a do Golpe Pesado fica nos treinos e as de Armas ficam no ramo.
 - **Leva 7** (`arvore/variacoes.js`): comandos de ação nos disparos (segurar), Wakaze (runa de espiral) e golpes rápidos (martelar), e 3 variações por família, com elementos de outros Vínculos via `v2`.
+
+## Leva 8: reorganização e ~1000 nós (`arvore/ordem.js`, `arvore/l8.js`, `arvore/leva8*.js`)
+### Reorganização (roda no fim de tree.js)
+- Cada setor dos Vínculos, Aura e Ocultismo virou **5 colunas temáticas** na mandala: 0 Ofensiva (continua a raiz) · 1 Controle e efeitos ·
+  2 Defesa, reações e suporte · 3 Maestria e passivas · 4 Especiais (formas, rituais, duplas, domínios, invocações). Como o ramo `b` continua
+  da ponta do ramo `b-5`, cada coluna vai do básico (perto do centro) ao avançado (na borda). O tema de um ramo é o da maioria dos nós.
+- Ramos de até 5 nós (fora as linhas de variação, `de`) são fundidos no ramo do mesmo tema mais curto do setor.
+- Dentro de cada ramo: do mais barato ao mais caro, o 1º nó fica (raiz ou nome do ramo), os Limites no fim e cada nó depois do próprio `pre`.
+- Marcial: os raios ficam lado a lado por tema. `ob` guarda o índice original do ramo (a montagem dos inimigos usa os ramos 1-6 originais).
+### Mecânicas novas
+| Efeito | Exemplo | O que faz |
+|---|---|---|
+| `echo` | `echo 60` | depois do golpe, repete a técnica usada antes desta (só dano) com P% do poder |
+| `brand` / `pop` | `brand 3` · `pop 1.8` | Marca de Caça (印 狩) no alvo; `pop` a consome: ×M se outro aliado marcou, metade do bônus se foi você |
+| `every` | `every 3 2.2` | a cada N-ésimo uso da técnica na luta, ×M |
+| `ovr` | `ovr` | Sacrifício: sem Aura suficiente, paga o que falta com 2 HP por ponto e o golpe sai +30% |
+| `rs` + `rx` | `rs indra 1.6`, `rx: 'st para 1'` | Ressonância: ×M se o último a agir foi um aliado com técnica daquele Vínculo (`any` = qualquer aliado) no mesmo alvo; `rx` são efeitos extras quando dispara. Em cura e suporte basta o aliado anterior (a cura é multiplicada) |
+### Conteúdo
+- **Marcial (12 ramos):** Manobras, Iaidō, Boxe e Muay Thai, Luta Agarrada, Capoeira, Estilo, Caçada em Grupo, Berserker, Artes do Chi, Ninjutsu, Gun Kata, Canto de Guerra.
+- **Aura (8):** um ramo avançado por categoria, Restrições e Pactos, Aura em Uníssono. **Ocultismo (8):** rituais de Sangue, Conhecimento, Morte e Energia, Contratos, Investigação, Corpo Amaldiçoado, Fim do Mundo.
+- **Cada Vínculo (6):** Ressonância (uma técnica para cada outro Vínculo), Primeiros Passos, Assinatura, Caça (Marca, eco, contador), Guarda, Ascensão (forma com Despertar e Limite).
+- **Variações (`arvore/leva8e.js`):** 4 versões de 44 técnicas existentes na linha de cada uma (rápida, larga/pesada, com elemento de outro Vínculo, com mecânica nova). Na Árvore de Armas, que não tem linhas, entram no ramo logo depois da base.
+- Notação compacta em `arvore/l8.js`: `N('Nome', 'descrição', 'd14/5 a x2', 'fx', {extras})`; `R('FOR', 'CON', ...nós)` dá XP e requisito pelo lugar no ramo.
