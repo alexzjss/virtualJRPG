@@ -10,7 +10,8 @@ const koHold = new Map(), hpPrev = new Map(), stPrev = new Map(), fxMarks = []; 
 let threatUntil = 0, enterUntil = 0;
 const skByName = n => Object.values(S.skills || {}).find(s => s.name === n);
 const fxAdd = (cls, html, ms, style = '') => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; if (style) d.style.cssText = style; fxl.append(d); setTimeout(() => d.remove(), ms); return d; };
-const unitEl = id => document.querySelector(`.p3d .bb[data-tgt="${id}"]`) || app.querySelector(`.unit[data-tgt="${id}"]`) || app.querySelector(`.tok[data-id="${id}"]`);
+const stage3d = () => { const r = document.querySelector('.p3d'); return r && r.style.display !== 'none' ? r : null; }; // o palco 3D do PC (fora do #app), quando visível
+const unitEl = id => (stage3d() && document.querySelector(`.p3d .bb[data-tgt="${id}"]`)) || app.querySelector(`.unit[data-tgt="${id}"]`) || app.querySelector(`.tok[data-id="${id}"]`);
 const fxPos = (el, y = .32) => { const r = el.getBoundingClientRect(); return `left:${r.left + r.width / 2}px;top:${r.top + r.height * y}px;--uw:${r.width}px`; };
 const mark = (sel, cls, ms) => fxMarks.push({ sel, cls, until: performance.now() + ms });
 const face = c => c?.img ? `<img src="${esc(c.img)}" alt="">` : `<span>${c ? esc(c.enemy ? KANJI[mainEl(c)] : c.name.slice(0, 1).toUpperCase()) : ''}</span>`;
@@ -97,7 +98,7 @@ function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CH
 }
 function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do ataque, contra-ataque, Choque e Black Flash
   const grade = acts.find(e => e.fx.cg), bf = acts.find(e => e.fx.bf), ctr = acts.find(e => e.fx.ctr), chq = acts.find(e => e.fx.chq);
-  if (bf) { if (stage && !calm()) stage.classList.add('shake'); seal('bf', 'BLACK FLASH!'); }
+  if (bf) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 450); } seal('bf', 'BLACK FLASH!'); }
   else if (grade) seal(grade.fx.cg, (RULES.CMD.GRADE_NAME[grade.fx.cg] || '') + '!');
   if (ctr) setTimeout(() => seal('ctr', 'CONTRA!'), 250);
   if (chq) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 400); } seal('chq', 'CHOQUE!'); }
@@ -107,14 +108,14 @@ function impact(acts) {
   if (big) { cutscene(a, f0); setTimeout(() => strikeFx(acts, f0, a), 1050); } else strikeFx(acts, f0, a);
 }
 function strikeFx(acts, f0, a) {
-  const stage = app.querySelector('.stage');
+  const old = app.querySelector('.stage'), stage = old || stage3d();
   if (f0.s && stage && !f0.dom) { fxl.querySelector('.callout')?.remove(); // faixa com o nome da ação
     fxAdd(`callout ${a?.enemy ? 'foe' : ''}`, `<div><small>${esc(a?.name || '')}</small><b>${esc(f0.s)}</b></div>`, 1150, `--fx:${ELC[f0.el] || '#e4002b'}`); }
-  if (stage && !f0.dom) { cine = { ids: [...new Set([f0.a, ...acts.map(e => e.fx.id)].filter(Boolean))], until: performance.now() + 1300 }; applyCine(true); setTimeout(() => applyCine(true), 1350); }
+  if (old && !f0.dom) { cine = { ids: [...new Set([f0.a, ...acts.map(e => e.fx.id)].filter(Boolean))], until: performance.now() + 1300 }; applyCine(true); setTimeout(() => applyCine(true), 1350); }
   const au = f0.a && unitEl(f0.a);
   if (au && !f0.dom) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); au.classList.add(f0.el && f0.el !== 'fis' || f0.heal ? 'cast' : 'lunge'); }
   const crit = acts.find(e => e.fx.crit), weak = acts.find(e => e.fx.w);
-  if (crit && stage) stage.classList.add('shake');
+  if (crit && stage) { stage.classList.add('shake'); if (!old) setTimeout(() => stage.classList.remove('shake'), 450); }
   comandoFx(acts, stage);
   if (crit || weak) setTimeout(() => cutIn(crit ? 'crit' : 'weak', a, S.chars[(crit || weak).fx.id]), 180);
   if (f0.dom) return;
@@ -151,7 +152,7 @@ function results(e) { // fim da batalha: XP, ouro, espólios e o que cada herói
   document.body.append(d); sfxc('win'); setTimeout(() => d.remove(), 14000);
 }
 function fxState() { // reaplica o que um redesenho apagaria: KO adiado, palco ameaçador, abertura e marcas temporárias
-  const now = performance.now(), st = app.querySelector('.stage');
+  const now = performance.now(), st = app.querySelector('.stage') || stage3d();
   st?.classList.toggle('threat', now < threatUntil); st?.classList.toggle('enter', now < enterUntil);
   for (const [id, until] of koHold) { if (now > until) { koHold.delete(id); continue; } document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.remove('ko'); }
   for (let i = fxMarks.length - 1; i >= 0; i--) { const m = fxMarks[i]; if (now > m.until) { fxMarks.splice(i, 1); continue; } document.querySelectorAll(m.sel).forEach(el => el.classList.add(m.cls)); }

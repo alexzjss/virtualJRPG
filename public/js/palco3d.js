@@ -120,7 +120,7 @@
 
   P.sync = h => {
     if (typeof document === 'undefined') return;
-    if (!h) { if (root) root.style.display = 'none'; return; }
+    if (!h) { if (root) { root.style.display = 'none'; for (const u of els.values()) u.el.remove(); els.clear(); camKey = ''; } return; } // fim da batalha: some com os recortes (nada de alvo velho para os efeitos)
     ensure(); mount(h); scene(); camera(units());
     requestAnimationFrame(place); clearTimeout(settle); settle = setTimeout(place, 400); // a página ainda anima a entrada (a posição final só vem depois)
   };
