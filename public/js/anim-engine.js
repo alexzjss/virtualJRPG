@@ -10,6 +10,8 @@
   const ELS = g.ANIM_PROFILES.PALETTES;
   const defaults = { quality: localStorage.getItem('vj_anim_quality') || 'auto', speed: +(localStorage.getItem('vj_anim_speed') || 1), flashes: localStorage.getItem('vj_anim_flash') !== '0' };
   let dpr = 1, W = 0, H = 0, raf = 0, last = 0, fps = 60, autoLow = false, effects = [], persist = [], seq = 0, mA = 1;
+  const clockNow = () => typeof g.CENA !== 'undefined' ? g.CENA.now() : performance.now(); // tempo virtual: hitstop e câmera lenta valem para o canvas
+  const later = ms => typeof g.CENA !== 'undefined' ? g.CENA.wait(ms) : new Promise(res => setTimeout(res, ms));
   const reduced = () => matchMedia('(prefers-reduced-motion:reduce)').matches;
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const rnd = n => { n |= 0; n = Math.imul(n ^ n >>> 16, 0x21f0aaad); n = Math.imul(n ^ n >>> 15, 0x735a2d97); return ((n ^ n >>> 15) >>> 0) / 4294967296; };
@@ -158,18 +160,18 @@
   }
   function frame(now) {
     raf = 0; resize(); if (last) { const inst = 1000 / Math.max(1, now - last); fps = fps * .94 + inst * .06; if (defaults.quality === 'auto') autoLow = fps < 43 ? true : fps > 56 ? false : autoLow; } last = now;
-    ctx.clearRect(0, 0, W, H); drawPersistent(now);
-    effects = effects.filter(e => { drawOne(e, now); return now < e.start + e.profile.duration; });
+    const vt = clockNow(); ctx.clearRect(0, 0, W, H); drawPersistent(vt);
+    effects = effects.filter(e => { drawOne(e, vt); return vt < e.start + e.profile.duration; });
     if (effects.length || persist.length) raf = requestAnimationFrame(frame);
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   function play({ actorId, targetIds = [], skill, fx = {}, delay = 0 } = {}) {
-    const aid = actorId || fx.a, P = profile(skill || skillByName(fx.s), fx), ar = rect(aid), a = point(aid, ar, P.origin), ids = [...new Set(targetIds.filter(Boolean))], targets = ids.length ? ids : [fx.id].filter(Boolean), start = performance.now() + delay;
+    const aid = actorId || fx.a, P = profile(skill || skillByName(fx.s), fx), ar = rect(aid), a = point(aid, ar, P.origin), ids = [...new Set(targetIds.filter(Boolean))], targets = ids.length ? ids : [fx.id].filter(Boolean), start = clockNow() + delay;
     try { if (typeof tone === 'function') { const f = NOTE[P.el] || 220, beam = P.family === 'beam' || P.family === 'ritual'; tone(f, Math.min(.5, P.duration / 1000), { type: beam ? 'sawtooth' : P.family === 'heal' ? 'sine' : 'triangle', to: beam ? f * 2 : P.family === 'projectile' ? f * 1.5 : 0, g: .035 + P.tier * .012 }); if (['smash', 'area', 'rain'].includes(P.family) && typeof thud === 'function') thud(.18, 180 + P.tier * 90, .16 + P.tier * .05, 'lowpass', P.duration * P.impact / 1000); } } catch {}
     const list = (targets.length ? targets : ['']).map((id, i) => { const tr = rect(id), b = targetPoint(tr), p = { ...P, seed: P.seed + i * 997, duration: P.duration + i * 40 }; return { id: ++seq, start: start + i * 40, from: a, to: b, footA: footPoint(ar), footB: footPoint(tr), sa: scaleOf(ar), sb: scaleOf(tr), profile: p }; });
     effects.push(...list); kick();
     const impactMs = Math.round(P.duration * P.impact + delay), doneMs = Math.round(P.duration + delay);
-    return { profile: P, impact: new Promise(res => setTimeout(res, impactMs)), done: new Promise(res => setTimeout(res, doneMs)) };
+    return { profile: P, impact: later(impactMs), done: later(doneMs) };
   }
   function sync() {
     const B = g.S?.battle; if (!B?.active) { persist = []; return; }

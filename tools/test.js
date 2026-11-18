@@ -1585,3 +1585,11 @@ test('animações: cura, área, ritual e sobrescrita do mestre usam famílias pr
   assert.equal(AP.familyOf({ name: 'Ritual do Vazio', kind: 'dmg' }), 'ritual');
   assert.equal(AP.familyOf({ name: 'Qualquer nome', kind: 'dmg', anim: 'musical' }), 'musical');
 });
+test('CENA: tempo virtual com congelamento e câmera lenta', async () => {
+  await import('../public/js/cena-tempo.js'); const C = globalThis.CENA;
+  assert.equal(C.virtualAt(150, []), 150);
+  assert.equal(C.virtualAt(150, [{ t0: 0, t1: 100, f: 0 }]), 50);
+  assert.equal(C.virtualAt(200, [{ t0: 0, t1: 100, f: .5 }, { t0: 50, t1: 150, f: 0 }]), 75); // sobreposição: vale o menor fator
+  let prev = -1; for (let r = 0; r <= 300; r += 7) { const v = C.virtualAt(r, [{ t0: 20, t1: 90, f: 0 }, { t0: 60, t1: 200, f: .3 }]); assert.ok(v >= prev); prev = v; }
+  C.reset(); assert.equal(C.factor(), 1);
+});
