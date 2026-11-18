@@ -127,10 +127,50 @@ export function buildSkills(sk) {
     b ? chain(deg, 10, nodes, anchor) : forked(deg, 10, nodes, anchor, false);
   }
   zone = null; CX = C; CY = C;
-  // posição na mandala (wx, wy): a própria grade em escala, centrada no núcleo Marcial. Apertar as pétalas em direção ao eixo cruzaria
-  // nós de setores vizinhos que se invadem na grade; a forma de pétala vem das ligações (ln), que são o que o mapa desenha.
-  for (const s of Object.values(G)) { s.wx = (s.gx - C) * MANDALA_U; s.wy = (s.gy - C) * MANDALA_U; }
+  ringLayout(G);
   return G;
+}
+// Posição na mandala (wx, wy): anéis concêntricos, como um sphere grid. O centro é dividido ao meio: Marcial na metade esquerda, Armas na direita.
+// Em volta ficam os 11 setores, cada um numa fatia igual. O anel de um nó é a distância dele (em ligações) à raiz do seu grupo, então cada anel é um nível de
+// profundidade. As ligações (ln) não mudam: só o desenho. Dentro do anel, cada nó fica perto do ângulo dos pais, e um varrimento afasta os que se encostam.
+function ringLayout(G) {
+  const SP = 104, GAP = 112, TAU = Math.PI * 2, SEC = TAU / ORDER.length, HALF = Math.PI * .94, WEDGE = SEC * .9;
+  const grp = s => s.br?.startsWith('armas') ? 'armas' : s.el === 'fis' ? 'marcial' : s.el;
+  const by = {}, dep = {}, ang = {}, rad = {}, par = {}, kids = {}, ang0 = {}, rootsOf = {};
+  for (const [id, s] of Object.entries(G)) (by[grp(s)] ||= []).push(id);
+  for (const [g, ids] of Object.entries(by)) { // anel de cada nó = ligações até a raiz (o centro Marcial, a raiz do setor ou as raízes das armas)
+    const set = new Set(ids), roots = g === 'marcial' ? ['g0'] : ids.filter(i => G[i].open), q = [...roots];
+    roots.forEach(r => dep[r] = 0);
+    for (let k = 0; k < q.length; k++) for (const j of G[q[k]].ln || []) if (set.has(j) && dep[j] == null) { dep[j] = dep[q[k]] + 1; par[j] = q[k]; (kids[q[k]] ||= []).push(j); q.push(j); }
+    rootsOf[g] = roots;
+    for (const i of ids) if (dep[i] == null) dep[i] = 0;
+  }
+  const ring = id => grp(G[id]) === 'armas' ? dep[id] + 1 : dep[id]; // no centro as armas começam um anel fora do núcleo
+  const count = (ids, fn) => { const c = []; for (const i of ids) c[fn(i)] = (c[fn(i)] || 0) + 1; return c; };
+  const cm = count(by.marcial, ring), ca = count(by.armas, ring), K = Math.max(cm.length, ca.length), rc = [0];
+  for (let k = 1; k < K; k++) rc[k] = Math.max(rc[k - 1] + GAP, Math.max(cm[k] || 0, ca[k] || 0) * SP / HALF);
+  const Rc = rc[K - 1], sec = ORDER.filter(el => by[el]), D = Math.max(...sec.flatMap(el => by[el].map(i => dep[i]))) + 1, rs = [];
+  for (let d = 0; d < D; d++) rs[d] = Math.max(d ? rs[d - 1] + GAP : Rc + GAP * 1.5, Math.max(...sec.map(el => count(by[el], i => dep[i])[d] || 0)) * SP / WEDGE);
+  const place = (ids, r, lo, hi, mid) => { // um anel de um grupo: ângulo ideal = média dos pais; o varrimento respeita o espaço mínimo entre esferas
+    const gap = SP / r, want = id => ang0[id] ?? mid;
+    const L = ids.map(id => [id, want(id)]).sort((p, q) => p[1] - q[1] || parseInt(p[0].slice(1)) - parseInt(q[0].slice(1))), pos = [];
+    L.forEach(([, w], i) => pos[i] = Math.max(Math.min(Math.max(w, lo), hi), i ? pos[i - 1] + gap : lo));
+    for (let i = L.length - 1; i >= 0; i--) pos[i] = Math.min(pos[i], i < L.length - 1 ? pos[i + 1] - gap : hi);
+    L.forEach(([id], i) => { ang[id] = pos[i]; rad[id] = r; });
+  };
+  const run = (ids, radius, lo, hi, mid, fn) => { const b = []; ids.forEach(i => (b[fn(i)] ||= []).push(i)); b.forEach((l, k) => l && place(l, radius(k), lo, hi, mid)); };
+  const m = .05, wt = {}, weigh = id => wt[id] ??= 1 + (kids[id] || []).reduce((a, k) => a + weigh(k), 0);
+  // leque da árvore: cada nó recebe uma fatia do ângulo do pai proporcional ao tamanho do seu ramo, então os ramos se espalham pela fatia sem se cruzar
+  const fan = (list, lo, hi) => { const tot = list.reduce((a, k) => a + weigh(k), 0); let x = lo;
+    for (const k of list) { const w = (hi - lo) * weigh(k) / tot; ang0[k] = x + w / 2; fan(kids[k] || [], x, x + w); x += w; } };
+  const span = { marcial: [Math.PI / 2 + m, Math.PI * 1.5 - m], armas: [-Math.PI / 2 + m, Math.PI / 2 - m] };
+  ORDER.forEach((el, i) => span[el] = [i * SEC - WEDGE / 2, i * SEC + WEDGE / 2]);
+  for (const g of Object.keys(by)) { const [lo, hi] = span[g], roots = g === 'marcial' ? kids.g0 || [] : rootsOf[g]; fan(roots, lo, hi); }
+  rad.g0 = 0; ang.g0 = Math.PI;
+  run((by.marcial || []).filter(i => i !== 'g0'), k => rc[k], Math.PI / 2 + m, Math.PI * 1.5 - m, Math.PI, ring);
+  run(by.armas || [], k => rc[k], -Math.PI / 2 + m, Math.PI / 2 - m, 0, ring);
+  sec.forEach(el => { const c = ORDER.indexOf(el) * SEC; run(by[el], d => rs[d], c - WEDGE / 2, c + WEDGE / 2, c, i => dep[i]); });
+  for (const [id, s] of Object.entries(G)) { s.wx = Math.round(rad[id] * Math.cos(ang[id])); s.wy = Math.round(rad[id] * Math.sin(ang[id])); }
 }
 // unidades de mundo por casa da grade (a esfera tem raio 24; sobra espaço para o nome em duas linhas)
 export const MANDALA_U = 96;
