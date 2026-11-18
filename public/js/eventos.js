@@ -96,6 +96,8 @@ app.addEventListener('click', e => {
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
   if (d.a === 'pick') { pick = { k: d.k, id: d.v }; return render(); }
+  if (d.a === 'skPinT') { const ch = S.chars[d.id]; return send({ t: 'skPin', id: d.id, sk: d.v, on: !ch?.skPin?.includes(d.v) }); }
+  if (d.a === 'skQx') { skQ = ''; return render(); }
   if (d.a === 'ofiUse') { const u = oUi[d.node] || {}; return send({ t: 'ofiUse', id: d.id, node: d.node, item: u.item, rune: u.rune, el2: u.el2, sig: u.sig, nm: u.nm, target: u.target, part: u.part }); }
   if (d.a?.startsWith('oc') && gm) return ocClick(d);
   if (d.a?.startsWith('wf') && gm) return wfClick(d);
@@ -248,11 +250,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();
     else if (gm && gui.sheet) gEsc(); // a ficha aberta (janela por cima de tudo) fecha primeiro
-    else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (aim) aim = null;
+    else if (rollDlg) rollDlg = null; else if (meOpen) meOpen = false; else if (gridFull) gridFull = null; else if (ctx) ctx = null; else if (skQ && sub === 'sk') skQ = ''; else if (aim) aim = null;
     else if (gm) gEsc(); // fecha a ficha aberta ou encolhe o painel largo
     return render();
   }
   if (e.target.matches('input,textarea,select')) return;
+  if (!gm && S.battle.active && sub === 'sk' && innerWidth > 700 && skKey(e)) { e.preventDefault(); return; } // seletor de skills: filtro por letras e Shift+F fixa
   if (gm && (e.key === 'Enter' || e.key === 'Delete')) { const first = Object.entries(S.reqs).sort((a, b) => a[1].n - b[1].n)[0]; if (first) { e.preventDefault(); return send(e.key === 'Enter' ? { t: 'reqOk', id: first[0], ...reqUi[first[0]] } : { t: 'reqNo', id: first[0] }); } }
   if (e.key === 'Enter' && !gm && S.battle.active) { const go = app.querySelector('.cmd.mine .cmd-go .go:not(:disabled)'); if (go && !e.target.matches('button')) { e.preventDefault(); go.click(); return; } } // na sua vez, Enter age
   if (e.key === 'Enter') { const c = app.querySelector('.chat'); if (c) { e.preventDefault(); c.focus(); } return; }

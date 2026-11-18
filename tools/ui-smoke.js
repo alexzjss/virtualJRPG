@@ -188,13 +188,13 @@ try {
     await shot(pg, 'ataque-total');
   });
 
-  await section('armas: aba Arma do jogador e ataque básico pela arma', async () => {
+  await section('armas: técnicas da arma no grupo Arma de Skills e ataque básico pela arma', async () => {
     for (const f of [bossCh, minion]) { delete f.st.down; delete f.st.broken; } push();
     check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia');
     check(/DES/.test(await txt(bia, '.alist .opt')), 'Atacar: o ataque do revólver deveria mostrar DES');
-    await click(bia, '.cmd [data-sub=wp]', 'aba Arma');
-    await until(async () => /Leque do Pistoleiro/i.test(await txt(bia, '.alist')), 'técnica do Revólver .38 na aba Arma'); // o CSS põe em maiúsculas
-    await click(bia, '.alist .opt[data-a=pick]', 'técnica da arma'); await tgBtn(bia, minion.id).click();
+    await click(bia, '.cmd [data-sub=sk]', 'aba Skills'); // no PC a Arma é um grupo dentro de Skills
+    await until(async () => /Leque do Pistoleiro/i.test(await txt(bia, '.alist')), 'técnica do Revólver .38 no grupo Arma de Skills');
+    await click(bia, '.alist .opt[data-v^="w:"]', 'técnica da arma'); await tgBtn(bia, minion.id).click();
     await shot(bia, 'arma');
     const n = S.seq; await click(bia, '.cmd-go .go', 'Agir com a técnica da arma');
     await until(() => S.log.slice(-6).some(l => /Leque do Pistoleiro/.test(l.text)), 'técnica da arma executada');
@@ -204,7 +204,7 @@ try {
     const torre = Object.keys(S.items).find(k => S.items[k].name === 'Escudo de Torre'), violino = Object.keys(S.items).find(k => S.items[k].name === 'Violino');
     thomas.inv[torre] = 1; thomas.equip.arma = torre; mikhail.inv[violino] = 1; mikhail.equip.arma = violino; push();
     check(toTurn(mikhail.id), 'vez da Mikhail'); await until(() => vis(bia, '.cmd.mine'), 'turno da Bia');
-    await click(bia, '.cmd [data-sub=wp]', 'aba Arma do violino');
+    await click(bia, '.cmd [data-sub=sk]', 'Skills com o violino');
     await until(async () => /Melodia de Coragem/i.test(await txt(bia, '.alist')), 'violino básico mostra a técnica de grupo (a 2ª vem nas categorias acima de básica)');
     await bia.locator('.cmd [data-sub=""]').first().click().catch(() => bia.locator('.cmd [data-sub=atk]').first().click().catch(() => {}));
     await shot(bia, 'instrumento');
