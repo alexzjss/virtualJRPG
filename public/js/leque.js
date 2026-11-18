@@ -72,8 +72,9 @@ const LEQUE = (() => {
       else if (mode === 'menu' && state.sel > 0) return null; // Skills/Itens no menu ainda não escolheram nada
       const haste = s?.fx?.find(f => f.t === 'haste' && f.to === 'self');
       const fraco = !!(s && s.power > 0 && ['dmg', 'mental'].includes(s.kind) && t?.enemy !== c.enemy && t?.weak?.includes(s.el)); // só a fraqueza que o jogador já vê
-      const dly = Math.round(delay(c) / (c.boss ? 2 : 1)); // delay() (nucleo.js) espelha o de src/rules.js:103 sem os modificadores de passivas
-      return { actor: c, name, cost: Math.round(dly * Math.round(ct * (haste ? 1 - haste.v / 100 : 1) * (fraco ? .75 : 1)) / 100) };
+      const dly = c.dly ?? Math.round(delay(c) / (c.boss ? 2 : 1)); // dly: delay() do servidor (src/net.js, com passivas); a conta local é só reserva
+      const debt = (c.brv || 0) < 0 ? Math.round(dly * -c.brv * .5) : 0; // dívida de Coragem atrasa mais (endTurn)
+      return { actor: c, name, cost: Math.round(dly * Math.round(ct * (haste ? 1 - haste.v / 100 : 1) * (fraco ? .75 : 1)) / 100) + debt };
     },
     // clicar num inimigo fora da mira dá zoom nele (de novo, sai)
     zoomClick(id) { const c = S.chars[id]; if (!cx || state.mode === 'aim' || !c?.enemy || c.hp <= 0 || !(id in S.battle.ticks)) return false; if (cx.my) { tgt = id; aim = null; } setZoom(PALCO3D.local.zoom === id ? null : id); return true; },

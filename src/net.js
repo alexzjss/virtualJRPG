@@ -11,9 +11,9 @@ import crypto from 'crypto';
 import { AUD, DATA, GM, IMG, KEY, MIME, OF, PORT, PORTAL, PUB, SEA, UP, VEND, seaMod } from './config.js';
 import { UPMAX, blocked, checkUser, clean, dirSize, flood, ipOf, magic, penalize, same } from './auth.js';
 import { ATTRS, PARTS, PL } from './consts.js';
-import { S, log, save } from './state.js';
-import { SK, modsOf, breakCheck, can, current, int, ofiSync, order, prep, reseat, rid, scene, usable } from './rules.js';
-import { H, NOUNDO, undoStack } from './handlers.js';
+import { S, inScene, log, newScene, save } from './state.js';
+import { SK, modsOf, breakCheck, delay, can, current, int, ofiSync, order, prep, reseat, rid, scene, usable } from './rules.js';
+import { H, NOUNDO, undoPush } from './handlers.js';
 import { nodeOf } from './oficios.js';
 
 
@@ -98,7 +98,7 @@ server.headersTimeout = 20e3; server.requestTimeout = 600e3; // conexões que nu
 const wss = new WebSocketServer({ server, maxPayload: 65536, perMessageDeflate: { threshold: 1024, concurrencyLimit: 4 } }); // o estado tem ~200 KB de JSON repetitivo: comprimido pesa bem menos pelo túnel
 wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('error')
 
-const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
+const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, battle: undefined, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
 // cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
 // jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
 // fraquezas do inimigo para jogadores: Identificar revela tudo; o acerto revela só o elemento usado (S.lore, por tipo)
@@ -107,14 +107,42 @@ const scrub = ch => { const k = 100 / (ch.hpMax || 1), L0 = S.lore?.[ch.tpl || c
 const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
 // `cm`: os modificadores dos comandos de ataque de cada técnica com comando (janelas, golpes extras…), para a tela desenhar o minigame certo
 const cmOf = ch => Object.fromEntries((ch.skills || []).filter(k => S.skills[k]?.cmd).map(k => { const m = modsOf(ch, S.skills[k]); return [k, { cw: m.cw, cp: m.cp, mx: m.mx, cz: m.cz, ma: m.ma, rit: m.rit, rn: m.rn, bf: m.bf }]; }));
-const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined, cm: cmOf(ch) }]));
+// `dly`: o atraso real do herói (delay() com passivas, forma, Marca, Domínio…), para a prévia de onde ele volta na ordem
+const heroOut = ch => ({ ...ch, gmNote: undefined, cm: cmOf(ch), dly: delay(ch) });
+const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : heroOut(ch)]));
 let net = { status: 'off', url: '', code: '', msg: 'Túnel desligado.' }; // situação do túnel, só para o mestre (não é salva)
 const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => `http://${i.address}:${PORT}`);
 // contas de jogador com a tela aberta agora (em minúsculas), só para o mestre: o leque dele recolhe a vez de quem está presente
 const onlineAccts = () => [...new Set([...wss.clients].filter(o => o.role === 'player' && o.acct && o.readyState === 1).map(o => String(o.acct).toLowerCase()))];
-const view = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...ch, cm: cmOf(ch) }])), users: undefined, accounts: Object.keys(S.users).sort(), online: onlineAccts(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
+// ---------- cenas separadas: cada cliente vê a cena dele ----------
+const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
+// cena de um cliente: mestre = foco; TV = a cena escolhida para ela; jogador = a do herói ativo (null = fora de cena; sem heróis = foco)
+const sceneOfClient = c => {
+  if (c.role === 'gm') return S.focus;
+  if (c.role === 'table') return okSc(S.tv) ? S.tv : S.focus;
+  const mine = Object.values(S.chars).filter(ch => !ch.enemy && !ch.summon && ch.owner === c.name), h = mine.find(ch => ch.id === c.hero) || mine.find(ch => okSc(ch.scene)) || mine[0];
+  return !h ? S.focus : okSc(h.scene) ? h.scene : null;
+};
+// cena em que uma mensagem acontece: a do personagem dela; sem personagem, a do cliente
+const sceneOfMsg = (c, m) => { const ch = S.chars[m?.id]; if (ch && (c.role === 'gm' || can(c, ch) || ch.enemy)) return okSc(ch.scene) ? ch.scene : ch.enemy ? S.focus : null; return sceneOfClient(c); };
+const OFF0 = 'Seu personagem está em outro lugar por enquanto. Aguarde o mestre chamar você de volta.';
+const viewIn = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...heroOut(ch), gmNote: ch.gmNote }])), users: undefined, accounts: Object.keys(S.users).sort(), online: onlineAccts(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
    { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),
-  log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
+  log: S.log.filter(e => (!e.to || (c.name && (e.to === c.name || e.from === c.name))) && (!e.sc || e.sc === S.scene)) };
+const view = c => {
+  const sid = sceneOfClient(c);
+  if (sid === null) { // fora de cena: só a tela de espera (sem mapa, sem inimigos, sem batalha)
+    const v = inScene(S.focus, () => viewIn(c)), mine = new Set(Object.values(S.chars).filter(ch => !ch.enemy && ch.owner === c.name).map(ch => ch.id));
+    return { ...v, scene: '_off', battle: { active: false, ticks: {}, order: [] }, scenes: { _off: newScene('Fora de cena') }, off: S.offMsg || OFF0,
+      chars: Object.fromEntries(Object.entries(v.chars).filter(([id, ch]) => !ch.enemy && (mine.has(id) || ch.scene === null))), log: v.log.filter(e => !e.sc) };
+  }
+  return inScene(sid, () => {
+    const v = viewIn(c);
+    v.scene = S.scene; v.battle = S.battle; // ponteiros não enumeráveis: o {...S} não os copia
+    if (c.role !== 'gm') v.scenes = Object.fromEntries(Object.entries(v.scenes).map(([k, sc]) => [k, k === S.scene ? sc : { name: sc.name }])); // das outras cenas, só o nome (destino das saídas)
+    return v;
+  });
+};
 // As definições de skills e itens são ~85% do estado e quase nunca mudam: vão numa mensagem à parte ("defs"), só para quem ainda
 // não tem a versão atual. O resto ("state") segue a cada mudança, bem mais leve pelo túnel.
 let defs = { v: 0, json: '' }, defsDirty = true;
@@ -164,25 +192,43 @@ const battleWatch = () => {
   const B = S.battle; if (!B.active) return;
   const all = Object.keys(B.ticks).map(k => S.chars[k]).filter(Boolean), foes = all.filter(o => o.enemy), pcs = all.filter(o => !o.enemy);
   const end = foes.length && foes.every(o => o.hp <= 0) ? 'won' : pcs.length && pcs.every(o => o.hp <= 0) ? 'lost' : '';
-  if (end && B.end !== end) log('Sistema', end === 'won' ? 'Todos os inimigos caíram. Clique em "Vitória" para distribuir as recompensas.' : 'Todos os heróis estão caídos.', end === 'won' ? 'ok' : 'bad', { to: GM });
+  const where = Object.values(S.scenes).filter(sc => sc.battle?.active).length > 1 ? ` (${scene().name})` : '';
+  if (end && B.end !== end) log('Sistema', (end === 'won' ? 'Todos os inimigos caíram. Clique em "Vitória" para distribuir as recompensas.' : 'Todos os heróis estão caídos.') + where, end === 'won' ? 'ok' : 'bad', { to: GM });
   B.end = end;
 };
 const push = () => {
-  try { ofiSync(); Object.values(S.chars).forEach(breakCheck); prep(); reseat(); pruneReqs(); usable(); battleWatch(); S.battle.order = S.battle.active ? order() : []; } catch (e) { console.error('Falha ao preparar o estado:', e); }
+  try {
+    ofiSync(); pruneReqs();
+    // cada personagem é preparado dentro da cena dele (fichas, bloqueios e fila leem a batalha daquela cena)
+    const groups = new Map(Object.keys(S.scenes).map(k => [k, []])); groups.set(null, []);
+    for (const ch of Object.values(S.chars)) groups.get(okSc(ch.scene) ? ch.scene : null).push(ch);
+    for (const [sid, list] of groups) inScene(sid, () => { list.forEach(breakCheck); prep(list, false); reseat(list); usable(list); if (sid !== null) { battleWatch(); S.battle.order = S.battle.active ? order() : []; } });
+    prep([], true);
+  } catch (e) { console.error('Falha ao preparar o estado:', e); }
   defsDirty = true;
   wss.clients.forEach(c => { try { sendState(c); } catch (e) { console.error('Falha ao enviar o estado:', e.message); } });
   save();
 };
 // executa uma mensagem de cliente; pedidos de jogador que exigem aprovação entram na fila em vez de acontecer
+// heróis fora de cena não andam nem agem no mapa ou na batalha (ficha, inventário e ofícios fora de batalha continuam)
+const OFFSTAGE = new Set(['move', 'act', 'defend', 'focus', 'allOut']);
+// conversa não pertence a uma cena: roda sem contexto (não ganha a marca de cena no histórico)
+const NOSCENE = new Set(['chat']);
 function handle(c, m) {
   if (typeof m.t !== 'string' || !Object.hasOwn(H, m.t)) return;
-  if (c.role === 'gm' && !NOUNDO.has(m.t)) { undoStack.push(JSON.stringify({ ...S, log: undefined, users: undefined })); if (undoStack.length > 20) undoStack.shift(); }
+  const ch0 = S.chars[m.id];
+  if (ch0 && !ch0.enemy && ch0.scene === null && OFFSTAGE.has(m.t) && c.role !== 'gm') return;
+  const sid = NOSCENE.has(m.t) ? null : sceneOfMsg(c, m);
+  inScene(sid, () => handleIn(c, m, sid));
+}
+function handleIn(c, m, sid) {
+  if (c.role === 'gm' && !NOUNDO.has(m.t)) undoPush(S.scene);
   const cat = c.role === 'player' && !c.ctl ? gateOf(m) : null;
   if (cat && !S.auto[cat]) { // vira um pedido (um por jogador: o novo substitui o anterior)
     const ch = S.chars[m.id];
     if (!can(c, ch) || (cat === 'act' && !(S.battle.active && current() === ch.id))) return;
     for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
-    S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq,
+    S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq, sc: sid,
       m: { node: m.node, rec: m.rec, rune: m.rune, el2: m.el2, sig: m.sig, nm: m.nm, part: m.part, part2: m.part2, id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
     return push();
   }
@@ -207,7 +253,7 @@ const reqText = m => { // frase curta que o mestre lê na fila
   const V = { use: 'usar', equip: ch?.equip[i?.type] === m.item ? 'tirar' : 'equipar', drop: 'descartar', buy: `comprar (${i?.price} ouro)`, sell: `vender (${Math.floor((i?.price || 0) / 2)} ouro)`, forge: 'forjar' };
   return `${V[m.t]} ${i?.name || '?'}${m.t === 'use' && tg && tg !== ch ? ' em ' + tg.name : ''}`;
 };
-const pruneReqs = () => { for (const [id, r] of Object.entries(S.reqs)) { const ch = S.chars[r.m.id]; if (!ch || ch.owner !== r.by || (r.cat === 'act' && !(S.battle.active && current() === ch.id))) delete S.reqs[id]; } };
+const pruneReqs = () => { for (const [id, r] of Object.entries(S.reqs)) { const ch = S.chars[r.m.id]; if (!ch || ch.owner !== r.by || (r.cat === 'act' && !inScene(okSc(ch.scene) ? ch.scene : null, () => S.battle.active && current() === ch.id))) delete S.reqs[id]; } };
 const tell0 = (c, o) => c.readyState === 1 && c.send(JSON.stringify({ t: 'note', ...o })); // aviso só para quem mandou
 const tell = (name, o) => wss.clients.forEach(x => x.role === 'player' && x.name === name && x.readyState === 1 && x.send(JSON.stringify({ t: 'note', ...o })));
 const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
@@ -252,11 +298,13 @@ function onMsg(c, raw) {
     }
     if (m.t === 'sync') { if (c.role) { c.defsV = -1; sendState(c); } return; } // o cliente pede tudo de novo (perdeu as definições)
     if (!c.role || c.peek) return;
+    if (m.t === 'activeHero') { const ch = S.chars[m.id]; if (c.role === 'player' && ch && !ch.enemy && ch.owner === c.name && c.hero !== ch.id) { c.hero = ch.id; sendState(c); } return; } // herói escolhido na tela: decide a cena que o jogador vê
     if (c.role !== 'gm' && (flood(c, 'all', 80) || (m.t === 'chat' && flood(c, 'chat', 10)) || (m.t === 'ping' && flood(c, 'ping', 12)))) return;
     if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
       if (c.role === 'table') return;
-      const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) });
-      return wss.clients.forEach(o => o.role && o.readyState === 1 && o.send(p));
+      const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) }), sid = sceneOfClient(c);
+      if (sid === null) return;
+      return wss.clients.forEach(o => o.role && o.readyState === 1 && (o.role === 'gm' ? S.focus === sid : sceneOfClient(o) === sid) && o.send(p)); // só quem está na mesma cena
     }
     handle(c, m);
   }
@@ -278,4 +326,4 @@ function start() {
   });
 }
 
-export { hiddenSkills, defsFor, curDefs, GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };
+export { sceneOfClient, sceneOfMsg, hiddenSkills, defsFor, curDefs, GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };

@@ -1490,3 +1490,9 @@ test('skPin: limite de 6 e migração corta saves com mais', () => {
   reset(); const h = mk(ana, { name: 'P' }); h.skills = Object.keys(S.skills).slice(0, 9);
   h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 6);
 });
+test('dly: o herói chega ao cliente com o atraso real do servidor, já com passivas de agilidade (prévia da ordem)', () => {
+  reset(); const h = mk(ana, { name: 'Veloz' }); const base = view(ana).chars[h.id].dly; assert.ok(base > 0);
+  const id = 'tst_agi'; S.skills[id] = { name: 'Pés Leves', kind: 'passive', mod: { agi: 50 } }; h.skills = [...(h.skills || []), id]; h.pslots = [...(h.pslots || []), id];
+  try { const v = view(ana).chars[h.id].dly, g = view(gm).chars[h.id].dly; assert.ok(v < base, `${v} < ${base}`); assert.equal(v, g); }
+  finally { delete S.skills[id]; }
+});
