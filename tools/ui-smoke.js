@@ -152,8 +152,19 @@ try {
       check(n1 - n0 <= 2 && await anaD.locator(`.p3d .bb.hero.tgt[data-tgt="${thomas.id}"]`).count() === 1, `a mira fica no aliado caído sem laço de desenho (${n1 - n0} desenhos em 1 s)`);
       await anaD.keyboard.press('Escape'); await anaD.keyboard.press('Escape'); delete shinkai.inv[it]; thomas.hp = thomas.hpMax; push(); await sleep(300); await anaD.keyboard.press('1'); await until(() => anaD.locator('.p3d .bb.foe.tgt').count(), 'mira de volta em inimigo'); }
     await until(() => vis(anaD, '.lq .stroke[data-lq=go]:not(.blk)'), 'Agir liberado'); await sleep(300); // o desenho da mira precisa ter assentado antes do Enter
+    // Task 8: investida com câmera; o número nasce sobre o recorte do alvo e a câmera volta ao turno em até 2 s
+    await anaD.evaluate(() => { const w = document.querySelector('.p3d .world'), tg = document.querySelector('.p3d .bb.tgt')?.dataset.tgt, R = window.__lg = { fast: false, num: null, t0: 0, back: 0 };
+      new MutationObserver(() => { if (w.classList.contains('fast')) R.fast = true; else if (R.fast && !R.back) R.back = performance.now(); }).observe(w, { attributes: true, attributeFilter: ['class'] });
+      new MutationObserver(ms => { for (const m of ms) for (const d of m.addedNodes) if (!R.num && d.classList?.contains('float')) { const b = document.querySelector(`.p3d .bb[data-tgt="${tg}"]`)?.getBoundingClientRect(), x = parseFloat(d.style.left), y = parseFloat(d.style.top);
+        R.num = b && { x, y, in: x >= b.left - 80 && x <= b.right + 80 && y >= b.top - 80 && y <= b.bottom + 80 }; } }).observe(document.querySelector('.fxl'), { childList: true });
+      document.addEventListener('keydown', e => { if (e.key === 'Enter' && !R.t0) R.t0 = performance.now(); }, true); });
     const n = S.seq; await anaD.keyboard.press('Enter');
     await until(() => S.seq > n && S.log.some(l => l.n > n), 'Enter manda a ação'); // qualquer registro novo: um golpe esquivado é narrado por quem esquiva, não pela Shinkai
+    { const lg = await until(() => anaD.evaluate(() => window.__lg.num && window.__lg.back && window.__lg), 'número e volta da câmera', 4000);
+      check(lg && lg.fast, 'a investida leva a câmera ao alvo (world.fast)');
+      check(lg && lg.num?.in, `o número de dano nasce sobre o recorte do alvo (${JSON.stringify(lg?.num)})`);
+      check(lg && lg.back - lg.t0 <= 2000 + 500, `a câmera volta ao turno em até 2 s depois do golpe (${lg && Math.round(lg.back - lg.t0)} ms desde o Enter)`);
+      check(await anaD.evaluate(() => !document.querySelector('.p3d .bb.lunging') && (w => w.style.transform.replace(/\s/g, '') === w.dataset.cam.replace(/\s/g, ''))(document.querySelector('.p3d .world'))), 'o recorte voltou ao lugar e a câmera ao enquadramento do turno'); }
     // condições aparecem sobre o recorte (e nos retratos do grupo)
     minion.st.burn = 3; shinkai.st.burn = 3; push();
     await until(() => vis(anaD, `.p3d .bb[data-tgt="${minion.id}"] .sti[data-st=burn]`), 'condição do inimigo sobre o recorte');

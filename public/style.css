@@ -1213,7 +1213,7 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .p3d .bb .bbi{position:relative;transform-origin:50% 100%}
 .p3d .bb.cast .bbi{animation:bbcast .7s ease-out}@keyframes bbcast{35%{transform:translateY(-6%) scale(1.14)}}
 .p3d .bb.lunge .bbi{animation:bblunge .55s cubic-bezier(.3,1.6,.5,1)}@keyframes bblunge{40%{transform:translateY(-4%) scale(1.16)}}
-.p3d .bb.hit .bbi{animation:bbhit .5s}@keyframes bbhit{15%{transform:translateX(-5%) rotate(-3deg);filter:brightness(2.2)}40%{transform:translateX(4%) rotate(2deg)}65%{transform:translateX(-2%)}}
+.p3d .bb.hit .bbi{animation:bbhit .5s}.p3d .bb.hurt{filter:brightness(1.6)}.p3d .world.fast{transition-duration:.45s}.p3d .bb.lunging{transition-duration:.45s;z-index:3}@keyframes bbhit{15%{transform:translateX(-5%) rotate(-3deg);filter:brightness(2.2)}40%{transform:translateX(4%) rotate(2deg)}65%{transform:translateX(-2%)}}
 .p3d .bb.dodge .bbi{animation:bbdodge .5s ease-out}@keyframes bbdodge{35%{transform:translateX(12%) rotate(4deg);opacity:.7}}
 .p3d .bb.kofall .bbi{animation:bbkofall .8s cubic-bezier(.5,0,.8,.4) both}@keyframes bbkofall{0%{filter:brightness(3) saturate(0)}25%{filter:brightness(1.6)}100%{filter:grayscale(1) brightness(.45);transform:rotate(-3deg) translateY(3%)}}
 .p3d .bb.mendfx .bbi{animation:bbmend .8s ease-out}@keyframes bbmend{30%{filter:drop-shadow(0 0 24px #3ddc84) brightness(1.4)}}

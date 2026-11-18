@@ -67,6 +67,7 @@
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
   const els = new Map(); // id -> { el, img, mini, sh, hpb, bad: [], key... }
+  let lastF = null, camLock = null; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
   const el = (tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
   const ensure = () => {
     if (root) return;
@@ -127,15 +128,15 @@
     for (const c of inB) {
       let u = els.get(c.id); if (!u) { u = mkUnit(c); els.set(c.id, u); }
       const p = F.get(c.id), z = p.z + (c === cur && c.enemy ? 900 : 0), pos = p.x + ',' + z;
-      if (u.pos !== pos) { u.pos = pos; u.el.style.setProperty('--x', p.x); u.el.style.setProperty('--z', z); }
+      if (u.pos !== pos && !u.lunging) { u.pos = pos; u.el.style.setProperty('--x', p.x); u.el.style.setProperty('--z', z); }
       const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u);
-      u.el.classList.toggle('ko', c.hp <= 0); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
+      u.el.classList.toggle('ko', c.hp <= 0); if (c.hp > 0) u.el.classList.remove('kofall'); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
       { const k = c.hp > 0 ? stIcons(c) : ''; if (u.stk !== k) { u.stk = k; u.sts.innerHTML = k; } } setCls(u, 'tgt', c.id === tgt);
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
         if (u.mini !== m + w) { u.mini = m + w; u.sh.textContent = m; u.sh.hidden = !m; u.hpi.style.width = w; } }
     }
-    return F;
+    lastF = F; return F;
   };
   // alvo que some (removido, caído ou oculto): a mira vai para o próximo inimigo de pé e o zoom fecha; devolve se algo mudou
   const vivo = id => { const c = S.chars[id]; return !!c && id in S.battle.ticks && c.hp > 0 && !c.dead; };
@@ -148,8 +149,9 @@
     return ch;
   };
   const camera = F => {
-    const v = cameraFor(view(F)), k = `${v.tx},${v.ty},${v.tz},${v.ry}`; if (k === camKey) return; camKey = k;
-    world.style.transform = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
+    const v = camLock || cameraFor(view(F)), k = `${v.tx},${v.ty},${v.tz},${v.ry}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
+    if (!camLock) world.dataset.cam = tr; // o enquadramento do turno (a fumaça confere a volta depois da investida)
+    if (k === camKey) return; camKey = k; world.style.transform = tr;
   };
 
   P.sync = h => {
@@ -161,6 +163,19 @@
     if (typeof HUD !== 'undefined') { HUD.place(); clearTimeout(hs1); clearTimeout(hs2); hs1 = setTimeout(HUD.place, 650); hs2 = setTimeout(HUD.place, 1250); } // a câmera leva ~1,1 s para chegar
     requestAnimationFrame(place); clearTimeout(settle); settle = setTimeout(place, 400); // a página ainda anima a entrada (a posição final só vem depois)
   };
+  // investida: a câmera corre até o alvo (0,45 s) e o recorte de quem age avança até a frente dele; resolve no impacto e volta sozinho
+  const LG_MS = 450, LG_HOLD = 500; // ida, pausa no alvo (o número nasce aqui), volta de 0,45 s: ~1,4 s no total
+  P.lunge = (fromId, toId) => new Promise(res => {
+    const a = els.get(fromId), F = lastF, to = F?.get(toId), from = F?.get(fromId);
+    if (!a || !to || !from || fromId === toId || !root || root.style.display === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return res();
+    const z0 = +a.el.style.getPropertyValue('--z') || from.z, dz = Math.sign(z0 - to.z) || 1, dx = Math.sign(from.x - to.x) || -1;
+    camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to } : { kind: 'hero', at: to }); world.classList.add('fast'); camera(F);
+    a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--x', to.x + 140 * dx); a.el.style.setProperty('--z', to.z + 260 * dz);
+    setTimeout(res, LG_MS);
+    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; camLock = null; if (lastF && root.style.display !== 'none') { units(); camera(lastF); } setTimeout(() => world.classList.remove('fast'), LG_MS); }, LG_MS + LG_HOLD);
+  });
+  // impacto no recorte: tremida curta (classe hurt por 450 ms)
+  P.shake = id => { const u = els.get(id); if (!u) return; u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };
   P.rectOf = id => els.get(id)?.el.getBoundingClientRect() || null;
   g.PALCO3D = P;
 })(globalThis);

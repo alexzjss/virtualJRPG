@@ -13,6 +13,8 @@ const fxAdd = (cls, html, ms, style = '') => { const d = document.createElement(
 const stage3d = () => { const r = document.querySelector('.p3d'); return r && r.style.display !== 'none' ? r : null; }; // o palco 3D do PC (fora do #app), quando visível
 const unitEl = id => (stage3d() && document.querySelector(`.p3d .bb[data-tgt="${id}"]`)) || app.querySelector(`.unit[data-tgt="${id}"]`) || app.querySelector(`.tok[data-id="${id}"]`);
 const fxPos = (el, y = .32) => { const r = el.getBoundingClientRect(); return `left:${r.left + r.width / 2}px;top:${r.top + r.height * y}px;--uw:${r.width}px`; };
+// os recortes do palco 3D não são redesenhados: a classe de animação sai sozinha e reinicia a cada golpe (no 2D o redesenho já a tira)
+const pulse = (el, cls, ms = 900) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); };
 const mark = (sel, cls, ms) => fxMarks.push({ sel, cls, until: performance.now() + ms });
 const face = c => c?.img ? `<img src="${esc(c.img)}" alt="">` : `<span>${c ? esc(c.enemy ? KANJI[mainEl(c)] : c.name.slice(0, 1).toUpperCase()) : ''}</span>`;
 
@@ -113,23 +115,27 @@ function strikeFx(acts, f0, a) {
     fxAdd(`callout ${a?.enemy ? 'foe' : ''}`, `<div><small>${esc(a?.name || '')}</small><b>${esc(f0.s)}</b></div>`, 1150, `--fx:${ELC[f0.el] || '#e4002b'}`); }
   if (old && !f0.dom) { cine = { ids: [...new Set([f0.a, ...acts.map(e => e.fx.id)].filter(Boolean))], until: performance.now() + 1300 }; applyCine(true); setTimeout(() => applyCine(true), 1350); }
   const au = f0.a && unitEl(f0.a);
-  if (au && !f0.dom) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); au.classList.add(f0.el && f0.el !== 'fis' || f0.heal ? 'cast' : 'lunge'); }
+  const casts = f0.el && f0.el !== 'fis' || f0.heal, t0 = acts.map(e => e.fx.id).find(id => id && id !== f0.a);
+  if (au && !f0.dom) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); pulse(au, casts ? 'cast' : 'lunge'); }
+  // no palco 3D a investida física leva a câmera e o recorte até o alvo; os golpes caem quando ela chega
+  const go = stage3d() && !old && !casts && !f0.dom && t0 && typeof PALCO3D !== 'undefined' ? PALCO3D.lunge(f0.a, t0) : null;
   const crit = acts.find(e => e.fx.crit), weak = acts.find(e => e.fx.w);
   if (crit && stage) { stage.classList.add('shake'); if (!old) setTimeout(() => stage.classList.remove('shake'), 450); }
   comandoFx(acts, stage);
   if (crit || weak) setTimeout(() => cutIn(crit ? 'crit' : 'weak', a, S.chars[(crit || weak).fx.id]), 180);
   if (f0.dom) return;
-  acts.forEach((e, i) => setTimeout(() => {
+  const hits = d0 => acts.forEach((e, i) => setTimeout(() => {
     const f = e.fx, el = unitEl(f.id);
     hitSfx(f);
     if (!el) return;
     el.style.setProperty('--fx', ELC[f.el] || '#fff');
-    if (f.dmg) { el.classList.add('hit'); fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); } else if (f.heal) el.classList.add('mendfx'); else if (f.miss) el.classList.add('dodge');
+    if (f.dmg) { if (stage3d() && typeof PALCO3D !== 'undefined') PALCO3D.shake(f.id); pulse(el, 'hit', 600); fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); } else if (f.heal) pulse(el, 'mendfx'); else if (f.miss) pulse(el, 'dodge', 600);
     const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
     if (num) fxAdd(`float ${f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : ''}`, num, 1250, fxPos(el, .22) + `;--fx:${ELC[f.el] || '#e4002b'}`);
     if (/QUEBROU!/.test(e.text)) setTimeout(() => shatter(el), 120);
     if (koHold.has(f.id)) setTimeout(() => knockout(f.id), 260);
-  }, 220 + i * 90));
+  }, d0 + i * 90));
+  if (go) go.then(() => hits(0)); else hits(220);
 }
 function threat(c) { // turno inimigo: o palco escurece, faixa vermelha e o inimigo dá um passo à frente
   threatUntil = performance.now() + 1300; fxState();
