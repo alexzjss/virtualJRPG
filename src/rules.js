@@ -622,6 +622,7 @@ function doAct(a, m, bonus = 0) {
   if (!m.release) {
     if (a[s.res] < s.cost && s.fx?.some(f => f.t === 'ovr')) { const miss = s.cost - a[s.res]; a[s.res] = s.cost; a.hp = Math.max(1, a.hp - miss * 2); a.bt.ovrNow = 1; log(a.name, `${s.name}: sacrifica ${miss * 2} HP pela técnica!`, 'bad'); }
     a[s.res] -= s.cost;
+    if (!a.enemy && !a.summon && m.skill !== 'atk') (a.skUse ??= {})[m.skill] = (a.skUse[m.skill] || 0) + 1; // contagem para os Atalhos do comando
     if (s.limit) a.limit = 0;
     if (s.uses) { a.bt ??= {}; a.bt.wu ??= {}; a.bt.wu[m.skill] = (a.bt.wu[m.skill] || 0) + 1; } // golpe com usos por batalha
     for (const [r, v] of Object.entries(s.pay || {})) { if (r === 'san' && cx?.noSan) continue; if (r === 'hp') a.hp = Math.max(1, a.hp - Math.ceil(a.hpMax * v / 100)); else a[r] = Math.max(0, a[r] - v); }

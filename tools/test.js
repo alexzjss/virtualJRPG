@@ -1400,3 +1400,20 @@ test('Leva 8: eco, marca detonada, contador, sacrifício e ressonância', () => 
   for (const k of Object.keys(S.skills).filter(k => k.startsWith('t8'))) delete S.skills[k];
   assert.match(RU.fxText(RU.parseFx('echo 50; brand 2; pop 1.6; every 3 2; rs any 1.4; ovr')), /ecoa.*Marca.*detona.*3º.*Ressonância.*Sacrifício/);
 });
+test('skPin: dono fixa e desfixa; recusa skill que não tem, outro jogador e o 13º', () => {
+  reset(); const h = mk(ana, {}); h.skills = [sk('Golpe Pesado'), sk('Vigor')];
+  H.skPin(ana, { id: h.id, sk: sk('Golpe Pesado'), on: true }); assert.deepEqual(h.skPin, [sk('Golpe Pesado')]);
+  H.skPin(bia, { id: h.id, sk: sk('Vigor'), on: true }); assert.equal(h.skPin.length, 1);
+  H.skPin(ana, { id: h.id, sk: 'g999999', on: true }); assert.equal(h.skPin.length, 1);
+  H.skPin(ana, { id: h.id, sk: sk('Golpe Pesado'), on: false }); assert.deepEqual(h.skPin, []);
+  h.skills = Object.keys(S.skills).slice(0, 14); h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 12);
+  S.items.tpin = { name: 'Arma Pin', type: 'arma', power: 5, wt: 'punho', el: '', price: 1, sk: [{ name: 'Golpe Pin', kind: 'dmg', el: 'fis', power: 5, cost: 1, res: 'aura' }] }; h.inv.tpin = 1; h.equip.arma = 'tpin'; h.skPin = [];
+  H.skPin(ana, { id: h.id, sk: 'w:tpin:0', on: true }); H.skPin(ana, { id: h.id, sk: 'w:tpin:3', on: true }); assert.deepEqual(h.skPin, ['w:tpin:0']);
+});
+test('skUse: conta a skill do herói quando resolve; não conta ataque básico nem inimigo', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 95; e.attrs.AGI = 1;
+  h.skills = [sk('Golpe Pesado')]; h.aura = 20; H.battle(gm, { on: true });
+  H.act(ana, { id: h.id, skill: sk('Golpe Pesado'), target: e.id }); assert.equal(h.skUse?.[sk('Golpe Pesado')], 1);
+  S.battle.ticks[h.id] = -1; H.act(ana, { id: h.id, skill: 'atk', target: e.id }); assert.equal(Object.keys(h.skUse).length, 1);
+  assert.equal(e.skUse, undefined);
+});
