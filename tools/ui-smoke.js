@@ -263,6 +263,13 @@ try {
     await bia.keyboard.press('2');
     await until(async () => /Melodia de Coragem/i.test(await txt(bia, '.skl')), 'violino básico mostra a técnica de grupo (a 2ª vem nas categorias acima de básica)');
     await bia.keyboard.press('Escape');
+    // utilidade de alvo único alcança aliados e inimigos com ←/→ (buff em aliado)
+    const ku = Object.keys(S.skills).find(x => { const q = S.skills[x]; return q.kind === 'util' && !q.area && q.tg !== 'self' && !q.limit && q.res === 'aura' && (q.cost || 0) <= 20 && !q.req && !q.reqItem; });
+    mikhail.skills = [...new Set([...mikhail.skills, ku])]; mikhail.aura = mikhail.auraMax; push(); await sleep(300);
+    await bia.keyboard.press('2'); await click(bia, `.skl .opt[data-v="${ku}"]`, 'skill de utilidade');
+    let aliado = false; for (let i = 0; i < 8 && !aliado; i++) { aliado = await bia.locator('.p3d .bb.hero.tgt').count() > 0; if (!aliado) { await bia.keyboard.press('ArrowRight'); await sleep(120); } }
+    check(aliado, 'utilidade de alvo único pode mirar um aliado');
+    await bia.keyboard.press('Escape'); await bia.keyboard.press('Escape');
     await shot(bia, 'instrumento');
     thomas.equip.arma = torre; push();
     await until(async () => (await gmP.evaluate(() => 1)) === 1, 'estado estável');

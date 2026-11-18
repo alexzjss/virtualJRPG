@@ -9,12 +9,13 @@ const LEQUE = (() => {
   const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
   const esq = (a, b) => a - b;
   const skSel = () => pick.k === 'sk' ? SK(pick.id) : null;
+  const bothSides = () => skSel()?.kind === 'util'; // utilidade pode mirar aliado (buff, limpeza) ou inimigo (debuff): ←/→ alcançam os dois lados
   const allySide = () => pick.k === 'it' || selfSk(skSel()) || skSel()?.kind === 'heal';
   // alvos possíveis do que está escolhido, da esquerda para a direita na tela (←/→ andam por eles)
   const cands = () => {
     if (!cx) return [];
     const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB.filter(o => !o.enemy).map(o => o.id), inB.filter(o => o.enemy).map(o => o.id));
-    const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => allySide() ? o.enemy === cx.actor.enemy : o.enemy !== cx.actor.enemy && o.hp > 0);
+    const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => bothSides() ? o.hp > 0 : allySide() ? o.enemy === cx.actor.enemy : o.enemy !== cx.actor.enemy && o.hp > 0);
     return l.sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0));
   };
   const fit = () => { // a mira abre num alvo do lado certo (inimigo ou aliado)
@@ -106,6 +107,7 @@ const LEQUE = (() => {
       if (!cx.my || cx.wait) return false;
       if (mode === 'all' && skKey(e)) return true; // letras filtram a lista; Shift+F fixa
       if (/^[1-3]$/.test(k) && mode === 'menu') { click(['atk', 'sk', 'it'][k - 1]); return true; }
+      if (e.target.matches?.('button') && (k === 'Enter' || k === ' ')) return false; // o botão focado já age no clique
       if (/^[4-8]$/.test(k)) { hint({ 4: 'defend', 5: 'focus', 6: 'braveT', 7: 'next', 8: 'allOut' }[k]); return true; }
       if (/^[qQ]$/.test(k) && canAim() && mode !== 'all' && mode !== 'items') { click('aim'); return true; }
       if (/^[tT]$/.test(k) && mode !== 'aim') { click('all'); return true; }
