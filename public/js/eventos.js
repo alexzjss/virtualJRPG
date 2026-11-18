@@ -32,7 +32,7 @@ app.addEventListener('keydown', e => { // elementos clicáveis que não são <bu
 function goAct(id) { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt = id; if (!(tgt in S.battle.ticks)) return toast('Escolha um alvo primeiro.');
   { const s0 = pick.k === 'sk' ? SK(pick.id) : null; if (pick.k !== 'it' && S.chars[tgt].hp <= 0 && !(s0 && (s0.kind === 'heal' || s0.area))) return toast('Esse alvo já caiu.', 'no', 'Escolha outro alvo.'); } const msg = pick.k === 'it' ? { t: 'use', id: id, item: pick.id, target: tgt } : { t: 'act', id: id, skill: pick.id, target: tgt, aim, brave: braveOn, pass: passTo }; aim = null; aimOpen = false; braveOn = false; passTo = ''; if (typeof LEQUE !== 'undefined') LEQUE.reset();
   const who = S.chars[id], s1 = msg.t === 'act' ? SK(msg.skill) : null;
-  if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
+  if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && !gm && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
   send(msg);
 }
 const sayChat = el => { if (el?.value.trim()) { send({ t: 'chat', text: el.value, secret }); el.value = ''; } };
@@ -48,7 +48,7 @@ app.addEventListener('click', e => {
   if (e.target.closest('.edin')) return;
   const edt = e.target.closest('[data-edit]');
   if (edt && gm) { editing = { id: edt.dataset.id, f: edt.dataset.edit }; editFocus = true; return render(); }
-  const lq = e.target.closest('.stroke[data-lq],.hk[data-lq]'); if (lq) return LEQUE.click(lq.dataset.lq, lq.dataset.v); // pincelada do leque (PC)
+  const lq = e.target.closest('.stroke[data-lq],.hk[data-lq],.lq-gm-open[data-lq]'); if (lq) return LEQUE.click(lq.dataset.lq, lq.dataset.v); // pincelada do leque (PC)
   const d = e.target.closest('[data-a]')?.dataset, u = e.target.closest('[data-tgt]'), tb = e.target.closest('[data-tab]');
   if (tb) { tabs[tb.dataset.id] = tb.dataset.tab; return render(); }
   const op = e.target.closest('[data-open]');
@@ -279,7 +279,7 @@ document.addEventListener('keydown', e => {
     const os = [...app.querySelectorAll('.cmd .alist .opt:not(:disabled)')]; if (!os.length) return;
     e.preventDefault(); const i = os.findIndex(o => o.classList.contains('on')); os[(i + (e.key === 'ArrowUp' ? os.length - 1 : 1) + (i < 0 && e.key === 'ArrowDown' ? os.length - 1 : 0)) % os.length].click(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return;
   }
-  if (e.key >= '1' && e.key <= '9') app.querySelectorAll(gm ? '.gcmd .p5i' : '.cmd .p5m .p5i')[e.key - 1]?.click();
+  if (e.key >= '1' && e.key <= '9') app.querySelectorAll('.cmd .p5m .p5i')[e.key - 1]?.click();
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => S && render(), 150); });

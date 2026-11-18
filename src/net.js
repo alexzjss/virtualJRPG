@@ -110,7 +110,9 @@ const cmOf = ch => Object.fromEntries((ch.skills || []).filter(k => S.skills[k]?
 const pubChars = () => Object.fromEntries(Object.values(S.chars).filter(ch => !ch.enemy || !hiddenFoe(ch)).map(ch => [ch.id, ch.enemy ? scrub(ch) : { ...ch, gmNote: undefined, cm: cmOf(ch) }]));
 let net = { status: 'off', url: '', code: '', msg: 'Túnel desligado.' }; // situação do túnel, só para o mestre (não é salva)
 const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => `http://${i.address}:${PORT}`);
-const view = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...ch, cm: cmOf(ch) }])), users: undefined, accounts: Object.keys(S.users).sort(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
+// contas de jogador com a tela aberta agora (em minúsculas), só para o mestre: o leque dele recolhe a vez de quem está presente
+const onlineAccts = () => [...new Set([...wss.clients].filter(o => o.role === 'player' && o.acct && o.readyState === 1).map(o => String(o.acct).toLowerCase()))];
+const view = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...ch, cm: cmOf(ch) }])), users: undefined, accounts: Object.keys(S.users).sort(), online: onlineAccts(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
    { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),
   log: S.log.filter(e => !e.to || (c.name && (e.to === c.name || e.from === c.name))) };
 // As definições de skills e itens são ~85% do estado e quase nunca mudam: vão numa mensagem à parte ("defs"), só para quem ainda
@@ -211,12 +213,14 @@ const tell = (name, o) => wss.clients.forEach(x => x.role === 'player' && x.name
 const kick = (name, msg, except) => wss.clients.forEach(o => { if (o !== except && o.acct === name) { o.send(JSON.stringify({ t: 'err', bad: true, msg })); o.role = null; o.close(); } });
 // conexões paradas: quem não responde ao ping em 30 s (aba fechada, celular sem sinal, túnel caído) ou não faz login em 30 s é encerrado
 const beat = setInterval(() => { const now = Date.now(); wss.clients.forEach(c => { if (!c.alive || (!c.role && now - c.t0 > 30e3)) return c.terminate(); c.alive = false; try { c.ping(); } catch {} }); }, 30e3); beat.unref();
+const gmSync = () => wss.clients.forEach(o => { if (o.role === 'gm' && o.readyState === 1) try { sendState(o); } catch {} });
 const MAXIP = 40; // conexões simultâneas de um mesmo endereço
 wss.on('connection', (c, req) => {
   c.ip = ipOf(req); c.alive = true; c.t0 = Date.now();
   c.role = null; // sem login não recebe nada
   c.on('pong', () => { c.alive = true; });
   c.on('error', () => {});
+  c.on('close', () => { if (c.acct) gmSync(); }); // quem entra ou sai muda o "online" do mestre
   let n = 0; wss.clients.forEach(o => { if (o.ip === c.ip) n++; });
   if (n > MAXIP) return c.close(1013, 'muitas conexões');
   c.on('message', raw => { try { onMsg(c, raw); } catch (e) { console.error('Erro ao tratar mensagem:', e); } });
@@ -244,7 +248,7 @@ function onMsg(c, raw) {
       } else return;
       clean(kAcc); // acertou: zera o contador da conta (o do IP continua)
       c.defsV = -1; // login novo sempre recebe as definições
-      return sendState(c);
+      sendState(c); if (c.role !== 'gm') gmSync(); return;
     }
     if (m.t === 'sync') { if (c.role) { c.defsV = -1; sendState(c); } return; } // o cliente pede tudo de novo (perdeu as definições)
     if (!c.role || c.peek) return;

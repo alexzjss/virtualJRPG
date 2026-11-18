@@ -4,7 +4,8 @@
 // Posições em coordenadas de 1440×860 (a câmera sempre põe o herói no mesmo lugar); o CSS escala tudo pelo --hk.
 const LEQUE = (() => {
   const state = { mode: 'menu', sel: 0 }; // mode: menu | skills (as 6 fixadas, tarefa 5) | all (lista inteira) | items | aim
-  let from = 'menu', turnKey = '', cx = null; // from: de onde a mira veio (Esc volta para lá); cx: quem está no leque agora
+  let from = 'menu', turnKey = '', cx = null, gmOpen = ''; // from: de onde a mira veio (Esc volta para lá); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
+  const donoOn = c => !c.enemy && !!c.owner && (S.online || []).includes(String(c.owner).toLowerCase()); // o jogador dono do herói está conectado (o mestre só age por ele se quiser)
   const ATK = { k: 'atk', id: 'atk' };
   const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
   const esq = (a, b) => a - b;
@@ -35,7 +36,7 @@ const LEQUE = (() => {
   const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
   const hint = n => { const b = app.querySelector(`.hk[data-a=${n}]`); if (b) b.click(); return !!b; }; // as dicas de baixo são botões: o clique passa pelo mesmo caminho do mouse
 
-  const stroke = (lq, key, label, small, x, y, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} style="left:${x}px;top:${y}px;${o.r != null ? `--r:${o.r}deg;` : ''}${o.fs ? `font-size:${o.fs}px` : ''}" ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
+  const stroke = (lq, key, label, small, x, y, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} style="left:${x}px;top:${y}px;${o.r != null ? `--r:${o.r}deg;` : ''}${o.fs ? `font-size:${o.fs}px` : ''}" ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
 
   return {
     state,
@@ -44,11 +45,13 @@ const LEQUE = (() => {
     off() { cx = null; },
     // alvo da câmera de mira (palco3d.js): só enquanto o leque está na mira
     aimTarget() { return cx && cx.my && !cx.wait && state.mode === 'aim' ? tgt : null; },
-    html(c, cur) {
-      const [, rq] = myReq() || [], my = cur === c, wait = !!(rq && rq.ch === c.id);
-      cx = { actor: c, cur, my, wait };
-      const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; }
+    // opts.gm: leque do mestre para quem está na vez (herói ou inimigo), no lugar da barra .gcmd
+    html(c, cur, opts = {}) {
+      const [, rq] = myReq() || [], my = cur === c, wait = !!(rq && rq.ch === c.id), gmO = !!opts.gm;
+      cx = { actor: c, cur, my, wait, gm: gmO };
+      const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; gmOpen = ''; if (gmO) { const f = battlers().find(o => o.enemy !== c.enemy && o.hp > 0); if (f) tgt = f.id; } }
       if (!my || wait || S.battle.cmd) return '';
+      if (gmO && donoOn(c) && gmOpen !== tk) return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox"><button type="button" class="lq-gm-open" data-lq="gmopen" title="${esc(c.owner)} está conectado: o leque fica recolhido até você pedir">Agir por ${esc(c.name)}</button></div></div>`;
       const inB = battlers();
       if (!inB.some(o => o.id === tgt) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0)) { const f = inB.find(o => o.enemy !== c.enemy && o.hp > 0); if (f) { tgt = f.id; aim = null; } } // na sua vez já vem mirado no primeiro inimigo de pé
       const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
@@ -60,6 +63,7 @@ const LEQUE = (() => {
         const M = [['atk', 1, 'Atacar', esc(ARMAS.prof(wp).atkN || 'Ataque'), wpnLine(wp, c)], ['sk', 2, 'Skills', sks.length + wsks.length], ['it', 3, 'Itens', cons.length]];
         h += [2, 1, 0].map((k, j) => stroke(M[k][0], M[k][1], M[k][2], M[k][3], 650 + j * 40, 410 + j * 78, { on: sel === k, title: M[k][4] })).join('');
         if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24 });
+        if (gmO) { h += stroke('next', '7', 'Passar', '', 150, 440, { r: 4, fs: 24 }); if (c.enemy) h += stroke('ai', 'I', 'IA decide', '', 610, 332, { a: 'ai' }); }
       } else if (mode === 'items') {
         h += cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, 600 + j * 36, 400 + j * 76, { v: k, on: sel === j, fs: 24 })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
       } else if (mode === 'all') {
@@ -81,6 +85,9 @@ const LEQUE = (() => {
     click(name, v) {
       if (!cx || !cx.my || cx.wait) { if (name === 'back') return back(); return; }
       const c = cx.actor;
+      if (name === 'gmopen') { gmOpen = turnKey; return render(); }
+      if (cx.gm && name === 'ai') { this.reset(); return send({ t: 'ai' }); }
+      if (cx.gm && name === 'next') { this.reset(); aim = null; return send({ t: 'next' }); }
       if (name === 'atk') { pick = { ...ATK }; return go('aim', 'menu'); }
       if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } return go('all', 'menu'); }
       if (name === 'it') return go('items', 'menu');
@@ -96,9 +103,10 @@ const LEQUE = (() => {
     clickTgt(id) { if (!cx || !cx.my || cx.wait || state.mode !== 'aim' || id !== tgt || !cands().some(o => o.id === id)) return false; confirm(); return true; },
     // teclado da batalha no PC; devolve true se tratou a tecla
     key(e) {
-      if (!cx || gm || role !== 'player' || innerWidth <= 700 || !S.battle?.active || S.battle.cmd) return false;
+      if (!cx || (gm ? !cx.gm : role !== 'player') || innerWidth <= 700 || !S.battle?.active || S.battle.cmd) return false;
       if (e.target.matches?.('input,textarea,select') || rollDlg || meOpen || navOpen || gridFull || ctx || document.querySelector('.stage-cmd,.result,.dlg-in')) return false;
       const k = e.key, mode = state.mode, c = cx.actor;
+      if (gm && (gui.sheet || (k === 'Enter' && Object.keys(S.reqs).length))) return false; // ficha aberta, ou Enter que aprova o pedido da fila
       if (k === 'Escape') {
         if (cx.wait) { const [id] = myReq() || []; if (id) send({ t: 'reqNo', id }); return true; }
         if (!cx.my || mode === 'menu') return false;
@@ -108,6 +116,8 @@ const LEQUE = (() => {
       if (mode === 'all' && skKey(e)) return true; // letras filtram a lista; Shift+F fixa
       if (/^[1-3]$/.test(k) && mode === 'menu') { click(['atk', 'sk', 'it'][k - 1]); return true; }
       if (e.target.matches?.('button') && (k === 'Enter' || k === ' ')) return false; // o botão focado já age no clique
+      if (cx.gm && /^[4-8]$/.test(k)) { if (k === '7') click('next'); return true; } // o mestre não tem as dicas de Defender, Coragem e afins
+      if (cx.gm && /^[iI]$/.test(k) && mode === 'menu' && c.enemy) { click('ai'); return true; }
       if (/^[4-8]$/.test(k)) { hint({ 4: 'defend', 5: 'focus', 6: 'braveT', 7: 'next', 8: 'allOut' }[k]); return true; }
       if (/^[qQ]$/.test(k) && canAim() && mode !== 'all' && mode !== 'items') { click('aim'); return true; }
       if (/^[tT]$/.test(k) && mode !== 'aim') { click('all'); return true; }

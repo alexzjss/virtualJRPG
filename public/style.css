@@ -1295,6 +1295,7 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .stroke.on::after{opacity:1;height:7px}
 .stroke.blk{filter:grayscale(1) brightness(.6)}
 .stroke small{font:600 13px var(--cond);letter-spacing:.5px;color:var(--gold);margin-left:6px;text-transform:none;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.lq-gm-open{position:absolute;left:640px;top:480px;padding:14px 34px;background:#0b0b0de6;border:0;border-left:4px solid var(--gold);font:400 26px var(--disp);letter-spacing:2px;text-transform:uppercase;color:var(--paper);cursor:pointer;transform:rotate(-2deg);clip-path:none}.lq-gm-open:hover{background:var(--red);color:#fff}
 .lq-sum{position:absolute;left:470px;top:690px;width:520px;display:flex;flex-direction:column;gap:3px;padding:10px 18px;background:#0b0b0de6;border-left:4px solid var(--red);transform:rotate(-1deg)}
 .lq-sum b{font:400 26px/1.1 var(--disp);letter-spacing:1px;text-transform:uppercase}.lq-sum b span{color:var(--gold)}.lq-sum small{font:600 13px var(--cond);color:var(--dim);letter-spacing:.3px}.lq-sum .why{color:#ff9aa6}
 .lq-aim{position:absolute;left:90px;top:490px;width:330px}

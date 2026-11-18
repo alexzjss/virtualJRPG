@@ -146,6 +146,24 @@ try {
     await anaD.context().close(); // o palco 3D pesa na renderização por software: a Ana do PC sai para não atrasar os blocos seguintes
   });
 
+  await section('mestre: leque de quem está na vez no palco 3D', async () => {
+    const foe = foesOf()[0], nGm = () => gmP.locator('.gcmd').count();
+    go({ t: 'ini', k: 'set', id: foe.id, v: 0 }); check(current() === foe.id || toTurn(foe.id), 'vez do inimigo'); await until(() => gmP.locator('[data-a="ai"].stroke').count(), 'leque do mestre na vez do inimigo');
+    check(await nGm() === 0, 'barra antiga some no PC');
+    check(await gmP.locator('[data-a="ai"].stroke').count() === 1, 'mestre tem IA decide no leque');
+    check(await gmP.locator('.lq .stroke[data-lq=atk]').count() === 1 && await gmP.locator('.lq-gm-open').count() === 0, 'inimigo: Atacar no leque e sem botão recolhido');
+    await gmP.keyboard.press('1'); check(await until(async () => await gmP.locator('.lq-sum').count() === 1, 'mira do mestre'), 'Atacar abre a mira');
+    const sa = S.seq; await gmP.keyboard.press('Enter'); await until(() => S.seq > sa, 'ataque do inimigo pelo leque do mestre');
+    await gmP.keyboard.press('Escape'); go({ t: 'ini', k: 'set', id: foe.id, v: 1e6 });
+    check(toTurn(shinkai.id), 'vez da Shinkai'); await until(() => gmP.locator('.lq-gm-open').count(), 'leque do herói recolhido (dono conectado)');
+    check(await gmP.locator('.lq-gm-open').count() === 1 && await gmP.locator('.lq .stroke').count() === 0, 'leque do herói recolhido');
+    await gmP.locator('.lq-gm-open').click(); await until(() => gmP.locator('.lq .stroke[data-lq=atk]').count(), 'Agir por abre o leque');
+    check(await gmP.locator('[data-a="ai"].stroke').count() === 0, 'herói não tem IA decide');
+    await gmP.locator('.gv[data-v=mapa]').click(); await until(async () => (await gmP.locator('.p3d').evaluate(e => getComputedStyle(e).display)) === 'none', 'aba Mapa esconde o mundo 3D');
+    await gmP.locator('.gv[data-v=palco]').click(); await until(async () => (await gmP.locator('.p3d').evaluate(e => getComputedStyle(e).display)) !== 'none', 'aba Palco devolve o mundo 3D');
+    await shot(gmP, 'mestre-leque');
+  });
+
   await section('faixa de clima, Cadeia e Domínio', async () => {
     for (const p of [ana, bia, mesa]) {
       check(await vis(p, '.fbar .wx'), `${p.who}: faixa de clima ausente`);
