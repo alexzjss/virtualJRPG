@@ -29,9 +29,11 @@ const LEQUE = (() => {
   const go = (mode, f) => { if (f) from = f; state.mode = mode; state.sel = 0; if (mode === 'aim') fit(); render(); };
   const back = () => {
     if (state.mode === 'aim') { if (aimOpen) { aimOpen = false; aim = null; } else { state.mode = from; if (from === 'menu') pick = { ...ATK }; } }
-    else if (skQ) skQ = ''; else state.mode = 'menu';
+    else if (skQ) skQ = ''; else state.mode = state.mode === 'all' && from === 'skills' ? 'skills' : 'menu';
     render();
   };
+  const usables = c => [...new Set([...wSk(c), ...c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive')])].filter(k => SK(k));
+  const six = c => PALCO3D.pickSix(c.skPin || [], c.skUse || {}, usables(c));
   const flat = () => skGroups(cx.actor, S.chars[tgt], skQ).flatMap(g => g.items);
   const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
   const hint = n => { const b = app.querySelector(`.hk[data-a=${n}]`); if (b) b.click(); return !!b; }; // as dicas de baixo são botões: o clique passa pelo mesmo caminho do mouse
@@ -57,7 +59,7 @@ const LEQUE = (() => {
       const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
       if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { ...ATK };
       const t = S.chars[tgt], s = skSel(), it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma'), mode = state.mode;
-      const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : 2));
+      const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : mode === 'skills' ? 6 : 2));
       let h = '';
       if (mode === 'menu') {
         const M = [['atk', 1, 'Atacar', esc(ARMAS.prof(wp).atkN || 'Ataque'), wpnLine(wp, c)], ['sk', 2, 'Skills', sks.length + wsks.length], ['it', 3, 'Itens', cons.length]];
@@ -66,8 +68,14 @@ const LEQUE = (() => {
         if (gmO) { h += stroke('next', '7', 'Passar', '', 150, 440, { r: 4, fs: 24 }); if (c.enemy) h += stroke('ai', 'I', 'IA decide', '', 610, 332, { a: 'ai' }); }
       } else if (mode === 'items') {
         h += cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, 600 + j * 36, 400 + j * 76, { v: k, on: sel === j, fs: 24 })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
+      } else if (mode === 'skills') {
+        const S6 = six(c), AF = { w: '▲', r: '▼', '?': '?' }, dia = s2 => `<span class="cost"><span class="lqd"><b>${s2.limit ? '∞' : s2.cost}</b></span>${s2.limit ? '' : s2.res === 'san' ? 'SAN' : 'AU'}</span>`;
+        const one = (i, big) => { const id = S6[i], s2 = SK(id), off = blocked(c, s2, id) ? blockWhy(c, s2, id) : '', af = skAff(s2, t), a = af ? `<span class="af ${af === 'r' ? 'r' : af === '?' ? 'q' : ''}">${AF[af]}</span>` : '', e = `<span class="el" style="--e:${ELC[s2.el] || '#888'}"></span>`;
+          return `<div class="stroke ${big ? 'big' : ''} ${sel === i ? 'on' : ''} ${off ? 'blk' : ''}" role="button" data-lq="skp" data-sk="${esc(id)}" data-v="${esc(id)}" ${off ? `title="${esc(off)}"` : ''}>${big ? `${dia(s2)}<div class="sk6n">${c.skPin?.includes(id) ? '<span class="star">★</span>' : ''}${e}${esc(s2.name)} ${a}</div><div class="t">${esc(KIND[s2.kind] || s2.kind)} · ${esc(EL[s2.el] || s2.el)}${s2.power ? ` · Poder ${s2.power}` : ''}${af === 'w' ? ' · <span class="w">▲ alvo fraco</span>' : ''}</div><p>${esc(desc(s2))}</p>${off ? `<div class="why">Bloqueada: ${esc(off)}</div>` : ''}` : `${e}${esc(s2.name)} ${a}${dia(s2)}`}</div>`; };
+        h += `<div class="sk6">${[3, 4, 5].filter(i => i < S6.length).map((i, j) => `<div class="sk6p" style="left:${560 + j * 14}px;top:${330 + j * 66}px">${one(i, 0)}</div>`).join('')}${[0, 1, 2].filter(i => i < S6.length).map((i, j) => `<div class="sk6p" style="left:${920 + j * 14}px;top:${230 + j * 128}px">${one(i, 1)}</div>`).join('')}</div>`;
+        h += stroke('all', 'T', 'Todas as skills…', String(usables(c).length), 600, 530, { on: sel === 6, r: -6, fs: 20 });
       } else if (mode === 'all') {
-        h += `<div class="lq-all" data-lq="all">${skPane(c, t, { bare: true })}</div>`;
+        h += `<div class="lq-all">${skPane(c, t, { bare: true })}</div>`;
         const cur2 = pick.k === 'sk' && s, w = cur2 && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
         if (cur2) h += `<div class="lq-sum"><b>${esc(s.name)}</b><small>${esc(desc(s))}</small>${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
       } else if (mode === 'aim') {
@@ -89,7 +97,9 @@ const LEQUE = (() => {
       if (cx.gm && name === 'ai') { this.reset(); return send({ t: 'ai' }); }
       if (cx.gm && name === 'next') { this.reset(); aim = null; return send({ t: 'next' }); }
       if (name === 'atk') { pick = { ...ATK }; return go('aim', 'menu'); }
-      if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } return go('all', 'menu'); }
+      if (name === 'sk' && six(c).length) return go('skills', 'menu');
+      if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } return state.mode === 'all' ? undefined : go('all', state.mode === 'skills' ? 'skills' : 'menu'); }
+      if (name === 'skp') { const s2 = SK(v); if (!s2 || blocked(c, s2, v)) return; pick = { k: 'sk', id: v }; if (selfSk(s2)) { tgt = c.id; return goAct(c.id); } return go('aim', 'skills'); }
       if (name === 'it') return go('items', 'menu');
       if (name === 'item') { pick = { k: 'it', id: v }; return go('aim', 'items'); }
       if (name === 'aim') return state.mode === 'aim' ? (aimOpen = !aimOpen, aimOpen || (aim = null), render()) : toAim();
@@ -116,19 +126,25 @@ const LEQUE = (() => {
       if (mode === 'all' && skKey(e)) return true; // letras filtram a lista; Shift+F fixa
       if (/^[1-3]$/.test(k) && mode === 'menu') { click(['atk', 'sk', 'it'][k - 1]); return true; }
       if (e.target.matches?.('button') && (k === 'Enter' || k === ' ')) return false; // o botão focado já age no clique
-      if (cx.gm && /^[4-8]$/.test(k)) { if (k === '7') click('next'); return true; } // o mestre não tem as dicas de Defender, Coragem e afins
+      if (cx.gm && /^[4-8]$/.test(k)) { if (k === '7' && mode === 'menu') click('next'); return true; } // o mestre não tem as dicas de Defender, Coragem e afins
       if (cx.gm && /^[iI]$/.test(k) && mode === 'menu' && c.enemy) { click('ai'); return true; }
       if (/^[4-8]$/.test(k)) { hint({ 4: 'defend', 5: 'focus', 6: 'braveT', 7: 'next', 8: 'allOut' }[k]); return true; }
-      if (/^[qQ]$/.test(k) && canAim() && mode !== 'all' && mode !== 'items') { click('aim'); return true; }
+      if (/^[qQ]$/.test(k) && canAim() && mode !== 'all' && mode !== 'items' && mode !== 'skills') { click('aim'); return true; }
       if (/^[tT]$/.test(k) && mode !== 'aim') { click('all'); return true; }
       if (/^[pP]$/.test(k) && mode === 'aim' && app.querySelector('[data-lq=pass]')) { click('pass'); return true; }
       if (k === 'ArrowUp' || k === 'ArrowDown') {
         const d = k === 'ArrowUp' ? 1 : -1; // o leque sobe para os itens: ↑ vai para cima na tela
         if (mode === 'menu') state.sel = (state.sel + d + 3) % 3;
         else if (mode === 'items') { const n = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons').length; if (!n) return true; state.sel = (state.sel - d + n) % n; }
+        else if (mode === 'skills') { const n = six(c).length; if (!n) return true; const col = (state.sel >= 3 && state.sel < 6 ? [3, 4, 5] : [0, 1, 2]).filter(i => i < n), i = col.indexOf(state.sel); // ↓ no fim da coluna chega à pincelada "Todas"
+          state.sel = state.sel === 6 ? (d > 0 ? col.at(-1) ?? 0 : 6) : d > 0 ? col[Math.max(0, i - 1)] : i < col.length - 1 ? col[i + 1] : 6; }
         else if (mode === 'all') { const l = flat(); if (!l.length) return true; const i = l.findIndex(x => pick.k === 'sk' && x.id === pick.id); pick = { k: 'sk', id: l[(i + (d > 0 ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id }; }
         else return false;
         render(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return true;
+      }
+      if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'skills') {
+        const n = six(c).length, s0 = state.sel; if (s0 === 6 || !n) return true; const to = k === 'ArrowRight' ? (s0 >= 3 ? s0 - 3 : s0) : (s0 < 3 ? s0 + 3 : s0);
+        if (to < n) state.sel = to; render(); return true;
       }
       if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'aim') {
         const l = cands(); if (!l.length) return true;
@@ -136,6 +152,7 @@ const LEQUE = (() => {
       }
       if (k === 'Enter') {
         if (mode === 'menu') click(['atk', 'sk', 'it'][state.sel]);
+        else if (mode === 'skills') { const id = six(c)[state.sel]; if (state.sel === 6) click('all'); else if (id) click('skp', id); }
         else if (mode === 'items') { const e2 = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons')[state.sel]; if (e2) click('item', e2[0]); }
         else if (mode === 'all') { if (pick.k === 'sk') go('aim', 'all'); }
         else if (mode === 'aim') confirm();

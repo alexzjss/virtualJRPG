@@ -44,8 +44,15 @@
     return { url: silhouette(c, false), fallback: true };
   };
 
+  // as 6 skills do leque: fixadas (na ordem de pins), depois as mais usadas (contagem > 0, decrescente, empate pelo id); só as usáveis, sem repetir
+  const pickSix = (pins, use, usable) => {
+    const ok = new Set(usable), fix = [...new Set(pins || [])].filter(k => ok.has(k));
+    const top = usable.filter(k => !fix.includes(k) && (use?.[k] || 0) > 0).sort((a, b) => use[b] - use[a] || (a < b ? -1 : a > b ? 1 : 0));
+    return [...fix, ...top].slice(0, 6);
+  };
+
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
-  const P = { formation, cameraFor, imgSrc, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { formation, cameraFor, imgSrc, pickSix, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0;

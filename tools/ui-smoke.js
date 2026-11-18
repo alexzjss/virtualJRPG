@@ -105,8 +105,14 @@ try {
     check(!(await vis(anaD, '.top .tnav')) && await vis(anaD, '.hud-tr [data-a=navT]') && await vis(anaD, '.hud-tr [data-a=chatT]'), 'em batalha: sem barra de páginas, com ☰ e chat no HUD');
     check(await vis(anaD, '.hud-bl [data-a=defend]') && await vis(anaD, '.hud-bl [data-a=braveT]') && await vis(anaD, '.hud-bl [data-a=next]'), 'dicas de Defender, Coragem e Passar');
     await shot(anaD, 'palco3d');
-    await anaD.keyboard.press('2'); check(await anaD.locator('[data-lq="all"], .skl').count() > 0, 'Skills abre a lista');
-    await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.skl').count()), 'Esc fecha a lista'), 'Esc volta ao menu');
+    { const ids = shinkai.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'); shinkai.skPin = ids.slice(0, 1); shinkai.skUse = Object.fromEntries(ids.slice(1, 7).map((k, i) => [k, 9 - i])); push(); await sleep(300); } // fixada e mais usadas para as 6
+    await anaD.keyboard.press('2'); await until(() => anaD.locator('.sk6').count(), 'tela das 6 skills');
+    check(await anaD.locator('.sk6 .stroke[data-sk]').count() <= 6 && await anaD.locator('.stroke[data-lq="all"]').count() === 1, 'Skills abre as 6 e a pincelada Todas');
+    await anaD.keyboard.press('ArrowLeft'); await anaD.keyboard.press('ArrowRight'); await anaD.keyboard.press('Enter'); check(await until(async () => await anaD.locator('.lq-sum').count() === 1 && !(await anaD.locator('.sk6').count()), 'mira da skill'), 'Enter numa skill das 6 abre a mira');
+    await anaD.keyboard.press('Escape'); await until(() => anaD.locator('.sk6').count(), 'volta às 6');
+    await anaD.keyboard.press('t'); check(await until(async () => await anaD.locator('.skl').count() > 0, 'lista completa'), 'T abre a lista completa');
+    await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.skl').count()) && await anaD.locator('.sk6').count() > 0, 'Esc volta às 6'), 'Esc da lista volta às 6');
+    await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sk6').count()), 'Esc fecha as 6'), 'Esc volta ao menu');
     await anaD.keyboard.press('1'); check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1, 'um alvo marcado'), 'Atacar entra na mira com 1 alvo');
     await shot(anaD, 'mira');
     const n = S.seq; await anaD.keyboard.press('Enter');

@@ -1454,6 +1454,11 @@ test('scrub repassa imagens de batalha do inimigo', async () => {
   const { scrub } = await import('../src/net.js'); reset(); const e = mk(gm, { enemy: true, name: 'X' }); Object.assign(e, { imgF: '/uploads/x.png', imgS: 2 });
   const p = scrub(e); assert.equal(p.imgF, '/uploads/x.png'); assert.equal(p.imgS, 2);
 });
+test('pickSix: fixadas primeiro, depois as mais usadas, até 6, sem repetir e só usáveis', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  assert.deepEqual(P.pickSix(['b', 'z'], { a: 9, b: 50, c: 3, d: 0 }, ['a', 'b', 'c', 'd']), ['b', 'a', 'c']);
+  assert.equal(P.pickSix([], Object.fromEntries('abcdefgh'.split('').map((k, i) => [k, i + 1])), 'abcdefgh'.split('')).length, 6);
+});
 test('palco 3D (navegador): formação, câmera e imagem de reserva', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
   const F = P.formation(['a', 'b', 'c', 'd', 'e'], ['x', 'y', 'z', 'w', 'v', 'u']);

@@ -1305,6 +1305,21 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .lq-all .opt.skr{display:grid;grid-template-columns:12px 8px minmax(0,1fr) 14px 64px 56px;align-items:center;gap:5px;width:100%;min-height:0;padding:5px 12px;margin:0 0 2px;border:0;background:linear-gradient(95deg,#0b0b0d,#17151b 85%,transparent);text-align:left;font:500 14px var(--body);color:var(--paper);text-transform:none;letter-spacing:0;clip-path:none;box-shadow:none;transform:none}
 .lq-all .opt.skr:hover{background:var(--ink3)}.lq-all .opt.skr.on{background:linear-gradient(95deg,var(--red2),var(--red) 60%,transparent);color:#fff}
 .lq-all .opt.skr b{font:600 14px/1.3 var(--body);text-transform:none;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk6p{position:absolute}
+.sk6 .stroke{font-size:22px;padding:8px 26px 10px 18px;--r:-4deg}
+.sk6 .stroke::before{background:linear-gradient(95deg,#0b0b0d 0%,#141217 85%,#14121700 100%)}
+.sk6 .stroke.on::before{background:linear-gradient(95deg,var(--red2) 0%,var(--red) 85%,transparent 100%)}
+.sk6 .stroke:not(.big){width:330px}
+.sk6 .stroke.big{flex-direction:column;align-items:flex-start;gap:2px;width:430px;padding:10px 30px 14px 30px;white-space:normal}
+.sk6 .sk6n{display:flex;gap:8px;align-items:center}
+.sk6 .stroke.big p{margin:0;font:500 13px/1.3 var(--body);letter-spacing:0;text-transform:none;color:#ddd;text-shadow:none}
+.sk6 .stroke.big .t{font:600 12px var(--cond);color:var(--dim);letter-spacing:.5px;text-transform:none}.sk6 .t .w{color:#ff7a8a}
+.sk6 .cost{display:flex;align-items:center;gap:4px;font:600 12px var(--cond);color:var(--dim);margin-left:auto}
+.sk6 .stroke.big .cost{position:absolute;right:26px;top:10px;margin:0}
+.sk6 .lqd{display:inline-grid;place-items:center;width:24px;height:24px;transform:rotate(45deg);border:2px solid var(--gold);background:#000a}.sk6 .lqd b{transform:rotate(-45deg);font:600 12px var(--cond);color:var(--paper)}
+.sk6 .el{width:12px;height:12px;border-radius:50%;background:var(--e);box-shadow:0 0 8px var(--e);flex:none}
+.sk6 .af{font:700 14px var(--cond);color:#ff7a8a}.sk6 .af.q{color:var(--dim)}.sk6 .af.r{color:#6fa8ff}
+.sk6 .star{color:var(--gold);font-size:16px}.sk6 .why{font:600 12px var(--cond);color:#ff9aa6;text-transform:none}
 .lq-all .opt.skr i{color:var(--dim)}.lq-all .opt.skr .pw,.lq-all .opt.skr .ct{font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* batalha do PC: sem a barra de páginas, sem a coluna de chat e com o palco ocupando a tela */
