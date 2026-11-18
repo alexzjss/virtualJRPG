@@ -49,7 +49,7 @@ for (const n of nodes) {
   if (n.k === 'passive' && !n.mod && !n.bon && !n.on && !n.vow && !n.amp && !n.pas && !n.rea) bad(n, 'passiva vazia');
   if (n.mod) for (const k in n.mod) if (!MODK.has(k)) bad(n, `mod ${k} desconhecido`);
   if (n.bon) for (const k in n.bon) if (!BON.has(k)) bad(n, `bon ${k} desconhecido`);
-  if (n.sc && !SC.has(n.sc) && !String(n.sc).startsWith('wt:')) bad(n, `escopo ${n.sc}`);
+  if (n.sc && !SC.has(n.sc) && !/^w[tc]:/.test(String(n.sc))) bad(n, `escopo ${n.sc}`);
   if (n.on && !R.ON[n.on]) bad(n, `gatilho ${n.on}`);
   if (n.on && !(n.fx || []).length) bad(n, `gatilho sem efeito`);
   if (n.vow && !R.VOW[n.vow]) bad(n, `voto ${n.vow}`);

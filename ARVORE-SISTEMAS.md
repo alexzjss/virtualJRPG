@@ -222,3 +222,8 @@ reação com PE → `rea`; PE → Aura; Sanidade continua Sanidade). O Ocultismo
   Poderes dos elementos (Sangue, Morte, Conhecimento, Energia) · Possuído e os quatro Presentes.
 - **Mecânica nova `mad N` (Loucura):** dano ×(1 + N × fração da Sanidade que falta ao usuário), no mesmo molde de `rage`. Usada nos nós de Medo e de Caos (*Canalizar o Medo*, *Lâmina do Medo*, *Valer-se do Caos*...).
 - Não portado: o que depende de perícias, inventário, investigação e perseguição (Carteirada, Eu Conheço um Cara, Preparado para Tudo, Terapia...), por não ter equivalente no combate.
+
+## Árvore de Armas (isolada)
+
+Os ramos de arma saíram do tronco Marcial para `TREE.armas` (ver ARMAS.md, "Árvore de Armas"): bloco à parte na grade, sem ligação com o resto. No Marcial, `branches[0]` é o núcleo, `[1]` os treinos e o resto vem em seguida
+(content.js usa `M.slice(2)` para os raios). `TREE.armas.branches` é a lista plana para as ferramentas que percorrem todas as árvores. Campos novos: `reqItem` (item exigido, tag em `kit` do item), `req` com categoria e `sc: 'wc:<cat>'`; `ramo` marca o 1º nó de um ramo (nome desenhado na mandala).

@@ -10,7 +10,8 @@ import { LEVA2C } from './arvore/leva2c.js';
 import { LEVA3 } from './arvore/leva3.js';
 import { LEVA4, marcarComandos } from './arvore/leva4.js';
 import { LEVA5 } from './arvore/ordo.js';
-import { ARMAS, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
+import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
+import { ARMAS_ARV } from './arvore/armas.js';
 import { SISTEMAS, AURA_SIN, OCULTO_PONTE, MARCIAL_SIST, MARCIAL_LACOS } from './arvore/sistemas.js';
 // Em cada ramo de 10 nós: 1-4 tronco, 5-7 caminho A (atributo principal), 8-9 caminho B (atributo secundário), 10 nó final.
 // rq = requisito de atributo para aprender, ex.: rq: { INT: 50 }.
@@ -20,44 +21,12 @@ export const TREE = {
       { n: "Golpe Pesado", k: "dmg", d: "Um golpe com todo o peso do corpo, capaz de deixar o inimigo zonzo.", xp: 10, a: "FOR", p: 10, c: 5, st: "stun" },
       { n: "Vigor", k: "passive", d: "Anos de treino deixam o corpo mais rijo e resistente.", xp: 10, pas: "hpMax", p: 10 },
       { n: "Golpe Giratório", k: "dmg", d: "Um giro amplo que alcança todos os que estão ao redor.", xp: 10, a: "FOR", p: 10, c: 7, area: true },
-      { n: "Tiro Certeiro", k: "dmg", d: "Respirar fundo, mirar com calma e disparar sem pressa.", xp: 15, a: "DES", p: 13, c: 4, ct: 60 },
+      { n: "Tiro Certeiro", req: "dist", k: "dmg", d: "Respirar fundo, mirar com calma e disparar sem pressa.", xp: 15, a: "DES", p: 13, c: 4, ct: 60 },
       { n: "Foco", k: "passive", d: "Um hábito de concentração que alarga a reserva de aura.", xp: 15, pas: "auraMax", p: 8 },
       { n: "Mente Firme", k: "passive", d: "A cabeça fria de quem já viu o pior e continua de pé.", xp: 15, pas: "sanMax", p: 10 },
       { n: "Grito de Guerra", k: "heal", d: "Um brado que faz o sangue ferver e acende o grupo.", xp: 20, a: "CAR", p: 0, c: 6, st: "atkUp", area: true },
       { n: "Passo Rápido", k: "heal", d: "Um incentivo curto, apressando o ritmo do aliado.", xp: 20, a: "AGI", p: 0, c: 4, st: "agiUp", ct: 50 },
       { n: "Golpe Limite", k: "dmg", d: "Toda a dor sofrida convertida em um golpe devastador.", xp: 40, a: "FOR", p: 48, c: 0, limit: true, fx: "rage .5" },
-    ],
-    [
-      { n: "Corte Rápido", k: "dmg", d: "Um talho curto de sabre, mais veloz que o piscar.", xp: 10, a: "FOR", p: 10, c: 3, req: "lamina", ct: 70 },
-      { n: "Estocada", k: "dmg", d: "Uma estocada de esgrima que perfura e faz sangrar.", xp: 10, a: "DES", p: 14, c: 5, req: "lamina", st: "bleed" },
-      { n: "Duelo de Sabres", k: "dmg", d: "Uma troca de golpes rápida, treinada em salões de esgrima.", xp: 15, a: "DES", p: 10, c: 7, req: "lamina", ct: 70, hits: 2 },
-      { n: "Dança de Lâminas", k: "dmg", d: "A lâmina gira em torno do corpo e corta o que está por perto.", xp: 20, a: "DES", p: 12, c: 8, req: "lamina", area: true },
-      { n: "Corte do Relâmpago", k: "dmg", d: "Um corte tão veloz que a lâmina some antes de acertar.", xp: 30, a: "FOR", p: 26, c: 9, req: "lamina", ct: 130 },
-      { n: "Golpe de Misericórdia", k: "dmg", d: "O golpe final de um soldado de elite, certeiro e pesado.", xp: 45, a: "FOR", p: 32, c: 12, req: "lamina", ct: 150, rq: { FOR: 55 }, fx: "exec 30 1.6" },
-    ],
-    [
-      { n: "Investida", k: "dmg", d: "Uma estocada em corrida, com o peso do corpo na ponta da lança.", xp: 10, a: "FOR", p: 16, c: 4, req: "lanca" },
-      { n: "Varredura", k: "dmg", d: "A haste varre o campo e derruba quem estiver na frente.", xp: 10, a: "FOR", p: 11, c: 7, req: "lanca", area: true },
-      { n: "Perfurar Armadura", k: "dmg", d: "Um golpe seco no ponto fraco que racha qualquer proteção.", xp: 15, a: "DES", p: 14, c: 6, req: "lanca", st: "defDn", fx: "pierce 50" },
-      { n: "Estoque Longo", k: "dmg", d: "A lança estendida ao máximo alcança onde o inimigo não espera.", xp: 20, a: "DES", p: 18, c: 6, req: "lanca" },
-      { n: "Empalar", k: "dmg", d: "Uma estocada funda que prende o alvo no lugar.", xp: 30, a: "FOR", p: 24, c: 10, req: "lanca", st: "stun" },
-      { n: "Lanceiro Implacável", k: "dmg", d: "Uma investida sem recuo, como uma carga de cavalaria.", xp: 45, a: "FOR", p: 30, c: 12, req: "lanca", ct: 140, rq: { FOR: 55 } },
-    ],
-    [
-      { n: "Tiro Duplo", k: "dmg", d: "Dois disparos seguidos, quase ao mesmo tempo.", xp: 10, a: "DES", p: 8, c: 4, req: "fogo", ct: 80, hits: 2 },
-      { n: "Tiro na Perna", k: "dmg", d: "Um tiro baixo que abala a mobilidade do inimigo.", xp: 10, a: "DES", p: 12, c: 5, req: "fogo", st: "agiDn" },
-      { n: "Rajada", k: "dmg", d: "Disparos em leque que cobrem toda a linha inimiga.", xp: 15, a: "DES", p: 12, c: 8, req: "fogo", area: true },
-      { n: "Tiro Ricochete", k: "dmg", d: "A bala bate na parede e acha o alvo pelas costas.", xp: 20, a: "DES", p: 18, c: 6, req: "fogo", fx: "chain 1 .7" },
-      { n: "Tiro Fatal", k: "dmg", d: "Um disparo calculado, direto entre os olhos.", xp: 30, a: "DES", p: 30, c: 9, req: "fogo", ct: 140 },
-      { n: "Saraivada", k: "dmg", d: "Uma chuva de balas despejada sem parar sobre o campo.", xp: 45, a: "DES", p: 20, c: 14, req: "fogo", area: true, ct: 130, rq: { DES: 55 } },
-    ],
-    [
-      { n: "Jab", k: "dmg", d: "Um soco curto e seco, quase sem preparo.", xp: 10, a: "DES", p: 8, c: 2, req: "punho", ct: 50 },
-      { n: "Gancho", k: "dmg", d: "Um gancho de baixo para cima que abala o queixo.", xp: 10, a: "FOR", p: 10, c: 6, req: "punho", st: "stun" },
-      { n: "Chute Giratório", k: "dmg", d: "Um chute em arco que alcança todos ao redor.", xp: 15, a: "AGI", p: 10, c: 7, req: "punho", area: true },
-      { n: "Cotovelada", k: "dmg", d: "Uma cotovelada seca no rosto, a curta distância.", xp: 20, a: "FOR", p: 16, c: 5, req: "punho" },
-      { n: "Punho de Ferro", k: "dmg", d: "Um soco acompanhado de todo o peso do corpo, capaz de amassar chapas.", xp: 30, a: "FOR", p: 24, c: 8, req: "punho", st: "defDn" },
-      { n: "Combo Furioso", k: "dmg", d: "Uma sequência de golpes sem fôlego, até o oponente cair.", xp: 45, a: "FOR", p: 11, c: 10, req: "punho", ct: 130, rq: { FOR: 55 }, hits: 3 },
     ],
     [
       { n: "Treino de FOR", k: "passive", d: "Dias de treino constante afinam a força.", xp: 15, pas: "FOR", p: 5 },
@@ -739,7 +708,6 @@ export const TREE = {
 };
 // ----- junção com arvore/ -----
 for (const [el, br] of Object.entries(VINC)) TREE[el].branches.push(...br);
-['lamina', 'lanca', 'fogo', 'punho'].forEach((wt, i) => TREE.marcial.branches[i + 1].push(...ARMAS[wt]));
 TREE.marcial.branches.push(...NOVOS);
 TREE.aura = { branches: AURA };
 TREE.oculto = { branches: OCULTO };
@@ -748,7 +716,17 @@ for (const [el, br] of Object.entries(SISTEMAS)) TREE[el].branches.push(...br);
 TREE.aura.branches.push(AURA_SIN);
 TREE.oculto.branches.push(OCULTO_PONTE);
 TREE.marcial.branches.push(MARCIAL_SIST, MARCIAL_LACOS);
-TREE.marcial.branches.push(...Object.values(ARMAS_NOVAS)); // estilos de arma novos: pesada, foco, corrente, arremesso, arco
+// Árvore de Armas (isolada, sem Vínculo): 4 ramos primordiais por categoria de golpe (corte, esmag, perf, dist) e, por tipo de arma, 3 ramos:
+// o clássico (que antes era do Marcial; o 1º nó leva `ramo` com o nome do tipo) e os 2 de ARMAS_ARV. `branches` é a lista plana (prim e depois cada tipo) para quem percorre todas as árvores.
+const ANT = { ...Object.fromEntries(['lamina', 'lanca', 'fogo', 'punho'].map(wt => [wt, [...ARMAS_BASE[wt], ...ARMAS[wt]]])), ...ARMAS_NOVAS };
+const NOME = { lamina: 'Lâmina', lanca: 'Lança', fogo: 'Armas de Fogo', punho: 'Punhos', pesada: 'Armas Pesadas', foco: 'Foco Místico', corrente: 'Corrente', arremesso: 'Arremesso', escudo: 'Escudo', instrumento: 'Instrumento', arco: 'Arco e Besta' };
+const ARM = { prim: ARMAS_ARV.prim, tipos: {} };
+for (const [wt, extra] of Object.entries(ARMAS_ARV.tipos)) {
+  const velho = ANT[wt].map((o, i) => i ? o : { ...o, ramo: NOME[wt] });
+  ARM.tipos[wt] = [velho, ...extra];
+}
+ARM.branches = [...Object.values(ARM.prim), ...Object.values(ARM.tipos).flat()];
+TREE.armas = ARM;
 // cartas portadas do Canva (ramos finais de cada setor)
 for (const [el, br] of Object.entries(CARTAS)) TREE[el].branches.push(...br);
 TREE.hiruko.branches.at(-1).push(...DOENCA_MAIS); // ramo da Doença completo

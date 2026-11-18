@@ -92,6 +92,11 @@
   const refScore = lvl => score({ wt: 'lamina', power: 10 + NIVEIS[lvl].p });
   const rel = i => Math.round(100 * score(i) / refScore(lvlOf(i))); // % do sabre simples do mesmo nível
   // faixa recomendada de orçamento por categoria (o resto do valor vem das técnicas e do elemento)
+  // categoria de golpe: o que a Árvore de Armas pede em `req` (um tipo, ou uma categoria que vários tipos cumprem) e em `sc: 'wc:<cat>'`
+  const CAT = { corte: ['lamina', 'arremesso', 'corrente'], esmag: ['pesada', 'punho', 'escudo'], perf: ['lanca', 'arco'], dist: ['fogo', 'arco', 'arremesso'] };
+  const CAT_N = { corte: 'Corte', esmag: 'Esmagamento', perf: 'Perfuração', dist: 'Distância' };
+  const reqOk = (req, wt) => !req || req === wt || !!CAT[req]?.includes(wt); // a arma empunhada (wt) cumpre o requisito?
+  const reqName = req => CAT_N[req] || TIPOS[req]?.n || req; // nome para mostrar
   const DIST = wt => !!TIPOS[wt]?.dist, MUN = wt => !!TIPOS[wt]?.mun; // tipos de distância (sem contra-ataque) e que usam munição
   const FAIXA = { basica: [90, 115], especial: [95, 125], elemental: [90, 120], lendaria: [115, 150], maldita: [120, 160] };
   const SUP = new Set(['escudo', 'instrumento']); // armas de apoio: o ataque é de propósito mais fraco, o valor está no bloqueio, na defesa e nas técnicas
@@ -516,5 +521,5 @@
   }
   // variante elemental de uma arma já pronta (rascunho novo; o chamador valida com clean)
   function variantEl(w, el) { const d = structuredClone(w); delete d.pk; delete d.base; delete d.sfxFrom; d.base = w.name; d.sfxFrom = 0; d.pk = []; const e = applyPack(d, 'el:' + el); return e ? null : d; }
-  g.ARMAS = { PK, PKG, applyPack, variantEl, faixaOf, SUP, DIST, MUN, TIPOS, CATS, NIVEIS, ELST, MOD: M, ULT, FAIXA, ATTRS, MODK, prof, basicFx, short, kv, fxOf, score, rel, lvlOf, make, skill, clean, traits };
+  g.ARMAS = { PK, PKG, applyPack, variantEl, faixaOf, SUP, DIST, MUN, CAT, CAT_N, reqOk, reqName, TIPOS, CATS, NIVEIS, ELST, MOD: M, ULT, FAIXA, ATTRS, MODK, prof, basicFx, short, kv, fxOf, score, rel, lvlOf, make, skill, clean, traits };
 })(globalThis);
