@@ -12,7 +12,7 @@ app.addEventListener('change', e => {
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type, ...(key ? { 'X-VJ-Key': encodeURIComponent(key) } : { 'X-VJ-User': encodeURIComponent(name), 'X-VJ-Pass': encodeURIComponent(pass) }) }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
-      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : d.up === 'hand' ? (hand.img = u, render()) : send({ t: 'set', id: d.id, f: 'img', v: u })).catch(() => toast('Falha no envio da imagem.', 'no', 'Aceita PNG, JPG, WEBP ou GIF de até 5 MB.'));
+      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : d.up === 'hand' ? (hand.img = u, render()) : send({ t: 'set', id: d.id, f: /^img[FBP]$/.test(d.up) ? d.up : 'img', v: u })).catch(() => toast('Falha no envio da imagem.', 'no', 'Aceita PNG, JPG, WEBP ou GIF de até 5 MB.'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
   else if (d.ini) send({ t: 'ini', k: 'set', id: d.ini, v });
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
@@ -68,6 +68,7 @@ app.addEventListener('click', e => {
   if (sl) { selCh = sl.dataset.sel; return render(); }
   if (!d && u) { if (LEQUE.clickTgt(u.dataset.tgt) || LEQUE.zoomClick(u.dataset.tgt)) return; if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
+  if (d.a === 'imgRm') return send({ t: 'set', id: d.id, f: d.k, v: '' }); // imagens de batalha: tira a frente, as costas ou o retrato
   if (d.a === 'openSheet') { if (gm) gOpen('f_' + d.id); else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual
     const saved = JSON.parse(localStorage.vj_lay || '{}');
@@ -284,3 +285,23 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => S && render(), 150); });
 if (gm || asWho ? key : name && pass) connect(); else loginForm();
+
+// ===== editor de enquadre das imagens de batalha (Ficha): arrastar move a figura, a roda aproxima, soltar envia imgK =====
+{
+  const chOf = id => S?.chars?.[id] || S?.bestiary?.[id];
+  const base = (el) => { const c = chOf(el.dataset.id), k = el.dataset.k, v = c?.imgK?.[k] || {}; return { id: el.dataset.id, k, x: +v.x || 0, y: +v.y || 0, z: +v.z || 1 }; };
+  const show = (el, v) => { const i = el.querySelector('img'); if (i) i.style.transform = PALCO3D.imgFit({ imgK: { [v.k]: v } }, v.k, { fallback: false }); };
+  const unit = el => el.classList.contains('por') ? [el.clientWidth, el.clientHeight] : [150, 150]; // retrato: % do quadro; figura: fração da altura (--h 150px)
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), r2 = v => Math.round(v * 100) / 100;
+  const fire = v => { send({ t: 'set', id: v.id, f: 'imgK', v: { k: v.k, x: r2(v.x), y: r2(v.y), z: r2(v.z) } }); setTimeout(() => { if (imgkLive === v) imgkLive = null; }, 800); };
+  let dr = null, wT = 0;
+  addEventListener('pointerdown', e => { const el = e.target.closest?.('.imgk'); if (!el || el.classList.contains('fb') || e.button !== 0) return; e.preventDefault();
+    const v = base(el); dr = { el, v, sx: e.clientX, sy: e.clientY, x0: v.x, y0: v.y, u: unit(el) }; imgkLive = v; el.setPointerCapture?.(e.pointerId); });
+  addEventListener('pointermove', e => { if (!dr) return; const v = dr.v; v.x = clamp(dr.x0 + (e.clientX - dr.sx) / dr.u[0], -1, 1); v.y = clamp(dr.y0 + (e.clientY - dr.sy) / dr.u[1], -1, 1);
+    const el = dr.el.isConnected ? dr.el : document.querySelector(`.imgk[data-id="${v.id}"][data-k="${v.k}"]`); if (el) show(el, v); });
+  addEventListener('pointerup', () => { if (!dr) return; const { v, x0, y0 } = dr; dr = null; if (v.x !== x0 || v.y !== y0) fire(v); else imgkLive = null; });
+  addEventListener('wheel', e => { const el = e.target.closest?.('.imgk'); if (!el || el.classList.contains('fb')) return; e.preventDefault();
+    const v = imgkLive && imgkLive.id === el.dataset.id && imgkLive.k === el.dataset.k ? imgkLive : (imgkLive = base(el)); v.z = clamp(v.z * Math.exp(-e.deltaY * .0015), .5, 3); show(el, v);
+    clearTimeout(wT); wT = setTimeout(() => fire(v), 350); }, { passive: false });
+  addEventListener('input', e => { const r = e.target; if (r.matches?.('.imgs input[type=range]')) { const o = r.parentElement.querySelector('output'); if (o) o.textContent = (+r.value).toFixed(1).replace('.', ',') + '×'; } });
+}

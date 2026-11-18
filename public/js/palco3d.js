@@ -44,6 +44,14 @@
     return { url: silhouette(c, false), fallback: true };
   };
 
+  // enquadre (imgK) da imagem própria: x, y em fração da altura da figura (−1..1) e z de 0,5 a 3; nunca na silhueta de reserva
+  // frente/costas: a figura tem altura var(--h) e gira pelos pés; retrato: deslocamento em % do próprio quadro, a partir do centro
+  const imgFit = (c, kind, src) => {
+    const k = c?.imgK?.[kind]; if (!k || typeof k !== 'object' || !src || src.fallback) return '';
+    const n = (v, a, b, d) => Math.min(b, Math.max(a, Number.isFinite(+v) && v !== null && v !== '' ? +v : d)), x = n(k.x, -1, 1, 0), y = n(k.y, -1, 1, 0), z = n(k.z, .5, 3, 1);
+    return kind === 'p' ? `translate(${+(x * 100).toFixed(1)}%,${+(y * 100).toFixed(1)}%) scale(${z})` : `translate(calc(${x} * var(--h)),calc(${y} * var(--h))) scale(${z})`;
+  };
+
   // as 6 skills do leque: fixadas (na ordem de pins), depois as mais usadas (contagem > 0, decrescente, empate pelo id); só as usáveis, sem repetir
   const pickSix = (pins, use, usable) => {
     const ok = new Set(usable), fix = [...new Set(pins || [])].filter(k => ok.has(k));
@@ -62,7 +70,7 @@
   };
 
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
-  const P = { formation, cameraFor, imgSrc, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { formation, cameraFor, imgSrc, imgFit, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
@@ -112,7 +120,7 @@
   };
 
   const setCls = (u, k, on) => { if (u.cls[k] !== on) { u.cls[k] = on; u.el.classList.toggle(k, on); } };
-  const setImg = u => { const s = imgSrc(u.c, 'f', u.bad); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } };
+  const setImg = u => { const s = imgSrc(u.c, 'f', u.bad), t = imgFit(u.c, 'f', s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e);

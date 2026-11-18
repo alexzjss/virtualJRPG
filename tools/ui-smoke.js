@@ -28,7 +28,8 @@ async function open(who, route, { phone = false, login } = {}) {
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' })); // sem internet: a fonte cai no padrão
   await ctx.addInitScript(() => { window.__osc = 0; const AC = window.AudioContext; if (AC) window.AudioContext = class extends AC { createOscillator() { window.__osc++; return super.createOscillator(); } }; }); // conta os sons sintetizados
   const page = await ctx.newPage();
-  page.on('console', m => { if (m.type() === 'error') { logs.push(`[${who}] console: ${m.text()}`); } });
+  page.on('console', m => { if (m.type() === 'error' && !/\/uploads\/nao-existe\.png$/.test(m.location()?.url || '')) { // o 404 da imagem quebrada de propósito (imagens de batalha) é esperado
+ logs.push(`[${who}] console: ${m.text()}`); } });
   page.on('pageerror', e => logs.push(`[${who}] erro de página: ${e.message}`));
   await page.goto(URL + route);
   if (login) { // login pelo formulário, como o usuário faria
@@ -532,6 +533,30 @@ try {
     await until(() => S.log.some(l => l.n > n && l.who === 'Shinkai'), 'pular manda a ação e o golpe sai');
     await until(async () => !(await ana.locator('.stage-cmd').count()), 'o minigame some da tela');
     go({ t: 'battle', on: false }); S.auto.act = auto0; push();
+  });
+
+  await section('imagens de batalha: ficha, enquadre e reserva', async () => {
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const ficha = async (p, id) => { await p.evaluate(id => { if (typeof gm !== 'undefined' && gm) gOpen('f_' + id); else { pg = 'pers'; selCh = id; } render(); }, id); };
+    await ficha(ana, shinkai.id);
+    check(await until(() => ana.locator('.imgb .iq').count(), 'seção de imagens na ficha'), 'a dona vê a seção "Imagens de batalha"');
+    check(await ana.locator('.imgb .iq').count() === 3 && await ana.locator('.imgb input[data-up=imgF]').count() === 1, 'herói: Frente, Costas e Retrato com envio');
+    check(/Use PNG com fundo transparente para o melhor resultado\./.test(await txt(ana, '.imgb')), 'dica do PNG transparente');
+    await ana.locator('.imgb input[data-up=imgF]').setInputFiles({ name: 'f.png', mimeType: 'image/png', buffer: PNG });
+    check(await until(() => /^\/uploads\//.test(shinkai.imgF || ''), 'frente enviada'), 'o envio grava a imagem de frente');
+    // enquadre: arrastar e soltar manda imgK.f; o tamanho manda imgS
+    { await ana.locator('.imgb .imgk[data-k=f]').scrollIntoViewIfNeeded(); const b = await ana.locator('.imgb .imgk[data-k=f]').boundingBox(); await ana.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await ana.mouse.down(); await ana.mouse.move(b.x + b.width / 2 + 20, b.y + b.height / 2 - 10, { steps: 4 }); await ana.mouse.up(); }
+    check(await until(() => shinkai.imgK?.f && shinkai.imgK.f.x > 0 && shinkai.imgK.f.y < 0, 'enquadre enviado'), `arrastar o enquadre grava imgK.f (${JSON.stringify(shinkai.imgK?.f)})`);
+    await ana.locator('.imgb input[data-f=imgS]').fill('1.6'); await ana.locator('.imgb input[data-f=imgS]').dispatchEvent('change');
+    check(await until(() => shinkai.imgS === 1.6, 'tamanho'), 'o controle de tamanho grava imgS');
+    // a Bia não vê os envios na ficha da Shinkai
+    await ficha(bia, shinkai.id); await sleep(300); check(!(await bia.locator(`.imgb input[type=file][data-id="${shinkai.id}"]`).count()) && !(await bia.locator(`.imgk[data-id="${shinkai.id}"]`).count()), 'outra jogadora não vê os envios nem o editor da Shinkai');
+    // no palco: o recorte usa a frente enviada com o enquadre; URL quebrada cai na reserva (silhueta), nunca em vazio (Review Focus 3)
+    go({ t: 'battle', on: true }); push(); await bia.evaluate(() => { pg = 'mesa'; render(); });
+    check(await until(() => bia.evaluate(([id, u]) => { const i = document.querySelector(`.p3d .bb[data-tgt="${id}"] img`); return i && i.getAttribute('src') === u && /scale/.test(i.style.transform); }, [shinkai.id, shinkai.imgF]), 'recorte com a frente'), 'o recorte usa a frente enviada, com o enquadre');
+    shinkai.imgF = '/uploads/nao-existe.png'; push();
+    check(await until(() => bia.evaluate(id => { const i = document.querySelector(`.p3d .bb[data-tgt="${id}"] img`); const s = i?.getAttribute('src') || ''; return s !== '' && s !== '/uploads/nao-existe.png' && !i.style.transform; }, shinkai.id), 'reserva'), 'imagem quebrada cai na reserva (sem enquadre aplicado à silhueta)');
+    shinkai.imgF = ''; shinkai.imgK = {}; shinkai.imgS = 1; go({ t: 'battle', on: false }); push();
   });
 
   // ---------- celular: transbordo, sobreposição e alvos de toque ----------

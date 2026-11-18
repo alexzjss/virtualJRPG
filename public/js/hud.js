@@ -3,7 +3,7 @@
 // O leque de comandos (pinceladas) mora em leque.js; as dicas de baixo mostram o que o teclado faz agora.
 let navOpen = false; // menu ☰ aberto (páginas do jogador, escondidas na barra de cima durante a batalha)
 const HUD = (() => {
-  const photo = (c, k) => `<img src="${esc(PALCO3D.imgSrc(c, k).url)}" alt="" draggable="false">`;
+  const photo = (c, k) => { const s = PALCO3D.imgSrc(c, k), t = PALCO3D.imgFit(c, k, s); return `<img src="${esc(s.url)}" alt="" draggable="false"${t ? ` style="transform:${esc(t)}"` : ''}>`; };
   const pct = (a, b) => Math.round(Math.max(0, Math.min(100, 100 * a / (b || 1))));
   const hint = (k, label, attrs = '', cls = '') => `<div class="hk ${cls}" ${attrs}>${k === '' ? '' : `<span class="key">${k}</span>`}${label}</div>`;
   let hlO = null; // retrato/recorte destacado pelo mouse (o #app é redesenhado, o recorte não)

@@ -104,6 +104,22 @@ function skTip(id, x, y, c) {
     : `<small>${PATRON[s.el] || ''} · ${KIND[s.kind] || s.kind}${s.limit ? ' · Limite' : ''}</small><b>${esc(s.name)}</b><small>${esc(desc(s))}</small><em>${has ? 'Aprendida' : RULES.xpCost(c, s) + ' XP'}</em>`;
 }
 
+// ===== imagens de batalha (Ficha e bestiário): frente, costas (só heróis) e retrato, com enquadre e tamanho na cena =====
+// O quadro .imgk é o editor: arrastar move a figura, a roda aproxima, soltar envia {t:'set', f:'imgK', v:{k, x, y, z}} (eventos.js)
+let imgkLive = null; // enquadre em edição {id, k, x, y, z}: o redesenho no meio do arraste não volta ao valor do servidor
+const IMGB = { f: ['imgF', 'Frente'], b: ['imgB', 'Costas'], p: ['imgP', 'Retrato'] };
+function imgBattle(c) {
+  if (!mine(c)) return '';
+  const quadro = k => { const [f, nm] = IMGB[k], src = PALCO3D.imgSrc(c, k), live = imgkLive && imgkLive.id === c.id && imgkLive.k === k ? imgkLive : null;
+    const fit = PALCO3D.imgFit(live ? { imgK: { [k]: live } } : c, k, src), own = !!c[f];
+    return `<div class="iq"><em>${nm}</em><div class="imgk ${k === 'p' ? 'por' : 'fig'} ${src.fallback ? 'fb' : ''}" data-k="${k}" data-id="${c.id}" title="${src.fallback ? 'Sem imagem: a cena usa a figura padrão' : 'Arraste para mover, use a roda para aproximar'}">${k === 'p' ? '' : '<i class="chao"></i>'}<img src="${esc(src.url)}" alt="" draggable="false"${fit ? ` style="transform:${esc(fit)}"` : ''}></div>
+      <div class="row"><label class="up">Enviar<input type="file" accept="image/*" data-up="${f}" data-id="${c.id}"></label>${own ? `<button type="button" class="ghost" data-a="imgRm" data-id="${c.id}" data-k="${f}">Remover</button>` : ''}</div></div>`; };
+  const sz = Math.min(2.5, Math.max(.5, +c.imgS || 1));
+  return `<div class="card wide imgb"><h3>Imagens de batalha <small>como aparece no palco 3D do computador</small></h3>
+    <p class="hint">Use PNG com fundo transparente para o melhor resultado.</p>
+    <div class="imgq">${(c.enemy ? ['f', 'p'] : ['f', 'b', 'p']).map(quadro).join('')}</div>
+    <label class="imgs">Tamanho na cena <input type="range" min="0.5" max="2.5" step="0.1" data-id="${c.id}" data-f="imgS" value="${sz}"><output>${sz.toFixed(1).replace('.', ',')}×</output></label></div>`;
+}
 function persPage(c) {
   const eqn = slot => eq(c, slot) ? `<b>${esc(eq(c, slot).name)}</b><small>${esc(idesc(eq(c, slot)))}</small>${wpnInfo(eq(c, slot), c)}${upInfo(c, c.equip[slot], eq(c, slot))}` : slot === 'arma' ? `<b class="none">Punhos</b><small>${esc(wpnLine(null, c))} · equipe uma arma na página Itens</small>` : '<b class="none">Vazio</b><small>equipe na página Itens</small>';
   const res = k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${edv(c, k, c[k])}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`;
@@ -118,7 +134,7 @@ function persPage(c) {
         <div class="resg">${res('hp')}${res('aura')}${res('san')}${res('limit')}</div><div class="sts big">${sts || '<small>Sem condições ativas.</small>'}</div></div></div>
     <div class="pp-grid"><div class="card wide"><h3>Atributos <small>${gm ? 'clique no número para editar, na sigla para rolar' : `toque para rolar o d100${gated('roll') ? ' (o mestre aprova)' : ''}`}</small></h3><div class="tiles">${A.map(tile).join('')}</div>
         <p class="hint">${gm ? `<label>Modificador da rolagem <input type="number" class="mod" data-mid="${c.id}" value="${mods[c.id] || 0}"></label> ` : ''}<span><i class="mkd"></i> marca os atributos usados com sucesso: eles podem evoluir no descanso longo.</span></p></div>
-      <div class="card"><h3>Ferimentos</h3>${bodyFig(c)}</div>
+      <div class="card"><h3>Ferimentos</h3>${bodyFig(c)}</div>${imgBattle(c)}
       <div class="card"><h3>Equipamento</h3><div class="slots"><div><em>Arma</em>${eqn('arma')}</div><div><em>Armadura</em>${eqn('armadura')}</div><div><em>Acessório</em>${eqn('acess')}</div><div><em>Munição</em>${munLine(c)}</div></div>
         <h3>Afinidades</h3><div class="row chips">${[...c.weak.map(k => `<span class="weak">Fraco: ${EL[k]}</span>`), ...c.resist.map(k => `<span class="res">Resiste: ${EL[k]}</span>`), eq(c, 'acess')?.el ? `<span class="res">Resiste: ${EL[eq(c, 'acess').el]}</span>` : ''].join('') || '<small>Nenhuma fraqueza ou resistência.</small>'}</div></div>
       ${S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips({ ...CAMPL, ...campExtra(c) }, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}" data-w="${campWith[c.id] || S.camp.with?.[c.id] || ''}">${l}</span>`)}</div><div class="row"><label>Conversar com <select data-a="campWith" data-id="${c.id}"><option value="">ninguém em especial</option>${Object.values(S.chars).filter(o => !o.enemy && o.id !== c.id && !o.summon).map(o => `<option value="${o.id}" ${(campWith[c.id] || S.camp.with?.[c.id]) === o.id ? 'selected' : ''}>${esc(o.name)} · laço ${RULES.bondLv(S.bonds?.[[c.id, o.id].sort().join('|')] || 0)}</option>`).join('')}</select></label></div></div>` : ''}
