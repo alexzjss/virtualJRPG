@@ -168,6 +168,7 @@ const H = {
     sc.rows = Math.max(1, Math.round(sc.cols / sc.ar * 1000) / 1000);
     if (m.f === 'bg') sc.bg = okUrl(m.v) ? m.v : '';
     if (m.f === 'bbg') sc.bbg = BBG.includes(m.v) || okUrl(m.v) ? m.v : ''; // fundo da batalha: tema pronto, imagem própria ou '' (usa o mapa)
+    if (m.f === 'bbL') { const L = {}; for (const k of ['ceu', 'frente']) if (okUrl(m.v?.[k])) L[k] = m.v[k]; sc.bbL = Object.keys(L).length ? L : undefined; } // camadas do parallax: céu (atrás) e frente (PNG); só URL válida
     if (m.f === 'clima') sc.clima = CLIMA.includes(m.v) ? m.v : ''; // clima visual sobreposto: '' (nenhum) ou um da lista
     if (m.f === 'name') sc.name = String(m.v).slice(0, 30) || '?';
     if (m.f === 'fogOn') sc.fogOn = !!m.v;
@@ -259,6 +260,7 @@ const H = {
       else if (S.meal && --S.meal.left <= 0) delete S.meal;
       pcs.forEach(o => { delete o.sharp; });
     }
+    const end = !m.on && S.battle.active ? (m.win ? 'win' : pcs.length && pcs.every(p => p.hp <= 0) ? 'lose' : 'flee') : ''; // o palco faz a pose final certa
     S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
     if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
     if (m.on) S.battle.ax = RU.axisOf(Object.keys(S.battle.ticks).map(k => S.chars[k])); // eixo do palco 3D: fixo até o mestre reenquadrar
@@ -270,7 +272,7 @@ const H = {
       if (S.tenac) { hs.forEach(h => { h.st.endure = 1; }); delete S.tenac; }
       hs.forEach(spawnCompanions); trapStart();
     }
-    log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.');
+    log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.', '', end ? { end } : undefined);
   },
   battleReframe(c) {
     if (c.role !== 'gm' || !S.battle.active) return;

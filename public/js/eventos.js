@@ -12,11 +12,12 @@ app.addEventListener('change', e => {
   if (d.up) {
     const f = el.files[0];
     if (f) fetch('/upload', { method: 'POST', headers: { 'Content-Type': f.type, ...(key ? { 'X-VJ-Key': encodeURIComponent(key) } : { 'X-VJ-User': encodeURIComponent(name), 'X-VJ-Pass': encodeURIComponent(pass) }) }, body: f }).then(r => r.ok ? r.text() : Promise.reject())
-      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : d.up === 'hand' ? (hand.img = u, render()) : send({ t: 'set', id: d.id, f: /^img[FBP]$/.test(d.up) ? d.up : 'img', v: u })).catch(() => toast('Falha no envio da imagem.', 'no', 'Aceita PNG, JPG, WEBP ou GIF de até 5 MB.'));
+      .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : /^bbL:/.test(d.up) ? send({ t: 'map', f: 'bbL', v: ({ ...(S.scenes[S.scene]?.bbL || {}), [d.up.slice(4)]: u }) }) : d.up === 'hand' ? (hand.img = u, render()) : send({ t: 'set', id: d.id, f: /^img[FBP]$/.test(d.up) ? d.up : 'img', v: u })).catch(() => toast('Falha no envio da imagem.', 'no', 'Aceita PNG, JPG, WEBP ou GIF de até 5 MB.'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
   else if (d.ini) send({ t: 'ini', k: 'set', id: d.ini, v });
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
   else if (d.map === 'bg') setBg(v);
+  else if (/^bbL:/.test(d.map)) send({ t: 'map', f: 'bbL', v: ({ ...(S.scenes[S.scene]?.bbL || {}), [d.map.slice(4)]: v }) }); // camadas do parallax
   else if (d.map) send({ t: 'map', f: d.map, v });
   else if (d.mid) mods[d.mid] = v;
   else if (d.sess) sess[d.sess] = v;
@@ -156,6 +157,7 @@ app.addEventListener('click', e => {
   if (d.a === 'myPass') { const p = prompt('Senha nova (pelo menos 4 caracteres):'); if (!p) return; if (prompt('Digite a senha nova de novo:') !== p) return toast('As duas senhas não batem.', 'no'); return send({ t: 'userPass', pass: p }); }
   if (d.a === 'userAdd') { const n = sess.n.trim(), p = sess.p || genPass(); if (!n) return toast('Escreva o login.', 'no'); send({ t: 'userAdd', name: n, pass: p, char: sess.ch }); sess.last = { n, p }; sess.n = ''; sess.p = ''; sess.ch = ''; return render(); }
   if (d.a === 'userPass') { const p = prompt(`Senha nova para ${d.k}:`, genPass()); if (!p) return; send({ t: 'userPass', name: d.k, pass: p }); sess.last = { n: d.k, p }; return render(); }
+  if (d.a === 'replay') { replayAct(+d.n); return; } // rever o golpe, só nesta tela
   if (d.a === 'logClear') { if (confirm('Apagar todo o chat e o histórico para todos? Não dá para desfazer.')) send({ t: 'logClear' }); return; }
   if (d.a === 'userDel') { if (confirm(`Apagar a conta ${d.k}? Os personagens dela ficam sem dono.`)) send({ t: 'userDel', name: d.k }); return; }
   if (d.a === 'giveChar') { const id = prompt('Qual personagem? Digite o número:\n' + heroes().map((c, i) => `${i + 1}. ${c.name}${c.owner ? ' (de ' + c.owner + ')' : ''}`).join('\n')); const c = heroes()[+id - 1]; if (c) send({ t: 'set', id: c.id, f: 'owner', v: d.k }); return; }

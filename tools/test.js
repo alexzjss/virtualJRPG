@@ -1593,3 +1593,99 @@ test('CENA: tempo virtual com congelamento e câmera lenta', async () => {
   let prev = -1; for (let r = 0; r <= 300; r += 7) { const v = C.virtualAt(r, [{ t0: 20, t1: 90, f: 0 }, { t0: 60, t1: 200, f: .3 }]); assert.ok(v >= prev); prev = v; }
   C.reset(); assert.equal(C.factor(), 1);
 });
+test('PFX: hitstop, tremida, slow e grupos de golpes', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX;
+  assert.equal(F.hitstopMs(0, false, false), 0); assert.equal(F.hitstopMs(.05, false, false), 70); assert.equal(F.hitstopMs(.4, false, false), 140);
+  assert.equal(F.hitstopMs(.1, true, false), 110); assert.equal(F.hitstopMs(.4, true, false), 160); assert.equal(F.hitstopMs(.01, false, true), 160);
+  assert.equal(F.shakeAmp(0, false), 0); assert.equal(F.shakeAmp(.1, false), 8); assert.equal(F.shakeAmp(.2, true), 20); assert.equal(F.shakeAmp(.5, true), 28);
+  const k = F.shakeKeys(10, -1); assert.equal(k.length, 7); assert.equal(k[0].transform, 'translate(0px,0px)'); assert.equal(k[6].transform, 'translate(0px,0px)'); assert.match(k[1].transform, /^translate\(-10px,/);
+  assert.deepEqual(F.slowFor({ ko: true, lastFoe: true }), { f: .3, ms: 1000, zoom: true }); assert.deepEqual(F.slowFor({ ko: true, lastFoe: false }), { f: .5, ms: 400, zoom: false });
+  assert.equal(F.slowFor({ ko: false }), null); assert.equal(F.slowFor({ ko: true, lastFoe: true, reduced: true }), null);
+  const g = F.groupHits([{ fx: { id: 'e', a: 'h', s: 'X', dmg: 3 } }, { fx: { id: 'e', a: 'h', s: 'X', dmg: 4 } }, { fx: { id: 'f', a: 'h', s: 'X', dmg: 2 } }, { fx: { id: 'e', a: 'h', s: 'X', miss: 1 } }]);
+  assert.deepEqual(g.map(x => [x.id, x.parts.length, x.total]), [['e', 2, 7], ['f', 1, 2], ['e', 1, 0]]);
+});
+test('PFX: arco dos números e plano do rastro da barra', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX, P = { vx: 50 };
+  assert.deepEqual(F.numberPath(0, P), { x: 0, y: 0, a: 1 });
+  for (let t = 0; t <= 1.3; t += .02) assert.ok(F.numberPath(t, P).y <= 70.001);
+  assert.equal(F.numberPath(1.2, P).a, 0); assert.equal(F.numberPath(.5, P).a, 1);
+  assert.equal(F.numberSeed(0, false).vx, -40); assert.equal(F.numberSeed(1, false).vx, 77); assert.equal(F.numberSeed(0, true).vy, -680);
+  assert.deepEqual(F.trailPlan(80, 50), { heal: false, bar: { to: 50, delay: 0 }, trail: { from: 80, to: 50, delay: 450 } });
+  assert.deepEqual(F.trailPlan(50, 80), { heal: true, bar: { to: 80, delay: 450 }, trail: { from: 50, to: 80, delay: 0 } });
+  assert.equal(F.trailPlan(50, 50), null);
+});
+test('PFX: recuo e arco da investida', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX;
+  assert.deepEqual(F.recoilVec({ x: 0, z: 0 }, { x: 0, z: -1000 }, .1, false), { dx: 0, dz: -48, tilt: 6, kneel: false });
+  assert.deepEqual(F.recoilVec({ x: 0, z: 0 }, { x: 300, z: 0 }, .5, true), { dx: 120, dz: 0, tilt: 14, kneel: true });
+  assert.equal(F.recoilVec({ x: 5, z: 5 }, { x: 5, z: 5 }, .3, false).dz, 84);
+  assert.equal(F.recoilVec({ x: 0, z: 0 }, { x: 0, z: -10 }, .25, false).kneel, true);
+  assert.deepEqual(F.lungeArc('smash'), { h: 220, crouch: .1, ease: 'cubic-bezier(.3,0,.4,1)' });
+  assert.deepEqual(F.lungeArc('dash'), { h: 0, crouch: .06, ease: 'cubic-bezier(.2,.9,.3,1)' });
+  assert.deepEqual(F.lungeArc('pierce'), { h: 0, crouch: 0, ease: 'linear' });
+  assert.deepEqual(F.lungeArc('slash'), { h: 80, crouch: .04, ease: 'cubic-bezier(.4,0,.2,1)' });
+  assert.deepEqual(F.lungeArc('beam'), { h: 60, crouch: .04, ease: 'cubic-bezier(.4,0,.2,1)' });
+});
+test('PFX: camadas, partículas e luz', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX;
+  assert.deepEqual(F.layerPlanes({ bbL: { ceu: '/a.png', frente: '/b.png' } }), [{ key: 'ceu', url: '/a.png', z: -4200, k: 1.444 }, { key: 'frente', url: '/b.png', z: -700, k: .472 }]);
+  assert.deepEqual(F.layerPlanes({}), []);
+  assert.equal(F.particleCount('high', false), 80); assert.equal(F.particleCount('auto', false), 80); assert.equal(F.particleCount('medium', false), 48); assert.equal(F.particleCount('low', false), 24); assert.equal(F.particleCount('high', true), 0);
+  const ps = F.particlesFor('neve', 30, 7); assert.equal(ps.length, 30); assert.ok(ps.every(p => p.kind === 'floco' && p.x >= -1400 && p.x <= 1400 && p.z >= -3200 && p.z <= 400 && p.dur >= 6 && p.dur <= 10));
+  assert.deepEqual(F.particlesFor('neve', 30, 7), ps);
+  assert.equal(F.particlesFor('', 30, 7).length, 0);
+  const L = F.litUnits(new Map([['a', { x: 0, z: 0 }], ['b', { x: 300, z: 0 }], ['c', { x: 900, z: 0 }]]), { x: 0, z: 0 });
+  assert.deepEqual(L, [{ id: 'a', k: 1 }, { id: 'b', k: .5 }]);
+});
+test('PFX: poses, auras, buffs e escudo', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX;
+  assert.deepEqual(F.poseOf({ hp: 0, hpMax: 10, limit: 100 }), ['ko']);
+  assert.deepEqual(F.poseOf({ hp: 2, hpMax: 10, limit: 100 }), ['ferido', 'limite']);
+  assert.deepEqual(F.poseOf({ hp: 9, hpMax: 10, limit: 40 }), []);
+  assert.deepEqual(F.auraOf({ poison: 2, frozen: 1, fear: 1, dread: 1, wet: 1 }), ['gelo', 'bolhas', 'tremor']);
+  assert.deepEqual(F.auraOf({ atkUp: 1 }), []);
+  assert.deepEqual(F.buffsOf({ atkUp: 1, agiDn: 2 }), [{ k: 'atk', dir: 1, col: '#ff493d' }, { k: 'agi', dir: -1, col: '#45e6b3' }]);
+  assert.deepEqual(F.buffDiff({ atkUp: 1 }, { atkUp: 1, defDn: 1 }), [{ k: 'def', dir: -1, col: '#e39b46' }]);
+  assert.deepEqual(F.shieldCracks(0, 30), { on: false, cracks: 0 }); assert.deepEqual(F.shieldCracks(30, 30), { on: true, cracks: 0 });
+  assert.deepEqual(F.shieldCracks(15, 30), { on: true, cracks: 1 }); assert.deepEqual(F.shieldCracks(5, 30), { on: true, cracks: 2 });
+});
+test('PFX: segmentos por quem age (o contra vira cena própria)', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX;
+  const s = F.segments([{ fx: { a: 'e', id: 'h' } }, { fx: { a: 'e', id: 'h' } }, { fx: { id: 'h' } }, { fx: { a: 'h', id: 'e', ctr: 1 } }]);
+  assert.deepEqual(s.map(x => x.length), [3, 1]); assert.equal(s[1][0].fx.ctr, 1);
+});
+test('PFX: actsAround junta o golpe inteiro e para no resto do log', async () => {
+  await import('../public/js/palco-fx.js'); const F = globalThis.PFX;
+  const L = [{ n: 1, text: 'oi' }, { n: 2, fx: { a: 'h', s: 'X', id: 'e' } }, { n: 3, fx: { a: 'h', s: 'X', id: 'f' } }, { n: 4, fx: { a: 'e', s: 'Y', id: 'h' } }, { n: 5, fx: { a: 'h', s: 'X', id: 'e' } }];
+  assert.deepEqual(F.actsAround(L, 3).map(e => e.n), [2, 3]); assert.deepEqual(F.actsAround(L, 5).map(e => e.n), [5]); assert.deepEqual(F.actsAround(L, 1), []);
+});
+test('palco 3D: órbita e contracampo do inimigo', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, at = { x: 200, z: -300 };
+  const o = P.cameraFor({ kind: 'orbit', at, ry0: 10, deg: 45 }), A = P.rotP(at, 55);
+  assert.equal(o.ry, 55); assert.equal(o.tx, Math.round(-A.x)); assert.equal(o.tz, Math.round(-A.z - 620)); assert.equal(o.ty, -60);
+  const foe = { x: 0, z: -2000 }, hero = { x: 0, z: 0 }, c = P.cameraFor({ kind: 'table', at: foe, pts: [foe, hero], w: 1440, foe: true });
+  assert.equal(P.unitKind({}, c.ry), 'f');
+});
+test('palco 3D: chefe no centro ao fundo, lacaios abrindo o arco, ninguém colado', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, fr = P.frame({ a: 0, cx: 0, cy: 0, d: 8 }, 20, 10);
+  const F = P.formation([{ id: 'h' }, { id: 'b', enemy: true, boss: true }, { id: 'm1', enemy: true }, { id: 'm2', enemy: true }, { id: 'm3', enemy: true }], fr);
+  assert.deepEqual(F.get('b'), { x: 0, z: -fr.D - 250 });
+  assert.deepEqual(F.get('m1'), { x: -420, z: -fr.D }); assert.deepEqual(F.get('m2'), { x: 420, z: -fr.D }); assert.deepEqual(F.get('m3'), { x: -760, z: -fr.D + 120 });
+  const G = P.formation([{ id: 'b1', enemy: true, boss: true }, { id: 'b2', enemy: true, boss: true }, { id: 'g', enemy: true, boss: true, x: 0, y: 0 }], fr), v = [...G.values()];
+  for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) assert.ok(Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z) >= 229);
+});
+test('cena: camadas do parallax vêm do mestre e só aceitam URL válida', () => {
+  reset(); H.map(gm, { f: 'bbL', v: { ceu: '/uploads/c.png', frente: 'javascript:x' } });
+  assert.deepEqual(S.scenes[S.scene].bbL, { ceu: '/uploads/c.png' });
+  H.map(gm, { f: 'bbL', v: {} }); assert.equal(S.scenes[S.scene].bbL, undefined);
+});
+test('scrub manda escudo e forma do inimigo', async () => {
+  const { scrub } = await import('../src/net.js'); reset(); const e = mk(gm, { enemy: true, name: 'Y' }); e.shield = 10; e.form = 'k';
+  const p = scrub(e); assert.ok(p.shield > 0); assert.equal(p.form, 'k');
+});
+test('fim de batalha marca vitória, derrota ou fuga no log', () => {
+  const end = () => S.log.filter(e => /Batalha encerrada/.test(e.text)).at(-1)?.end;
+  reset(); let h = mk(ana, {}), e = mk(gm, { enemy: true }); H.battle(gm, { on: true }); e.hp = 0; H.battle(gm, { on: false, win: true }); assert.equal(end(), 'win');
+  reset(); h = mk(ana, {}); e = mk(gm, { enemy: true }); H.battle(gm, { on: true }); h.hp = 0; H.battle(gm, { on: false }); assert.equal(end(), 'lose');
+  reset(); h = mk(ana, {}); e = mk(gm, { enemy: true }); H.battle(gm, { on: true }); H.battle(gm, { on: false }); assert.equal(end(), 'flee');
+});

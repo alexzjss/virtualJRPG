@@ -153,7 +153,6 @@
     if (reduced() || qLevel() < .5) return;
     for (const p of persist) { const r = rect(p.id); if (!r) continue; const f = footPoint(r), sc = scaleOf(r), t = now / 1000, col = ELS[p.el]?.[1] || '#ffffff';
       const ringAt = (R, c, a) => { ell(f, R * sc, R * sc * .28); stroke(c, 2.5, a); };
-      if (p.shield) ringAt(46 + Math.sin(t * 2) * 2, '#77c8ff', .45);
       if (p.form) ringAt(38 + Math.sin(t * 3) * 3, col, .5);
       p.states.slice(0, 3).forEach((s, j) => { const pc = ELS[p.el] || ELS.fis, a = t * (.9 + j * .2) + j * 2.1; ell({ x: f.x + Math.cos(a) * 34 * sc, y: f.y + Math.sin(a) * 9 * sc }, 3 * sc, 2 * sc); paint(pc[j % 3], .7, 0); });
     }
@@ -162,7 +161,8 @@
     raf = 0; resize(); if (last) { const inst = 1000 / Math.max(1, now - last); fps = fps * .94 + inst * .06; if (defaults.quality === 'auto') autoLow = fps < 43 ? true : fps > 56 ? false : autoLow; } last = now;
     const vt = clockNow(); ctx.clearRect(0, 0, W, H); drawPersistent(vt);
     effects = effects.filter(e => { drawOne(e, vt); return vt < e.start + e.profile.duration; });
-    if (effects.length || persist.length) raf = requestAnimationFrame(frame);
+    extras = extras.filter(x => { const k = clamp((vt - x.start) / x.dur); x.draw(k); return k < 1; });
+    if (effects.length || persist.length || extras.length) raf = requestAnimationFrame(frame);
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   function play({ actorId, targetIds = [], skill, fx = {}, delay = 0 } = {}) {
@@ -173,6 +173,14 @@
     const impactMs = Math.round(P.duration * P.impact + delay), doneMs = Math.round(P.duration + delay);
     return { profile: P, impact: later(impactMs), done: later(doneMs) };
   }
+  // efeitos avulsos (faísca do parry, tinta do KO): desenho por fração k de 0 a 1
+  let extras = [];
+  const extra = (dur, draw) => { extras.push({ start: clockNow(), dur, draw }); kick(); };
+  function sparks(x, y, color = '#ffd36a', n = 14) { if (reduced()) return; const sd = ++seq * 13;
+    extra(260, k => { for (let i = 0; i < n; i++) { const a = i * TAU / n + rnd(sd + i) * .5, d0 = 8 + k * 70 * (.6 + rnd(sd + i + 50) * .6), d1 = d0 + 18 * (1 - k); ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * d0, y + Math.sin(a) * d0); ctx.lineTo(x + Math.cos(a) * d1, y + Math.sin(a) * d1); stroke(i % 3 ? color : '#fff', 3.5 * (1 - k) + .5, 1 - k * .8); } }); }
+  function ink(r, color = '#e4002b', ms = 900) { if (!r || !r.width) return; const sd = ++seq * 7, n = 12, cx = r.left + r.width / 2, sc = clamp(r.height / 300, .4, 2);
+    extra(reduced() ? 260 : ms, k => { for (let i = 0; i < n; i++) { const y = r.top + r.height * (i + .5) / n - 40 * k * rnd(sd + i + 5), len = r.width * (.4 + rnd(sd + i + 9) * .5) * (.3 + k), x0 = cx + (rnd(sd + i) - .5) * r.width * .4 + (rnd(sd + i + 3) - .5) * 160 * k;
+      ribbon([{ x: x0 - len / 2, y }, { x: x0, y: y - 6 }, { x: x0 + len / 2, y: y + 3 }], 10 * (1 - k * .7) * sc, i % 2 ? color : INK, 1 - k, 0, sd + i); } }); }
   function sync() {
     const B = g.S?.battle; if (!B?.active) { persist = []; return; }
     persist = Object.values(g.S.chars || {}).filter(c => c.id in B.ticks && c.hp > 0).map(c => ({ id: c.id, el: typeof g.mainEl === 'function' ? g.mainEl(c) : 'fis', shield: !!c.shield, form: !!c.form, states: Object.keys(c.st || {}) })); kick();
@@ -181,5 +189,5 @@
   const setQuality = v => { if (!['auto', 'low', 'medium', 'high'].includes(v)) return; defaults.quality = v; localStorage.setItem('vj_anim_quality', v); resize(); kick(); };
   const setSpeed = v => { defaults.speed = clamp(+v || 1, .5, 2); localStorage.setItem('vj_anim_speed', defaults.speed); };
   const setFlashes = v => { defaults.flashes = !!v; localStorage.setItem('vj_anim_flash', v ? '1' : '0'); };
-  g.ANIMFX = { play, profile, sync, flash, setQuality, setSpeed, setFlashes, settings: defaults, familyOf, palette: ELS };
+  g.ANIMFX = { sparks, ink, play, profile, sync, flash, setQuality, setSpeed, setFlashes, settings: defaults, familyOf, palette: ELS };
 })();

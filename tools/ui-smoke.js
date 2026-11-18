@@ -192,6 +192,11 @@ try {
     minion.st.burn = 3; shinkai.st.burn = 3; push();
     await until(() => vis(anaD, `.p3d .bb[data-tgt="${minion.id}"] .sti[data-st=burn]`), 'condição do inimigo sobre o recorte');
     await until(() => vis(anaD, `.pm[data-tgt="${shinkai.id}"] .sti[data-st=burn]`), 'condição do herói no grupo');
+    // polimento: aura da condição no recorte (o mesmo nó depois de outro desenho), mundo com tremida e relógio de cena solto
+    { const sel = `.p3d .bb[data-tgt="${minion.id}"] .aura[data-a~=brasas]`; await until(() => anaD.locator(sel).count(), 'aura de queimadura no recorte');
+      await anaD.evaluate(q => { window.__aura = document.querySelector(q); render(); }, sel); check(await anaD.evaluate(q => document.querySelector(q) === window.__aura, sel), 'a aura sobrevive ao redesenho (mesmo nó)');
+      check(await anaD.evaluate(() => !!document.querySelector('.p3d .shk .drift .world') && CENA.factor() === 1), 'palco com tremida e deriva, relógio de cena em 1×');
+      await anaD.evaluate(() => replayAct(-1)); check(await anaD.evaluate(() => !document.querySelector('.fxl .rpltag')), 'replay de entrada inexistente não roda'); }
     delete minion.st.burn; delete shinkai.st.burn; push();
     // as animações do coreo não podem tirar o recorte do lugar (X1): o .bb só posiciona, quem anima é o .bbi
     const pos = await anaD.evaluate(id => { const e = document.querySelector(`.p3d .bb[data-tgt="${id}"]`); e.classList.add('ko', 'kofall', 'hit', 'cast', 'dodge', 'lunge');

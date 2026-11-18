@@ -1391,6 +1391,9 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .pl.bat3 .stage3d.full{height:calc(100vh - 62px);min-height:300px}
 .pl.bat3 .chatcol{position:fixed;z-index:60;right:0;top:62px;bottom:0;width:340px;max-height:none;background:var(--ink);border-left:3px solid var(--red)}
 .pl.bat3 .chatcol .panel{height:100%}
+.pl.bat3 .chatcol header button{display:inline-flex}
+.p3d-reset{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:5;pointer-events:auto;padding:6px 14px;border:2px solid var(--red,#e4002b);background:rgba(10,8,12,.85);color:#fff;font:600 13px system-ui,sans-serif;letter-spacing:.5px;cursor:pointer}
+.p3d-reset[hidden]{display:none}
 .stage3d.hudp{z-index:11;pointer-events:none;background:none}
 /* ficha do alvo (ao lado do recorte) e barra do topo: mira e zoom no palco 3D */
 .hud-top{left:calc(200px*var(--hk,.85));top:calc(18px*var(--hk,.85));width:480px;text-align:center;transform:scale(var(--hk,.85));transform-origin:0 0;pointer-events:none}
@@ -1433,3 +1436,103 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .hrq div{grid-column:1/-1;display:flex;gap:6px;margin-top:4px}.hrq button{min-height:0;padding:3px 10px;font:600 13px var(--cond)}.hrq .ok{background:var(--gold);color:#000}.hrq kbd{font-size:10px;opacity:.7}
 .hud-req .more{color:var(--dim);font:600 12px var(--cond)}
 .lq-sum .offside{color:#ffc93c;font-size:15px}
+
+/* ===== polimento do palco 3D: peso do golpe, câmera, cenário, estados no recorte, reações e fim ===== */
+.p3d .shk,.p3d .drift{position:absolute;inset:0;transform-style:preserve-3d}
+.p3d .drift{transform-origin:50% 50% -600px;animation:p3drift 16s ease-in-out infinite alternate}
+@keyframes p3drift{from{transform:rotateY(-2deg) translateY(-4px)}to{transform:rotateY(2deg) translateY(4px)}}
+.p3d.locked .drift,.p3d.selecting .drift{animation-play-state:paused}
+.p3d::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,#0000 45%,#000c 100%);opacity:0;transition:opacity .2s}
+.p3d.vinheta::after{opacity:.55}
+.p3d.derrota{filter:grayscale(1) brightness(.7);transition:filter 1s}
+/* recuo, arco da investida e sombra viva */
+@property --lift{syntax:'<number>';inherits:true;initial-value:0}
+.p3d .bb{transform:translate3d(calc((var(--x,0) + var(--rx,0)) * 1px),0,calc((var(--z,0) + var(--rz,0)) * 1px)) translate(-50%,-100%) rotateY(calc(var(--bry,0deg) * -1))}
+.p3d .bb.rc{transition:transform .3s ease-out,filter .3s,opacity .25s}
+.p3d .bb img{rotate:var(--tilt,0deg)}
+.p3d .bb.kneel .bbi{scale:1 .86;transition:scale .12s}
+.p3d .bb.lunging{transition-timing-function:var(--lg-ease,cubic-bezier(.4,0,.2,1))}
+.p3d .bb.arc{animation:bblift var(--lg,.45s) both}@keyframes bblift{50%{--lift:.75}}
+.p3d .bb.arc .bbi{animation:bbarc var(--lg,.45s) var(--lg-ease,ease) both}
+@keyframes bbarc{0%{translate:0 0}15%{translate:0 calc(var(--crouch,0) * 100%)}50%{translate:0 calc(var(--arc-h,0) * -1px)}100%{translate:0 0}}
+.p3d .bb .shadow{transform:scale(calc(1 - var(--lift,0) * .5));opacity:calc(1 - var(--lift,0) * .6)}
+.p3d .bb.lit .shadow{translate:calc(var(--litk,0) * -24px) 0}
+.p3d .bb.foe.ko .shadow,.p3d .bb.inked .shadow{display:none}
+/* números com física, barras com rastro */
+.fxl .float.phys{animation:none}.fxl .float.total{font-size:1.3em;letter-spacing:.02em}.fxl .float.replay{opacity:.85}
+.fxl .float.crit.phys{text-shadow:0 0 12px var(--fx),0 3px 0 #000}
+.trail{position:absolute;left:0;top:0;bottom:0;background:#fffa;transition:width .5s ease-out;pointer-events:none;border-radius:inherit}.trail.heal{background:#3ddc84}
+[data-bid]{position:relative;z-index:1}
+.p3d .bb .mini .hp{position:relative}.p3d .bb .mini .hp>i:not(.trail){position:relative;z-index:1}.p3d .bb .mini .hp>i.trail{width:100%}
+/* luz do elemento */
+.p3d .bb.lit img{filter:drop-shadow(0 0 calc(var(--litk,0) * 40px) var(--lit)) brightness(calc(1 + var(--litk,0) * .25)) drop-shadow(0 18px 18px #000a)}
+.p3d .flare{position:absolute;left:0;top:0;width:760px;height:760px;border-radius:50%;background:radial-gradient(var(--lit) 0,#0000 62%);opacity:.65;mix-blend-mode:screen;pointer-events:none;animation:p3flare .5s ease-out forwards}@keyframes p3flare{to{opacity:0}}
+/* cenário: camadas e clima em 3D */
+.p3d .bbplane.layer{background-color:transparent;background-size:cover;background-position:center;background-repeat:no-repeat;pointer-events:none}
+.p3d .bbplane.ly-frente{background-size:contain;background-position:center bottom}
+.p3d .pcl{position:absolute;left:0;top:0;transform-style:preserve-3d;pointer-events:none}
+.p3d .pt{position:absolute;left:0;top:0;transform:translate3d(calc(var(--x) * 1px),calc(var(--y) * 1px),calc(var(--z) * 1px)) scale(var(--s));animation-iteration-count:infinite;animation-timing-function:linear}
+.p3d .pt-gota{width:3px;height:54px;background:linear-gradient(#bfe3ff00,#bfe3ffcc);animation-name:ptrain}@keyframes ptrain{from{translate:0 -200px}to{translate:-60px 1100px}}
+.p3d .pt-floco{width:12px;height:12px;border-radius:50%;background:#fff;opacity:.85;animation-name:ptsnow}@keyframes ptsnow{0%{translate:0 -300px}50%{translate:50px 350px}100%{translate:-20px 1000px}}
+.p3d .pt-cinza{width:9px;height:7px;background:#8a8478;opacity:.8;animation-name:ptsnow}
+.p3d .pt-brasa{width:9px;height:9px;border-radius:50%;background:#ffb13b;box-shadow:0 0 10px #ff6a00;animation-name:ptember}@keyframes ptember{0%{translate:0 700px;opacity:0}20%{opacity:1}100%{translate:40px -300px;opacity:0}}
+.p3d .pt-nevoa{width:700px;height:170px;border-radius:50%;background:radial-gradient(#e8eef633,#0000 70%);animation-name:ptfog;animation-direction:alternate;animation-timing-function:ease-in-out}@keyframes ptfog{from{translate:-200px 760px}to{translate:240px 760px}}
+/* poses por estado */
+.p3d .bb .bbi{transition:rotate .6s,scale .3s}
+.p3d .bb.pose-ferido .bbi{scale:1 .95}.p3d .bb.pose-ferido img{filter:brightness(.78) saturate(.8) drop-shadow(0 18px 18px #000a)}
+.p3d .bb.pose-limite img{animation:p3lim 1.4s ease-in-out infinite alternate}@keyframes p3lim{to{filter:drop-shadow(0 0 18px var(--c,#fff)) drop-shadow(0 18px 18px #000a) brightness(1.15)}}
+.p3d .bb.hero.pose-ko .bbi,.p3d .bb.end-cai .bbi{rotate:x 80deg}
+/* auras de condição */
+.p3d .bb .aura{position:absolute;inset:0;pointer-events:none}.p3d .aura b{position:absolute;inset:0;--ac:#fff;--ad:-1}
+.p3d .aura i{position:absolute;bottom:12%;width:12px;height:12px;border-radius:50%;background:var(--ac);opacity:0;animation:p3aura 1.6s linear infinite}
+.p3d .aura i:nth-child(1){left:20%}.p3d .aura i:nth-child(2){left:38%;animation-delay:-.3s}.p3d .aura i:nth-child(3){left:55%;animation-delay:-.7s}.p3d .aura i:nth-child(4){left:70%;animation-delay:-1s}.p3d .aura i:nth-child(5){left:45%;animation-delay:-1.3s}
+@keyframes p3aura{0%{translate:0 0;opacity:0}20%{opacity:.9}100%{translate:0 calc(var(--ad) * 220px);opacity:0}}
+.p3d .aura .a-bolhas{--ac:#6fe36a99}.p3d .aura .a-bolhas i{border:2px solid #b7ff9c;background:#6fe36a44}
+.p3d .aura .a-brasas{--ac:#ff8a24}.p3d .aura .a-brasas i{width:7px;height:7px;box-shadow:0 0 8px #ff5a00}
+.p3d .aura .a-gotas{--ac:#c3002f;--ad:1}.p3d .aura .a-gotas i{bottom:auto;top:30%;width:6px;height:10px}
+.p3d .aura .a-molhado{--ac:#55d8ff;--ad:1}.p3d .aura .a-molhado i{bottom:auto;top:10%;width:4px;height:12px}
+.p3d .aura .a-estrelas i,.p3d .aura .a-faiscas i,.p3d .aura .a-zzz i{bottom:auto;top:-4%;animation-name:p3orb}.p3d .aura .a-estrelas{--ac:#ffe36c}.p3d .aura .a-faiscas{--ac:#fff27a}.p3d .aura .a-zzz{--ac:#9ecbff}
+@keyframes p3orb{0%{translate:-40px 0;opacity:.9}50%{translate:40px -10px;opacity:.9}100%{translate:-40px 0;opacity:.9}}
+.p3d .aura .a-nevoa{--ac:#a05cff}.p3d .aura .a-espiral{--ac:#ff72b6}.p3d .aura .a-radiacao{--ac:#b9f26c}
+.p3d .aura .a-nevoa i,.p3d .aura .a-radiacao i{width:60px;height:60px;filter:blur(10px)}
+.p3d .aura .a-venda::before{content:'';position:absolute;left:28%;right:28%;top:12%;height:7%;background:#111;border-radius:4px}
+.p3d .bbi:has(.a-gelo) img{filter:hue-rotate(170deg) saturate(.55) brightness(1.2) drop-shadow(0 0 10px #9be7ff)}
+.p3d .bbi:has(.a-tremor) img{animation:p3trem .14s steps(2) infinite}@keyframes p3trem{50%{translate:2px 0}}
+/* escudo, setas de buff e forma */
+.p3d .bb .bolha{position:absolute;left:50%;bottom:-6%;width:calc(var(--h,300px) * .62);aspect-ratio:.87;translate:-50% 0;pointer-events:none;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:radial-gradient(#77c8ff10 40%,#77c8ff66);box-shadow:inset 0 0 30px #77c8ff;animation:p3bub 2.4s ease-in-out infinite alternate}
+.p3d .bb .bolha[data-k="1"]{background:linear-gradient(115deg,#0000 48%,#fffc 49%,#0000 51%),radial-gradient(#77c8ff10 40%,#77c8ff55)}
+.p3d .bb .bolha[data-k="2"]{background:linear-gradient(115deg,#0000 48%,#fffc 49%,#0000 51%),linear-gradient(60deg,#0000 40%,#fffc 41%,#0000 43%),linear-gradient(160deg,#0000 62%,#fffc 63%,#0000 65%),radial-gradient(#77c8ff08 40%,#77c8ff40)}
+.p3d .bb .bolha.estoura{animation:p3pop .5s ease-out forwards}@keyframes p3bub{to{scale:1.03}}@keyframes p3pop{to{scale:1.35;opacity:0}}
+.p3d .bb .seta{position:absolute;left:50%;top:12%;translate:-50% 0;font:900 24px/1 Barlow,sans-serif;color:var(--sc);-webkit-text-stroke:1px #000;paint-order:stroke fill;pointer-events:none;white-space:nowrap;animation:p3up .9s ease-out forwards}
+.p3d .bb .seta.dn{animation-name:p3dn}@keyframes p3up{to{translate:-50% -90px;opacity:0}}@keyframes p3dn{to{translate:-50% 90px;opacity:0}}
+.p3d .bb .bufs{position:absolute;left:50%;bottom:-34px;translate:-50% 0;display:flex;gap:3px;font:900 13px/1 Barlow,sans-serif;pointer-events:none}.p3d .bb .bufs b{color:var(--sc);text-shadow:0 1px 0 #000}
+.p3d .bb.forma img{filter:drop-shadow(0 0 14px var(--fe,#fff)) drop-shadow(0 18px 18px #000a)}
+.p3d .bb.formfx .bbi{animation:p3form .7s ease-out}@keyframes p3form{30%{scale:1.12}}
+.p3d .bb.formflash img{animation:p3fflash .7s ease-out}@keyframes p3fflash{15%{filter:brightness(3.5) saturate(0)}}
+/* reações: fantasma da esquiva, desequilíbrio do parry, anel do QTE no chão, tinta do KO */
+.p3d .bb .bbi .ghost{position:absolute;left:0;top:0;pointer-events:none;animation:p3ghost .5s ease-out forwards}@keyframes p3ghost{to{opacity:0;translate:calc(var(--gd,1) * var(--gi,1) * -14%) 0}}
+.p3d .bb.esquiva .bbi{animation:p3esq .5s ease-out}@keyframes p3esq{35%{translate:calc(var(--gd,1) * 18%) 0}}
+.p3d .bb.stagger img{animation:p3stag .6s ease-out}@keyframes p3stag{25%{translate:-6% 2%;rotate:-6deg}}
+.p3d .bb .qring{position:absolute;left:50%;bottom:0;width:240px;height:240px;margin:0 0 -120px -120px;transform:rotateX(90deg);pointer-events:none}
+.p3d .qring i{position:absolute;inset:0;border-radius:50%}.p3d .qring .qt{border:4px solid #fff9}.p3d .qring .qo{border:7px solid #3aa0ff;box-shadow:0 0 22px #3aa0ff}
+.p3d .qring[data-g=perf] .qo{border-color:#ffc93c;box-shadow:0 0 30px #ffc93c}.p3d .qring[data-g=otimo] .qo{border-color:#55d8ff}.p3d .qring[data-g=bom] .qo{border-color:#fff}.p3d .qring[data-g=erro] .qo{border-color:#ff2b3d;box-shadow:0 0 22px #ff2b3d}
+.p3d .qring.graded{animation:p3qg .4s ease-out}@keyframes p3qg{40%{scale:1.15}}.p3d .qring.out{opacity:0;transition:opacity .25s}
+.p3d .bb.inked{opacity:0;pointer-events:none;transition:opacity .6s .15s}
+/* entrada e pose final */
+.p3d .bb .puff{position:absolute;left:50%;bottom:-24px;width:260px;height:90px;translate:-50% 0;border-radius:50%;background:radial-gradient(#1a1420dd,#0000 70%);pointer-events:none;animation:p3puff .8s ease-out forwards}@keyframes p3puff{to{scale:1.6;opacity:0}}
+.p3d .bb.in-h .bbi{animation:p3inh .9s calc(var(--i,0) * 120ms) cubic-bezier(.3,1.3,.5,1) both}@keyframes p3inh{0%{translate:-120% 0;opacity:0}60%{translate:0 -8%;opacity:1}80%{translate:0 2%}100%{translate:0 0}}
+.p3d .bb.in-f .bbi{animation:p3inf .8s calc(var(--i,0) * 120ms) ease-out both}@keyframes p3inf{0%{translate:0 30%;opacity:0}100%{translate:0 0;opacity:1}}
+.p3d .bb.end-vit .bbi{animation:p3vit .9s ease-out both}@keyframes p3vit{40%{translate:0 -14%}100%{translate:0 0}}.p3d .bb.end-vit img{filter:drop-shadow(0 0 20px var(--c,#fff)) drop-shadow(0 18px 18px #000a)}
+.p3d .bb.end-foge{--z:900!important;transition:transform 1.1s ease-in!important}
+@media(prefers-reduced-motion:reduce){.p3d .drift,.p3d .pt,.p3d .aura i,.p3d .bb .bbi,.p3d .bb img{animation:none!important}}
+/* faixas: corte de turno, chefe, fim, retrato do inimigo e replay */
+.fxl .turncut{position:fixed;left:0;right:0;top:34%;height:120px;display:flex;align-items:center;gap:18px;padding-left:12vw;background:linear-gradient(90deg,var(--c,#e4002b),#000c 70%,#0000);clip-path:polygon(0 18%,100% 0,100% 82%,0 100%);color:#fff;font:900 italic 44px/1 Barlow,sans-serif;text-shadow:0 3px 0 #000;pointer-events:none;animation:p3cut .9s cubic-bezier(.2,.9,.3,1) both}
+.fxl .turncut.me{font-size:56px}@keyframes p3cut{0%{translate:-100% 0}14%{translate:0 0}75%{translate:0 0;opacity:1}100%{translate:60% 0;opacity:0}}
+.fxl .tc-por,.fxl .th-por{display:block;width:110px;height:110px;overflow:hidden;border:3px solid #fff;transform:skewX(-8deg);background:#111;flex:none}.fxl .tc-por img,.fxl .th-por img{width:100%;height:100%;object-fit:cover}.fxl .tc-por img.crop,.fxl .th-por img.crop{object-position:50% 0;height:220%}
+.fxl .threat .th-por{position:absolute;left:8vw;top:50%;translate:0 -50%}
+.fxl .bossband{position:fixed;left:0;right:0;top:20%;height:130px;display:flex;align-items:center;justify-content:center;gap:22px;background:linear-gradient(90deg,#0000,#8d001ce6 20%,#8d001ce6 80%,#0000);clip-path:polygon(0 12%,100% 0,100% 88%,0 100%);color:#fff;pointer-events:none;animation:p3cut 1.6s cubic-bezier(.2,.9,.3,1) both}
+.fxl .bossband small{display:block;font:700 16px Barlow,sans-serif;letter-spacing:.3em;text-transform:uppercase}.fxl .bossband b{font:900 italic 54px/1 Barlow,sans-serif;text-shadow:0 3px 0 #000}
+.fxl .endband{position:fixed;left:0;right:0;top:40%;text-align:center;font:900 italic 84px/1 Barlow,sans-serif;color:#fff;-webkit-text-stroke:3px #000;paint-order:stroke fill;pointer-events:none;animation:p3end 2s ease-out both}.fxl .endband.lose{color:#c9c9c9}.fxl .endband.flee{color:#ffd36a}
+@keyframes p3end{0%{scale:1.4;opacity:0}15%{scale:1;opacity:1}85%{opacity:1}100%{opacity:0}}
+.fxl .rpltag{position:fixed;top:12px;left:50%;translate:-50% 0;padding:4px 14px;background:#000c;border:1px solid #ffc93c;color:#ffc93c;font:800 14px Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase;pointer-events:none}
+.log .rpl{margin-left:6px;padding:0 6px;min-height:0;font-size:11px;line-height:18px;vertical-align:middle}

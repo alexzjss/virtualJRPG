@@ -29,13 +29,13 @@
 @keyframes q3in{from{opacity:0;scale:1.4}}@keyframes q3w{0%{opacity:0;scale:2}20%{opacity:1;scale:1}80%{opacity:1}100%{opacity:0;translate:0 -40%}}@keyframes q3fl{50%{filter:brightness(2.5) drop-shadow(0 0 20px var(--fc,#fff))}}
 @media(prefers-reduced-motion:reduce){.qte3d,.qte3d .q3w{animation-duration:.01s}}`;
   document.head.append(css);
-  let st = null, key = '', t0 = 0, raf = 0, hid = '', pend = 0, tugT = 0, seen = [], lastTick = 0, chqOn = false;
+  let qr = null, qi = -1, st = null, key = '', t0 = 0, raf = 0, hid = '', pend = 0, tugT = 0, seen = [], lastTick = 0, chqOn = false;
   // no PC (palco 3D visível) o anel abre sobre o recorte do herói alvo, com a mesma interface do openStage (ui, fx, sfx, buzz, setHint, close)
   const p3dOn = () => { const r = document.querySelector('.p3d'); return !!r && r.style.display !== 'none' && typeof PALCO3D !== 'undefined'; };
   const openQte3d = h => {
     const root = document.createElement('div'); root.className = 'qte3d'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Defesa de ' + h.name);
     root.innerHTML = '<div class="q3ui"></div><div class="q3h" aria-live="polite"></div>'; document.body.append(root);
-    const ui = root.querySelector('.q3ui'), place = () => { const r = PALCO3D.rectOf(h.id); if (!r) return; const rs = Math.round(Math.max(150, Math.min(r.width * 1.15, r.height * .55, 300)));
+    const ui = root.querySelector('.q3ui'), place = () => { const r = PALCO3D.rectOf(h.id); if (!r) return; const rs = Math.round(Math.max(130, Math.min(r.width * 1.15, r.height * .55, 300) * .8));
       // preso dentro da tela (com folga para os botões embaixo)
       root.style.setProperty('--rs', rs + 'px'); root.style.left = Math.max(rs / 2, Math.min(innerWidth - rs / 2, r.left + r.width / 2)) + 'px'; root.style.top = Math.max(rs / 2 + 60, Math.min(innerHeight - rs / 2 - 120, r.top + r.height * .4)) + 'px'; };
     place();
@@ -50,7 +50,7 @@
   const D = () => RULES.CMD.DEF, clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const heroes = () => { const C = S?.battle?.cmd; if (gm || !S?.battle?.active || !C) return []; return Object.values(S.chars).filter(c => !c.enemy && c.owner === name && c.hp > 0 && C.tgs?.includes(c.id)); };
   const chqKey = h => (h.skills || []).find(k => S.skills[k]?.cmd === 'choque') || '';
-  const kill = ms => { if (st) { st.close(ms ?? 200); st = null; } cancelAnimationFrame(raf); clearInterval(tugT); tugT = 0; pend = 0; seen = []; chqOn = false; };
+  const kill = ms => { qr?.close(); qr = null; qi = -1; if (st) { st.close(ms ?? 200); st = null; } cancelAnimationFrame(raf); clearInterval(tugT); tugT = 0; pend = 0; seen = []; chqOn = false; };
   const impact = (C, i) => t0 + C.beats[i] - 150; // o anel fecha um pouco antes do impacto no servidor (ida e volta da rede)
   const press = dir => {
     const C = S?.battle?.cmd; if (!st || !C) return;
@@ -72,6 +72,7 @@
     const C = S?.battle?.cmd; if (!st || !C) return;
     st.place?.(); // o anel 3D acompanha o recorte (a câmera pode estar andando)
     const now = performance.now(), ring = st.ui.querySelector('i.r'); let i = C.beats.findIndex((_, k) => now <= impact(C, k)); if (i < 0) i = C.beats.length - 1;
+    if (p3dOn() && typeof PVIDA !== 'undefined' && i !== qi && now <= impact(C, i)) { qi = i; qr = PVIDA.qteRing(hid, impact(C, i)); } // o anel também no chão do herói, em 3D
     const stt = i === 0 ? t0 : impact(C, i - 1), dur = impact(C, i) - stt, fin = C.fin?.[i] || {}, ease = !!fin.ease, p = ms => sc(f2(clamp((ms - stt) / dur), ease));
     if (ring) { ring.style.transform = `scale(${p(now)})`;
       st.ui.querySelectorAll('u').forEach(u => { u.style.transform = `scale(${p(impact(C, i) - +u.dataset.ms)})`; });
@@ -86,7 +87,8 @@
     for (let i = seen.length; i < notes.length; i++) { const v = notes[i]; if (v === undefined) break; seen[i] = v; const f = st.fx, mid = [innerWidth / 2, innerHeight / 2];
       if (v === 'par') { f.burst(mid[0], mid[1], 36, '#fff'); f.word('KIN!', { color: '#ff5a5a' }); f.flash('#fff', 140); f.shake(14, 260); f.hitstop(80); st.sfx('hit'); st.buzz([20, 30, 40]); }
       else if (v === 'esq') { f.word('WHOOSH', { color: '#7dc4ff' }); f.burst(mid[0], mid[1], 18, '#3aa0ff'); st.sfx('whoosh'); st.buzz(25); }
-      else if (v === 'cedo' || v === 'late') { f.flash('#ff2b3d', 160); f.shake(8, 200); st.sfx('miss'); st.buzz(80); } }
+      else if (v === 'cedo' || v === 'late') { f.flash('#ff2b3d', 160); f.shake(8, 200); st.sfx('miss'); st.buzz(80); }
+      qr?.grade(v === 'par' ? 'perf' : v === 'esq' ? 'otimo' : 'erro'); }
   };
   const paint = () => { // o que muda a cada estado: notas, botões e o cabo de guerra
     const C = S.battle.cmd, h = S.chars[hid], z = C.z?.[hid] || {}, notes = C.p?.[hid] || [], foe = S.chars[C.foe], mine = C.chq?.id === hid;

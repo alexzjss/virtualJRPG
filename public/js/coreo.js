@@ -7,7 +7,9 @@ const fxl = document.createElement('div'); fxl.className = 'fxl'; fxl.setAttribu
 const lastPct = new Map(), DICE_MS = 950, NUM_MS = 460;
 let cine = null, wasActive = null;
 const koHold = new Map(), hpPrev = new Map(), stPrev = new Map(), fxMarks = []; // marcas reaplicadas a cada redesenho até expirarem
-let threatUntil = 0, enterUntil = 0;
+let threatUntil = 0, enterUntil = 0, busyUntil = 0;
+const dropPct = new Map(), lastEl = new Map(); // quanto do HP cada alvo perdeu neste lote (peso do golpe) e o elemento do último dano (cor da tinta do KO)
+const P3 = () => !!stage3d() && !app.querySelector('.stage') && typeof PALCO3D !== 'undefined' && typeof PFX !== 'undefined';
 const skByName = n => Object.values(S.skills || {}).find(s => s.name === n);
 const fxAdd = (cls, html, ms, style = '') => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; if (style) d.style.cssText = style; fxl.append(d); setTimeout(() => d.remove(), ms); return d; };
 const stage3d = () => { const r = document.querySelector('.p3d'); return r && r.style.display !== 'none' ? r : null; }; // o palco 3D do PC (fora do #app), quando visível
@@ -16,6 +18,8 @@ const fxPos = (el, y = .32) => { const r = el.getBoundingClientRect(); return `l
 // os recortes do palco 3D não são redesenhados: a classe de animação sai sozinha e reinicia a cada golpe (no 2D o redesenho já a tira)
 const pulse = (el, cls, ms = 900) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); };
 const mark = (sel, cls, ms) => fxMarks.push({ sel, cls, until: performance.now() + ms });
+// retrato do recorte (imgP, ou o topo da frente) para o corte de turno e a faixa do inimigo
+const portrait = c => { if (typeof PALCO3D === 'undefined') return face(c); const s = PALCO3D.imgSrc(c, 'p'), t = PALCO3D.imgFit(c, 'p', s); return `<img src="${esc(s.url)}" alt=""${t ? ` style="transform:${t}"` : ''}${s.crop ? ' class="crop"' : ''}>`; };
 const face = c => c?.img ? `<img src="${esc(c.img)}" alt="">` : `<span>${c ? esc(c.enemy ? KANJI[mainEl(c)] : c.name.slice(0, 1).toUpperCase()) : ''}</span>`;
 
 // sons novos (Web Audio sintetizado, sem arquivos; respeitam o botão de som)
@@ -90,7 +94,8 @@ function knockout(id) { // nocaute: corte em diagonal, o cartão cai e apaga
   const el = unitEl(id), c = S.chars[id]; if (!el || !c) return;
   el.classList.add('ko'); mark(`.unit[data-tgt="${id}"]`, 'kofall', 900);
   el.classList.add('kofall');
-  fxAdd('kofx', `<i></i><b>${c.enemy ? 'Abatido' : 'Caído'}</b>`, 1000, fxPos(el, .45)); sfxc('ko');
+  if (c.enemy && stage3d() && typeof PVIDA !== 'undefined') PVIDA.inkOut(id, ELC[lastEl.get(id)] || '#e4002b'); else fxAdd('kofx', `<i></i><b>${c.enemy ? 'Abatido' : 'Caído'}</b>`, 1000, fxPos(el, .45));
+  sfxc('ko');
 }
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CHOQUE!, BLACK FLASH!
@@ -105,11 +110,27 @@ function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do
   if (ctr) setTimeout(() => seal('ctr', 'CONTRA!'), 250);
   if (chq) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 400); } seal('chq', 'CHOQUE!'); }
 }
-function impact(acts) {
-  const f0 = acts[0].fx, a = S.chars[f0.a], big = (f0.lim || f0.dom) && a;
-  if (big) { cutscene(a, f0); setTimeout(() => strikeFx(acts, f0, a), 1050); } else strikeFx(acts, f0, a);
+// cada quem-age é uma cena (o contra-ataque ganha a sua, com a câmera virando para o ombro de quem defende)
+async function impact(acts, o = {}) {
+  busyUntil = performance.now() + 8000;
+  try { for (const seg of (typeof PFX !== 'undefined' ? PFX.segments(acts) : [acts])) {
+    const f0 = seg[0].fx, a = S.chars[f0.a], big = (f0.lim || f0.dom) && a;
+    if (f0.ctr && P3()) await PALCO3D.focus(f0.a, [f0.id], 260);
+    if (big) { cutscene(a, f0); if (P3()) PALCO3D.orbitShot(a.id, 45, 1000); await new Promise(r => setTimeout(r, 1050)); }
+    await strikeFx(seg, f0, a, o);
+  } } finally { busyUntil = 0; }
 }
-function strikeFx(acts, f0, a) {
+// números com física: arco, quique e cor do elemento (no 3D); no 2D e com movimento reduzido ficam como antes
+function floatNum(el, txt, cls, i, f) {
+  const col = f.dmg ? (typeof ANIM_PROFILES !== 'undefined' && ANIM_PROFILES.PALETTES[f.el]?.[1]) || ELC[f.el] || '#e4002b' : ELC[f.el] || '#e4002b';
+  const d = fxAdd(`float ${cls}`, txt, 1250, fxPos(el, .22) + `;--fx:${col}`);
+  if (!P3() || calm() || !d.animate) return d;
+  const sd = PFX.numberSeed(i, f.crit), sc = /total/.test(cls) ? 1.35 : f.crit ? 1.25 : 1; d.classList.add('phys');
+  d.animate(Array.from({ length: 13 }, (_, k) => { const p = PFX.numberPath(k * .1, sd); return { transform: `translate(-50%,-50%) translate(${p.x}px,${p.y}px) scale(${sc})`, opacity: p.a }; }), { duration: 1200, fill: 'forwards' });
+  return d;
+}
+function strikeFx(acts, f0, a, o = {}) {
+  let done; const fin = new Promise(r => { done = r; });
   const old = app.querySelector('.stage'), stage = old || stage3d();
   if (f0.s && stage && !f0.dom) { fxl.querySelector('.callout')?.remove(); // faixa com o nome da ação
     fxAdd(`callout ${a?.enemy ? 'foe' : ''}`, `<div><small>${esc(a?.name || '')}</small><b>${esc(f0.s)}</b></div>`, 1150, `--fx:${ELC[f0.el] || '#e4002b'}`); }
@@ -118,25 +139,46 @@ function strikeFx(acts, f0, a) {
   const casts = f0.el && f0.el !== 'fis' || f0.heal, t0 = acts.map(e => e.fx.id).find(id => id && id !== f0.a);
   if (au && !f0.dom) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); pulse(au, casts ? 'cast' : 'lunge'); }
   // no palco 3D a investida física leva a câmera e o recorte até o alvo; os golpes caem quando ela chega
-  const go = stage3d() && !old && !casts && !f0.dom && t0 && typeof PALCO3D !== 'undefined' ? PALCO3D.lunge(f0.a, t0) : null;
+  const go = stage3d() && !old && !casts && !f0.dom && t0 && typeof PALCO3D !== 'undefined' ? PALCO3D.lunge(f0.a, t0, typeof ANIM_PROFILES !== 'undefined' ? ANIM_PROFILES.familyOf(skByName(f0.s), f0) : '') : null;
   const crit = acts.find(e => e.fx.crit), weak = acts.find(e => e.fx.w);
-  if (crit && stage) { stage.classList.add('shake'); if (!old) setTimeout(() => stage.classList.remove('shake'), 450); }
+  if (crit && stage && !P3()) { stage.classList.add('shake'); if (!old) setTimeout(() => stage.classList.remove('shake'), 450); }
   comandoFx(acts, stage);
   if (crit || weak) setTimeout(() => cutIn(crit ? 'crit' : 'weak', a, S.chars[(crit || weak).fx.id]), 180);
   const sk = skByName(f0.s), engine = typeof ANIMFX !== 'undefined';
   if (crit && engine) ANIMFX.flash(ELC[f0.el] || '#fff', 90);
-  if (f0.dom) { if (engine) ANIMFX.play({ actorId: f0.a, targetIds: [f0.id], skill: sk, fx: f0 }); return; }
-  const hits = d0 => acts.forEach((e, i) => setTimeout(() => {
+  if (f0.dom) { if (engine) ANIMFX.play({ actorId: f0.a, targetIds: [f0.id], skill: sk, fx: f0 }); setTimeout(done, 1200); return fin; }
+  // peso do golpe (3D): hitstop, tremida na direção do golpe, recuo e luz; parry solta faíscas, esquiva deixa fantasmas; o golpe final desacelera
+  const p3 = P3(), sumD = {}; acts.forEach(e => { if (e.fx.dmg) sumD[e.fx.id] = (sumD[e.fx.id] || 0) + e.fx.dmg; });
+  const pctOf = f => f.dmg ? (dropPct.get(f.id) || 0) * f.dmg / (sumD[f.id] || f.dmg) : 0, dirOf = (x, y) => { const A = PALCO3D.posOf(x), B = PALCO3D.posOf(y); return A && B ? Math.sign(B.x - A.x) || 1 : 1; };
+  const foeLeft = id => Object.values(S.chars).some(c => c.enemy && c.id !== id && c.id in S.battle.ticks && c.hp > 0);
+  const hit1 = (e, i, j, n, G) => {
     const f = e.fx, el = unitEl(f.id);
     hitSfx(f);
     if (!el) return;
     el.style.setProperty('--fx', ELC[f.el] || '#fff');
-    if (f.dmg) { if (stage3d() && typeof PALCO3D !== 'undefined') PALCO3D.shake(f.id); pulse(el, 'hit', 600); if (!engine) fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); } else if (f.heal) pulse(el, 'mendfx'); else if (f.miss) pulse(el, 'dodge', 600);
+    const pct = pctOf(f), koNow = !o.replay && j === n - 1 && koHold.has(f.id);
+    if (f.dmg) { lastEl.set(f.id, f.el);
+      if (p3) { PALCO3D.recoil(f.id, f0.a, pct, f.crit); if (typeof CENA !== 'undefined') CENA.hitstop(PFX.hitstopMs(pct, f.crit, koNow)); PALCO3D.quake(PFX.shakeAmp(pct, f.crit), dirOf(f0.a, f.id)); PALCO3D.light(f.id, ELC[f.el] || '#fff'); }
+      else if (stage3d() && typeof PALCO3D !== 'undefined') PALCO3D.shake(f.id);
+      pulse(el, 'hit', 600); if (!engine) fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); }
+    else if (f.heal) pulse(el, 'mendfx');
+    else if (f.miss) { pulse(el, 'dodge', 600);
+      if (p3 && f.par) { const ra = PALCO3D.rectOf(f.a || f0.a), rb = PALCO3D.rectOf(f.id); if (ra && rb && engine && ANIMFX.sparks) ANIMFX.sparks((ra.left + ra.right + rb.left + rb.right) / 4, (ra.top + ra.bottom + rb.top + rb.bottom) / 4 - 20, '#ffd36a');
+        if (typeof CENA !== 'undefined') CENA.slow(.4, 350); PALCO3D.recoil(f.a || f0.a, f.id, .3, false); const au2 = unitEl(f.a || f0.a); if (au2) pulse(au2, 'stagger', 600); }
+      if (p3 && f.esq && typeof PVIDA !== 'undefined') PVIDA.ghosts(f.id, dirOf(f0.a, f.id)); }
     const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
-    if (num) fxAdd(`float ${f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : ''}`, num, 1250, fxPos(el, .22) + `;--fx:${ELC[f.el] || '#e4002b'}`);
+    const rp = o.replay ? ' replay' : '';
+    if (num) floatNum(el, num, (f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : '') + rp, i, f);
+    if (G) setTimeout(() => floatNum(el, '= −' + G.total, 'total' + rp, i + 1, f), 200); // multi-hit: o total depois do último
     if (/QUEBROU!/.test(e.text)) setTimeout(() => shatter(el), 120);
-    if (koHold.has(f.id)) setTimeout(() => knockout(f.id), 260);
-  }, d0 + i * 90));
+    if (koNow) { setTimeout(() => knockout(f.id), 260);
+      const sl = p3 && PFX.slowFor({ ko: true, lastFoe: !!S.chars[f.id]?.enemy && !foeLeft(f.id), reduced: calm() });
+      if (sl && typeof CENA !== 'undefined') { CENA.slow(sl.f, sl.ms); if (sl.zoom) { PALCO3D.focus(f.id, [], 300); PALCO3D.vignette(sl.ms); } } }
+  };
+  // golpes do mesmo grupo (multi-hit) caem a 140 ms um do outro; devolve quando o último cai
+  const hits = d0 => { let k = 0, last = d0; for (const G of (typeof PFX !== 'undefined' ? PFX.groupHits(acts) : acts.map(e => ({ parts: [e], total: 0 }))))
+    G.parts.forEach((e, j) => { const i = k++, at = d0 + i * 140; last = at; setTimeout(() => hit1(e, i, j, G.parts.length, G.parts.length > 1 && j === G.parts.length - 1 ? G : null), at); });
+    setTimeout(done, last + 500); };
   const animate = () => {
     if (!engine) return void hits(220);
     const run = ANIMFX.play({ actorId: f0.a, targetIds: acts.map(e => e.fx.id), skill: sk, fx: f0 });
@@ -146,14 +188,18 @@ function strikeFx(acts, f0, a) {
   const cam = stage3d() && !old && typeof PALCO3D !== 'undefined' && PALCO3D.focus;
   const aim = cam && !go ? PALCO3D.focus(f0.a, acts.map(e => e.fx.id)) : null;
   if (go) go.then(animate); else if (aim) aim.then(animate); else animate();
+  return fin;
 }
 function threat(c) { // turno inimigo: o palco escurece, faixa vermelha e o inimigo dá um passo à frente
   threatUntil = performance.now() + 1300; fxState();
-  fxAdd('threat', `<div><small>Turno inimigo</small><b>${esc(c.name)}</b></div>`, 1300); sfxc('threat');
+  fxAdd('threat', `${stage3d() ? `<i class="th-por">${portrait(c)}</i>` : ''}<div><small>Turno inimigo</small><b>${esc(c.name)}</b></div>`, 1300); sfxc('threat');
 }
 function intro() { // abertura: os dois lados entram e a faixa "Batalha!" corta a tela
   enterUntil = performance.now() + 1400; fxState();
   const fs = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.enemy).map(c => esc(c.name));
+  const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0), boss = inB.find(c => c.enemy && c.boss);
+  if (stage3d() && typeof PVIDA !== 'undefined') PVIDA.enter(inB.filter(c => !c.enemy).map(c => c.id), inB.filter(c => c.enemy).map(c => c.id));
+  if (boss) setTimeout(() => fxAdd('bossband', `${stage3d() ? `<i class="th-por">${portrait(boss)}</i>` : ''}<div><small>Chefe</small><b>${esc(boss.name)}</b></div>`, 1600), 900);
   fxAdd('intro', `<i class="in-l"></i><i class="in-r"></i><div><b>Batalha!</b><small>${fs.slice(0, 4).join(' · ')}${fs.length > 4 ? ` e mais ${fs.length - 4}` : ''}</small></div>`, 1700); sfxc('start');
   if (typeof ANIMFX !== 'undefined') setTimeout(() => Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0).forEach((c, i) => {
     const p = (c.skills || []).map(SK).find(s => s?.kind === 'passive'); if (p) setTimeout(() => ANIMFX.play({ actorId: c.id, targetIds: [c.id], skill: { ...p, anim: 'form' }, fx: { a: c.id, id: c.id, s: p.name, el: p.el, passive: 1 } }), i * 80);
@@ -170,6 +216,20 @@ function results(e) { // fim da batalha: XP, ouro, espólios e o que cada herói
   d.addEventListener('click', ev => { if (ev.target === d || ev.target.dataset.rs) d.remove(); });
   document.body.append(d); sfxc('win'); setTimeout(() => d.remove(), 14000);
 }
+// fim da batalha no 3D: o palco fica mais um pouco para a pose final (vitória, derrota ou retirada)
+function endFx(k) {
+  const hs = Object.values(S.chars).filter(c => !c.enemy && PALCO3D.unitOf(c.id)).map(c => c.id), up = hs.filter(id => S.chars[id].hp > 0), V = typeof PVIDA !== 'undefined' ? PVIDA : null;
+  if (k === 'win') { PALCO3D.linger(2600); V?.pose(up, 'vit', 150); PALCO3D.orbitGroup(up, 60, 1800); }
+  else if (k === 'lose') { PALCO3D.linger(3000); document.querySelector('.p3d')?.classList.add('derrota'); V?.pose(hs, 'cai', 250); fxAdd('endband lose', '<b>Derrota</b>', 2800); }
+  else { PALCO3D.linger(2200); V?.pose(up, 'foge', 120); fxAdd('endband flee', '<b>Retirada</b>', 2000); }
+}
+// replay só nesta tela: refaz a coreografia de um golpe do log sem tocar em KO, barras ou turno
+function replayAct(n) {
+  if (!S.battle?.active || !stage3d()) return toast('Só dá para rever durante a batalha.');
+  if (busyUntil > performance.now()) return toast('Espere o golpe atual terminar.');
+  const acts = typeof PFX !== 'undefined' ? PFX.actsAround(S.log, n) : []; if (!acts.length) return;
+  const tag = fxAdd('rpltag', 'Replay', 6000); impact(acts.map(e => ({ ...e })), { replay: true }).then(() => tag.remove());
+}
 function fxState() { // reaplica o que um redesenho apagaria: KO adiado, palco ameaçador, abertura e marcas temporárias
   const now = performance.now(), st = app.querySelector('.stage') || stage3d();
   st?.classList.toggle('threat', now < threatUntil); st?.classList.toggle('enter', now < enterUntil);
@@ -182,11 +242,14 @@ function fx() {
   const rolls = news.filter(e => e.rr), acts = news.filter(e => e.fx).slice(-8), quick = B.active, wait = acts.some(e => e.d) ? (quick ? NUM_MS : DICE_MS) : 0;
   app.querySelectorAll('[data-bid]').forEach(el => { // a barra escoa do valor anterior até o novo, depois do dado
     const k = el.dataset.bid, p = el.dataset.p, old = lastPct.get(k);
-    if (old != null && old !== p) { el.style.transition = 'none'; el.style.width = old + '%'; el.offsetWidth; el.style.transition = ''; el.style.transitionDelay = (wait + (acts.some(e => e.fx.lim || e.fx.dom) ? 1100 : 0)) + 'ms'; el.style.width = p + '%'; }
+    if (old != null && old !== p) { el.style.transition = 'none'; el.style.width = old + '%'; el.offsetWidth; el.style.transition = ''; const d0 = wait + (acts.some(e => e.fx.lim || e.fx.dom) ? 1100 : 0), T = typeof PFX !== 'undefined' ? PFX.trailPlan(+old, +p) : null;
+      el.style.transitionDelay = (d0 + (T ? T.bar.delay : 0)) + 'ms'; el.style.width = p + '%';
+      if (T && el.parentElement) { const par = el.parentElement; let t = par.querySelector(':scope > .trail'); if (!t) { t = document.createElement('i'); t.className = 'trail'; par.insertBefore(t, el); if (getComputedStyle(par).position === 'static') par.style.position = 'relative'; }
+        t.classList.toggle('heal', T.heal); t.style.transition = 'none'; t.style.width = old + '%'; t.offsetWidth; t.style.transition = ''; t.style.transitionDelay = (d0 + T.trail.delay) + 'ms'; t.style.width = p + '%'; } }
     lastPct.set(k, p);
   });
   // quem caiu nesta leva só "cai" quando o golpe chega
-  if (B.active) for (const c of Object.values(S.chars)) { if (!(c.id in B.ticks) && !c.dead) continue; const was = hpPrev.get(c.id); if (was > 0 && c.hp <= 0 && seen != null) koHold.set(c.id, performance.now() + wait + 2600); hpPrev.set(c.id, c.hp); }
+  if (B.active) for (const c of Object.values(S.chars)) { if (!(c.id in B.ticks) && !c.dead) continue; const was = hpPrev.get(c.id); if (was > 0 && c.hp <= 0 && seen != null) koHold.set(c.id, performance.now() + wait + 2600); if (was != null && seen != null && c.hp < was) dropPct.set(c.id, (was - c.hp) / (c.hpMax || 1)); hpPrev.set(c.id, c.hp); }
   else hpPrev.clear();
   // condições novas entram com um pulo; dano contínuo e regeneração fazem o ícone pulsar
   for (const c of Object.values(S.chars)) { const ks = Object.keys(c.st || {}), was = stPrev.get(c.id); if (was && seen != null) ks.filter(k => !was.includes(k)).forEach(k => mark(`.unit[data-tgt="${c.id}"] .sti[data-st="${k}"],.pm[data-tgt="${c.id}"] .sti[data-st="${k}"]`, 'new', 700)); stPrev.set(c.id, ks); }
@@ -196,18 +259,19 @@ function fx() {
   if (B.active && wasActive === false) intro();
   wasActive = !!B.active;
   if (rolls.length) (quick ? numRoll : dicePanel)(rolls.at(-1), rolls.filter(e => e.rr.atk).length);
-  if (acts.length) setTimeout(() => impact(acts), wait);
+  if (acts.length) { busyUntil = performance.now() + wait + 8000; setTimeout(() => impact(acts), wait); }
   const plain = news.filter(e => !e.fx).at(-1), win = news.find(e => /^Vitória!/.test(e.text));
   if (role === 'table' && plain && !win) { // legenda discreta para o que não é golpe
     document.querySelector('.caption')?.remove(); clearTimeout(capT);
     const cp = document.createElement('div'); cp.className = 'caption'; cp.innerHTML = `<b>${esc(plain.who)}</b>${esc(plain.text)}`; document.body.append(cp); capT = setTimeout(() => cp.remove(), 6000);
   }
-  if (win?.res) setTimeout(() => results(win), 400);
+  const endE = news.find(e => e.end); if (endE && stage3d() && typeof PALCO3D !== 'undefined') endFx(endE.end);
+  if (win?.res) setTimeout(() => results(win), endE?.end === 'win' && stage3d() ? 2000 : 400);
   else if (win) { const v = document.createElement('div'); v.className = 'victory'; v.innerHTML = `<b>Vitória</b><span>${esc(win.text.replace(/^Vitória!\s*/, ''))}</span>`; document.body.append(v); setTimeout(() => v.remove(), 6500); }
   if (cur && cur.id !== lastCur && lastCur !== undefined) {
     const later = wait + (acts.length ? 900 : 0); // a vez troca depois que o golpe anterior terminou
     if (cur.enemy) setTimeout(() => threat(cur), later);
-    else setTimeout(() => { const mineT = role === 'player' && mine(cur); fxAdd(`banner ${mineT ? 'me' : ''}`, mineT ? 'Seu turno' : 'Turno de ' + esc(cur.name), 1100, `--c:${esc(cur.color)}`); if (mineT) navigator.vibrate?.([60, 40, 60]); }, later);
+    else setTimeout(() => { const mineT = role === 'player' && mine(cur), txt = mineT ? 'Seu turno' : 'Turno de ' + esc(cur.name); if (stage3d()) fxAdd(`turncut ${mineT ? 'me' : ''}`, `<i class="tc-por">${portrait(cur)}</i><b>${txt}</b>`, 900, `--c:${esc(cur.color)}`); else fxAdd(`banner ${mineT ? 'me' : ''}`, txt, 1100, `--c:${esc(cur.color)}`); if (mineT) navigator.vibrate?.([60, 40, 60]); }, later);
   }
   lastCur = cur?.id ?? null;
   fxWatch(); gainWatch();
