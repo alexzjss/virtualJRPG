@@ -168,7 +168,7 @@ const H = {
     sc.rows = Math.max(1, Math.round(sc.cols / sc.ar * 1000) / 1000);
     if (m.f === 'bg') sc.bg = okUrl(m.v) ? m.v : '';
     if (m.f === 'bbg') sc.bbg = BBG.includes(m.v) || okUrl(m.v) ? m.v : ''; // fundo da batalha: tema pronto, imagem própria ou '' (usa o mapa)
-    if (m.f === 'bbL') { const L = {}; for (const k of ['ceu', 'frente']) if (okUrl(m.v?.[k])) L[k] = m.v[k]; sc.bbL = Object.keys(L).length ? L : undefined; } // camadas do parallax: céu (atrás) e frente (PNG); só URL válida
+    if (m.f === 'bbL') { const L = {}; for (const k of ['ceu', 'frente', 'piso']) if (okUrl(m.v?.[k])) L[k] = m.v[k]; sc.bbL = Object.keys(L).length ? L : undefined; } // camadas do parallax: céu (atrás) e frente (PNG); só URL válida
     if (m.f === 'clima') sc.clima = CLIMA.includes(m.v) ? m.v : ''; // clima visual sobreposto: '' (nenhum) ou um da lista
     if (m.f === 'name') sc.name = String(m.v).slice(0, 30) || '?';
     if (m.f === 'fogOn') sc.fogOn = !!m.v;

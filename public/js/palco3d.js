@@ -203,10 +203,11 @@
   const colorOf = c => /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : c.enemy ? '#e60012' : '#00b7ff';
   const fmt = n => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
   const chao = (fr, F, cur) => {
-    const sc = S.scenes[S.scene] || {}, show = sc.grid !== false && sc.cols > 0 && sc.rows > 0, key = show ? [S.scene, sc.cols, sc.rows, fr.a, fr.cx, fr.cy, fr.k].join('|') : '';
+    const sc = S.scenes[S.scene] || {}, piso = sc.bbL?.piso || '', grid = sc.grid !== false, show = (grid || piso) && sc.cols > 0 && sc.rows > 0, key = show ? [S.scene, sc.cols, sc.rows, fr.a, fr.cx, fr.cy, fr.k, piso, grid].join('|') : '';
     if (key !== floorKey) { floorKey = key; floor.hidden = !show;
       if (show) { const o = toWorld(-.5, -.5, fr, true), c = Math.cos(fr.a), s = Math.sin(fr.a); // x local = coluna do grid, y local = linha; ambos deitados no chão
-        Object.assign(floor.style, { width: sc.cols * fr.k + 'px', height: sc.rows * fr.k + 'px', backgroundSize: fr.k + 'px ' + fr.k + 'px', transform: `matrix3d(${-s},0,${-c},0,${c},0,${-s},0,0,-1,0,0,${o.x.toFixed(1)},-2,${o.z.toFixed(1)},1)` }); } }
+        const gl = 'linear-gradient(#fff1 1.5px,transparent 1.5px),linear-gradient(90deg,#fff1 1.5px,transparent 1.5px)', cell = fr.k + 'px ' + fr.k + 'px'; // piso: imagem esticada no tabuleiro, grade por cima se visível
+        Object.assign(floor.style, { width: sc.cols * fr.k + 'px', height: sc.rows * fr.k + 'px', backgroundImage: [grid ? gl : '', piso ? `url("${piso.replace(/["\\]/g, encodeURIComponent)}")` : ''].filter(Boolean).join(','), backgroundSize: [grid ? cell + ',' + cell : '', piso ? '100% 100%' : ''].filter(Boolean).join(','), boxShadow: grid ? '' : 'none', transform: `matrix3d(${-s},0,${-c},0,${c},0,${-s},0,0,-1,0,0,${o.x.toFixed(1)},-2,${o.z.toFixed(1)},1)` }); } }
     const t = local.aim && S.chars[local.aim], r = cur && t && F.has(cur.id) && F.has(t.id) ? rangeOf(cur, t, sc.unit) : null;
     rl.hidden = rb.hidden = !r;
     if (r) { const a = F.get(cur.id), b = F.get(t.id), dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz);
