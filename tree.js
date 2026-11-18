@@ -13,6 +13,7 @@ import { LEVA5 } from './arvore/ordo.js';
 import { LEVA6 } from './arvore/leva6.js';
 import { nivelar } from './arvore/nivel.js';
 import { posicionar } from './arvore/posicao.js';
+import { balancearAtuais } from './arvore/atuais.js';
 import { variar } from './arvore/variacoes.js';
 import { reorganizar } from './arvore/ordem.js';
 import { LEVA8 } from './arvore/leva8.js';
@@ -740,6 +741,7 @@ TREE.hiruko.branches.at(-1).push(...DOENCA_MAIS); // ramo da Doença completo
 // leva 2: dois ramos por setor (ofensivo e reações/reforços), com 3 Limites por setor
 for (const L of [LEVA2A, LEVA2B, LEVA2C, LEVA3, LEVA4, LEVA5, LEVA6, LEVA8]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);
 posicionar(TREE); // arvore/posicao.js: técnicas já usadas pelos jogadores descem, as fortes sobem, e cada uma ganha uma vizinha
+balancearAtuais(TREE); // curva única, inclusive para as variações acrescentadas pelo passe de posição
 variar8(TREE); // arvore/leva8e.js: 4 variações de 45 técnicas, na linha de cada uma
 nivelar(TREE); // arvore/nivel.js: evoluções somadas na base e pisos de custo das técnicas fortes
 marcarComandos(TREE); // Leva 4: comandos de ação nos nós que já existiam
