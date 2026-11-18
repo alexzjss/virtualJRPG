@@ -1,0 +1,131 @@
+// Testes das cenas separadas: grupo dividido, fora de cena, batalhas simultâneas, saídas e desfazer por cena
+//   node --test tools/test-cenas.js
+import test from 'node:test'; import assert from 'node:assert/strict';
+import fs from 'fs'; import os from 'os'; import path from 'path';
+process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjcenas-'));
+const { H, S, current, derive, view, handle } = await import('../server.js');
+const { inScene, adopt } = await import('../src/state.js');
+const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' }, tv = { role: 'table' };
+const reset = () => {
+  S.chars = {}; S.log.length = 0; S.reqs = {}; S.auto.pass = false;
+  for (const k of Object.keys(S.scenes)) if (k !== S.focus) delete S.scenes[k];
+  Object.assign(S.scenes[S.focus], { battle: { active: false, ticks: {} }, exits: [] }); S.tv = S.focus;
+};
+const mk = (c, m = {}) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, c.role === 'player' ? { ...m, owner: c.name } : m); const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; ch.x = ch.y = 0; return ch; };
+const newScene = name => { const before = S.focus; handle(gm, { t: 'sceneAdd', name }); const id = S.focus; S.focus = before; return id; };
+// dois grupos: Ana na cena A com um inimigo, Bia na cena B com outro
+const split = () => {
+  reset(); const A = S.focus, B = newScene('Mina');
+  const a = mk(ana), ea = mk(gm, { enemy: true });
+  const b = mk(bia); handle(gm, { t: 'moveTo', ids: [b.id], scene: B });
+  S.focus = B; const eb = mk(gm, { enemy: true }); eb.x = 3; S.focus = A;
+  return { A, B, a, b, ea, eb };
+};
+
+test('ponteiros: S.scene/S.battle seguem o contexto e não vão para o save', () => {
+  reset(); const A = S.focus, B = newScene('Outra');
+  assert.equal(S.scene, A); inScene(B, () => { assert.equal(S.scene, B); S.battle = { active: true, ticks: {} }; });
+  assert.equal(S.scenes[B].battle.active, true); assert.equal(S.battle.active, false);
+  const saved = JSON.parse(JSON.stringify(S)); assert.ok(!('battle' in saved) && !('scene' in saved)); assert.equal(saved.focus, A);
+});
+
+test('migração: save antigo com S.battle e S.scene vira batalha da cena e foco', () => {
+  const old = { chars: { h: { name: 'Velho', owner: 'Ana', scene: 'x', x: 1, y: 1 } }, scenes: { x: { name: 'Antiga', cols: 20, rows: 12 }, y: { name: 'Outra', cols: 20, rows: 12 } }, scene: 'y', battle: { active: true, ticks: { h: 5 } }, log: [] };
+  const keep = JSON.parse(JSON.stringify(S));
+  adopt(old);
+  assert.equal(S.focus, 'y'); assert.equal(S.scene, 'y'); assert.equal(S.scenes.y.battle.active, true); assert.deepEqual(S.scenes.y.battle.ticks, { h: 5 });
+  assert.equal(S.scenes.x.battle.active, false); assert.deepEqual(S.scenes.x.exits, []);
+  assert.ok(!Object.keys(S).includes('battle'));
+  adopt(keep);
+});
+
+test('moveTo: heróis vão separados; fora de cena; trocar o foco não arrasta ninguém', () => {
+  const { A, B, a, b } = split();
+  assert.equal(a.scene, A); assert.equal(b.scene, B);
+  handle(gm, { t: 'sceneGo', id: B }); assert.equal(S.focus, B); assert.equal(a.scene, A);
+  handle(gm, { t: 'moveTo', ids: [a.id], scene: null }); assert.equal(a.scene, null); assert.equal(a.x, null);
+  handle(ana, { t: 'move', id: a.id, x: 2, y: 2 }); assert.equal(a.x, null, 'fora de cena não anda');
+  handle(gm, { t: 'moveTo', ids: [a.id, b.id], scene: A }); assert.equal(a.scene, A); assert.equal(b.scene, A); assert.notDeepEqual([a.x, a.y], [b.x, b.y]);
+  handle(bia, { t: 'moveTo', ids: [a.id], scene: B }); assert.equal(a.scene, A, 'só o mestre move entre cenas');
+});
+
+test('visão: cada jogador vê a própria cena; fora de cena só a tela de espera; TV vê a cena dela', () => {
+  const { A, B, a, b, ea, eb } = split();
+  const va = view(ana), vb = view(bia);
+  assert.equal(va.scene, A); assert.equal(vb.scene, B);
+  assert.ok(va.chars[ea.id] && !va.chars[eb.id], 'Ana não vê o inimigo da Mina'); assert.ok(vb.chars[eb.id] && !vb.chars[ea.id]);
+  assert.deepEqual(Object.keys(va.scenes[B]), ['name'], 'das outras cenas, só o nome');
+  assert.equal(va.scenes[A].battle, undefined);
+  S.tv = B; assert.equal(view(tv).scene, B);
+  const vg = view(gm); assert.equal(vg.scene, S.focus); assert.ok(vg.battle && vg.scenes[B].battle, 'o mestre recebe as batalhas de todas as cenas');
+  handle(gm, { t: 'offMsg', v: 'Volto já' }); handle(gm, { t: 'moveTo', ids: [b.id], scene: null });
+  const vo = view(bia); assert.equal(vo.off, 'Volto já'); assert.equal(vo.scene, '_off'); assert.ok(!Object.values(vo.chars).some(o => o.enemy)); assert.equal(vo.battle.active, false);
+});
+
+test('batalhas simultâneas: cada cena tem a sua fila, e uma não mexe na outra', () => {
+  const { A, B, a, b, ea, eb } = split();
+  handle(gm, { t: 'battle', on: true }); // na cena em foco (A)
+  inScene(B, () => handle(gm, { t: 'sceneGo', id: B })); handle(gm, { t: 'battle', on: true }); S.focus = A;
+  assert.ok(S.scenes[A].battle.active && S.scenes[B].battle.active);
+  assert.deepEqual(Object.keys(S.scenes[A].battle.ticks).sort(), [a.id, ea.id].sort());
+  assert.deepEqual(Object.keys(S.scenes[B].battle.ticks).sort(), [b.id, eb.id].sort());
+  const curB = inScene(B, () => current()), tB = { ...S.scenes[B].battle.ticks };
+  // um turno em A
+  const curA = inScene(A, () => current()), ca = S.chars[curA];
+  if (ca.enemy) handle(gm, { t: 'act', id: ca.id, skill: 'atk', target: a.id }); else handle(ana, { t: 'act', id: a.id, skill: 'atk', target: ea.id });
+  if (S.scenes[A].battle.cmd) inScene(A, () => H.cmdSkip(gm));
+  assert.deepEqual(S.scenes[B].battle.ticks, tB, 'a fila de B não andou'); assert.equal(inScene(B, () => current()), curB);
+  assert.ok(S.scenes[B].battle.order.length > 0 && S.scenes[A].battle.order.length > 0, 'cada cena tem a sua previsão de turnos');
+  // encerrar A não toca em B
+  handle(gm, { t: 'battle', on: false }); assert.equal(S.scenes[A].battle.active, false); assert.equal(S.scenes[B].battle.active, true);
+  // entrar numa cena em batalha põe o herói na fila de lá; sair tira da fila
+  handle(gm, { t: 'moveTo', ids: [a.id], scene: B }); assert.ok(a.id in S.scenes[B].battle.ticks);
+  handle(gm, { t: 'moveTo', ids: [a.id], scene: A }); assert.ok(!(a.id in S.scenes[B].battle.ticks));
+});
+
+test('batalhas simultâneas: log de batalha não vaza para a outra cena; chat continua para todos', () => {
+  const { A, B, a, b, ea } = split();
+  handle(gm, { t: 'battle', on: true });
+  handle(gm, { t: 'chat', text: 'oi, mesa' });
+  const la = view(ana).log.map(e => e.text), lb = view(bia).log.map(e => e.text);
+  assert.ok(lb.includes('oi, mesa') && la.includes('oi, mesa'));
+  assert.ok(S.log.some(e => e.sc === A), 'entradas da batalha têm a cena');
+  assert.ok(!view(bia).log.some(e => e.sc === A), 'Bia (na Mina) não recebe o log da batalha de A');
+});
+
+test('fim de batalha: refeição e invocações só de quem lutou nela', () => {
+  const { A, B, a, b } = split();
+  S.meal = { n: 'Sopa', by: 'x', ids: { [a.id]: 1, [b.id]: 1 }, m: { atk: 5 } };
+  handle(gm, { t: 'battle', on: true }); handle(gm, { t: 'battle', on: false });
+  assert.ok(S.meal && !(a.id in S.meal.ids) && S.meal.ids[b.id] === 1, 'Bia não lutou: a refeição dela continua');
+  delete S.meal;
+});
+
+test('saídas: pisar numa saída vira pedido; aprovar leva o herói e ele chega pela volta', () => {
+  const { A, B, a } = split();
+  handle(gm, { t: 'exitAdd', scene: A, x: 5, y: 4, to: B, both: true });
+  assert.equal(S.scenes[A].exits.length, 1); assert.equal(S.scenes[B].exits.length, 1); assert.equal(S.scenes[B].exits[0].to, A);
+  handle(ana, { t: 'move', id: a.id, x: 5, y: 4 });
+  const r = Object.entries(S.reqs).find(([, q]) => q.cat === 'pass'); assert.ok(r, 'pedido de passagem criado'); assert.equal(a.scene, A);
+  handle(gm, { t: 'reqOk', id: r[0] }); assert.equal(a.scene, B);
+  const back = S.scenes[B].exits[0]; assert.ok(Math.max(Math.abs(a.x - back.x), Math.abs(a.y - back.y)) <= 1, 'chega ao lado da saída de volta');
+  S.auto.pass = true; handle(ana, { t: 'move', id: a.id, x: back.x, y: back.y }); assert.equal(a.scene, A, 'com passagem liberada, passa direto');
+  handle(gm, { t: 'exitDel', scene: A, id: S.scenes[A].exits[0].id }); assert.equal(S.scenes[A].exits.length, 0);
+});
+
+test('desfazer: só a cena do foco volta; a outra cena e quem está nela ficam', () => {
+  const { A, B, a, b, ea, eb } = split();
+  handle(gm, { t: 'set', id: ea.id, f: 'hp', v: 1 }); // ação na cena A
+  inScene(B, () => {}); S.focus = B; handle(gm, { t: 'set', id: eb.id, f: 'hp', v: 2 }); S.focus = A; // ação na cena B
+  b.gold = 77; // algo que aconteceu na cena B depois
+  handle(gm, { t: 'undo' }); // desfaz na cena A
+  assert.notEqual(S.chars[ea.id].hp, 1, 'A voltou'); assert.equal(S.chars[eb.id].hp, 2, 'B não mexeu'); assert.equal(S.chars[b.id].gold, 77);
+});
+
+test('cenas: duplicar copia mapa e saídas sem batalha; excluir só cena vazia', () => {
+  const { A, B } = split(); S.scenes[A].bg = '/maps/x.png'; S.scenes[A].exits = [{ id: 'e1', x: 1, y: 1, to: B }];
+  handle(gm, { t: 'sceneAdd', dup: A, name: 'Cópia' }); const C = S.focus; S.focus = A;
+  assert.equal(S.scenes[C].bg, '/maps/x.png'); assert.equal(S.scenes[C].exits[0].to, B); assert.notEqual(S.scenes[C].exits[0].id, 'e1'); assert.equal(S.scenes[C].battle.active, false);
+  handle(gm, { t: 'sceneDel', id: B }); assert.ok(S.scenes[B], 'B tem a Bia: não apaga');
+  handle(gm, { t: 'sceneDel', id: C }); assert.ok(!S.scenes[C]);
+});

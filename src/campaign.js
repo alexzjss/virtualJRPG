@@ -5,7 +5,7 @@ import { BK, BLANK, S, adopt, backup, diaryFile, flushDiary, log, slug } from '.
 import { fixMedia } from './media.js';
 import { seed } from './seed.js';
 import { int, newChar, okUrl, prep, rid } from './rules.js';
-import { H, NOUNDO, undoStack } from './handlers.js';
+import { H, NOUNDO, undoClear } from './handlers.js';
 import { ATTRS, BBG, CLIMA, EL, ITYPES, NEW, PARTS, R, SCH, STK, TIER } from './consts.js';
 import { blocked, ipOf, penalize, same } from './auth.js';
 import { hooks, push } from './net.js';
@@ -32,7 +32,7 @@ function saveSlot() { // guarda a campanha atual em data/campanhas/<nome>.json
   fs.writeFileSync(tmp, JSON.stringify(S)); fs.renameSync(tmp, f); touch();
 }
 function swap(o, isNew = false) { // troca a campanha em uso, sempre com uma cópia de segurança antes; se a nova não abrir, a atual continua intacta
-  backup('antes-de-trocar'); adopt(o, isNew, () => { if (isNew) seed(); fix(); prep(); }); undoStack.length = 0; touch();
+  backup('antes-de-trocar'); adopt(o, isNew, () => { if (isNew) seed(); fix(); prep(); }); undoClear(); touch();
 }
 // campanha vinda de um arquivo de fora: só passam chaves simples, definições no esquema e um histórico limpo
 const okKey = k => /^[\w-]{1,32}$/.test(k), KINDS_LOG = ['', 'ok', 'bad', 'chat'];

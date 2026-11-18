@@ -1,6 +1,6 @@
 import { BASICS, ITEMS_V, VEHICLES, buildItems, buildSkills } from '../content.js';
 import { BASE, addLimit, aiAct, allDown, allOut, applySt, at, at0, bondAdd, breakVow, can, current, d100, delay, doAct, doDefend, doFocus, endTurn, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, newChar, normSlots, ofiSync, okUrl, onMap, partyRef, passive, pick, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, trig, usable, vows } from './rules.js';
-import { S, log, newScene } from './state.js';
+import { S, inScene, log, newScene } from './state.js';
 import { ATTRS, BBG, CAMP, CLIMA, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TIER, VN, it, sk } from './consts.js';
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
@@ -9,13 +9,31 @@ import { manualPlan, runPlan, derive, modsOf, cantUse, effSkill, chqMeta, chqRes
 function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo executa o plano guardado
   if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) { const plan = planOf(C, a); if (C.chq) chqResolve(a, plan, C); else runPlan(a, plan); } } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
 }
-function openCmd(C, plan, a) { S.battle.cmd = C; cmdPlan = plan; cmdFor = C; cmdTimer = setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }, C.w + RU.CMD.DEF.grace + 50); }
-let cmdPlan = null, cmdFor = null, cmdTimer = null; // plano do inimigo que espera a janela de defesa fechar (fica fora do estado enviado aos clientes)
-const planOf = (C, a) => { if (cmdFor !== C || !cmdPlan) { cmdPlan = aiPlan(a); cmdFor = C; } return cmdPlan; }; // janela salva sem o plano (servidor reiniciado): planeja de novo, uma vez
+// plano do inimigo que espera a janela de defesa fechar (fica fora do estado enviado aos clientes), um por cena: batalhas simultâneas não se cruzam
+const cmdBy = {}, cmdOf = () => cmdBy[S.scene] ??= { plan: null, for: null, timer: null };
+// o temporizador volta para a cena em que a janela abriu antes de disparar
+const cmdArm = (C, a) => { const K = cmdOf(), sid = S.scene; clearTimeout(K.timer); K.timer = setTimeout(() => inScene(sid, () => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }), C.w + RU.CMD.DEF.grace + 50); };
+function openCmd(C, plan, a) { S.battle.cmd = C; const K = cmdOf(); K.plan = plan; K.for = C; cmdArm(C, a); }
+const planOf = (C, a) => { const K = cmdOf(); if (K.for !== C || !K.plan) { K.plan = aiPlan(a); K.for = C; } return K.plan; }; // janela salva sem o plano (servidor reiniciado): planeja de novo, uma vez
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
-const undoStack = [], NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear']);
+const NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'tvSet', 'offMsg']);
+// Desfazer por cena: cada cena tem a sua pilha. A foto guarda o estado global, a cena e os personagens que não estão em outra cena;
+// desfazer devolve isso e deixa intactas as outras cenas (e as batalhas delas) e quem está nelas.
+const undoBy = {};
+// pisou numa saída: pedido de passagem na fila do mestre (um por jogador); S.auto.pass ou o mestre jogando pelo jogador passam direto
+const passReq = (c, ch) => {
+  const ex = scene().exits.find(e => e.x === ch.x && e.y === ch.y); if (!ex || !S.scenes[ex.to]) return;
+  if (S.auto.pass || c.ctl || c.appr) return H.moveTo({ role: 'gm' }, { ids: [ch.id], scene: ex.to });
+  for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
+  S.reqs[rid()] = { by: c.name, ch: ch.id, cat: 'pass', t: 'pass', text: `passar para ${S.scenes[ex.to].name}`, n: ++S.seq, sc: S.scene, m: { id: ch.id, to: ex.to } };
+};
+const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
+const undoPush = sid => { if (!okSc(sid)) return; const st = undoBy[sid] ??= [];
+  st.push(JSON.stringify({ sid, S: { ...S, log: undefined, users: undefined, scenes: undefined, chars: undefined, focus: undefined, tv: undefined }, sc: S.scenes[sid], chars: Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => !(okSc(ch.scene) && ch.scene !== sid))) }));
+  if (st.length > 20) st.shift(); };
+const undoClear = () => { for (const k of Object.keys(undoBy)) delete undoBy[k]; };
 
 const H = {
   addChar(c, m) {
@@ -23,11 +41,14 @@ const H = {
     const enemy = !!m.enemy, id = rid();
     S.chars[id] = newChar(id, enemy, enemy ? '' : String(m.owner || '').trim().slice(0, 30));
   },
-  undo(c) { // desfaz a última ação do mestre (até 20)
-    if (c.role !== 'gm' || !undoStack.length) return;
-    const prev = JSON.parse(undoStack.pop()), keep = { log: S.log, users: S.users, seq: S.seq };
+  undo(c) { // desfaz a última ação do mestre nesta cena (até 20 por cena)
+    const st = undoBy[S.scene];
+    if (c.role !== 'gm' || !st?.length) return;
+    const p = JSON.parse(st.pop()), keep = { log: S.log, users: S.users, seq: S.seq, scenes: S.scenes, focus: S.focus, tv: S.tv };
+    const other = Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => okSc(ch.scene) && ch.scene !== p.sid));
     for (const k of Object.keys(S)) delete S[k];
-    Object.assign(S, prev, keep);
+    Object.assign(S, p.S, keep, { chars: { ...Object.fromEntries(Object.entries(p.chars).filter(([id]) => !other[id])), ...other } });
+    if (okSc(p.sid)) S.scenes[p.sid] = p.sc;
     log('Mestre', 'desfez a última ação.');
   },
   logClear(c) { if (c.role === 'gm') S.log = []; }, // mestre apaga o chat e o histórico de todos
@@ -54,8 +75,13 @@ const H = {
     else if (f === 'nen' && c.role === 'gm') ch.nen = RU.NEN.includes(m.v) ? m.v : '';
 
   },
-  move(c, m) { const ch = S.chars[m.id]; if (can(c, ch)) { ch.x = int(m.x, 0, Math.ceil(scene().cols) - 1); ch.y = int(m.y, 0, Math.ceil(scene().rows) - 1); } },
-  place(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) { ch.x = ch.y = onMap(ch) ? null : 0; ch.scene = S.scene; } },
+  move(c, m) { const ch = S.chars[m.id]; if (can(c, ch)) { ch.x = int(m.x, 0, Math.ceil(scene().cols) - 1); ch.y = int(m.y, 0, Math.ceil(scene().rows) - 1); if (c.role !== 'gm' && !ch.enemy && !S.battle.active && scene().exits?.some(e => e.x === ch.x && e.y === ch.y)) passReq(c, ch); } }, // pisou numa saída: vira pedido de passagem
+  place(c, m) { // põe no mapa da cena em foco ou tira dele; herói de outra cena chega pelo moveTo (sai da batalha de lá)
+    const ch = S.chars[m.id]; if (c.role !== 'gm' || !ch) return;
+    if (ch.x != null && ch.scene === S.focus) { ch.x = ch.y = null; return; }
+    if (!ch.enemy && ch.scene !== S.focus) return H.moveTo(c, { ids: [ch.id], scene: S.focus });
+    ch.scene = S.focus; ch.x = ch.y = 0;
+  },
   roll(c, m) {
     const ch = S.chars[m.id];
     if (!can(c, ch) || !ATTRS.includes(m.attr)) return;
@@ -152,15 +178,61 @@ const H = {
     for (let x = int(m.x) - 1; x <= int(m.x) + 1; x++) for (let y = int(m.y) - 1; y <= int(m.y) + 1; y++)
       if (x >= 0 && y >= 0 && x < Math.ceil(sc.cols) && y < Math.ceil(sc.rows)) { if (m.hide) delete sc.seen[x + ',' + y]; else sc.seen[x + ',' + y] = 1; }
   },
-  sceneAdd(c) { if (c.role === 'gm') { const id = rid(); S.scenes[id] = newScene('Cena ' + (Object.keys(S.scenes).length + 1)); H.sceneGo(c, { id }); } },
-  sceneGo(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) { S.scene = m.id; Object.values(S.chars).filter(ch => !ch.enemy).forEach(ch => ch.scene = m.id); } }, // heróis acompanham a cena; inimigos ficam na deles
-  sceneDel(c) { if (c.role === 'gm' && Object.keys(S.scenes).length > 1) { delete S.scenes[S.scene]; H.sceneGo(c, { id: Object.keys(S.scenes)[0] }); } },
+  // ----- cenas: o mestre cria, foca e distribui os heróis; cada herói está numa cena ou fora de cena (scene null) -----
+  sceneAdd(c, m = {}) { // nova cena: em branco ou cópia de outra (mapa, loja, clima, recursos e saídas; sem batalha nem personagens)
+    if (c.role !== 'gm') return;
+    const id = rid(), src = m.dup && S.scenes[m.dup], name = String(m.name || '').trim().slice(0, 30);
+    S.scenes[id] = src ? { ...structuredClone({ ...src, battle: undefined }), battle: { active: false, ticks: {} }, name: name || (src.name + ' (cópia)').slice(0, 30), exits: src.exits.map(e => ({ ...e, id: rid() })) } : newScene(name || 'Cena ' + (Object.keys(S.scenes).length + 1), { exits: [], battle: { active: false, ticks: {} } });
+    S.focus = id;
+    if (Array.isArray(m.take) && m.take.length) inScene(id, () => H.moveTo(c, { ids: m.take, scene: id }));
+  },
+  sceneGo(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) S.focus = m.id; }, // muda só o foco do mestre: ninguém é levado junto
+  sceneDel(c, m = {}) { // só uma cena vazia e sem batalha (os heróis precisam ser movidos antes)
+    const id = Object.hasOwn(S.scenes, m.id) ? m.id : S.focus;
+    if (c.role !== 'gm' || Object.keys(S.scenes).length < 2 || S.scenes[id].battle?.active || Object.values(S.chars).some(ch => !ch.enemy && ch.scene === id)) return;
+    delete S.scenes[id];
+    for (const [k, ch] of Object.entries(S.chars)) if (ch.enemy && ch.scene === id) delete S.chars[k]; // inimigos da cena apagada vão junto
+    for (const sc of Object.values(S.scenes)) sc.exits = (sc.exits || []).filter(e => e.to !== id);
+    if (S.focus === id) S.focus = Object.keys(S.scenes)[0];
+    if (S.tv === id) S.tv = S.focus;
+  },
+  tvSet(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) S.tv = m.id; }, // cena que a TV mostra
+  offMsg(c, m) { if (c.role === 'gm') S.offMsg = String(m.v ?? '').slice(0, 300); }, // recado da tela de espera
+  moveTo(c, m) { // leva heróis para uma cena (ou para fora de cena, scene null): saem da batalha da cena antiga e entram na da nova
+    if (c.role !== 'gm') return;
+    const to = m.scene === null || m.scene === '' ? null : Object.hasOwn(S.scenes, m.scene) ? m.scene : undefined; if (to === undefined) return;
+    const ids = [...new Set(Array.isArray(m.ids) ? m.ids : [])].filter(id => S.chars[id] && !S.chars[id].enemy).slice(0, 50), moved = [];
+    for (const [i, id] of ids.entries()) {
+      const ch = S.chars[id], from = ch.scene; if (from === to) continue;
+      if (Object.hasOwn(S.scenes, from)) inScene(from, () => { delete S.battle.ticks[id]; });
+      for (const o of Object.values(S.chars)) if (o.summon?.by === id && o.scene === from) { if (Object.hasOwn(S.scenes, from)) inScene(from, () => { delete S.battle.ticks[o.id]; }); delete S.chars[o.id]; } // invocações não atravessam cenas
+      ch.scene = to; moved.push(ch);
+      if (to === null) { ch.x = ch.y = null; continue; }
+      inScene(to, () => {
+        const sc = scene(), C = Math.ceil(sc.cols), Rw = Math.ceil(sc.rows), ex = sc.exits.find(e => e.id === m.exit) || sc.exits.find(e => e.to === from); // chega pela saída que liga as duas cenas, se houver
+        const busy = new Set(Object.values(S.chars).filter(o => o !== ch && o.scene === to && o.x != null).map(o => o.x + ',' + o.y));
+        const cx = ex ? ex.x : Math.floor(C / 2), cy = ex ? ex.y : Math.floor(Rw / 2); let best = null;
+        for (let r = ex ? 1 : 0; r < Math.max(C, Rw) && !best; r++) for (let dy = -r; dy <= r && !best; dy++) for (let dx = -r; dx <= r && !best; dx++) { const x = cx + dx, y = cy + dy; if (x >= 0 && y >= 0 && x < C && y < Rw && !busy.has(x + ',' + y)) best = [x, y]; }
+        [ch.x, ch.y] = best || [cx, cy];
+        if (S.battle.active && ch.hp > 0 && !ch.dead) { const T = S.battle.ticks; T[id] = Math.max(0, ...Object.values(T)) + 1 + i; ch.bt = {}; } // entra no fim da fila da batalha que está acontecendo lá
+      });
+    }
+    if (moved.length) log('Mestre', `${moved.map(o => o.name).join(', ')} → ${to === null ? 'fora de cena' : S.scenes[to].name}.`);
+  },
+  exitAdd(c, m) { // saída no mapa da cena para outra cena; both = cria a volta na casa espelhada da outra
+    const sc = S.scenes[m.scene] || scene(), to = m.to, sid = S.scenes[m.scene] ? m.scene : S.scene;
+    if (c.role !== 'gm' || !Object.hasOwn(S.scenes, to) || to === sid || sc.exits.length >= 12) return;
+    const x = int(m.x, 0, Math.ceil(sc.cols) - 1), y = int(m.y, 0, Math.ceil(sc.rows) - 1);
+    sc.exits.push({ id: rid(), x, y, to });
+    if (m.both && !S.scenes[to].exits.some(e => e.to === sid)) { const d = S.scenes[to]; d.exits.push({ id: rid(), x: Math.min(Math.ceil(d.cols) - 1, Math.max(0, Math.ceil(d.cols) - 1 - x)), y: Math.min(Math.ceil(d.rows) - 1, y), to: sid }); }
+  },
+  exitDel(c, m) { const sc = S.scenes[m.scene] || scene(); if (c.role === 'gm') sc.exits = sc.exits.filter(e => e.id !== m.id); },
   // ----- batalha -----
   battle(c, m) {
     if (c.role !== 'gm') return;
     const all = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(Boolean), dead = all.filter(o => o.enemy && o.hp <= 0), pcs = all.filter(o => !o.enemy);
     all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; delete o.brv; delete o.ten; delete o.brk; delete o.domUsed; delete o.icd; o.shield = 0; });
-    for (const [k, o] of Object.entries(S.chars)) if (o.summon) delete S.chars[k]; // invocações somem com o fim da luta
+    for (const [k, o] of Object.entries(S.chars)) if (o.summon && (o.scene === S.scene || k in S.battle.ticks)) delete S.chars[k]; // invocações desta cena somem com o fim da luta (as de outra batalha ficam)
     if (!m.on && m.win && pcs.length && dead.length) { // recompensas divididas entre os heróis
       const sum = f => Math.floor(dead.reduce((a, o) => a + o[f], 0) / pcs.length), xp = sum('xpR'), gold = sum('goldR'), drops = [];
       pcs.forEach(p => { p.xp += xp; p.gold += gold; });
@@ -181,7 +253,11 @@ const H = {
         log('Mestre', `Contrato cumprido: ${ct.target}! +${Math.floor(ct.gold / pcs.length)} de ouro e +${ct.xp} XP para cada herói.`, 'ok');
       }
     }
-    if (!m.on && S.battle.active) { if (S.meal && --S.meal.left <= 0) delete S.meal; Object.values(S.chars).forEach(o => { delete o.sharp; }); } // refeição e arma afiada valem por uma batalha
+    if (!m.on && S.battle.active) { // refeição e arma afiada valem por uma batalha, só para quem lutou nesta
+      if (S.meal?.ids) { for (const p of pcs) if (p.id in S.meal.ids && --S.meal.ids[p.id] <= 0) delete S.meal.ids[p.id]; if (!Object.keys(S.meal.ids).length) delete S.meal; }
+      else if (S.meal && --S.meal.left <= 0) delete S.meal;
+      pcs.forEach(o => { delete o.sharp; });
+    }
     S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
     if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
     if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
@@ -234,7 +310,7 @@ const H = {
     if (!C.chq) {
       const key = m.skill, s = (ch.skills || []).includes(key) && S.skills[key]; if (!s || s.cmd !== 'choque' || ch.chqT || cantUse(ch, effSkill(ch, key))) return;
       ch[s.res] -= s.cost; ch.chqT = 1; C.p[ch.id] = []; C.chq = { id: ch.id, skill: key, at: now, w: 3000, meta: chqMeta(S.chars[C.foe], planOf(C, S.chars[C.foe]), ch, key), n: 0, last: now };
-      C.w = now - C.at + 3000; clearTimeout(cmdTimer); cmdTimer = setTimeout(() => { if (S.battle.cmd === C) { fireCmd(C, S.chars[C.foe]); push(); } }, C.w + RU.CMD.DEF.grace + 50); return;
+      C.w = now - C.at + 3000; cmdArm(C, S.chars[C.foe]); return;
     }
     if (C.chq.id !== ch.id || now > C.chq.at + C.chq.w + RU.CMD.DEF.grace) return;
     const add = Math.min(Math.max(0, Math.floor(+m.n) || 0), Math.ceil(20 * (now - C.chq.last) / 1000)); C.chq.n += add; C.chq.last = now;
@@ -449,7 +525,9 @@ const H = {
     if (c.role !== 'gm' || !r) return;
     delete S.reqs[m.id];
     const mod = int(m.mod, -100, 100), n = S.seq;
-    H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', txt: r.t === 'ofiUse' ? String(m.txt || '').slice(0, 200) : '', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' });
+    const rc = S.chars[r.m.id], rsc = r.sc !== undefined ? r.sc : rc && Object.hasOwn(S.scenes, rc.scene) ? rc.scene : null; // roda na cena em que o pedido nasceu
+    if (r.cat === 'pass') return void inScene(rsc, () => H.moveTo(c, { ids: [r.m.id], scene: r.m.to, exit: r.m.exit }));
+    inScene(rsc, () => H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', txt: r.t === 'ofiUse' ? String(m.txt || '').slice(0, 200) : '', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' }));
     tell(r.by, S.seq === n && r.cat !== 'item' && r.cat !== 'camp' ? { kind: 'no', text: `${r.text}: não foi possível agora.` } : { kind: 'ok', text: `Aprovado: ${r.text}${mod ? ` (${mod > 0 ? '+' : ''}${mod})` : ''}` });
   },
   reqNo(c, m) {
@@ -591,7 +669,7 @@ const H = {
     if (!R.ok) return;
     if (r.meal) {
       const pcs = Object.values(S.chars).filter(o => !o.enemy && !o.dead), dbl = ['ensopado', 'sopa'].includes(r.id) && OF.hook(ch, 'dobro') ? 2 : 1;
-      S.meal = { n: r.n, by: ch.name, left: OF.hook(ch, 'refDupla') ? 2 : 1, m: Object.fromEntries(Object.entries(r.meal).map(([k, v]) => [k, v * dbl])) };
+      S.meal = { n: r.n, by: ch.name, ids: Object.fromEntries(pcs.map(o => [o.id, OF.hook(ch, 'refDupla') ? 2 : 1])), m: Object.fromEntries(Object.entries(r.meal).map(([k, v]) => [k, v * dbl])) };
       const sanUp = OF.hook(ch, 'sanRef'); pcs.forEach(o => { if (sanUp) o.san = Math.min(o.sanMax, o.san + sanUp); if (r.san) o.san = Math.max(0, o.san - r.san); });
       return log(ch.name, `serve ${r.n}: ${r.mealD} para o grupo na próxima batalha.`, 'ok');
     }
@@ -649,4 +727,4 @@ const H = {
   },
 };
 
-export { H, NOUNDO, undoStack };
+export { H, NOUNDO, undoBy, undoClear, undoPush };

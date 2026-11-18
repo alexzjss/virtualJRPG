@@ -5,11 +5,11 @@ import { AR, OF, RU } from './config.js';
 import { ATTRS, BODY, CTRL, DOT, ELCOL, EXTRA, FOIL, PARTS, PL, R, RESN, ROLES, ROLE_N, STN, TIER, VN } from './consts.js';
 
 // recalcula máximos de personagens e modelos antes de enviar o estado
-const prep = () => { Object.values(S.chars).forEach(derive); Object.values(S.chars).forEach(normSlots); const hs = Object.values(S.chars).filter(c => !c.enemy && !c.summon); for (const c of hs) c.bondMax = Math.max(0, ...hs.filter(o => o !== c).map(o => bondLv(c, o))); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
+const prep = (list = Object.values(S.chars), full = true) => { list.forEach(derive); list.forEach(normSlots); if (!full) return; const hs = Object.values(S.chars).filter(c => !c.enemy && !c.summon); for (const c of hs) c.bondMax = Math.max(0, ...hs.filter(o => o !== c).map(o => bondLv(c, o))); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
 // herói que caiu e voltou (cura, item, mestre) é reencaixado na fila logo após o tempo atual, sem tempo velho ou ausente
-const reseat = () => {
+const reseat = (list = Object.values(S.chars)) => {
   const T = S.battle.ticks;
-  for (const ch of Object.values(S.chars)) {
+  for (const ch of list) {
     if (!ch.fell || ch.enemy) continue;
     if (ch.hp <= 0) { if (ch.dead) delete T[ch.id]; continue; } // ainda caído: continua na contagem; morto sai
     delete ch.fell; delete ch.dying;
@@ -18,7 +18,7 @@ const reseat = () => {
     T[ch.id] = (others.length ? Math.min(...others) : 0) + delay(ch);
   }
 };
-const usable = () => { for (const ch of Object.values(S.chars)) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries([...ch.skills, ...wSk(ch)].filter(k => SK(k) && SK(k).kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
+const usable = (list = Object.values(S.chars)) => { for (const ch of list) { if (S.battle.active && ch.id in S.battle.ticks) ch.cant = Object.fromEntries([...ch.skills, ...wSk(ch)].filter(k => SK(k) && SK(k).kind !== 'passive').map(k => [k, cantUse(ch, effSkill(ch, k))])); else delete ch.cant; } };
 let cfgSig = JSON.stringify(S.ofiCfg);
 const ofiSync = force => { const sg = JSON.stringify(S.ofiCfg); if (force || sg !== cfgSig) { cfgSig = sg; OF.apply(S.ofiCfg); } }; // reaplica o catálogo de ofícios do mestre quando ele muda (desfazer pode trocá-lo)
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -92,7 +92,7 @@ function modsOf(ch, s) { // soma dos modificadores das passivas (no escopo da sk
   if (wu) { if (wu.sig != null) add(OF.SIG[wu.sig]?.m || {}); for (const rn of wu.g || []) add(OF.RUNAS[rn]?.mod || {}); if (wu.living && stageOf(wu.kills) >= 3 && s?.basic) m.crit += 10; }
   const wp = eq(ch, 'arma'); // traços da arma empunhada: bônus fixos sempre; acerto e crítico só no ataque básico; sem o atributo pedido, −20 de acerto nos golpes com ela
   if (wp?.type === 'arma') { const P = AR.prof(wp); add(P.mod.m); if (s?.basic) { m.hit += P.hit; m.crit += P.crit; } if ((s?.basic || s?.req || s?.wpn) && AR.short(wp, x => at0(ch, x)).length) m.hit -= 20; }
-  if (S.meal && S.battle?.active && !ch.enemy) add(S.meal.m); // refeição do acampamento
+  if (S.meal && S.battle?.active && !ch.enemy && (!S.meal.ids || S.meal.ids[ch.id] > 0)) add(S.meal.m); // refeição do acampamento
   if (ch.sharp && s?.basic) m.atkP += 3; // arma afiada
   if (S.battle?.active && !ch.enemy && ch.id in S.battle.ticks) for (const o of battlers()) { // laços: aliados queridos por perto fortalecem
     if (o === ch || o.enemy || o.hp <= 0) continue;
