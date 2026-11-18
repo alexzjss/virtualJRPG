@@ -4,7 +4,7 @@
 // Posições em coordenadas de 1440×860 (a câmera sempre põe o herói no mesmo lugar); o CSS escala tudo pelo --hk.
 const LEQUE = (() => {
   const state = { mode: 'menu', sel: 0 }; // mode: menu | skills (as 6 fixadas, tarefa 5) | all (lista inteira) | items | aim
-  let from = 'menu', turnKey = '', cx = null, gmOpen = ''; // from: de onde a mira veio (Esc volta para lá); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
+  let from = 'menu', listFrom = 'menu', turnKey = '', cx = null, gmOpen = ''; // from: de onde a mira veio (Esc volta para lá); listFrom: de onde a lista completa veio (as 6 ou o menu); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
   const donoOn = c => !c.enemy && !!c.owner && (S.online || []).includes(String(c.owner).toLowerCase()); // o jogador dono do herói está conectado (o mestre só age por ele se quiser)
   const ATK = { k: 'atk', id: 'atk' };
   const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
@@ -28,14 +28,21 @@ const LEQUE = (() => {
   const confirm = () => { const w = why(); if (w) return toast(w, 'no'); goAct(cx.actor.id); };
   const go = (mode, f) => { if (f) from = f; state.mode = mode; state.sel = 0; if (mode === 'aim') fit(); render(); };
   const back = () => {
-    if (state.mode === 'aim') { if (aimOpen) { aimOpen = false; aim = null; } else { state.mode = from; if (from === 'menu') pick = { ...ATK }; } }
-    else if (skQ) skQ = ''; else state.mode = state.mode === 'all' && from === 'skills' ? 'skills' : 'menu';
+    if (state.mode === 'aim') { if (aimOpen) { aimOpen = false; aim = null; } else state.mode = from; }
+    else if (skQ) skQ = ''; else state.mode = state.mode === 'all' ? listFrom : 'menu';
+    if (state.mode === 'menu') pick = { ...ATK }; // de volta ao menu, nada de escolha velha para o Q e o "Mirar parte"
     render();
   };
   const usables = c => [...new Set([...wSk(c), ...c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive')])].filter(k => SK(k));
   const six = c => PALCO3D.pickSix(c.skPin || [], c.skUse || {}, usables(c));
   const flat = () => skGroups(cx.actor, S.chars[tgt], skQ).flatMap(g => g.items);
   const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
+  // inimigos de pé, da esquerda para a direita na tela
+  const foes = () => { const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB.filter(o => !o.enemy).map(o => o.id), inB.filter(o => o.enemy).map(o => o.id));
+    return inB.filter(o => o.enemy && o.hp > 0 && !o.dead).sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0)); };
+  const setZoom = id => { if ((PALCO3D.local.zoom || null) === (id || null)) return; PALCO3D.local.zoom = id || null; render(); };
+  const zoomStep = d => { const l = foes(); if (!l.length) return; const i = l.findIndex(o => o.id === PALCO3D.local.zoom), n = l[(i + d + l.length) % l.length].id;
+    if (state.mode === 'aim' && cands().some(o => o.id === n)) { tgt = n; aim = null; } setZoom(n); };
   const hint = n => { const b = app.querySelector(`.hk[data-a=${n}]`); if (b) b.click(); return !!b; }; // as dicas de baixo são botões: o clique passa pelo mesmo caminho do mouse
 
   const stroke = (lq, key, label, small, x, y, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} style="left:${x}px;top:${y}px;${o.r != null ? `--r:${o.r}deg;` : ''}${o.fs ? `font-size:${o.fs}px` : ''}" ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
@@ -46,12 +53,22 @@ const LEQUE = (() => {
     reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; },
     off() { cx = null; },
     // alvo da câmera de mira (palco3d.js): só enquanto o leque está na mira
+    // linha de efeito previsto sobre o alvo (ficha): "nome · P12 · ▲ FRACO · −1 escudo"; só na mira, de golpe que dá dano
+    preview(t) {
+      if (!cx || !cx.my || cx.wait || state.mode !== 'aim' || !t?.enemy || pick.k === 'it') return '';
+      const c = cx.actor, wp = eq(c, 'arma'), P = ARMAS.prof(wp), sk = skSel(), s = sk || { name: P.atkN || 'Ataque', kind: P.mental ? 'mental' : 'dmg', el: wp?.el || 'fis', power: wp?.power ?? c.arma };
+      if (!(s.power > 0) || !['dmg', 'mental'].includes(s.kind)) return '';
+      const af = skAff(s, t);
+      return `${s.name} · P${s.power} · ${af === 'w' ? '▲ FRACO · −1 escudo' : af === 'r' ? '▼ resiste' : af === '?' ? '? não testado' : 'neutro'}`;
+    },
+    // clicar num inimigo fora da mira dá zoom nele (de novo, sai)
+    zoomClick(id) { const c = S.chars[id]; if (!cx || state.mode === 'aim' || !c?.enemy || c.hp <= 0 || !(id in S.battle.ticks)) return false; if (cx.my) { tgt = id; aim = null; } setZoom(PALCO3D.local.zoom === id ? null : id); return true; },
     aimTarget() { return cx && cx.my && !cx.wait && state.mode === 'aim' ? tgt : null; },
     // opts.gm: leque do mestre para quem está na vez (herói ou inimigo), no lugar da barra .gcmd
     html(c, cur, opts = {}) {
       const [, rq] = myReq() || [], my = cur === c, wait = !!(rq && rq.ch === c.id), gmO = !!opts.gm;
       cx = { actor: c, cur, my, wait, gm: gmO };
-      const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; gmOpen = ''; if (gmO) { const f = battlers().find(o => o.enemy !== c.enemy && o.hp > 0); if (f) tgt = f.id; } }
+      const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; gmOpen = ''; PALCO3D.local.zoom = null; if (gmO) { const f = battlers().find(o => o.enemy !== c.enemy && o.hp > 0); if (f) tgt = f.id; } }
       if (!my || wait || S.battle.cmd) return '';
       if (gmO && donoOn(c) && gmOpen !== tk) return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox"><button type="button" class="lq-gm-open" data-lq="gmopen" title="${esc(c.owner)} está conectado: o leque fica recolhido até você pedir">Agir por ${esc(c.name)}</button></div></div>`;
       const inB = battlers();
@@ -98,7 +115,7 @@ const LEQUE = (() => {
       if (cx.gm && name === 'next') { this.reset(); aim = null; return send({ t: 'next' }); }
       if (name === 'atk') { pick = { ...ATK }; return go('aim', 'menu'); }
       if (name === 'sk' && six(c).length) return go('skills', 'menu');
-      if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } return state.mode === 'all' ? undefined : go('all', state.mode === 'skills' ? 'skills' : 'menu'); }
+      if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } if (state.mode === 'all') return; listFrom = state.mode === 'skills' ? 'skills' : 'menu'; return go('all'); }
       if (name === 'skp') { const s2 = SK(v); if (!s2 || blocked(c, s2, v)) return; pick = { k: 'sk', id: v }; if (selfSk(s2)) { tgt = c.id; return goAct(c.id); } return go('aim', 'skills'); }
       if (name === 'it') return go('items', 'menu');
       if (name === 'item') { pick = { k: 'it', id: v }; return go('aim', 'items'); }
@@ -117,6 +134,9 @@ const LEQUE = (() => {
       if (e.target.matches?.('input,textarea,select') || rollDlg || meOpen || navOpen || gridFull || ctx || document.querySelector('.stage-cmd,.result,.dlg-in')) return false;
       const k = e.key, mode = state.mode, c = cx.actor;
       if (gm && (gui.sheet || (k === 'Enter' && Object.keys(S.reqs).length))) return false; // ficha aberta, ou Enter que aprova o pedido da fila
+      if (k === 'Escape' && PALCO3D.local.zoom) { setZoom(null); return true; } // o zoom fecha antes de qualquer outro passo
+      if (/^[zZ]$/.test(k) && mode !== 'all') { const a = S.chars[this.aimTarget()] || S.chars[tgt], z = a?.enemy && a.hp > 0 ? a : foes()[0]; setZoom(PALCO3D.local.zoom ? null : z?.id); return true; }
+      if (PALCO3D.local.zoom && (k === 'ArrowLeft' || k === 'ArrowRight') && mode !== 'all') { zoomStep(k === 'ArrowLeft' ? -1 : 1); return true; }
       if (k === 'Escape') {
         if (cx.wait) { const [id] = myReq() || []; if (id) send({ t: 'reqNo', id }); return true; }
         if (!cx.my || mode === 'menu') return false;
@@ -144,7 +164,7 @@ const LEQUE = (() => {
       }
       if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'skills') {
         const n = six(c).length, s0 = state.sel; if (s0 === 6 || !n) return true; const to = k === 'ArrowRight' ? (s0 >= 3 ? s0 - 3 : s0) : (s0 < 3 ? s0 + 3 : s0);
-        if (to < n) state.sel = to; render(); return true;
+        state.sel = to < n ? to : n > 3 ? n - 1 : s0; render(); return true; // sem a mesma linha na outra coluna: vai para o último dela
       }
       if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'aim') {
         const l = cands(); if (!l.length) return true;

@@ -66,7 +66,7 @@ app.addEventListener('click', e => {
   const pgb = e.target.closest('[data-pg]'), sl = e.target.closest('[data-sel]');
   if (pgb) { pg = pgb.dataset.pg; navOpen = false; if (innerWidth < 1000) chatOpen = false; scrollTo(0, 0); return render(); }
   if (sl) { selCh = sl.dataset.sel; return render(); }
-  if (!d && u) { if (LEQUE.clickTgt(u.dataset.tgt)) return; if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
+  if (!d && u) { if (LEQUE.clickTgt(u.dataset.tgt) || LEQUE.zoomClick(u.dataset.tgt)) return; if (tgt !== u.dataset.tgt) aim = null; tgt = u.dataset.tgt; return render(); }
   if (!d) return;
   if (d.a === 'openSheet') { if (gm) gOpen('f_' + d.id); else { pg = 'pers'; selCh = d.id; } return render(); }
   if (d.a === 'lay') { // arranjos de janelas: aplica o salvo (ou o padrão); Shift salva o atual

@@ -1329,3 +1329,17 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .pl.bat3 .chatcol{position:fixed;z-index:60;right:0;top:62px;bottom:0;width:340px;max-height:none;background:var(--ink);border-left:3px solid var(--red)}
 .pl.bat3 .chatcol .panel{height:100%}
 .stage3d.hudp{z-index:11;pointer-events:none;background:none}
+/* ficha do alvo (ao lado do recorte) e barra do topo: mira e zoom no palco 3D */
+.hud-top{left:calc(200px*var(--hk,.85));top:calc(18px*var(--hk,.85));width:480px;text-align:center;transform:scale(var(--hk,.85));transform-origin:0 0;pointer-events:none}
+.hud-top .hpbar{height:10px;background:#200;border:1px solid #fff3;transform:skewX(-14deg)}.hud-top .hpbar i{display:block;height:100%;background:linear-gradient(#ff4060,#e4002b);transition:width .6s}
+.hud-top h4{margin:4px 0 0;font:400 28px var(--disp);letter-spacing:2px;text-transform:uppercase;text-shadow:0 2px 6px #000}.hud-top .sh2{display:inline-block;margin-right:8px;color:#cfe3ff}
+.hud-sheet{left:0;top:0;width:270px;transform:scale(var(--hk,.85));transform-origin:0 0;pointer-events:none;transition:left .3s,top .3s,opacity .2s}
+.hud-sheet .sheet{width:270px;margin:0;background:#0b0b0df4;border:0;border-left:4px solid var(--red);padding:9px 12px;clip-path:polygon(0 0,100% 0,96% 100%,0 100%);box-sizing:border-box}
+.hud-sheet .sheet h5{margin:0;font:400 24px var(--disp);letter-spacing:1px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:baseline}.hud-sheet .sheet h5 small{font:600 13px var(--cond);color:var(--dim)}
+.hud-sheet .sheet .hpbar{height:8px;margin-top:4px;background:#200;border:1px solid #fff3}.hud-sheet .sheet .hpbar i{display:block;height:100%;background:linear-gradient(#ff4060,#e4002b)}
+.hud-sheet .sheet .row{display:flex;gap:6px;align-items:center;margin-top:6px;font:600 12px var(--cond);color:var(--dim)}.hud-sheet .sheet .row:first-of-type{justify-content:space-between}.hud-sheet .sheet .esc{color:#cfe3ff}
+.hud-sheet .sheet .wk{display:flex;gap:3px}.hud-sheet .sheet .wk span{width:22px;height:22px;display:grid;place-items:center;font:800 12px var(--cond);background:#000;border:1px solid var(--line);color:var(--dim)}
+.hud-sheet .sheet .wk .w{background:var(--red);color:#fff;border-color:var(--red)}.hud-sheet .sheet .wk .r{background:#17508f;color:#fff;border-color:#17508f}.hud-sheet .sheet .wk .q{border-style:dashed}
+.hud-sheet .sheet .cond{display:flex;gap:3px;flex-wrap:wrap}
+.hud-sheet .sheet .more p{font:600 12px var(--cond);margin:6px 0 0;color:#ccc}
+.hud-sheet .sheet .pv{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);font:600 13px var(--cond);color:var(--gold)}

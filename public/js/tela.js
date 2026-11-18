@@ -43,7 +43,7 @@ function render() {
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
     dockFix();
     const body = { ...xWins(), ...(gui.sheet && ent(gui.sheet.slice(2)) ? { [gui.sheet]: gmSheet(ent(gui.sheet.slice(2))) } : {}), pedidos: gui.R === 'pedidos' && sideOpen('R') ? reqStrip() : '', sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
-    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '') : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '' })}${cropper()}${ctxMenu()}`;
+    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, (bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '') + (b ? HUD.gm() : '')) : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '' })}${cropper()}${ctxMenu()}`;
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) { pg = 'mesa'; if (innerWidth > 700) chatOpen = false; navOpen = false; } // a batalha começou: leva o jogador para a mesa (no PC o chat só abre por cima, quando pedido)
@@ -52,7 +52,7 @@ function render() {
     const page = !c ? `<section class="card"><h3>Bem-vindo, ${esc(name)}</h3><p>Você entrou na campanha. O mestre ainda não ligou um personagem à sua conta: assim que ele fizer isso, a ficha aparece aqui sozinha.</p></section>`
       : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'ofi' ? oficiosPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
-      : chaseBar() + (actor ? bat3 ? battle(false, HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + LEQUE.html(actor, cur)) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
+      : chaseBar() + (actor ? bat3 ? battle(false, ((lq) => HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + lq)(LEQUE.html(actor, cur))) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
     const pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
     if (chatOpen) chatSeen = S.seq;
     lastPg = pg + (c?.id || '');

@@ -34,11 +34,42 @@ const HUD = (() => {
       + (downAll ? hint(8, 'Ataque Total', `data-a="allOut" data-id="${a.id}" title="Todo inimigo Derrubado ou Quebrado: o grupo inteiro ataca"`, 'allout') : '')
       + hint(7, 'Passar', `data-a="next" data-id="${a.id}" title="Passa a vez gastando metade do tempo"`)
       + (mode !== 'menu' ? hint('Esc', 'Voltar', 'data-lq="back"') : '') + '</div>'; };
+  // ficha do inimigo: HP (em % para o jogador, números para o mestre), escudo da Quebra, fraquezas só do que foi descoberto e condições; full (zoom) acrescenta golpes e o efeito da Quebra
+  const MAIN5 = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku'];
+  const sheet = (id, { full = false, preview = '' } = {}) => {
+    const c = S.chars[id]; if (!c || !c.enemy) return '';
+    const weak = c.weak || [], res = c.resist || [], els = [...MAIN5, ...new Set([...weak, ...res].filter(e => !MAIN5.includes(e)))];
+    const wk = els.map(e => { const k = weak.includes(e) ? 'w' : res.includes(e) ? 'r' : !gm && (c.known || 0) < 2 && MAIN5.includes(e) ? 'q' : '', nm = EL[e] || e;
+      return `<span class="${k}" title="${esc(nm + (k === 'w' ? ': fraqueza' : k === 'r' ? ': resiste' : k === 'q' ? ': não testado' : ''))}">${k === 'q' ? '?' : esc((typeof KANJI !== 'undefined' && KANJI[e]) || e.slice(0, 1).toUpperCase())}</span>`; }).join('');
+    const st = c.hp > 0 ? stIcons(c) : '', golpes = (c.telK || []).map(k => SK(k)?.name).filter(Boolean);
+    return `<div class="sheet ${full ? 'full' : ''}"><h5>${esc(c.name)}<small>${c.boss ? 'Chefe' : 'Inimigo'}</small></h5>
+      <div class="row"><span>HP ${gm ? `${c.hp}/${c.hpMax}` : pct(c.hp, c.hpMax) + '%'}</span><span class="esc">ESCUDO ${c.brk ? c.brk.cur : 0}</span></div>
+      <div class="hpbar"><i style="width:${pct(c.hp, c.hpMax)}%"></i></div>
+      <div class="row">FRAQUEZAS <div class="wk">${wk}</div></div>${st ? `<div class="row">CONDIÇÕES <div class="cond">${st}</div></div>` : ''}
+      ${full ? `<div class="more"><p>Golpes conhecidos: ${golpes.length ? esc(golpes.join(', ')) : 'nenhum visto ainda'}.</p>${c.brk ? '<p>Quebra: perde 2 turnos e sofre +50% de dano.</p>' : ''}</div>` : ''}${preview ? `<div class="pv">${esc(preview)}</div>` : ''}</div>`;
+  };
+  // inimigo em destaque: o do zoom ou o da mira
+  const alvoId = () => { const id = PALCO3D.local.zoom || LEQUE.aimTarget(), c = id && S.chars[id]; return c && c.enemy && c.hp > 0 && id in S.battle.ticks ? id : null; };
+  let pos = { id: '', l: 0, t: 0 }; // última posição da ficha (o desenho refaz o HTML a cada estado: sem isso ela piscaria)
+  const alvo = () => { const id = alvoId(); if (!id) return ''; const c = S.chars[id], zoom = !!PALCO3D.local.zoom, hp = pct(c.hp, c.hpMax), ok = pos.id === id;
+    return `<div class="hud-top" aria-label="Alvo"><div class="hpbar"><i style="width:${hp}%"></i></div><h4><span class="sh2" title="Escudo (Quebra)">◆${c.brk ? c.brk.cur : 0}</span>${esc(c.name)}</h4></div>`
+      + `<div class="hud-sheet" data-sid="${id}" style="${ok ? `left:${pos.l}px;top:${pos.t}px` : 'opacity:0'}">${sheet(id, { full: zoom, preview: LEQUE.preview(c) })}</div>`; };
   return {
+    sheet,
+    // mestre: só a barra do topo e a ficha do alvo (o leque dele vem separado)
+    gm() { const a = alvo(); return a ? `<div class="hudw table">${a}</div>` : ''; },
+    // coloca a ficha ao lado do recorte (à direita; à esquerda se não couber; presa entre top 110 e 560); a câmera leva ~1,1 s, então é chamada de novo depois
+    place() {
+      const w = app.querySelector('.hud-sheet'), h = w?.closest('.hudw'), r = w && PALCO3D.rectOf(w.dataset.sid); if (!r) return;
+      const hr = h.getBoundingClientRect(), hk = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) || .85, W = 270 * hk;
+      let l = r.right - hr.left + 20 * hk; if (l + W + 10 > hr.width) l = r.left - hr.left - 20 * hk - W;
+      l = Math.round(Math.max(10, l)); const t = Math.round(Math.max(110 * hk, Math.min(560 * hk, r.top - hr.top + r.height * .15)));
+      Object.assign(w.style, { left: l + 'px', top: t + 'px', opacity: '' }); pos = { id: w.dataset.sid, l, t };
+    },
     // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
     html({ actorId = null, dim = false, unread = 0, table = false } = {}) {
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table };
-      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8))}${topo(o)}${grupo(inB, cur)}${dicas(o, inB, cur)}</div>`;
+      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8))}${topo(o)}${grupo(inB, cur)}${dicas(o, inB, cur)}${alvo()}</div>`;
     },
   };
 })();

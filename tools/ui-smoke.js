@@ -113,8 +113,36 @@ try {
     await anaD.keyboard.press('t'); check(await until(async () => await anaD.locator('.skl').count() > 0, 'lista completa'), 'T abre a lista completa');
     await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.skl').count()) && await anaD.locator('.sk6').count() > 0, 'Esc volta às 6'), 'Esc da lista volta às 6');
     await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sk6').count()), 'Esc fecha as 6'), 'Esc volta ao menu');
+    // Esc volta pelo caminho de ida: mira → lista → 6 skills → menu (e o menu não guarda a skill escolhida)
+    await anaD.keyboard.press('2'); await until(() => anaD.locator('.sk6').count(), 'as 6 de novo'); await anaD.keyboard.press('t'); await until(() => anaD.locator('.skl').count(), 'lista de novo');
+    await anaD.keyboard.press('Enter'); await until(async () => await anaD.locator('.lq-sum').count() === 1 && !(await anaD.locator('.skl').count()), 'mira vinda da lista');
+    await anaD.keyboard.press('Escape'); check(await until(() => anaD.locator('.skl').count(), 'mira → lista'), 'Esc da mira volta à lista');
+    await anaD.keyboard.press('Escape'); check(await until(() => anaD.locator('.sk6').count(), 'lista → 6'), 'Esc da lista volta às 6');
+    await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sk6').count()), 'seis → menu'), 'Esc das 6 volta ao menu');
+    check(await anaD.evaluate(() => pick.k === 'atk'), 'de volta ao menu a escolha é Atacar');
     await anaD.keyboard.press('1'); check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1, 'um alvo marcado'), 'Atacar entra na mira com 1 alvo');
     await shot(anaD, 'mira');
+    // ficha do alvo, barra do topo, zoom e alvo que some (Task 6)
+    check(await until(() => vis(anaD, '.hud-sheet .sheet'), 'ficha do alvo'), 'com a mira aberta a ficha do alvo está visível');
+    check(/ESCUDO/.test(await txt(anaD, '.hud-sheet .sheet')) && await vis(anaD, '.hud-top h4'), 'a ficha mostra ESCUDO e a barra do topo mostra o alvo');
+    check(await anaD.evaluate(() => { const s = document.querySelector('.hud-sheet .sheet').getBoundingClientRect(), r = document.querySelector('.p3d .bb.tgt').getBoundingClientRect(); return s.left >= 0 && s.right <= innerWidth && (s.left >= r.right - 2 || s.right <= r.left + 2); }), 'a ficha fica ao lado do recorte mirado, sem cobri-lo');
+    check(!(await anaD.locator('.hud-sheet .sheet.full').count()), 'sem zoom a ficha não é a completa');
+    await anaD.keyboard.press('z'); check(await until(() => vis(anaD, '.hud-sheet .sheet.full'), 'ficha completa'), 'Z abre a ficha completa (zoom)');
+    await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sheet.full').count()), 'zoom fechou'), 'Esc fecha o zoom');
+    check(await vis(anaD, '.hud-sheet .sheet') && await anaD.locator('.lq-sum').count() === 1, 'Esc do zoom não sai da mira');
+    await anaD.locator('.p3d .bb.foe:not(.ko)').first().dispatchEvent('wheel', { deltaY: -100 }); check(await until(() => vis(anaD, '.hud-sheet .sheet.full'), 'zoom pela roda'), 'a roda para cima sobre o inimigo dá zoom');
+    await anaD.locator('.p3d .bb.foe:not(.ko)').first().dispatchEvent('wheel', { deltaY: 100 }); check(await until(async () => !(await anaD.locator('.sheet.full').count()), 'sai do zoom'), 'a roda para baixo sai do zoom');
+    // enquanto não é descoberta, a fraqueza não aparece para o jogador (só o que o lore revela)
+    minion.known = 0; push(); await sleep(200); check(await aimAt(anaD, minion.id), 'mirar o Diabrete'); await sleep(300);
+    { const lore = S.lore?.[minion.tpl || minion.name]?.w || [], vis0 = minion.weak.filter(e => lore.includes(e)).length;
+      check(await anaD.locator('.hud-sheet .sheet .wk .w').count() === vis0 && await anaD.locator('.hud-sheet .sheet .wk .q').count() >= 1, `a ficha só mostra as fraquezas descobertas (${vis0}) e "?" no resto`); }
+    // o mestre remove o inimigo mirado: a mira passa para outro, sem erro de console
+    { const ex = bestId('Diabrete de Cinzas') || Object.keys(S.bestiary)[2]; H.bSpawn(gmc, { id: ex, n: 1 }); const novo = foesOf().find(c => c !== bossCh && c !== minion);
+      go({ t: 'ini', k: 'in', id: novo.id }); go({ t: 'ini', k: 'set', id: novo.id, v: 1e6 }); push(); await sleep(300); check(await aimAt(anaD, novo.id), 'mirar o inimigo que vai sumir');
+      await anaD.keyboard.press('z'); await until(() => vis(anaD, '.sheet.full'), 'zoom no inimigo que vai sumir');
+      go({ t: 'delChar', id: novo.id }); push();
+      check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1 && (await anaD.locator('.p3d .bb.tgt').getAttribute('data-tgt')) !== novo.id, 'mira troca'), 'removido o inimigo mirado, a mira passa para outro');
+      check(await until(async () => !(await anaD.locator('.sheet.full').count()) && await vis(anaD, '.hud-sheet .sheet'), 'zoom fecha'), 'o zoom fecha e a ficha segue o novo alvo'); } await sleep(300);
     const n = S.seq; await anaD.keyboard.press('Enter');
     await until(() => S.log.some(l => l.n > n && l.who === 'Shinkai'), 'Enter manda a ação');
     // condições aparecem sobre o recorte (e nos retratos do grupo)

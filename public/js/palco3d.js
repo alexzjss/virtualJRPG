@@ -55,7 +55,7 @@
   const P = { formation, cameraFor, imgSrc, pickSix, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
-  let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0;
+  let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
   const els = new Map(); // id -> { el, img, mini, sh, hpb, bad: [], key... }
   const el = (tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
   const ensure = () => {
@@ -67,6 +67,9 @@
     // clique num recorte vale como clique no alvo dentro do #app (os atalhos estão delegados em #app)
     root.addEventListener('click', e => { const u = e.target.closest('[data-tgt]'); if (!u || !host?.isConnected) return; const i = el('i', '', host); i.dataset.tgt = u.dataset.tgt; i.hidden = true; i.click(); i.remove(); });
     root.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-tgt]')) { e.preventDefault(); e.target.click(); } });
+    // roda para cima sobre um inimigo dá zoom nele; para baixo sai
+    root.addEventListener('wheel', e => { const u = e.target.closest?.('.bb.foe:not(.ko)'); if (!u || !host?.isConnected) return; e.preventDefault();
+      const want = e.deltaY < 0 ? u.dataset.tgt : null; if ((local.zoom || null) === want || (!want && !local.zoom)) return; local.zoom = want; if (typeof render === 'function') render(); }, { passive: false });
     addEventListener('scroll', place, true); addEventListener('resize', place);
   };
   const place = () => {
@@ -124,6 +127,15 @@
     }
     return F;
   };
+  // alvo que some (removido, caído ou oculto): a mira vai para o próximo inimigo de pé e o zoom fecha; devolve se algo mudou
+  const vivo = id => { const c = S.chars[id]; return !!c && id in S.battle.ticks && c.hp > 0 && !c.dead; };
+  const heal = () => {
+    let ch = false;
+    if (local.zoom && !vivo(local.zoom)) { local.zoom = null; ch = true; }
+    if (tgt && (!S.chars[tgt] || !(tgt in S.battle.ticks) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0))) { const f = Object.values(S.chars).find(c => c.enemy && vivo(c.id)); if (f) { tgt = f.id; aim = null; ch = true; } }
+    if (local.aim && !vivo(local.aim)) { local.aim = S.chars[tgt]?.enemy && vivo(tgt) ? tgt : null; ch = true; }
+    return ch;
+  };
   const camera = F => {
     const v = cameraFor(view(F)), k = `${v.tx},${v.ty},${v.tz},${v.ry}`; if (k === camKey) return; camKey = k;
     world.style.transform = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
@@ -131,8 +143,11 @@
 
   P.sync = h => {
     if (typeof document === 'undefined') return;
-    if (!h) { if (root) { root.style.display = 'none'; for (const u of els.values()) u.el.remove(); els.clear(); camKey = ''; } return; } // fim da batalha: some com os recortes (nada de alvo velho para os efeitos)
-    ensure(); mount(h); scene(); camera(units());
+    if (!h) { if (root) { root.style.display = 'none'; for (const u of els.values()) u.el.remove(); els.clear(); camKey = ''; } local.zoom = null; return; } // fim da batalha: some com os recortes (nada de alvo velho para os efeitos)
+    ensure(); mount(h); scene();
+    if (heal() && typeof render === 'function') setTimeout(render); // redesenha o HUD sem a ficha do alvo que sumiu
+    camera(units());
+    if (typeof HUD !== 'undefined') { HUD.place(); clearTimeout(hs1); clearTimeout(hs2); hs1 = setTimeout(HUD.place, 650); hs2 = setTimeout(HUD.place, 1250); } // a câmera leva ~1,1 s para chegar
     requestAnimationFrame(place); clearTimeout(settle); settle = setTimeout(place, 400); // a página ainda anima a entrada (a posição final só vem depois)
   };
   P.rectOf = id => els.get(id)?.el.getBoundingClientRect() || null;
