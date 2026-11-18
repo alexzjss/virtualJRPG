@@ -22,7 +22,7 @@ export const CARTAS = {
     { n: "Cólera", k: "form", d: "Libera todo o potencial físico: o dano dobra, e o corpo paga metade do HP a cada rodada.", xp: 30, a: "FOR", c: 3, fm: "dur 3; atk 50; dr hp 12; end st exaus 2" },
     { n: "Kai", k: "form", d: "Libera todo o potencial espiritual: o dano de Aura dobra, mas custa toda a Aura e acaba em 3 rodadas.", xp: 35, a: "SAB", c: 3, fm: "dur 3; atkP 10; dr aura 5; end lose aura 99", rq: { SAB: 50 } },
     { n: "Inconsciência", k: "form", d: "Abandonar os sentidos naturais e viver só de vontade e brutalidade: enxerga rastros de Aura.", xp: 50, a: "FOR", c: 5, fm: "dur 9; atk 30; hit 15; crit 10; end st blind 3; end st exaus 2", rq: { FOR: 55 } },
-    { n: "Esquiva Flanqueada", k: "dmg", d: "Dois Personagens esquivam do mesmo ataque e flanqueiam o alvo, abrindo um ataque vantajoso.", xp: 25, a: "DES", p: 22, c: 4, ct: 70, duo: "Esquiva Flanqueada", fx: "st exposed 1" },
+    { n: "Esquiva Flanqueada", k: "dmg", d: "Dois Personagens esquivam do mesmo ataque e flanqueiam o alvo, abrindo um ataque vantajoso.", xp: 25, a: "DES", p: 15, c: 4, ct: 70, duo: "Esquiva Flanqueada", fx: "st exposed 1" },
     { n: "Soco da Dualidade", k: "dmg", d: "Dois Personagens reúnem a Aura do ambiente e socam juntos: duas mãos em uma só corrente de impacto.", xp: 50, a: "FOR", p: 46, c: 12, duo: "Soco da Dualidade", rq: { FOR: 55 } },
     { n: "Lâmina da Irmandade", k: "dmg", d: "Dois Personagens armados atacam em sincronia contra um único alvo.", xp: 40, a: "DES", p: 36, c: 9, duo: "Lâmina da Irmandade" },
     { n: "Ataque de Trio", k: "dmg", d: "Três Personagens atacam de forma sincronizada contra um único alvo.", xp: 70, a: "FOR", p: 52, c: 14, ct: 150, trio: "Ataque de Trio|Ataque de Trio" },

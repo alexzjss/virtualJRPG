@@ -21,7 +21,7 @@ export const TREE = {
       { n: "Golpe Pesado", k: "dmg", d: "Um golpe com todo o peso do corpo, capaz de deixar o inimigo zonzo.", xp: 10, a: "FOR", p: 10, c: 5, st: "stun" },
       { n: "Vigor", k: "passive", d: "Anos de treino deixam o corpo mais rijo e resistente.", xp: 10, pas: "hpMax", p: 10 },
       { n: "Golpe Giratório", k: "dmg", d: "Um giro amplo que alcança todos os que estão ao redor.", xp: 10, a: "FOR", p: 10, c: 7, area: true },
-      { n: "Tiro Certeiro", req: "dist", k: "dmg", d: "Respirar fundo, mirar com calma e disparar sem pressa.", xp: 15, a: "DES", p: 13, c: 4, ct: 60 },
+      { n: "Tiro Certeiro", req: "dist", k: "dmg", d: "Respirar fundo, mirar com calma e disparar sem pressa.", xp: 15, a: "DES", p: 10, c: 4, ct: 60 },
       { n: "Foco", k: "passive", d: "Um hábito de concentração que alarga a reserva de aura.", xp: 15, pas: "auraMax", p: 8 },
       { n: "Mente Firme", k: "passive", d: "A cabeça fria de quem já viu o pior e continua de pé.", xp: 15, pas: "sanMax", p: 10 },
       { n: "Grito de Guerra", k: "heal", d: "Um brado que faz o sangue ferver e acende o grupo.", xp: 20, a: "CAR", p: 0, c: 6, st: "atkUp", area: true },

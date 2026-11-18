@@ -58,7 +58,7 @@ export const LEVA5 = {
     ],
     [ // Sobrevivente (Sobrevivendo ao Horror)
       P('Durão', 'Quem sobreviveu até aqui aguenta mais do que parece.', 15, { bon: 'hpMax 12' }),
-      { n: 'Pancada Forte', k: 'dmg', d: 'Um golpe de desespero, sem técnica nenhuma, que funciona.', xp: 15, a: 'FOR', p: 12, c: 2 },
+      { n: 'Pancada Forte', k: 'dmg', d: 'Um golpe de desespero, sem técnica nenhuma, que funciona.', xp: 15, a: 'FOR', p: 12, c: 4},
       { n: 'Correria Desesperada', k: 'util', d: 'Quando tudo dá errado, correr é uma tática.', xp: 20, a: 'AGI', c: 3, tg: 'self', fx: 'st agiUp 2 self; st evade 1 self' },
       P('Instinto de Fuga', 'Ao ser ferido, o corpo já se afasta do próximo golpe antes da cabeça.', 25, { on: 'hurt', ch: 40, fx: 'st evade 1 self' }),
       { n: 'Soluções Improvisadas', k: 'util', d: 'Uma cadeira, um cinto e uma ideia: dá para atravessar mais uma sala.', xp: 25, a: 'INT', c: 4, tg: 'self', fx: 'res hp 6 self; st defUp 2 self' },

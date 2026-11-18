@@ -1343,3 +1343,11 @@ test('Árvore de Armas: req por categoria (corte, esmag, perf, dist), maestria w
   const e = mk(gm, { enemy: true }); assert.equal(cantUse(e, g), ''); assert.equal(cantUse(e, ski('Tiro Certeiro')), ''); ski('Tiro Certeiro').req = '';
   assert.ok(Object.values(S.items).some(i => (i.kit || '').includes('medico')) && Object.values(S.items).some(i => (i.kit || '').includes('armadilha')));
 });
+test('desarme: arma não conta, técnicas da arma bloqueadas e inimigo bate mais fraco', async () => {
+  const { cantUse } = await import('../src/rules.js');
+  reset(); const h = mk(ana, {}); S.items.wx = { name: 'Sabre de Teste', type: 'arma', power: 9, wt: 'lamina', price: 1 }; h.equip.arma = 'wx';
+  const s = S.skills[sk('Corte de Ferro')];
+  assert.ok(!/Exige/.test(cantUse(h, s) || ''));
+  h.st.disarm = 2; assert.match(cantUse(h, s) || '', /Exige/);
+  assert.equal(RU.ST.disarm, 'Desarmado'); assert.ok(RU.NEG.includes('disarm'));
+});

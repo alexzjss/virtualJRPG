@@ -55,7 +55,7 @@ export const LEVA2C = {
   ],
   marcial: [
     [ // Ofensivo: trincheira e rua (Ímpeto)
-      { n: "Jab de Rua", k: "dmg", d: "Um jab rápido de quem aprendeu a brigar no cais.", xp: 10, a: "FOR", p: 12, c: 3, ct: 60, fx: "stack impeto 5 self" },
+      { n: "Jab de Rua", k: "dmg", d: "Um jab rápido de quem aprendeu a brigar no cais.", xp: 10, a: "FOR", p: 9, c: 3, ct: 60, fx: "stack impeto 5 self" },
       { n: "Cotovelada Curta", k: "dmg", d: "Um cotovelo curto no queixo, sem cerimônia.", xp: 10, a: "FOR", p: 13, c: 3, fx: "st stun 1 25%" },
       { n: "Sequência de Boxe", k: "dmg", d: "Esquerda, direita, esquerda: o boxe do clube operário.", xp: 15, a: "AGI", p: 7, c: 5, hits: 3, combo: "Jab de Rua|Cotovelada Curta" },
       { n: "Rasteira", k: "dmg", d: "Um chute baixo que leva o alvo ao chão.", xp: 15, a: "AGI", p: 10, c: 4, fx: "st down 1 50%; stack impeto 5 self" },

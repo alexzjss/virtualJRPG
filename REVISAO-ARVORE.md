@@ -95,3 +95,10 @@ Chefes depois da Quebra (4 heróis, nível 0/2): Ifrit 46/49 · Leviatã 81/81 �
 Id interno `radiacao` renomeado para `hiruko`, com migração do estado salvo.
 
 Serafim Caído (revisto na frente de IA dos inimigos): 76% / 89% no nível 0 / 2 com Defender (.2) e `arma -4 / hp 0,6`. Dentro da faixa de 46-89%. Ponto em aberto encerrado.
+
+## Revisão 2026-11-17 · Leva 1: Marcial + Armas
+- Motor: estado **Desarmado** (`st disarm N`). Usado em Desarmar, Desarme, Laçada (40%) e Golpe do Mestre Duelista.
+- Marcas: Xeque-Mate e Ponto Cego detonam Marcado (`det marked`).
+- Requisitos: o 1º nó de cada ramo de tipo de arma exige a raiz primordial da sua categoria (`pre`); o nó final de cada ramo exige o 3º nó do ramo irmão (topo pede 2 ramos). Foco e instrumento não têm categoria.
+- Balanço (p ≈ 2,6×custo, ajustado por golpes/área/tempo): nerf em Esquiva Flanqueada 22→15, Pancada Forte custo 2→4, Jab de Rua 12→9, Tiro Certeiro 13→10, Dedo-Pistola 22→18; buff em Chicote Frenético 7→12, Kata das Cinco Formas e Forma Contínua 10→16, Dança da Lança Serpente 10→15, Combo do Duelista 9→14, Selo Rápido 6→10, Saraivada Cerrada 8→11, Roda de Facas 8→10, Desarmar 8→12.
+- Próximas levas: Vínculos; Aura/Ocultismo/Ordo.

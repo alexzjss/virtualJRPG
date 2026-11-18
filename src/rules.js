@@ -28,7 +28,7 @@ const int = (v, lo = 0, hi = 9999) => Math.min(hi, Math.max(lo, Math.round(+v) |
 const okUrl = v => /^(https?:\/\/[^\s'"()<>]+|\/(uploads|maps)\/[\w.-]+)$/.test(v);
 const can = (c, ch) => ch && (c.role === 'gm' || (c.role === 'player' && ch.owner === c.name));
 const scene = () => S.scenes[S.scene];
-const eq = (ch, slot) => S.items[ch.equip[slot]];
+const eq = (ch, slot) => slot === 'arma' && ch.st?.disarm ? undefined : S.items[ch.equip[slot]]; // Desarmado: a arma não conta
 const at0 = (ch, a) => ch.attrs[a] + (eq(ch, 'acess')?.attr === a ? eq(ch, 'acess').power + (ch.up?.[ch.equip.acess]?.p || 0) : 0) + (eq(ch, 'arma')?.mod ? AR.kv(eq(ch, 'arma').mod).a[a] || 0 : 0); // arma pode dar atributo enquanto empunhada
 // técnicas da arma: o id 'w:<item>:<n>' aponta para a lista sk do item; só valem com a arma equipada
 const SK = id => { if (typeof id !== 'string' || !id.startsWith('w:')) return S.skills[id]; const [, k, n] = id.split(':'), s = S.items[k]?.sk?.[+n]; return s ? { ...s, wpn: k } : undefined; };
@@ -467,7 +467,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
   if (olho) a.bt.olho = 1;
   const blkP = !mental && !s.area && !o.counter && t.enemy !== a.enemy ? AR.prof(eq(t, 'arma')).block : 0, blk = blkP > 0 && Math.random() * 100 < blkP; // escudo: bloqueia golpe físico único de inimigo
-  const mult = (blk ? .4 : 1) * (bf ? 2.5 : crit ? 2 : 1) * (a.clone ? .5 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
+  const mult = (blk ? .4 : 1) * (bf ? 2.5 : crit ? 2 : 1) * (a.clone ? .5 : 1) * (w ? 1.5 : 1) * (rs ? .5 : 1) * (a.st.atkUp ? 1.25 : 1) * (a.st.atkDn ? .75 : 1) * (a.st.disarm && (a.enemy || a.summon) && !mental ? .8 : 1) * (a.st.fury ? 1.25 : 1) * (t.st.defUp ? .75 : 1) * (t.st.defDn ? 1.25 : 1) * (t.st.down ? 1.25 : 1) * (t.st.frozen ? 1.25 : 1) * (wk ? 2 : 1)
     * (1 + ma.atk / 100) * Math.max(.3, 1 - mt.def / 100) * vowMult(a, s, t) * fxMult(a, s, t) * (o.mult || 1) * (o.cx?.mult || 1) * (mental && t.st.dread ? 1.25 : 1) * (a.st.exaus ? .85 : 1)
     * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]) * (rea && (rea.rea.t === 'block' || rea.rea.t === 'absorb') ? 1 - rea.rea.v / 100 : 1);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);

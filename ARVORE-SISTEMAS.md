@@ -90,6 +90,7 @@ Escudo, Regeneração (1/20 do HP por turno; chefes 1/3 disso), Provocando, Prot
 próximo golpe erra), Furtivo (não pode ser alvo direto; +25% de acerto e crítico dobrado no próximo ataque), Foco (+15% de acerto,
 vê Furtivos), Exposto (armadura não conta), Exausto, Selo, Cego (−25% de acerto), Enraizado (AGI não ajuda a esquivar),
 Concentrando, Transformado, Tenacidade (o próximo golpe fatal deixa com 1 HP), Pavor (perde Sanidade por turno, +25% de dano mental).
+Desarmado (`st disarm N`): a arma equipada não conta (luta com os punhos, perde as técnicas com `req` de arma); inimigos e invocações causam −20% de dano físico.
 Dano contínuo agora acumula duração (até 6 turnos).
 
 ## Inimigos
