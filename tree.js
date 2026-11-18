@@ -10,6 +10,8 @@ import { LEVA2C } from './arvore/leva2c.js';
 import { LEVA3 } from './arvore/leva3.js';
 import { LEVA4, marcarComandos } from './arvore/leva4.js';
 import { LEVA5 } from './arvore/ordo.js';
+import { LEVA6 } from './arvore/leva6.js';
+import { nivelar } from './arvore/nivel.js';
 import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
 import { ARMAS_ARV } from './arvore/armas.js';
 import { SISTEMAS, AURA_SIN, OCULTO_PONTE, MARCIAL_SIST, MARCIAL_LACOS } from './arvore/sistemas.js';
@@ -731,5 +733,6 @@ TREE.armas = ARM;
 for (const [el, br] of Object.entries(CARTAS)) TREE[el].branches.push(...br);
 TREE.hiruko.branches.at(-1).push(...DOENCA_MAIS); // ramo da Doença completo
 // leva 2: dois ramos por setor (ofensivo e reações/reforços), com 3 Limites por setor
-for (const L of [LEVA2A, LEVA2B, LEVA2C, LEVA3, LEVA4, LEVA5]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);
+for (const L of [LEVA2A, LEVA2B, LEVA2C, LEVA3, LEVA4, LEVA5, LEVA6]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);
+nivelar(TREE); // arvore/nivel.js: evoluções somadas na base e pisos de custo das técnicas fortes
 marcarComandos(TREE); // Leva 4: comandos de ação nos nós que já existiam

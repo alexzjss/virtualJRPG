@@ -228,3 +228,9 @@ reação com PE → `rea`; PE → Aura; Sanidade continua Sanidade). O Ocultismo
 
 Os ramos de arma saíram do tronco Marcial para `TREE.armas` (ver ARMAS.md, "Árvore de Armas"): bloco à parte na grade, sem ligação com o resto. No Marcial, `branches[0]` é o núcleo, `[1]` os treinos e o resto vem em seguida
 (content.js usa `M.slice(2)` para os raios). `TREE.armas.branches` é a lista plana para as ferramentas que percorrem todas as árvores. Campos novos: `reqItem` (item exigido, tag em `kit` do item), `req` com categoria e `sc: 'wc:<cat>'`; `ramo` marca o 1º nó de um ramo (nome desenhado na mandala).
+
+## Leva 6 e nivelamento (`arvore/leva6.js`, `arvore/nivel.js`)
+
+- **Leva 6**: um ramo novo por Vínculo (Cinzas, Marés, Cordilheira, Condutores, Mil Cortes, Coroa Solar, Fases da Lua, Hemomancia, Simbiose) e dois na Aura (Armas de Aura, que começa em Conjurar Arma; Fluxo Avançado).
+- **Sem nós de evolução**: `X: Nível 2`, `X — Discente/Verdadeiro` (todo `amp`) e `X ++` foram somados na técnica base (mais poder e custo; XP da base + metade do nó). Quem tinha o nó apagado recebe o XP de volta na migração.
+- **Pisos de custo** (só sobem): formas pela soma de bônus (≥30: 35 XP, atributo 52, 2 nós do ramo; ≥50: 55/56/4; ≥75: 90/60/6 e Despertar do Vínculo); formas com Despertar ≥120 XP; Domínios 150 XP, atributo 62, 6 nós e Despertar; técnicas em dupla ×1,5 e atributo 55; trio 110 XP, atributo 60 e Lâmina da Irmandade; dano direto pelo poder (≥22: 25 XP · ≥30: 40 · ≥40: 50 · ≥60: 70); Conjuração ×1,4, e Conjurar Arma foi para o meio do ramo (45 XP, INT 55, exige Escudo Conjurado).

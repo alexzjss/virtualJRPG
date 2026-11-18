@@ -318,8 +318,8 @@ test('requisitos novos: Despertar, nó anterior, nós do ramo, estado e afinidad
   const near = k => { const s = S.skills[k]; return Object.keys(S.skills).find(j => j !== k && Math.max(Math.abs(S.skills[j].gx - s.gx), Math.abs(S.skills[j].gy - s.gy)) <= 1 && ['fis', 'oculto'].includes(S.skills[j].el)); };
   h.skills = [near(oc)]; H.learn(ana, { id: h.id, skill: oc }); assert.ok(!h.skills.includes(oc)); // sem o Despertar
   H.aw(ana, { id: h.id, k: 'outro' }); assert.deepEqual(h.aw, []); H.aw(gm, { id: h.id, k: 'outro' }); H.learn(ana, { id: h.id, skill: oc }); assert.ok(h.skills.includes(oc));
-  const amp = id('Lacre de Brasa — Discente'); h.vinc = ['kagutsuchi']; h.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'kagutsuchi-7' && k !== amp && k !== id('Ritual: Lacre de Brasa'));
-  H.learn(ana, { id: h.id, skill: amp }); assert.ok(!h.skills.includes(amp)); h.skills.push(id('Ritual: Lacre de Brasa')); H.learn(ana, { id: h.id, skill: amp }); assert.ok(h.skills.includes(amp));
+  const amp = id('Núcleo de Corte'), base = id('Núcleo de Indra'); h.vinc = ['indra']; h.skills = Object.keys(S.skills).filter(k => S.skills[k].br === S.skills[amp].br && k !== amp && k !== base); // nó com pre
+  H.learn(ana, { id: h.id, skill: amp }); assert.ok(!h.skills.includes(amp)); h.skills.push(base); H.learn(ana, { id: h.id, skill: amp }); assert.ok(h.skills.includes(amp));
   const q = id('Mutação Final: Quimera'); h.vinc = ['hiruko']; h.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'hiruko-8').slice(0, 9).filter(k => k !== q).slice(0, 5);
   H.learn(ana, { id: h.id, skill: q }); assert.ok(!h.skills.includes(q)); // 5 de 6 nós do ramo
   const fin = id('Restrição Autoimposta'), F = S.skills[fin]; h.skills = Object.keys(S.skills).filter(k => k !== fin && !S.skills[k].vow && ['fis', 'aura'].includes(S.skills[k].el) && Math.max(Math.abs(S.skills[k].gx - F.gx), Math.abs(S.skills[k].gy - F.gy)) <= 1);
