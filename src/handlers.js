@@ -44,6 +44,9 @@ const H = {
     else if (f === 'name') ch.name = String(m.v).slice(0, 30) || '?';
     else if (f === 'color' && /^#[0-9a-f]{6}$/i.test(m.v)) ch.color = m.v;
     else if (f === 'img') ch.img = okUrl(m.v) ? m.v : '';
+    else if (f === 'imgF' || f === 'imgP' || (f === 'imgB' && !ch.enemy)) ch[f] = okUrl(m.v) ? m.v : ''; // imagens do palco de batalha: frente, retrato e costas (inimigo não tem costas)
+    else if (f === 'imgS') ch.imgS = Math.min(2.5, Math.max(0.5, +m.v || 1));
+    else if (f === 'imgK') { const v = m.v, k = v?.k, n = (x, a, b, d) => Math.min(b, Math.max(a, Number.isFinite(+x) && x !== null && x !== '' ? +x : d)); if (k === 'f' || k === 'p' || (k === 'b' && !ch.enemy)) { if (!ch.imgK || typeof ch.imgK !== 'object') ch.imgK = {}; ch.imgK[k] = { x: n(v.x, -1, 1, 0), y: n(v.y, -1, 1, 0), z: n(v.z, 0.5, 3, 1) }; } } // enquadre da imagem no palco
     else if (f === 'xp' && c.role === 'gm') ch.xp = int(m.v);
     else if (f === 'owner' && c.role === 'gm') ch.owner = String(m.v).trim().slice(0, 30);
     else if (f === 'bio') ch.bio = String(m.v).slice(0, 3000);
@@ -267,11 +270,11 @@ const H = {
     }
     doAct(a, m, mod);
   },
-  skPin(c, m) { // fixa ou desfixa uma skill nos Atalhos do comando de batalha (máx. 12)
+  skPin(c, m) { // fixa ou desfixa uma skill nos Atalhos do comando de batalha (máx. 6)
     const ch = S.chars[m.id], k = m.sk; if (!can(c, ch) || ch.enemy || typeof k !== 'string') return;
     const w = /^w:([^:]+):(\d+)$/.exec(k), ok = ch.skills.includes(k) || (!!w && w[1] === ch.equip?.arma && !!S.items[w[1]]?.sk?.[+w[2]]);
     const L = Array.isArray(ch.skPin) ? ch.skPin.filter(x => x !== k) : [];
-    if (m.on) { if (!ok || L.length >= 12) return; L.push(k); }
+    if (m.on) { if (!ok || L.length >= 6) return; L.push(k); }
     ch.skPin = L;
   },
   pslot(c, m) { // liga ou desliga uma passiva ativa (só no acampamento ou pelo mestre, fora de batalha)

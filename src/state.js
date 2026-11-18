@@ -70,9 +70,9 @@ for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: []
 if (S.shop) { S.scenes[S.scene].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 if (isNew) S.itemsV = ITEMS_V; else migrateItems();
 fixShape();
-for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', ...ch });
+for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.scene, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', imgF: '', imgB: '', imgP: '', imgK: {}, imgS: 1, ...ch });
 for (const [id, ch] of Object.entries(S.chars)) fixChar(ch, id, true);
-for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, ...b, enemy: true }); fixChar(b, id, false); }
+for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, imgF: '', imgP: '', imgK: {}, imgS: 1, ...b, enemy: true }); fixChar(b, id, false); }
 }
 // ---------- saneamento: um arquivo editado à mão, antigo ou importado nunca deixa o estado num formato que derrube o servidor ----------
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -121,7 +121,7 @@ function fixChar(ch, id, live) {
   if (!/^#[0-9a-f]{6}$/i.test(ch.color)) ch.color = ch.enemy ? '#e60012' : '#00b7ff';
   if (!str(ch.img)) ch.img = '';
   const at = isObj(ch.attrs) ? ch.attrs : {}; ch.attrs = Object.fromEntries(ATTRS.map(a => [a, Math.min(100, Math.max(1, Math.round(fin(at[a], ch.enemy ? 50 : 40))))]));
-  arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str); arr('skPin', str); ch.skPin = ch.skPin.slice(0, 12);
+  arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str); arr('skPin', str); ch.skPin = ch.skPin.slice(0, 6);
   ch.skUse = isObj(ch.skUse) ? Object.fromEntries(Object.entries(ch.skUse).filter(([, n]) => Number.isInteger(n) && n > 0)) : {};
   ['st', 'inv', 'equip', 'marks', 'body', 'bon'].forEach(obj);
   for (const k of ['hpMax', 'auraMax', 'sanMax']) ch.bon[k] = Math.round(fin(ch.bon[k]));

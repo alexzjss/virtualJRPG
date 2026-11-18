@@ -1400,13 +1400,13 @@ test('Leva 8: eco, marca detonada, contador, sacrifício e ressonância', () => 
   for (const k of Object.keys(S.skills).filter(k => k.startsWith('t8'))) delete S.skills[k];
   assert.match(RU.fxText(RU.parseFx('echo 50; brand 2; pop 1.6; every 3 2; rs any 1.4; ovr')), /ecoa.*Marca.*detona.*3º.*Ressonância.*Sacrifício/);
 });
-test('skPin: dono fixa e desfixa; recusa skill que não tem, outro jogador e o 13º', () => {
+test('skPin: dono fixa e desfixa; recusa skill que não tem, outro jogador e o 7º', () => {
   reset(); const h = mk(ana, {}); h.skills = [sk('Golpe Pesado'), sk('Vigor')];
   H.skPin(ana, { id: h.id, sk: sk('Golpe Pesado'), on: true }); assert.deepEqual(h.skPin, [sk('Golpe Pesado')]);
   H.skPin(bia, { id: h.id, sk: sk('Vigor'), on: true }); assert.equal(h.skPin.length, 1);
   H.skPin(ana, { id: h.id, sk: 'g999999', on: true }); assert.equal(h.skPin.length, 1);
   H.skPin(ana, { id: h.id, sk: sk('Golpe Pesado'), on: false }); assert.deepEqual(h.skPin, []);
-  h.skills = Object.keys(S.skills).slice(0, 14); h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 12);
+  h.skills = Object.keys(S.skills).slice(0, 14); h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 6);
   S.items.tpin = { name: 'Arma Pin', type: 'arma', power: 5, wt: 'punho', el: '', price: 1, sk: [{ name: 'Golpe Pin', kind: 'dmg', el: 'fis', power: 5, cost: 1, res: 'aura' }] }; h.inv.tpin = 1; h.equip.arma = 'tpin'; h.skPin = [];
   H.skPin(ana, { id: h.id, sk: 'w:tpin:0', on: true }); H.skPin(ana, { id: h.id, sk: 'w:tpin:3', on: true }); assert.deepEqual(h.skPin, ['w:tpin:0']);
 });
@@ -1435,4 +1435,26 @@ test('lore malformado (importado) não quebra a tela dos jogadores', () => {
   reset(); mk(ana, {}); const e = mk(gm, { enemy: true }); e.weak = ['fuhaku']; H.battle(gm, { on: true });
   S.lore = { [e.tpl || e.name]: { w: { x: 1 }, r: 'fis' } };
   assert.deepEqual(view(ana).chars[e.id].weak, []); delete S.lore;
+});
+
+test('imagens de batalha: dono e mestre gravam frente/costas/retrato, escala e enquadre com limites; outro jogador não', () => {
+  reset(); const h = mk(ana, { name: 'Shin' });
+  H.set(ana, { id: h.id, f: 'imgF', v: '/uploads/a.png' }); assert.equal(h.imgF, '/uploads/a.png');
+  H.set(ana, { id: h.id, f: 'imgB', v: 'javascript:alert(1)' }); assert.equal(h.imgB, '');
+  H.set(bia, { id: h.id, f: 'imgP', v: '/uploads/b.png' }); assert.equal(h.imgP ?? '', '');
+  H.set(ana, { id: h.id, f: 'imgS', v: 9 }); assert.equal(h.imgS, 2.5);
+  H.set(gm, { id: h.id, f: 'imgK', v: { k: 'f', x: 5, y: -0.2, z: 0.1 } }); assert.deepEqual(h.imgK.f, { x: 1, y: -0.2, z: 0.5 });
+});
+test('bestiário: imagem de frente, retrato, escala e enquadre vão para o inimigo criado', () => {
+  reset(); const id = Object.keys(S.bestiary)[0]; Object.assign(S.bestiary[id], { imgF: '/uploads/g.png', imgP: '/uploads/gp.png', imgS: 1.8, imgK: { f: { x: 0, y: 0.1, z: 1 } } });
+  H.bSpawn(gm, { id, n: 1 }); const e = Object.values(S.chars).find(c => c.enemy);
+  assert.equal(e.imgF, '/uploads/g.png'); assert.equal(e.imgP, '/uploads/gp.png'); assert.equal(e.imgS, 1.8); assert.deepEqual(e.imgK.f, { x: 0, y: 0.1, z: 1 });
+});
+test('scrub repassa imagens de batalha do inimigo', async () => {
+  const { scrub } = await import('../src/net.js'); reset(); const e = mk(gm, { enemy: true, name: 'X' }); Object.assign(e, { imgF: '/uploads/x.png', imgS: 2 });
+  const p = scrub(e); assert.equal(p.imgF, '/uploads/x.png'); assert.equal(p.imgS, 2);
+});
+test('skPin: limite de 6 e migração corta saves com mais', () => {
+  reset(); const h = mk(ana, { name: 'P' }); h.skills = Object.keys(S.skills).slice(0, 9);
+  h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 6);
 });
