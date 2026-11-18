@@ -84,3 +84,18 @@ Pendências:
 ## Tela do mestre, 2ª versão (substitui as docas arrastáveis)
 `public/js/docas.js`: trilho de ícones à esquerda (um painel por vez; clicar no ativo recolhe), barra lateral direita com abas Fichas, Iniciativa, Chat e Pedidos (o selo conta os pedidos), centro com Palco ou Mapa (P, M; Tab fora da batalha), barra de ações da batalha sempre acima do centro, fichas em janela por cima de tudo (Esc fecha primeiro). `[` e `]` recolhem as laterais; abaixo de 1100 px só uma lateral fica aberta. Arranjo em `localStorage.vj_gui` (a chave antiga `vj_dock` deixou de ser lida). Na lista de fichas, inimigos ganharam ✕ e os botões "Remover caídos" e "Remover todos".
 `npm run ui` passa inteiro (73 verificações): use `npm i --no-save playwright@1.64.0`, a versão que casa com o Chromium 1248 já baixado nesta máquina. Ele achou e foi corrigido: o menu de comando do jogador transbordava no celular e no tablet (uma regra de 3 colunas no fim do CSS anulava as das telas estreitas) e os botões de girar a mandala tinham 31px. Falta olhar a tela com o mestre de verdade.
+
+## Palco 3D de batalha (PC, estilo Expedition 33)
+Spec em `docs/superpowers/specs/2026-11-18-palco-3d-design.md`, plano em `docs/superpowers/plans/2026-11-18-palco-3d.md` (11 tarefas, todas feitas). No PC (> 700 px) a batalha é um palco CSS 3D fora do `#app` (`public/js/palco3d.js`, atualizado por diferença em `PALCO3D.sync`), com HUD nos cantos (`hud.js`) e leque de pinceladas (`leque.js`); o celular continua com o painel antigo.
+Existe:
+- Câmera por turno (ombro do herói, mira, zoom no inimigo, vista do inimigo); recortes com frente, costas e retrato (`imgF`/`imgB`/`imgP`), enquadre `imgK` e tamanho `imgS`, editados na seção "Imagens de batalha" da Ficha (o bestiário usa a mesma Ficha). URL quebrada cai na reserva seguinte, até a silhueta padrão.
+- Leque do jogador e do mestre, tela das 6 skills (no máximo 6 fixadas), ficha do alvo com zoom, alvo que some sem erro.
+- Ordem de turnos com prévia de onde você volta: usa o atraso real do servidor (`dly` em cada herói, com passivas, forma, Marca e Domínio) e soma a dívida de Coragem.
+- Coreografia: `PALCO3D.lunge` leva câmera e recorte até o alvo (0,45 s), os golpes caem na chegada e tudo volta em ~1,4 s; as classes de animação do `coreo.js` reiniciam a cada golpe (os recortes não são redesenhados).
+- Vez do inimigo: faixa "{inimigo} · {golpe}" e "ALVO: {herói}" por 1,6 s (`S.battle.cmd.nm`), HUD apagada, retrato do alvo piscando e o anel de defesa `.qte3d` sobre o recorte do herói alvo, com a câmera indo rápido ao ombro dele (o anel dura ~1,3 s).
+Decisões do dono: estilo E33 só no PC; celular intacto; coreografia de ~1,5 s por ação; nunca mostrar fraqueza não descoberta; mestre vê tudo.
+Falta ver com gente de verdade:
+- Conforto da câmera (enjoo, velocidade) e se a investida de 1,4 s cansa em lutas longas.
+- O anel de defesa sobre o recorte: tamanho, legibilidade e se dá tempo de reagir com a câmera chegando junto.
+- Imagens reais (PNG transparente) com o editor de enquadre, e o tamanho na cena com chefes grandes.
+Armadilhas de teste: no Chromium sem GPU do `npm run ui` o close-up 3D desenha ~2 quadros/s, então transições de câmera quase não andam; os testes medem o pedido de câmera e a âncora do anel, não o quadro final (o bloco do anel no PC emula "reduzir movimento"). A checagem "o aperto chega ao servidor como nota" do celular é instável também na base.
