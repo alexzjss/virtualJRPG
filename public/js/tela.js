@@ -1,7 +1,7 @@
-let gmWasB = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
+let gmWasB = null, gmFocus = null, lastHero = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
 function render() {
   const ae = document.activeElement;
-  if (drag || wdrag || cdrag || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }
+  if (drag || wdrag || cdrag || (typeof mzDrag !== "undefined" && mzDrag) || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }
   pending = false; LEQUE.off();
   // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
@@ -16,13 +16,15 @@ function render() {
     if (reqIn) { lastReqN = newest[1].n; if (!snd.mute) beep(); }
   }
   if (gm) {
-    if (b && !gmWasB) gui.view = 'palco'; else if (!b && gmWasB) gui.view = 'mapa'; // a batalha começou: o palco vem para a frente; acabou: volta o mapa
-    gmWasB = b;
+    // a batalha da cena em foco começou: o palco vem para a frente; acabou: volta a Mesa. Trocar o foco entre cenas não muda a vista.
+    if (gmWasB === null) gui.view = b ? 'palco' : 'mesa';
+    else if (S.focus === gmFocus) { if (b && !gmWasB) gui.view = 'palco'; else if (!b && gmWasB) gui.view = 'mesa'; }
+    gmWasB = b; gmFocus = S.focus;
     // Cena: o que se usa toda hora fica à mostra; mapa, grade, recursos e fundo da batalha ficam em "Mais…" (o aberto fica lembrado)
     const cena = `<div class="row prim">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1" class="own">Iniciar batalha</button>'}</div>
       <div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
       <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button><button data-a="pause" data-on="${S.paused ? '' : 1}" ${on(S.paused)} title="Mostra a tela de título para os jogadores e a TV">${S.paused ? 'Retomar mesa' : 'Pausar mesa'}</button></div>
-      <div class="row chips">Cenas: ${chips(S.scenes, (id, s) => `<span class="${id === S.scene ? 'weak' : ''}" data-a="sceneGo" data-id="${id}">${esc(s.name)}</span>`)}<span data-a="sceneAdd">+</span><span data-a="sceneDel">excluir atual</span><span data-a="content" data-coll="scenes">+ cenas de exemplo</span></div>
+      <div class="row chips">Cena: <b>${esc(sc.name)}</b><span data-g="view" data-v="mesa" title="Criar, trocar e distribuir os heróis entre as cenas">abrir a Mesa</span></div>
       <div class="row chips">Clima: <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
       <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
       ${xCena(sc)}
@@ -43,16 +45,16 @@ function render() {
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
     dockFix();
     const body = { ...xWins(), ...(gui.sheet && ent(gui.sheet.slice(2)) ? { [gui.sheet]: gmSheet(ent(gui.sheet.slice(2))) } : {}), pedidos: gui.R === 'pedidos' && sideOpen('R') ? reqStrip() : '', sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
-    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, (bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '') + (b ? HUD.gm() : '')) : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '' })}${cropper()}${ctxMenu()}`;
+    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, (bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '') + (b ? HUD.gm() : '')) : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '', mesa: gui.view === 'mesa' ? MESA.html() : '' })}${cropper()}${ctxMenu()}`;
   } else if (role === 'player') {
-    const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
+    const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], _hs = c && !asWho && c.id !== lastHero && (lastHero = c.id, send({ t: 'activeHero', id: c.id })), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) { pg = 'mesa'; if (innerWidth > 700) chatOpen = false; navOpen = false; } // a batalha começou: leva o jogador para a mesa (no PC o chat só abre por cima, quando pedido)
     const bat3 = b && actor && pg === 'mesa' && innerWidth > 700, unread = chatOpen ? 0 : S.log.filter(l => l.n > chatSeen).length; // bat3: batalha do PC, sem o painel antigo
     wasBattle = b;
     const page = !c ? `<section class="card"><h3>Bem-vindo, ${esc(name)}</h3><p>Você entrou na campanha. O mestre ainda não ligou um personagem à sua conta: assim que ele fizer isso, a ficha aparece aqui sozinha.</p></section>`
       : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'ofi' ? oficiosPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
-      : chaseBar() + (actor ? bat3 ? battle(false, ((lq) => HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + lq)(LEQUE.html(actor, cur))) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
+      : S.off ? `<section class="offwait"><div><b>Fora de cena</b><p>${esc(S.off)}</p></div></section>` : chaseBar() + (actor ? bat3 ? battle(false, ((lq) => HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + lq)(LEQUE.html(actor, cur))) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
     const pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
     if (chatOpen) chatSeen = S.seq;
     lastPg = pg + (c?.id || '');

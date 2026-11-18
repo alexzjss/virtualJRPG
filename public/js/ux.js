@@ -91,7 +91,7 @@ function watch() {
   if (cur !== lastTurn) { lastTurn = cur; if (myTurn) { toast(`Sua vez: ${c.name}`, 'ok', 'Escolha o alvo e a ação.'); playSfx('sino'); navigator.vibrate?.([80, 60, 80]); } }
   const nreq = gm ? Object.keys(S.reqs || {}).length : 0;
   document.title = (myTurn ? '▶ Sua vez · ' : nreq ? `(${nreq}) ` : '') + baseTitle;
-  if (lastScene !== null && lastScene !== S.scene && !gm) { const d = document.createElement('div'); d.className = 'scenecard'; d.innerHTML = `<small>Nova cena</small><b>${esc(S.scenes[S.scene].name)}</b>`; document.body.append(d); setTimeout(() => d.remove(), 3200); }
+  if (lastScene !== null && lastScene !== S.scene && S.scene !== '_off' && !gm) { const d = document.createElement('div'); d.className = 'scenecard'; d.innerHTML = `<small>Nova cena</small><b>${esc(S.scenes[S.scene].name)}</b>`; document.body.append(d); setTimeout(() => d.remove(), 3200); }
   lastScene = S.scene;
 }
 

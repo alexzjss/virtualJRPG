@@ -1,0 +1,77 @@
+/* Mesa do mestre (public/js/mesa.js) e tela de espera do jogador fora de cena */
+.gview[data-view="mesa"]{overflow:hidden}
+.mesa{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;background:var(--ink)}
+.mz-top{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.mz-sp{flex:1}
+.mz-note{color:var(--dim);font:500 12px var(--body)}
+.mz-note select{margin-left:4px}
+.mz-main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px)}
+.mz-board{display:flex;gap:12px;padding:14px;overflow:auto;align-items:flex-start}
+.mz-col{flex:0 0 220px;background:var(--ink2);border:1px solid var(--line);display:flex;flex-direction:column;transition:border-color .15s,transform .15s,box-shadow .15s}
+.mz-col.focus{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.mz-col.over{border-color:var(--red);transform:translateY(-3px);box-shadow:0 8px 24px #e4002b44}
+.mz-thumb{all:unset;box-sizing:border-box;display:block;height:92px;position:relative;cursor:pointer;background:linear-gradient(160deg,#2a2a33,#101014) center/cover}
+.mz-thumb::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 40%,#000c)}
+.mz-thumb:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.mz-thumb b{position:absolute;left:10px;right:10px;bottom:6px;z-index:1;font:400 20px var(--disp);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mz-tags{position:absolute;right:6px;top:6px;z-index:1;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.mz-tags em{font:600 11px var(--cond);font-style:normal;text-transform:uppercase;background:#000c;padding:2px 6px;letter-spacing:.4px}
+.mz-tags em.tv{background:var(--gold);color:#000}
+.mz-bat{all:unset;box-sizing:border-box;display:block;background:var(--red2);padding:5px 10px;font:600 13px var(--cond);text-transform:uppercase;cursor:pointer}
+.mz-bat:hover,.mz-bat:focus-visible{background:var(--red)}
+.mz-bat.wait{background:var(--red);animation:mzpul 1.2s ease-in-out infinite alternate}
+@keyframes mzpul{to{background:var(--red2)}}
+.mz-meta{display:flex;gap:8px;padding:6px 10px;font:600 12px var(--cond);color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line)}
+.mz-drop{min-height:116px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
+.mz-empty{color:#5b5966;font:600 12px var(--cond);text-transform:uppercase;margin:auto}
+.mz-hero{width:58px;cursor:grab;text-align:center;position:relative}
+.mz-face{display:grid;place-items:center;width:58px;height:58px;font:400 26px var(--disp);font-style:normal;background:var(--c) center/cover;clip-path:polygon(8% 0,100% 0,92% 100%,0 100%);transition:transform .12s}
+.mz-hero:hover .mz-face{transform:scale(1.06)}
+.mz-hero small{display:block;font:600 12px var(--cond);text-transform:uppercase;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mz-hp{display:block;height:3px;background:#000;margin-top:1px}.mz-hp i{display:block;height:100%;background:var(--hp)}
+.mz-hero.sel .mz-face{outline:3px solid var(--gold);outline-offset:2px}
+.mz-hero.drag{opacity:.35}
+.mz-on{position:absolute;right:2px;top:2px;width:9px;height:9px;border-radius:50%;background:var(--hp);box-shadow:0 0 0 2px #000}
+.mz-on.off{background:#555}
+.mz-col.off{background:repeating-linear-gradient(135deg,#0d0d10 0 10px,#111115 10px 20px);border-style:dashed}
+.mz-col.off .mz-thumb{height:64px;cursor:default;background:#16161b}
+.mz-msg{margin:0 10px 10px;background:var(--ink3);color:var(--paper);border:1px solid var(--line);font:500 13px var(--body);padding:6px;resize:vertical;min-height:52px}
+.mz-col.add{all:unset;box-sizing:border-box;flex:0 0 140px;min-height:220px;border:1px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--dim);font:400 26px var(--disp)}
+.mz-col.add small{font:600 13px var(--cond);text-transform:uppercase}
+.mz-col.add:hover,.mz-col.add:focus-visible{color:var(--paper);border-color:var(--paper)}
+.mz-side{background:var(--ink2);border-left:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+.mz-side h2{font:400 24px var(--disp);margin:0;letter-spacing:.5px}
+.mz-h{display:block;font:600 13px var(--cond);text-transform:uppercase;color:var(--dim);margin:0 0 6px;letter-spacing:.6px}
+.mz-mini{position:relative;width:100%;background:#16161b center/cover;border:1px solid var(--line);cursor:crosshair}
+.mz-grid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(#ffffff14 1px,transparent 1px),linear-gradient(90deg,#ffffff14 1px,transparent 1px);background-size:calc(100% / var(--c)) calc(100% / var(--r))}
+.mz-tk{position:absolute;width:9px;height:9px;transform:translate(-50%,-50%);border-radius:50%;background:var(--c);box-shadow:0 0 0 2px #000;pointer-events:none}
+.mz-tk.foe{border-radius:0;transform:translate(-50%,-50%) rotate(45deg)}
+.mz-ex{all:unset;position:absolute;transform:translate(-50%,-50%);background:var(--gold);color:#000;font:600 11px var(--cond);text-transform:uppercase;padding:2px 6px;white-space:nowrap;cursor:pointer;box-shadow:0 0 0 2px #000}
+.mz-ex:hover{background:var(--red);color:#fff}
+.mz-pick{position:absolute;width:12px;height:12px;transform:translate(-50%,-50%);border:2px solid var(--gold);pointer-events:none}
+.mz-list{display:flex;flex-direction:column;gap:4px}
+.mz-li{display:flex;align-items:center;gap:6px;background:var(--ink3);padding:5px 8px;font:600 13px var(--cond);text-transform:uppercase}
+.mz-li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mz-li button{padding:3px 8px;font-size:12px}
+.mz-li.req{border-left:3px solid var(--gold);background:#2a2410}
+.mz-selbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:#000;border:1px solid var(--gold);padding:8px 12px;display:flex;gap:6px;align-items:center;z-index:5;font:600 14px var(--cond);text-transform:uppercase;max-width:calc(100% - 32px);flex-wrap:wrap}
+.mz-modal{position:absolute;inset:0;background:#000b;display:grid;place-items:center;z-index:6}
+.mz-box{background:var(--ink2);border:1px solid var(--line);border-top:3px solid var(--red);padding:18px;width:min(460px,calc(100% - 32px));display:flex;flex-direction:column;gap:12px}
+.mz-box h2{font:400 26px var(--disp);margin:0}
+.mz-box input:not([type]){background:var(--ink3);color:var(--paper);border:1px solid var(--line);padding:8px;font:500 15px var(--body)}
+.mz-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.mz-opt{background:var(--ink3);border:1px solid var(--line);padding:10px;text-align:center}
+.mz-opt.on{border-color:var(--red);background:#2a0810}
+.mz-opt small{display:block;color:var(--dim);text-transform:none;font:500 12px var(--body);margin-top:3px}
+.row.end{justify-content:flex-end}
+.mz-pov{position:absolute;inset:0;z-index:7;display:flex;flex-direction:column;background:#000}
+.mz-pov header{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--gold);color:#000;font:600 15px var(--cond);text-transform:uppercase}
+.mz-pov header span{flex:1}.mz-pov header button{background:#000;color:var(--paper)}
+.mz-pov iframe{flex:1;border:0;width:100%;background:#000}
+/* jogador fora de cena */
+.offwait{min-height:60vh;display:grid;place-items:center;text-align:center;background:radial-gradient(circle at 50% 45%,#1a0a10,transparent 70%)}
+.offwait b{display:block;font:400 clamp(40px,8vw,72px) var(--disp);letter-spacing:2px}
+.offwait p{color:var(--dim);font:500 18px var(--body);max-width:520px;margin:10px auto 0;white-space:pre-line}
+/* saída no mapa (todas as telas): a casa marcada leva a outra cena */
+.mexit{position:absolute;left:calc(var(--x)*100%/var(--cols));top:calc(var(--y)*100%/var(--rows));width:calc(100%/var(--cols));aspect-ratio:1;border:2px dashed var(--gold);background:#ffc93c22;z-index:2;pointer-events:none}
+.mexit b{position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%);white-space:nowrap;background:var(--gold);color:#000;font:600 11px var(--cond,sans-serif);text-transform:uppercase;padding:1px 5px;box-shadow:0 0 0 2px #000}

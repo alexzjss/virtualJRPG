@@ -79,9 +79,10 @@ Decisões do construtor. Cada item é uma chamada minha, que o usuário pode cor
 
 - **Invocações:** ao fim de uma batalha, só as invocações daquela cena somem ([handlers.js:182](../../../src/handlers.js)).
 - **`S.meal` e `sharp`:** são gastos ou limpos só para os heróis que estavam naquela batalha ([handlers.js:184](../../../src/handlers.js)). `S.meal` vira por herói (`ch.meal`), para que uma refeição continue valendo para quem não lutou.
-- **`S.marcha`, `S.tenac` e `trapStart`:** passam a ser por herói ([handlers.js:191-193](../../../src/handlers.js)). Quem preparou a marcha leva o efeito para a batalha em que entrar.
-- **`S.camp` (acampamento):** continua global. Só heróis em cena e fora de batalha participam.
-- **`S.chase` (perseguição):** fica por cena (`sc.chase`), como a batalha.
+- **`S.marcha`, `S.tenac` e `S.trap`:** continuam globais e são gastos pela primeira batalha que começar. Na implementação, `S.marcha` e `S.tenac` não têm quem os ative, e a armadilha é uma só. Separar por herói não mudaria nada hoje.
+- **`S.camp` (acampamento):** continua global.
+- **`S.chase` (perseguição):** continua global, uma por vez. Ela só aparece para o mestre, e torná-la por cena exigiria outro ponteiro sem ganho real.
+- **`S.meal`:** virou `S.meal.ids` (herói → batalhas restantes). Saves com o formato antigo (`left`) continuam funcionando.
 
 ### Carregar, trocar de campanha e restaurar backup
 
