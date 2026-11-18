@@ -1497,3 +1497,10 @@ test('dly: o herói chega ao cliente com o atraso real do servidor, já com pass
   try { const v = view(ana).chars[h.id].dly, g = view(gm).chars[h.id].dly; assert.ok(v < base, `${v} < ${base}`); assert.equal(v, g); }
   finally { delete S.skills[id]; }
 });
+test('palco 3D: herói aparece de costas (imgB, senão silhueta de costas) e inimigo de frente', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  assert.equal(P.unitKind({ enemy: false }), 'b'); assert.equal(P.unitKind({ enemy: true }), 'f');
+  const h = { name: 'Ana', color: '#ff0000', imgF: '/f.png', imgB: '/b.png', imgK: { b: { x: 0, y: 0, z: 2 } } };
+  assert.equal(P.imgSrc(h, P.unitKind(h)).url, '/b.png'); assert.match(P.imgFit(h, 'b', P.imgSrc(h, 'b')), /scale\(2\)/);
+  const s = P.imgSrc({ ...h, imgB: '' }, 'b'); assert.ok(s.fallback, 'sem costas: silhueta, não a frente'); assert.equal(P.imgFit({ ...h, imgB: '' }, 'b', s), '');
+});

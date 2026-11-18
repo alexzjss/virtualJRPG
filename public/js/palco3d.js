@@ -44,6 +44,9 @@
     return { url: silhouette(c, false), fallback: true };
   };
 
+  // no palco a câmera fica atrás do grupo: herói aparece de costas, inimigo de frente
+  const unitKind = c => c?.enemy ? 'f' : 'b';
+
   // enquadre (imgK) da imagem própria: x, y em fração da altura da figura (−1..1) e z de 0,5 a 3; nunca na silhueta de reserva
   // frente/costas: a figura tem altura var(--h) e gira pelos pés; retrato: deslocamento em % do próprio quadro, a partir do centro
   const imgFit = (c, kind, src) => {
@@ -70,7 +73,7 @@
   };
 
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
-  const P = { formation, cameraFor, imgSrc, imgFit, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { formation, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
@@ -120,7 +123,7 @@
   };
 
   const setCls = (u, k, on) => { if (u.cls[k] !== on) { u.cls[k] = on; u.el.classList.toggle(k, on); } };
-  const setImg = u => { const s = imgSrc(u.c, 'f', u.bad), t = imgFit(u.c, 'f', s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
+  const setImg = u => { const k = unitKind(u.c), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e);

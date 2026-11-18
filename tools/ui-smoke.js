@@ -551,12 +551,14 @@ try {
     check(await until(() => shinkai.imgS === 1.6, 'tamanho'), 'o controle de tamanho grava imgS');
     // a Bia não vê os envios na ficha da Shinkai
     await ficha(bia, shinkai.id); await sleep(300); check(!(await bia.locator(`.imgb input[type=file][data-id="${shinkai.id}"]`).count()) && !(await bia.locator(`.imgk[data-id="${shinkai.id}"]`).count()), 'outra jogadora não vê os envios nem o editor da Shinkai');
-    // no palco: o recorte usa a frente enviada com o enquadre; URL quebrada cai na reserva (silhueta), nunca em vazio (Review Focus 3)
+    // no palco o herói aparece DE COSTAS: o recorte usa as costas com o enquadre delas, nunca a frente; URL quebrada cai na silhueta de costas, nunca em vazio (Review Focus 3)
+    shinkai.imgB = shinkai.imgF; shinkai.imgK = { ...shinkai.imgK, b: { x: .1, y: 0, z: 1.2 } };
     go({ t: 'battle', on: true }); push(); await bia.evaluate(() => { pg = 'mesa'; render(); });
-    check(await until(() => bia.evaluate(([id, u]) => { const i = document.querySelector(`.p3d .bb[data-tgt="${id}"] img`); return i && i.getAttribute('src') === u && /scale/.test(i.style.transform); }, [shinkai.id, shinkai.imgF]), 'recorte com a frente'), 'o recorte usa a frente enviada, com o enquadre');
-    shinkai.imgF = '/uploads/nao-existe.png'; push();
-    check(await until(() => bia.evaluate(id => { const i = document.querySelector(`.p3d .bb[data-tgt="${id}"] img`); const s = i?.getAttribute('src') || ''; return s !== '' && s !== '/uploads/nao-existe.png' && !i.style.transform; }, shinkai.id), 'reserva'), 'imagem quebrada cai na reserva (sem enquadre aplicado à silhueta)');
-    shinkai.imgF = ''; shinkai.imgK = {}; shinkai.imgS = 1; go({ t: 'battle', on: false }); push();
+    check(await until(() => bia.evaluate(([id, u]) => { const i = document.querySelector(`.p3d .bb[data-tgt="${id}"] img`); return i && i.getAttribute('src') === u && /scale\(1\.2\)/.test(i.style.transform); }, [shinkai.id, shinkai.imgB]), 'recorte com as costas'), 'o recorte do herói usa a imagem de costas, com o enquadre das costas');
+    shinkai.imgB = '/uploads/nao-existe.png'; push();
+    check(await until(() => bia.evaluate(id => { const i = document.querySelector(`.p3d .bb[data-tgt="${id}"] img`); const s = i?.getAttribute('src') || ''; return s.startsWith('data:image/svg+xml') && !i.style.transform; }, shinkai.id), 'reserva'), 'costas quebradas caem na silhueta de costas (não na frente, sem enquadre)');
+    check(await bia.evaluate(id => { const f = Object.values(S.chars).find(c => c.enemy && c.id in S.battle.ticks), i = f && document.querySelector(`.p3d .bb[data-tgt="${f.id}"] img`); return !!i && i.getAttribute('src') === PALCO3D.imgSrc(f, 'f').url; }), 'o inimigo continua de frente');
+    shinkai.imgF = ''; shinkai.imgB = ''; shinkai.imgK = {}; shinkai.imgS = 1; go({ t: 'battle', on: false }); push();
   });
 
   // ---------- celular: transbordo, sobreposição e alvos de toque ----------
