@@ -25,7 +25,7 @@
 
   // ---------- desenho ----------
   const cam = M.cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
-  let disp = 'system-ui,sans-serif', cx0, lv, lx, lused = false, pv = null, ac, rot = 0, hg = null, rings = [], core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
+  let disp = 'system-ui,sans-serif', cx0, pv = null, ac, rot = 0, hg = null, rings = [], core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
   const hexA = (h, a) => { const v = parseInt((h || '#ffffff').slice(1), 16); return `rgba(${v >> 16},${v >> 8 & 255},${v & 255},${a})`; };
   const col = el => (typeof ELC !== 'undefined' && ELC[el === 'armas' ? 'fis' : el]) || '#ffffff';
   const grp = s => s.br?.startsWith('armas') ? 'armas' : s.el; // a Árvore de Armas é um bloco à parte (el 'fis', sem ligação com o Marcial): ganha o próprio selo
@@ -58,7 +58,7 @@
     stars = []; for (let i = 0; i < 900; i++) stars.push([(Math.random() * 2 - 1) * bound * 1.25, (Math.random() * 2 - 1) * bound * 1.25, Math.random() * 1.5 + .3, Math.random() * TAU]);
     motes = seals.filter(s => s.el !== 'fis').flatMap(s => Array.from({ length: 14 }, () => [s, Math.random() * TAU, Math.random() * s.r, Math.random() * TAU]));
   }
-  const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = Math.min(1.5, devicePixelRatio || 1); /* acima de 1.5 a nitidez não paga o custo: celulares têm 3× */ W = Math.max(200, r.width); H = Math.max(200, r.height); if (cv.width === Math.round(W * DPR) && cv.height === Math.round(H * DPR)) return; cv.width = lv.width = Math.round(W * DPR); cv.height = lv.height = Math.round(H * DPR); cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
+  const resize = () => { if (!host) return; const r = host.getBoundingClientRect(); DPR = Math.min(1.5, devicePixelRatio || 1); /* acima de 1.5 a nitidez não paga o custo: celulares têm 3× */ W = Math.max(200, r.width); H = Math.max(200, r.height); if (cv.width === Math.round(W * DPR) && cv.height === Math.round(H * DPR)) return; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); cv.style.width = W + 'px'; cv.style.height = H + 'px'; dirty = true; };
   let lively = true; // o último quadro tinha algo pulsando na tela (nó disponível, rota ou animação)
   let touched = 0; // última interação (arrastar, zoom, voo): até 1,5 s depois desenha a ~30 fps; parado, a pulsação ambiente vai a ~12 fps
   const busy = () => anim.size || performance.now() - touched < 1500;
@@ -69,21 +69,16 @@
     if (!dirty && now - last < (busy() ? 33 : lively || o.route?.length > 1 ? 80 : 250)) { raf = requestAnimationFrame(draw); return; }
     last = now; dirty = false; const T = now / 1000, far = cam.z < LOD; hg = hover && o.skills[hover] ? grp(o.skills[hover]) : null;
     cx = cx0; cx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    // CENSURA TEMPORÁRIA (Hiruko): o que é do ramo Hiruko vai para uma camada à parte, borrada de uma vez só no fim
-    // (ctx.filter em cada traço custava um blur por operação e travava a mandala). Remover junto com public/js/censura-hiruko.js
-    const CENS = 'hiruko', cen = on => { const to = on ? lx : cx0; if (to === cx) return; if (on && !lused) { lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, lv.width, lv.height); lx.setTransform(DPR, 0, 0, DPR, 0, 0); lused = true; }
-      to.globalAlpha = cx.globalAlpha; to.lineWidth = cx.lineWidth; to.lineCap = cx.lineCap; to.font = cx.font; to.textAlign = cx.textAlign; to.textBaseline = cx.textBaseline; cx = to; };
-    lused = false;
     const bg = cx.createRadialGradient(...w2s(0, 0), 0, ...w2s(0, 0), Math.max(W, H) * .9); bg.addColorStop(0, '#15101c'); bg.addColorStop(1, '#07070d'); cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
     cx.fillStyle = 'rgb(210,200,255)'; for (const [sx, sy, r, ph] of stars) { const x = (sx - cam.x) * cam.z + VW() / 2, y = (sy - cam.y) * cam.z + H / 2; if (x < 0 || y < 0 || x > W || y > H) continue; cx.globalAlpha = .12 + .2 * Math.sin(T * 1.3 + ph); cx.fillRect(x, y, r, r); } cx.globalAlpha = 1;
     // guias do sphere grid: um anel por nível, a divisória Marcial | Armas no centro e as 11 fatias dos setores em volta
     { const [ox, oy] = w2s(0, 0), n = SECN, z = cam.z, rb = (Math.max(...rings, 0) + 70) * z, cr = Math.max(0, core) * z;
       cx.lineWidth = 1; cx.strokeStyle = 'rgba(170,160,230,.08)'; // núcleo: anéis cinza; fora dele cada fatia tem a cor e o padrão do seu patrono
       for (const r of rings) { if (r * z < 6 || r * z > cr) continue; cx.beginPath(); cx.arc(ox, oy, r * z, 0, TAU); cx.stroke(); }
-      ORDER.forEach((el, i) => { cen(el === CENS); const c = col(el), a0 = (i - .5) * TAU / n + rot, a1 = (i + .5) * TAU / n + rot, gr = cx.createRadialGradient(ox, oy, cr, ox, oy, rb);
+      ORDER.forEach((el, i) => { const c = col(el), a0 = (i - .5) * TAU / n + rot, a1 = (i + .5) * TAU / n + rot, gr = cx.createRadialGradient(ox, oy, cr, ox, oy, rb);
         gr.addColorStop(0, hexA(c, o.mineEls?.has(el) ? .16 : .09)); gr.addColorStop(1, hexA(c, .015)); cx.fillStyle = gr; cx.beginPath(); cx.arc(ox, oy, rb, a0, a1); cx.arc(ox, oy, cr, a1, a0, true); cx.closePath(); cx.fill();
         cx.strokeStyle = hexA(c, far ? .1 : .2); cx.setLineDash(DASH[i].map(v => v * Math.max(.6, z * 2.2)));
-        for (const r of rings) { if (r * z <= cr + 2) continue; cx.beginPath(); cx.arc(ox, oy, r * z, a0, a1); cx.stroke(); } cx.setLineDash([]); }); cen(false);
+        for (const r of rings) { if (r * z <= cr + 2) continue; cx.beginPath(); cx.arc(ox, oy, r * z, a0, a1); cx.stroke(); } cx.setLineDash([]); }); 
       cx.strokeStyle = 'rgba(170,160,230,.3)'; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(ox, oy, cr, 0, TAU); cx.stroke();
       const vx = Math.cos(rot + Math.PI / 2) * cr, vy = Math.sin(rot + Math.PI / 2) * cr; cx.beginPath(); cx.moveTo(ox - vx, oy - vy); cx.lineTo(ox + vx, oy + vy);
       for (let i = 0; i < n; i++) { const a = (i + .5) * TAU / n + rot; cx.moveTo(ox + Math.cos(a) * cr, oy + Math.sin(a) * cr); cx.lineTo(ox + Math.cos(a) * rb, oy + Math.sin(a) * rb); } cx.stroke();
@@ -93,19 +88,19 @@
       if (z > .12) { cx.font = `600 ${Math.round(Math.min(13, 8 + 6 * z))}px ${disp}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; tiers.forEach((r, k) => { if (z > .35 || (k + 1) % 5 === 0) { const x = ox + Math.cos(a) * r * z, y = oy + Math.sin(a) * r * z; cx.fillStyle = 'rgba(10,8,20,.8)'; cx.beginPath(); cx.arc(x, y, 8, 0, TAU); cx.fill(); cx.fillStyle = 'rgba(210,200,255,.75)'; cx.fillText(k + 1, x, y + .5); } }); }
       if (z < .5) { cx.fillStyle = 'rgba(200,190,255,.5)'; cx.font = `600 13px ${disp}`; cx.textAlign = 'center'; cx.fillText('Marcial', ox + Math.cos(Math.PI + rot) * cr * .5, oy + Math.sin(Math.PI + rot) * cr * .5 + 44); cx.fillText('Armas', ox + Math.cos(rot) * cr * .5, oy + Math.sin(rot) * cr * .5 + 44); } }
     // fundo de cada setor: halo na cor do patrono, partículas lentas e o kanji grande (selo quando afastado)
-    for (const s of seals) { cen(s.el === CENS); const [x, y] = w2s(s.x, s.y), r = s.r * cam.z * 1.3, c = col(s.el), mine = s.el === 'fis' || s.el === 'armas' || o.mineEls?.has(s.el);
+    for (const s of seals) { const [x, y] = w2s(s.x, s.y), r = s.r * cam.z * 1.3, c = col(s.el), mine = s.el === 'fis' || s.el === 'armas' || o.mineEls?.has(s.el);
       const gr = cx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, hexA(c, mine ? .17 : .08)); gr.addColorStop(1, hexA(c, 0)); cx.fillStyle = gr; cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.fill();
       cx.save(); const kj = s.el === 'armas' ? '武' : s.el === 'fis' ? '拳' : (typeof KANJI !== 'undefined' && KANJI[s.el]) || ''; cx.globalAlpha = far ? .85 : .11; cx.fillStyle = c; cx.shadowColor = c; cx.shadowBlur = far ? 0 : 24 * cam.z; cx.font = `${Math.max(40, far ? r * .9 : Math.min(r * .9, 170))}px 'Noto Serif JP','Yu Mincho','MS Mincho',serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(kj, x, y); cx.restore();
       if (hg && s.el === hg) { cx.strokeStyle = hexA(c, .6); cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * .62, 0, TAU); cx.stroke(); }
       if (far) { cx.strokeStyle = hexA(c, .55); cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, Math.max(26, r * .5), 0, TAU); cx.stroke();
         cx.fillStyle = hexA(c, .95); cx.font = `600 14px ${disp}`; cx.textAlign = 'center'; cx.fillText((s.el === 'armas' ? 'Armas' : typeof PATRON !== 'undefined' ? PATRON[s.el] : s.el) + (mine && s.el !== 'fis' && s.el !== 'armas' ? ' · seu Vínculo' : ''), x, y + Math.max(26, r * .5) + 16); } }
-    cen(false);
+    
     for (const [s, a, d, ph] of motes) { const t = T * .15 + ph, [x, y] = w2s(s.x + Math.cos(a + t) * d, s.y + Math.sin(a + t) * d); if (x < 0 || y < 0 || x > W || y > H) continue; cx.fillStyle = hexA(col(s.el), .25 + .2 * Math.sin(T + ph)); cx.beginPath(); cx.arc(x, y, Math.max(1, 2.5 * cam.z), 0, TAU); cx.fill(); }
     // trilhas
     cx.lineCap = 'round';
     for (const [a, b] of E) { const pa = P.get(a), pb = P.get(b), [x1, y1] = w2s(...pa), [x2, y2] = w2s(...pb);
       if (Math.max(x1, x2) < -40 || Math.min(x1, x2) > W + 40 || Math.max(y1, y2) < -40 || Math.min(y1, y2) > H + 40) continue;
-      cen(o.skills[a].el === CENS || o.skills[b].el === CENS); cx.globalAlpha = hg && grp(o.skills[a]) !== hg ? .22 : 1;
+      cx.globalAlpha = hg && grp(o.skills[a]) !== hg ? .22 : 1;
       const sa = o.state(a), sb = o.state(b), on = sa === 'own' && sb === 'own', out = sa === 'out' || sb === 'out', sec = sa === 'secret' || sb === 'secret';
       const el = o.skills[a].el === 'fis' ? o.skills[b].el : o.skills[a].el, c = col(el), mx = (x1 + x2) / 2 + (y2 - y1) * .16, my = (y1 + y2) / 2 - (x2 - x1) * .16;
       const lit = [a, b].some(id => anim.has(id) && now - anim.get(id) < 900);
@@ -117,14 +112,14 @@
       // portão: na trilha que chega a um nó travado (requisito, Despertar, escolha trancada) vindo de um aprendido
       const gate = sa === 'own' && sb !== 'own' && o.marks(b).gate ? b : sb === 'own' && sa !== 'own' && o.marks(a).gate ? a : null;
       if (gate && !far && cam.z > .45) { const gx = (x1 + 2 * mx + x2) / 4, gy = (y1 + 2 * my + y2) / 4, z = Math.max(7, 9 * cam.z); cx.fillStyle = '#0b0b14'; cx.strokeStyle = hexA(c, .95); cx.lineWidth = 1.5; cx.fillRect(gx - z, gy - z, 2 * z, 2 * z); cx.strokeRect(gx - z, gy - z, 2 * z, 2 * z); cx.fillStyle = hexA(c, .95); cx.font = `${Math.round(z * 1.3)}px serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('⛩', gx, gy + 1); } }
-    cx.globalAlpha = 1; cen(false);
+    cx.globalAlpha = 1; 
     // rota até o nó escolhido
     if (o.route?.length > 1) { cx.strokeStyle = '#ffffff'; cx.lineWidth = 3; cx.setLineDash([10, 8]); cx.lineDashOffset = -T * 30; cx.beginPath(); o.route.forEach((id, i) => { const [x, y] = w2s(...P.get(id)); i ? cx.lineTo(x, y) : cx.moveTo(x, y); }); cx.stroke(); cx.setLineDash([]); }
     if (pv && hover && pv.ids.length > 1) { cx.strokeStyle = 'rgba(255,211,77,.85)'; cx.lineWidth = 2.5; cx.setLineDash([6, 7]); cx.lineDashOffset = -T * 24; cx.beginPath(); pv.ids.forEach((id, i) => { const p = P.get(id); if (!p) return; const [x, y] = w2s(...p); i ? cx.lineTo(x, y) : cx.moveTo(x, y); }); cx.stroke(); cx.setLineDash([]); }
     // esferas
     const r0 = Math.max(1.5, R * cam.z); let pulse = false;
     for (const id of o.ids) { const s = o.skills[id], [x, y] = w2s(...P.get(id)); if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
-      cen(s.el === CENS); const st = o.state(id), mk = o.marks(id), c = col(s.el), r = r0 * (s.limit || s.back ? 1.25 : 1);
+      const st = o.state(id), mk = o.marks(id), c = col(s.el), r = r0 * (s.limit || s.back ? 1.25 : 1);
       if (far) { cx.fillStyle = st === 'own' ? c : hexA(c, st === 'out' || st === 'secret' ? .14 : .45); cx.beginPath(); cx.arc(x, y, Math.max(1.2, r * .7), 0, TAU); cx.fill(); continue; }
       cx.globalAlpha = (mk.dim ? .25 : 1) * (hg && grp(s) !== hg ? .3 : 1); orb(x, y, r, s, c, st);
       if (st === 'av') { pulse = true; cx.strokeStyle = hexA(c, .5 + .4 * Math.sin(T * 3 + x * .01)); cx.lineWidth = Math.max(1.5, 3 * cam.z); cx.beginPath(); cx.arc(x, y, r * 1.55, 0, TAU); cx.stroke(); }
@@ -141,8 +136,7 @@
         if (named) lines.forEach((l, i) => cx.fillText(l, x, y + r + fs * (i + .9)));
         if (named && st !== 'own' && st !== 'secret' && mk.xp != null) { cx.fillStyle = mk.poor ? 'rgba(255,120,120,.9)' : hexA(c, .85); cx.font = `${Math.round(Math.min(12, r * .5))}px system-ui,sans-serif`; cx.fillText(mk.xp + ' XP', x, y + r + fs * (lines.length + .9)); } }
       cx.globalAlpha = 1; }
-    cen(false);
-    if (lused) { cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.filter = `blur(${6 * DPR}px)`; cx.drawImage(lv, 0, 0); cx.restore(); lused = false; }
+    
     if (pv && hover && pv.ids.length > 1 && P.get(hover)) { const [x, y] = w2s(...P.get(hover)), t = `${pv.ids.length - 1} ${pv.ids.length > 2 ? 'nós' : 'nó'} · ${pv.cost} XP`; cx.font = `600 13px ${disp}`; const w = cx.measureText(t).width + 16; cx.fillStyle = 'rgba(10,8,20,.92)'; cx.strokeStyle = 'rgba(255,211,77,.9)'; cx.lineWidth = 1; cx.fillRect(x - w / 2, y - R * cam.z - 34, w, 22); cx.strokeRect(x - w / 2, y - R * cam.z - 34, w, 22); cx.fillStyle = '#ffd34d'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(t, x, y - R * cam.z - 22); }
     lively = pulse;
     // minimapa
