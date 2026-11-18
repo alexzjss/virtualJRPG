@@ -1392,3 +1392,14 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .imgk.fig .chao{position:absolute;left:0;right:0;bottom:14px;border-top:2px dashed var(--gold,#ffc93c);opacity:.7}
 .imgk.por{width:120px;height:110px;clip-path:polygon(18% 0,100% 6%,88% 100%,0 92%)}.imgk.por img{width:100%;height:100%;object-fit:cover;object-position:50% 15%;display:block;pointer-events:none}
 .imgb .imgs{display:flex;align-items:center;gap:10px;margin-top:10px}.imgb .imgs input{width:200px}
+
+/* minimapa da batalha (hud.js): abaixo da ordem dos turnos; no mestre, canto superior esquerdo */
+.hud-mini{width:180px;margin-top:8px;pointer-events:auto;background:#000a;border:1px solid #fff3;padding:4px;position:relative}
+.hudw.gmh>.hud-mini{position:absolute;left:12px;top:12px;transform:scale(var(--hk,.85));transform-origin:0 0;margin:0}
+.hud-mini .mt{display:flex;justify-content:space-between;width:100%;font:700 13px var(--cond,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:none;border:0;padding:2px 4px;cursor:pointer}
+.hud-mini .mt .key{opacity:.7}.hud-mini.off .mm{display:none}
+.hud-mini .mm{position:relative;width:100%;background-color:#10131a;background-repeat:no-repeat;overflow:hidden;touch-action:none}
+.hud-mini .mg{position:absolute;inset:0;background-image:linear-gradient(90deg,#fff2 1px,transparent 1px),linear-gradient(#fff2 1px,transparent 1px);pointer-events:none}
+.hud-mini .mk{position:absolute;left:var(--x);top:var(--y);width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:var(--c,#fff);border:2px solid #000;box-shadow:0 0 0 1px #fff6}
+.hud-mini .mk.foe{border-radius:2px;transform:rotate(45deg)}.hud-mini .mk.now{box-shadow:0 0 0 2px #fff,0 0 8px 2px var(--c,#fff);z-index:2}.hud-mini .mk.ko{opacity:.35}
+.hud-mini .mk.drag{cursor:grab}.hud-mini .mk.drag::after{content:"";position:absolute;inset:-6px}

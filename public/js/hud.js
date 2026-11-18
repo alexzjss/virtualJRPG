@@ -8,12 +8,12 @@ const HUD = (() => {
   const hint = (k, label, attrs = '', cls = '') => `<div class="hk ${cls}" ${attrs}>${k === '' ? '' : `<span class="key">${k}</span>`}${label}</div>`;
   let hlO = null; // retrato/recorte destacado pelo mouse (o #app é redesenhado, o recorte não)
   // prévia ao vivo: onde o herói da vez volta na fila com a ação destacada (retrato fantasma "VOCÊ" e linha de motivo)
-  const ordem = (tl) => { const pv = LEQUE.timeCost(), sl = pv && PALCO3D.previewSlot(S.battle.ticks, pv.actor.id, pv.cost, tl), gAt = sl ? Math.min(sl.pos + 1, tl.length) : -1;
+  const ordem = (tl, table) => { const pv = LEQUE.timeCost(), sl = pv && PALCO3D.previewSlot(S.battle.ticks, pv.actor.id, pv.cost, tl), gAt = sl ? Math.min(sl.pos + 1, tl.length) : -1;
     // estilo FFX: plaqueta com retrato pequeno e nome; a da vez fica maior, no topo, com o selo AGORA
     const ghost = sl ? `<div class="ot ghost ${pv.actor.enemy ? 'foe' : 'hero'}" aria-hidden="true"><span class="otp">${photo(pv.actor, 'p')}</span><b class="otn">VOCÊ</b></div>` : '';
     const rows = tl.map((id, i) => { const c = S.chars[id];
       return `${i === gAt ? ghost : ''}<div class="ot ${c.enemy ? 'foe' : 'hero'} ${i ? '' : 'now'} ${id === hlO ? 'hl' : ''}" data-o="${id}" title="${esc(c.name)}"><span class="otp">${photo(c, 'p')}</span><b class="otn">${esc(c.name)}</b></div>`; }).join('') + (gAt >= tl.length ? ghost : '');
-    return `<div class="hud-order" aria-label="Ordem dos turnos">${rows}${sl ? `<div class="ot-why">◆ ${esc(pv.name)}: ${sl.approx ? '≈' : 'você volta em'} ${sl.pos + 1}º</div>` : ''}</div>`; };
+    return `<div class="hud-order" aria-label="Ordem dos turnos">${rows}${sl ? `<div class="ot-why">◆ ${esc(pv.name)}: ${sl.approx ? '≈' : 'você volta em'} ${sl.pos + 1}º</div>` : ''}${miniMapa(table)}</div>`; };
   // passar o mouse num retrato acende o recorte no palco e vice-versa (classe hl)
   const hl = id => { hlO = id; document.querySelectorAll('.ot.hl,.bb.hl').forEach(e => e.classList.remove('hl')); if (!id) return; document.querySelectorAll(`.ot[data-o="${id}"],.bb[data-tgt="${id}"]`).forEach(e => e.classList.add('hl')); };
   // mão ☞ estilo JRPG: o único marcador de alvo. Na mira ela fica no alvo atual (passar o mouse num candidato troca o alvo);
@@ -48,6 +48,29 @@ const HUD = (() => {
     const icons = o.table ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Chat" aria-pressed="${chatOpen}">${ico('chat')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
     const menu = navOpen && !o.table ? `<nav class="hud-menu" aria-label="Páginas">${chips(PAGES, (k, l) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${ico(k)}<span>${k === 'mesa' ? 'Batalha' : l}</span></button>`)}</nav>` : '';
     return `<div class="hud-tr">${icons}${menu}${fieldBar()}<div class="hlog" aria-live="polite">${lines.map(l => `<div><b>${esc(l.who)}</b> ${esc(l.text)}</div>`).join('')}</div></div>`; };
+  // minimapa: o mapa da cena em ponto pequeno, logo abaixo da ordem dos turnos; arrastar o próprio ponto move o token (o servidor confere o dono)
+  // recolhe pelo título "Mapa" ou pela tecla M (para o mestre, M já abre a visão do mapa: só o título)
+  let miniOpen = true; try { miniOpen = localStorage.getItem('p3d.mini') !== '0'; } catch {}
+  const miniT = () => { miniOpen = !miniOpen; try { localStorage.setItem('p3d.mini', miniOpen ? '1' : '0'); } catch {} if (typeof render === 'function') render(); };
+  const miniMapa = (table = false) => {
+    const m = S.scenes[S.scene]; if (!m || !(m.cols > 0) || !(m.rows > 0)) return '';
+    const cr = m.crop || { x: 0, y: 0, w: 1, h: 1 }, hid = (x, y) => m.fogOn && !m.seen?.[x + ',' + y], cur = timeline(1)[0];
+    const bg = m.bg ? `background-image:url('${esc(m.bg)}');background-size:${100 / cr.w}% ${100 / cr.h}%;background-position:${cr.w < 1 ? cr.x / (1 - cr.w) * 100 : 0}% ${cr.h < 1 ? cr.y / (1 - cr.h) * 100 : 0}%;` : '';
+    const dots = Object.values(S.chars).filter(c => c.x != null && c.y != null && c.scene === S.scene && (mine(c) || !hid(c.x, c.y))).map(c => {
+      const drag = !table && mine(c);
+      return `<i class="mk ${c.enemy ? 'foe' : 'hero'} ${c.id === cur ? 'now' : ''} ${c.hp > 0 ? '' : 'ko'} ${drag ? 'drag' : ''}" data-mk="${c.id}" style="--x:${(c.x + m.ox + .5) / m.cols * 100}%;--y:${(c.y + m.oy + .5) / m.rows * 100}%;--c:${esc(c.color)}" title="${esc(c.name)}"></i>`; }).join('');
+    return `<div class="hud-mini ${miniOpen ? '' : 'off'}" data-mini><button type="button" class="mt" data-a="miniT" aria-expanded="${miniOpen}">Mapa${gm ? '' : ' <span class="key">M</span>'}</button><div class="mm" style="aspect-ratio:${m.ar || m.cols / m.rows};${bg}">${m.grid === false ? '' : `<span class="mg" style="background-size:${100 / m.cols}% ${100 / m.rows}%"></span>`}${dots}</div></div>`; };
+  let mkDrag = null;
+  document.addEventListener('pointerdown', e => { const d = e.target.closest?.('.hud-mini .mk.drag'); if (!d || e.button) return; e.preventDefault(); mkDrag = { id: d.dataset.mk, box: d.parentElement }; });
+  document.addEventListener('pointermove', e => { if (!mkDrag) return; const b = document.querySelector(`.hud-mini .mk[data-mk="${mkDrag.id}"]`)?.parentElement || mkDrag.box, r = b.getBoundingClientRect(), d = b.querySelector(`.mk[data-mk="${mkDrag.id}"]`);
+    if (d) { d.style.setProperty('--x', Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)) + '%'); d.style.setProperty('--y', Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100)) + '%'); } });
+  const mkEnd = e => { if (!mkDrag) return; const k = mkDrag; mkDrag = null; const m = S.scenes[S.scene], b = document.querySelector(`.hud-mini .mk[data-mk="${k.id}"]`)?.parentElement || k.box;
+    if (e.type === 'pointerup' && m && b?.isConnected) { const r = b.getBoundingClientRect();
+      const x = Math.max(0, Math.floor((e.clientX - r.left) / r.width * m.cols - m.ox)), y = Math.max(0, Math.floor((e.clientY - r.top) / r.height * m.rows - m.oy));
+      send({ t: 'move', id: k.id, x: Math.min(x, Math.ceil(m.cols) - 1), y: Math.min(y, Math.ceil(m.rows) - 1) }); }
+    if (typeof render === 'function') render(); };
+  document.addEventListener('pointerup', mkEnd); document.addEventListener('pointercancel', mkEnd);
+  document.addEventListener('keydown', e => { if (gm || e.key.toLowerCase() !== 'm' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.target.matches?.('input,textarea,select,[contenteditable]') || !S?.battle?.active || innerWidth <= 700 || !document.querySelector('.hud-mini')) return; miniT(); });
   // vez do inimigo: faixa "{INIMIGO} · {GOLPE}" e "ALVO: {HERÓI}" por 1,6 s quando a janela de defesa abre (o relógio é o deste navegador)
   let bandK = '', bandT = 0;
   const faixa = () => { const C = S.battle.cmd; if (!C) { bandK = ''; return ''; }
@@ -102,12 +125,12 @@ const HUD = (() => {
     return `<div class="hud-top" aria-label="Alvo"><div class="hpbar"><i style="width:${hp}%"></i></div><h4><span class="sh2" title="Escudo (Quebra)">◆${c.brk ? c.brk.cur : 0}</span>${esc(c.name)}</h4></div>`
       + `<div class="hud-sheet" data-sid="${id}" style="${ok ? `left:${pos.l}px;top:${pos.t}px` : 'opacity:0'}">${sheet(id, { full: zoom, preview: LEQUE.preview(c) })}</div>`; };
   return {
-    sheet,
+    sheet, miniT,
     // mestre: só a barra do topo e a ficha do alvo (o leque dele vem separado)
     // com o leque aberto, também a lista de alvos e a fileira de comandos do ator (a mesma do jogador)
     gm() { const a = alvo(), x = LEQUE.ctx(), inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
       const br = x?.shown ? `<div class="hud-br">${alvos()}${cmds(x.actor, x.cur, inB, true)}</div>` : '';
-      return a || br ? `<div class="hudw gmh">${a}${br}</div>` : ''; },
+      return `<div class="hudw gmh">${a}${br}${miniMapa()}</div>`; },
     // coloca a ficha ao lado do recorte (à direita; à esquerda se não couber; presa entre top 110 e 560); a câmera leva ~1,1 s, então é chamada de novo depois
     place() {
       handNow();
@@ -120,7 +143,7 @@ const HUD = (() => {
     // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
     html({ actorId = null, dim = false, unread = 0, table = false } = {}) {
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table };
-      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8))}${topo(o)}<div class="hud-br">${table ? '' : alvos() + cmds(S.chars[actorId], cur, inB)}${grupo(inB, cur)}</div>${alvo()}${faixa()}</div>`;
+      return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${table ? '' : alvos() + cmds(S.chars[actorId], cur, inB)}${grupo(inB, cur)}</div>${alvo()}${faixa()}</div>`;
     },
   };
 })();

@@ -1540,3 +1540,10 @@ test('rangeOf: distância em casas (Chebyshev) e em metros; sem posição, nulo'
   assert.deepEqual(P.rangeOf({ x: 1, y: 1 }, { x: 4, y: 3 }, 0), { casas: 3, m: null });
   assert.equal(P.rangeOf({ x: null, y: 1 }, { x: 4, y: 3 }, 1.5), null);
 });
+test('move em batalha: jogador só move o próprio herói (minimapa)', () => {
+  reset(); const a = mk(ana, { name: 'HA' }), b = mk(bia, { name: 'HB' });
+  for (const o of [a, b]) { H.place(gm, { id: o.id }); H.move(gm, { id: o.id, x: 2, y: 2 }); }
+  H.battle(gm, { on: true });
+  H.move(ana, { id: b.id, x: 5, y: 5 }); assert.deepEqual([b.x, b.y], [2, 2]);
+  H.move(ana, { id: a.id, x: 4, y: 3 }); assert.deepEqual([a.x, a.y], [4, 3]);
+});

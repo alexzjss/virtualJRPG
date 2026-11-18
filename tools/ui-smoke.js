@@ -102,6 +102,12 @@ try {
     check(await anaD.locator('.p3d .bb[data-tgt]').count() >= 4, 'palco 3D com recortes');
     check(await anaD.locator('.hud-party .pm').count() >= 2, 'grupo no canto');
     check(await anaD.locator('.hud-order .ot').count() >= 4 && await vis(anaD, '.hud-order .ot.now'), 'ordem dos turnos no canto');
+    { const esp = await anaD.evaluate(() => Object.values(S.chars).filter(c => c.x != null && c.y != null && c.scene === S.scene).length), n = await anaD.locator('.hud-mini .mk').count();
+      check(n >= 1 && n <= esp && await vis(anaD, '.hud-mini'), 'minimapa abaixo da ordem, com um ponto por token visível (' + n + ' de ' + esp + ')');
+      check(await anaD.locator('.hud-mini .mk.drag').count() >= 1 && await anaD.evaluate(() => [...document.querySelectorAll('.hud-mini .mk.drag')].every(d => S.chars[d.dataset.mk].owner === name)), 'só os tokens da Ana arrastam no minimapa');
+      await anaD.locator('.hud-mini .mt').click(); check(await anaD.locator('.hud-mini.off').count() === 1, 'clicar em "Mapa" recolhe o minimapa');
+      await anaD.locator('.hud-mini .mt').click(); check(await anaD.locator('.hud-mini.off').count() === 0, 'clicar de novo expande o minimapa');
+      check(await mesa.evaluate(() => !document.querySelector('.hud-mini .mk.drag')), 'na tela da mesa nenhum ponto do minimapa arrasta'); }
     check(/SHINKAI/i.test(await txt(anaD, '.hud-order .ot.now .otn')) && await anaD.locator('.hud-order .ot .otn').count() >= 4, 'ordem estilo FFX: plaquetas com nome, a da vez no topo');
     check(await anaD.evaluate(() => { const c = document.querySelector('.hud-br .hud-cmd'), p = document.querySelector('.hud-br .hud-party'); if (!c || !p) return false; const a = c.getBoundingClientRect(), b = p.getBoundingClientRect(); return a.bottom <= b.top + 2 && a.right > innerWidth * .6; }), 'comandos de turno no canto inferior direito, acima do grupo');
     check(!(await vis(anaD, '.hud-tgts')), 'sem lista de alvos fora da mira');
