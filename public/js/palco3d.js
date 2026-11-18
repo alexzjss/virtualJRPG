@@ -9,10 +9,13 @@
   // fr: eixo da batalha (ax) + escala; a profundidade entre os grupos fica entre 900 e 2600 px
   const frame = (ax, cols, rows) => { const d = ax?.d || 0, D = clamp(d * 260, 900, 2600); return { a: ax?.a || 0, cx: ax?.cx || 0, cy: ax?.cy || 0, k: d > 0 ? D / d : 260, D, cols, rows }; };
   // origem no centro dos heróis; z = -along * k (inimigos ao fundo), x = perp * k (a direita do eixo vai para +x)
-  const toWorld = (gx, gy, fr) => {
+  const toWorld = (gx, gy, fr, raw) => {
     const dx = gx - fr.cx, dy = gy - fr.cy, c = Math.cos(fr.a), s = Math.sin(fr.a), along = dx * c + dy * s, perp = -dx * s + dy * c;
+    if (raw) return { x: perp * fr.k, z: -along * fr.k };
     return { x: n0(Math.round(clamp(perp * fr.k, -1000, 1000))), z: n0(Math.round(clamp(-along * fr.k, -fr.D - 900, 400))) };
   };
+  // distância entre dois tokens: casas (Chebyshev, como RULES) e metros quando a cena tem escala
+  const rangeOf = (a, b, unit) => { if (!a || !b || a.x == null || a.y == null || b.x == null || b.y == null) return null; const casas = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)); return { casas, m: unit > 0 ? +(casas * unit).toFixed(2) : null }; };
   // posição (x, z) de cada combatente: do grid; sem posição, slot de reserva do seu lado; depois separa quem ficou colado
   const formation = (chars, fr) => {
     const M = new Map(), ids = [];
@@ -97,10 +100,10 @@
   const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
-  const P = { lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
-  let root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
+  let floor = null, rl = null, rb = null, floorKey = '', root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', settle = 0, hs1 = 0, hs2 = 0;
   const els = new Map(); // id -> { el, img, mini, sh, hpb, bad: [], key... }
   let lastF = null, lastFr = null, camLock = null, fastT = 0; // camLock: a investida segura a câmera no alvo (o sync não a devolve no meio do golpe)
   const el = (tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
@@ -108,7 +111,8 @@
     if (root) return;
     root = el('div', 'p3d'); root.setAttribute('aria-hidden', 'false');
     const cam = el('div', 'cam', root); world = el('div', 'world', cam); atw = el('div', 'atw', world);
-    scn = el('div', 'p3d-scn', atw); el('div', 'ground', atw); el('div', 'fog', atw); grp = el('div', 'units', atw);
+    scn = el('div', 'p3d-scn', atw); el('div', 'ground', atw); floor = el('div', 'floorgrid', atw); el('div', 'fog', atw); grp = el('div', 'units', atw);
+    rl = el('div', 'rangeln', atw); rb = el('div', 'rangelb', atw); rl.hidden = rb.hidden = true;
     document.body.appendChild(root);
     // clique num recorte vale como clique no alvo dentro do #app (os atalhos estão delegados em #app)
     root.addEventListener('click', e => { const u = e.target.closest('[data-tgt]'); if (!u || !host?.isConnected) return; const i = el('i', '', host); i.dataset.tgt = u.dataset.tgt; i.hidden = true; i.click(); i.remove(); });
@@ -150,13 +154,28 @@
   const setImg = u => { const k = unitKind(u.c), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
-    e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e);
+    e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e); el('i', 'ring', e);
     u.sts = el('div', 'sts', e); // âncora das condições (.sti): as marcas de condição nova e de efeito contínuo do coreo.js caem aqui
     if (c.enemy) { u.miniEl = el('div', 'mini', e); u.sh = el('b', 'sh', u.miniEl); u.hpb = el('i', 'hp', u.miniEl); u.hpi = el('i', '', u.hpb); }
     u.inner = el('div', 'bbi', e); u.img = el('img', '', u.inner); u.img.alt = ''; // o .bbi é quem anima (cast, hit, dodge, kofall): o .bb só posiciona
     u.img.draggable = false;
     u.img.addEventListener('error', () => { if (u.url && !u.fb) { u.bad.push(u.url); setImg(u); } }); // imagem quebrada: cai para a próxima reserva
     grp.appendChild(e); return u;
+  };
+  // chão: grade alinhada ao mapa, cor do anel de cada recorte e a linha de alcance da mira
+  const colorOf = c => /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : c.enemy ? '#e60012' : '#00b7ff';
+  const fmt = n => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const chao = (fr, F, cur) => {
+    const sc = S.scenes[S.scene] || {}, show = sc.grid !== false && sc.cols > 0 && sc.rows > 0, key = show ? [S.scene, sc.cols, sc.rows, fr.a, fr.cx, fr.cy, fr.k].join('|') : '';
+    if (key !== floorKey) { floorKey = key; floor.hidden = !show;
+      if (show) { const o = toWorld(-.5, -.5, fr, true), c = Math.cos(fr.a), s = Math.sin(fr.a); // x local = coluna do grid, y local = linha; ambos deitados no chão
+        Object.assign(floor.style, { width: sc.cols * fr.k + 'px', height: sc.rows * fr.k + 'px', backgroundSize: fr.k + 'px ' + fr.k + 'px', transform: `matrix3d(${-s},0,${-c},0,${c},0,${-s},0,0,-1,0,0,${o.x.toFixed(1)},-2,${o.z.toFixed(1)},1)` }); } }
+    const t = local.aim && S.chars[local.aim], r = cur && t && F.has(cur.id) && F.has(t.id) ? rangeOf(cur, t, sc.unit) : null;
+    rl.hidden = rb.hidden = !r;
+    if (r) { const a = F.get(cur.id), b = F.get(t.id), dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz);
+      rl.style.width = L.toFixed(0) + 'px'; rl.style.transform = `translate3d(${a.x}px,-3px,${a.z}px) rotateY(${(Math.atan2(-dz, dx) * 180 / Math.PI).toFixed(2)}deg) rotateX(90deg)`;
+      rb.style.transform = `translate3d(${(a.x + dx / 2).toFixed(0)}px,-40px,${(a.z + dz / 2).toFixed(0)}px) translate(-50%,-100%)`;
+      rb.textContent = `${r.casas} ${r.casas === 1 ? 'casa' : 'casas'}${r.m != null ? ' · ' + fmt(r.m) + ' m' : ''}`; }
   };
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
@@ -167,13 +186,13 @@
       const p = F.get(c.id), adv = c === cur && c.enemy, x = adv ? Math.round(p.x / 2) : p.x, z = adv ? Math.round(p.z / 2) : p.z, pos = x + ',' + z; // inimigo na vez anda metade do caminho até os heróis
       if (u.pos !== pos && !u.lunging) { u.pos = pos; u.el.style.setProperty('--x', x); u.el.style.setProperty('--z', z); }
       const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
-      u.c = c; setImg(u);
+      u.c = c; setImg(u); { const col = colorOf(c); if (u.col !== col) { u.col = col; u.el.style.setProperty('--c', col); } }
       u.el.classList.toggle('ko', c.hp <= 0); if (c.hp > 0) u.el.classList.remove('kofall'); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
       { const k = c.hp > 0 ? stIcons(c) : ''; if (u.stk !== k) { u.stk = k; u.sts.innerHTML = k; } } setCls(u, 'tgt', c.id === tgt);
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
         if (u.mini !== m + w) { u.mini = m + w; u.sh.textContent = m; u.sh.hidden = !m; u.hpi.style.width = w; } }
     }
-    lastF = F; lastFr = fr; return F;
+    lastF = F; lastFr = fr; chao(fr, F, cur); return F;
   };
   // alvo que some (removido, caído ou oculto): a mira vai para o próximo inimigo de pé e o zoom fecha; devolve se algo mudou
   const vivo = id => { const c = S.chars[id]; return !!c && id in S.battle.ticks && c.hp > 0 && !c.dead; };

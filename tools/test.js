@@ -1534,3 +1534,9 @@ test('lungeMs: duração da investida cresce com a distância e satura', async (
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
   assert.equal(P.lungeMs(0), 300); assert.equal(P.lungeMs(1000), 370); assert.equal(P.lungeMs(9000), 700);
 });
+test('rangeOf: distância em casas (Chebyshev) e em metros; sem posição, nulo', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  assert.deepEqual(P.rangeOf({ x: 1, y: 1 }, { x: 4, y: 3 }, 1.5), { casas: 3, m: 4.5 });
+  assert.deepEqual(P.rangeOf({ x: 1, y: 1 }, { x: 4, y: 3 }, 0), { casas: 3, m: null });
+  assert.equal(P.rangeOf({ x: null, y: 1 }, { x: 4, y: 3 }, 1.5), null);
+});

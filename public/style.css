@@ -1194,6 +1194,10 @@ details.mais>.row{margin:8px 10px}
 body .p3d .bbplane.stage{display:block;min-height:0;height:2600px;background:#050506}
 .p3d .ground{position:absolute;left:-3000px;top:-3000px;width:6000px;height:6000px;transform:rotateX(90deg);
  background:radial-gradient(closest-side,#3a3a2a 0%,#1b1d17 45%,transparent 75%),repeating-linear-gradient(0deg,#ffc93c0d 0 2px,transparent 2px 160px),repeating-linear-gradient(90deg,#ffc93c0d 0 2px,transparent 2px 160px)}
+.p3d .floorgrid{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;background-image:linear-gradient(#fff1 1.5px,transparent 1.5px),linear-gradient(90deg,#fff1 1.5px,transparent 1.5px);box-shadow:inset 0 0 0 2px #fff1}
+.p3d .bb{transform-style:preserve-3d}.p3d .bb .ring{position:absolute;left:50%;bottom:0;width:210px;height:210px;margin:0 0 -105px -105px;border-radius:50%;border:5px solid var(--c,#fff);box-shadow:0 0 18px var(--c,#fff),inset 0 0 18px var(--c,#fff);opacity:.8;transform:rotateX(90deg);pointer-events:none}.p3d .bb.ko .ring{display:none}
+.p3d .rangeln{position:absolute;left:0;top:0;height:16px;margin-top:-8px;transform-origin:0 50%;background:repeating-linear-gradient(90deg,#ffd84a 0 36px,transparent 36px 60px);opacity:.85;pointer-events:none}
+.p3d .rangelb{position:absolute;left:0;top:0;padding:.25em .8em;font:700 34px var(--cond,sans-serif);color:#fff;background:#000b;border:2px solid #ffd84a;border-radius:99px;white-space:nowrap;pointer-events:none}
 .p3d .fog{position:absolute;left:-3000px;top:-700px;width:6000px;height:800px;transform:translateZ(-1900px);background:linear-gradient(180deg,transparent,#c9b9a033 70%,transparent);pointer-events:none}
 .p3d .bb{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;outline:0;transform:translate3d(calc(var(--x,0)*1px),0,calc(var(--z,0)*1px)) translate(-50%,-100%);transition:transform .6s cubic-bezier(.4,0,.2,1),filter .3s}
 .p3d .bb img{display:block;height:var(--h,300px);width:auto;transform-origin:50% 100%;filter:drop-shadow(0 18px 18px #000a)}
