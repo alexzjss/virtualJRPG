@@ -105,3 +105,21 @@ Decisões do dono: proporcional comprimido; eixo automático fixado ao ligar a b
 Falta ver com gente de verdade: o conforto da grade no chão em perspectiva, e se o eixo fixo incomoda em lutas que mudam de lado (o mestre reenquadra à mão).
 
 Armadilhas de teste: no Chromium sem GPU do `npm run ui` o close-up 3D desenha ~2 quadros/s, então transições de câmera quase não andam; os testes medem o pedido de câmera e a âncora do anel, não o quadro final (o bloco do anel no PC emula "reduzir movimento"). A checagem "o aperto chega ao servidor como nota" do celular é instável também na base.
+
+### Polimento do palco
+Plano em `docs/superpowers/plans/2026-11-18-palco-polimento.md` (13 tarefas, todas feitas, sem spec separado). Duas bases novas: `cena-tempo.js` (`CENA`: hitstop e câmera lenta via `playbackRate` e tempo virtual no canvas) e `palco-fx.js` (`PFX`: a matemática pura, testada no Node). O que vive em cada recorte está em `palco-vida.js` (`PVIDA`).
+Existe:
+- Peso do golpe: hitstop de 60 a 160 ms, tremida do mundo na direção do golpe, recuo com joelho no chão no golpe forte, multi-hit a 140 ms com o total no fim, slow-mo de 50% no KO e de 30% com zoom e vinheta no último inimigo.
+- Números em arco com quique e cor do elemento; barras com rastro (claro no dano, verde na cura), na HUD e na mini barra do inimigo.
+- Câmera: deriva idle de ±2°, arco de 45° no Limite e no Domínio, contracampo do ombro do inimigo na investida dele, contra-ataque com virada rápida (260 ms).
+- Cenário: camadas "Céu" e "Frente" do parallax (`sc.bbL`, editadas junto do fundo da batalha), clima em partículas 3D (24/48/80 pela qualidade), luz do elemento no chão e nos recortes próximos.
+- Chefe no centro ao fundo, 1,6× maior, com lacaios abrindo o arco e faixa própria na abertura; investida em arco por família (smash pula, dash rasante, pierce reto).
+- Estados: poses (ferido curvado, Limite brilhando, herói KO deitado), auras de condição (até 3), bolha de escudo que racha e estoura, setas de buff/debuff e flash de transformação.
+- Corte de turno com retrato; entrada individual; KO do inimigo em pinceladas; vitória (pose e órbita), derrota (cinza, todos caem) e retirada (correm para a câmera), com o log `end` do servidor e o palco ficando até 3 s depois do fim.
+- Parry com faíscas e desequilíbrio, esquiva com fantasmas, anel do QTE também deitado no chão do herói, replay local do golpe pelo botão ▶ no log.
+Decisões do dono: ficaram de fora a respiração idle, as etiquetas de afinidade, o contador de Cadeia, a profundidade de campo, as cicatrizes no chão, o andar entre casas, a formação por papel, o telegrafar do golpe, o próximo da fila, o fecho de rodada, todo o áudio novo, os FX manuais do mestre, o pular animações e o modo cinema.
+Falta ver com gente de verdade:
+- Conforto do hitstop e do slow em lutas longas.
+- Partículas em PCs fracos.
+- Legibilidade das auras empilhadas.
+- Arte de forma, que não existe (a transformação só faz flash e aura).
