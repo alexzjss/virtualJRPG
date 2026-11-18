@@ -1169,6 +1169,12 @@ test('choque: só em golpe anunciado de alvo único e para quem tem a técnica',
     const { hs: [h3] } = dfx(['Aparar']); h3.skills.push(sk('Tiro Certeiro')); H.ai(gm); assert.ok(!S.battle.cmd.chqOk?.length, 'golpe não anunciado não tem Choque');
   } finally { noChq(); }
 });
+test('janela de defesa salva sem o plano (servidor reiniciado): pular faz o inimigo agir e o Choque não quebra', () => {
+  const { hs: [h], e } = dfx([]); h.skills = []; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); assert.ok(S.battle.cmd);
+  S.battle.cmd = structuredClone(S.battle.cmd); S.battle.cmd.chqOk = [h.id]; h.skills.push(sk('Tiro Certeiro')); // o retrato salvo volta sem o plano em memória
+  assert.doesNotThrow(() => H.chq(ana, { id: h.id, skill: sk('Tiro Certeiro') }));
+  const hp = h.hp; fixR(.3, () => H.cmdSkip(gm)); assert.ok(h.hp < hp, 'o inimigo ainda ataca'); assert.ok(!S.battle.cmd);
+});
 test('choque: vencer anula o golpe, devolve ×1,3 e expõe; perder leva ×1,3; apertos acima de 20/s são cortados', () => {
   try {
     const win = chqFx(); const hp = win.h.hp, aura = win.h.aura; H.chq(ana, { id: win.h.id, skill: sk('Tiro Certeiro') }); const C = S.battle.cmd;
