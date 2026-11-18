@@ -30,7 +30,7 @@ export const CARTAS = {
 
   // ---------- Aura: disparos e reforços ----------
   aura: [[
-    { n: "Shukoudan", k: "dmg", d: "Um disparo de energia pura em direção a um alvo.", xp: 10, a: "SAB", p: 9, c: 2, ct: 60, cat: "emi" },
+    { n: "Shukoudan", k: "dmg", d: "Um disparo de energia pura em direção a um alvo.", xp: 10, a: "SAB", p: 9, c: 3, ct: 60, cat: "emi" },
     { n: "Força de Aura", k: "dmg", d: "A Aura reforça o corpo: a pancada sai com muito mais força.", xp: 10, a: "FOR", p: 12, c: 2, cat: "int", fx: "st atkUp 1 self" },
     { n: "Teia de Aura", k: "dmg", d: "Uma teia de Aura elétrica que gruda no alvo; serve para puxar objetos leves ou se lançar até os pesados.", xp: 15, a: "DES", p: 4, c: 3, cat: "tra", fx: "st root 2; push 20" },
     { n: "Canhão de Aura", k: "dmg", d: "A Aura se concentra entre as mãos numa esfera e sai como um canhão de energia.", xp: 25, a: "SAB", p: 34, c: 13, ct: 120, cat: "emi", rq: { SAB: 50 } },
