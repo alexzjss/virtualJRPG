@@ -181,21 +181,24 @@ function command(c, cur) {
   const t = inB.find(o => o.id === tgt), [rqId, rq] = myReq() || [], wait = rq && rq.ch === c.id;
   const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
   if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { k: 'atk', id: 'atk' };
-  const tab = ['sk', 'it', 'wp'].includes(sub) ? sub : 'atk', s = pick.k === 'sk' ? SK(pick.id) : null, it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma');
+  const desk = innerWidth > 700, tab = desk && sub === 'wp' ? 'sk' : ['sk', 'it', 'wp'].includes(sub) ? sub : 'atk';
+  if (desk && tab === 'sk' && pick.k !== 'sk') { const f = skGroups(c, t).flatMap(g => g.items)[0]; if (f) pick = { k: 'sk', id: f.id }; } // abrir Skills já escolhe a primeira da lista
+  const s = pick.k === 'sk' ? SK(pick.id) : null, it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma');
   const label = it ? it.name : s ? s.name : 'Ataque', canAim = !it && !(s && (s.area || ['heal', 'util', 'form'].includes(s.kind) || selfSk(s))) && t;
   const why = !my ? 'Aguarde a sua vez' : !t && !selfSk(s) ? 'Escolha um alvo' : s && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
   const tg = o => `<button class="tg ${o.enemy ? 'foe' : 'ally'} ${o.id === tgt ? 'on' : ''} ${o.hp > 0 ? '' : 'ko'}" data-tgt="${o.id}" style="--c:${esc(o.enemy ? '#e4002b' : o.color)}" aria-pressed="${o.id === tgt}"><b>${esc(o.name)}</b>${bar('hp', o, true)}<small>${o.hp > 0 ? (o.enemy ? Math.round(100 * o.hp / (o.hpMax || 1)) + '%' : `${o.hp}/${o.hpMax}`) : 'caído'}</small></button>`;
+  const tgsH = thin => `<div class="p5t ${thin ? 'thin' : ''}"><small>Alvo <kbd>←</kbd><kbd>→</kbd></small><div class="tgs">${inB.map(tg).join('')}</div></div>`; // no PC, faixa fina de alvos acima da lista; a Arma vive dentro de Skills (cmd-skills.js)
   const opt = (k, id, name, meta, d, off) => `<button class="opt ${pick.k === k && pick.id === id ? 'on' : ''}" data-a="pick" data-k="${k}" data-v="${id}" ${off ? 'disabled' : ''} aria-pressed="${pick.k === k && pick.id === id}"><b>${esc(name)}</b><i>${meta}</i><small>${esc(off || d)}</small></button>`;
   const skOpt = k => { const x = SK(k); return opt('sk', k, x.name, x.limit ? 'Limite' : `${x.cost} ${RES[x.res]}${x.pay ? ' +' : ''}${x.uses ? ` · ${x.uses}×` : ''}`, desc(x), blocked(c, x, k) ? blockWhy(c, x, k) : ''); };
-  const list = tab === 'sk' ? sks.map(skOpt).join('') || '<p class="none">Nenhuma skill ativa ainda. Aprenda na página Habilidades.</p>'
+  const list = tab === 'sk' && desk ? skPane(c, t) : tab === 'sk' ? sks.map(skOpt).join('') || '<p class="none">Nenhuma skill ativa ainda. Aprenda na página Habilidades.</p>'
     : tab === 'wp' ? wsks.map(skOpt).join('') || `<p class="none">${wp ? 'Esta arma não tem técnicas próprias.' : 'Sem arma equipada: equipe uma na página Itens para usar as técnicas dela.'}</p>`
     : tab === 'it' ? cons.map(([k, q]) => opt('it', k, S.items[k].name, '×' + q, idesc(S.items[k]))).join('') || '<p class="none">Nenhum consumível no inventário.</p>'
     : opt('atk', 'atk', ARMAS.prof(wp).atkN || 'Ataque', 'sem custo', `${wp ? wp.name : 'Punhos'} · ${wpnLine(wp, c)}`);
   const tl = timeline(6).slice(1).map(id => `<i class="${S.chars[id].enemy ? 'foe' : ''}">${esc(S.chars[id].name)}</i>`).join('');
   const allies = inB.filter(o => !o.enemy && o.id !== c.id && o.hp > 0), downAll = inB.filter(o => o.enemy && o.hp > 0).length > 0 && inB.filter(o => o.enemy && o.hp > 0).every(o => o.st.down || o.st.broken);
   // menu estilo Persona: teclas 1–9; Atacar/Arma/Skills/Itens abrem a lista ao lado, o resto age direto
-  const free = my && !wait, n = { wp: wsks.length, sk: sks.length, it: cons.length };
-  const M = [['atk', 'Atacar'], ['wp', 'Arma'], ['sk', 'Skills'], ['it', 'Itens'],
+  const free = my && !wait, n = { wp: wsks.length, sk: sks.length + (desk ? wsks.length : 0), it: cons.length };
+  const M = [['atk', 'Atacar'], ...(desk ? [] : [['wp', 'Arma']]), ['sk', 'Skills'], ['it', 'Itens'],
     ['defend', `Defender${c.brv > 0 ? ' · ' + c.brv : ''}`, 'Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)'],
     ['focus', `Concentrar${c.ten ? ' ×' + [1, 1.5, 2, 3][c.ten] : ''}`, 'Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3'],
     ['braveT', `Coragem ${c.brv || 0}`, 'Gasta 1 ponto de Coragem para agir de novo; sem pontos, fica devendo tempo (dívida: o próximo turno demora mais)'],
@@ -208,8 +211,8 @@ function command(c, cur) {
     <div class="cmd-g"><div class="cmd-me"><h2>${esc(c.name)}</h2>${['hp', 'aura', 'san', 'limit'].map(k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${c[k]}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`).join('')}
         <div class="sts">${c.hp > 0 ? stChips(c) || '<small>Sem condições.</small>' : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}</div></div>
       <ul class="p5m" role="menu" aria-label="Comandos">${M.map(mi).join('')}</ul>
-      <div class="cmd-step p5s"><div class="alist" role="listbox" aria-label="${{ atk: 'Ataque', wp: 'Técnicas da arma', sk: 'Skills', it: 'Itens' }[tab]}">${list}</div>
-        <div class="p5t"><small>Alvo <kbd>←</kbd><kbd>→</kbd></small><div class="tgs">${inB.map(tg).join('')}</div></div>
+      <div class="cmd-step p5s">${desk ? tgsH(true) : ''}${tab === 'sk' && desk ? list : `<div class="alist" role="listbox" aria-label="${{ atk: 'Ataque', wp: 'Técnicas da arma', sk: 'Skills', it: 'Itens' }[tab]}">${list}</div>`}
+        ${desk ? '' : tgsH(false)}
         <div class="p5x">${canAim ? `<button class="ghost aimb ${aim ? 'on' : ''}" data-a="aimT" aria-expanded="${aimOpen}">${aim ? `Mira: ${PL[aim]} (−${AIMP[aim]}%)` : 'Mirar numa parte do corpo'}</button>` : ''}${allies.length ? `<select data-a="passSel" aria-label="Passar a vez depois de acertar uma fraqueza"><option value="">Fraqueza passa a vez: ninguém</option>${allies.map(o => `<option value="${o.id}" ${passTo === o.id ? 'selected' : ''}>Fraqueza passa a vez: ${esc(o.name)}</option>`).join('')}</select>` : ''}</div>
         ${canAim && aimOpen ? aimBox() : ''}</div></div>
     <div class="cmd-go ${wait ? 'wait' : ''}"><div class="sum"><small>${wait ? 'Aguardando o mestre' : 'Sua ação'}${braveOn ? ' · com Coragem' : ''}</small><b>${wait ? esc(rq.text) : `${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim && aim ? ` · ${PL[aim]}` : ''}`}</b></div>

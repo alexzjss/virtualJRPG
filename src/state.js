@@ -121,7 +121,8 @@ function fixChar(ch, id, live) {
   if (!/^#[0-9a-f]{6}$/i.test(ch.color)) ch.color = ch.enemy ? '#e60012' : '#00b7ff';
   if (!str(ch.img)) ch.img = '';
   const at = isObj(ch.attrs) ? ch.attrs : {}; ch.attrs = Object.fromEntries(ATTRS.map(a => [a, Math.min(100, Math.max(1, Math.round(fin(at[a], ch.enemy ? 50 : 40))))]));
-  arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str);
+  arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str); arr('skPin', str); ch.skPin = ch.skPin.slice(0, 12);
+  ch.skUse = isObj(ch.skUse) ? Object.fromEntries(Object.entries(ch.skUse).filter(([, n]) => Number.isInteger(n) && n > 0)) : {};
   ['st', 'inv', 'equip', 'marks', 'body', 'bon'].forEach(obj);
   for (const k of ['hpMax', 'auraMax', 'sanMax']) ch.bon[k] = Math.round(fin(ch.bon[k]));
   for (const [k, n] of Object.entries(ch.inv)) { if (fin(n) > 0) ch.inv[k] = Math.round(fin(n)); else delete ch.inv[k]; }

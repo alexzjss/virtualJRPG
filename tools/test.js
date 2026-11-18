@@ -1400,3 +1400,39 @@ test('Leva 8: eco, marca detonada, contador, sacrifício e ressonância', () => 
   for (const k of Object.keys(S.skills).filter(k => k.startsWith('t8'))) delete S.skills[k];
   assert.match(RU.fxText(RU.parseFx('echo 50; brand 2; pop 1.6; every 3 2; rs any 1.4; ovr')), /ecoa.*Marca.*detona.*3º.*Ressonância.*Sacrifício/);
 });
+test('skPin: dono fixa e desfixa; recusa skill que não tem, outro jogador e o 13º', () => {
+  reset(); const h = mk(ana, {}); h.skills = [sk('Golpe Pesado'), sk('Vigor')];
+  H.skPin(ana, { id: h.id, sk: sk('Golpe Pesado'), on: true }); assert.deepEqual(h.skPin, [sk('Golpe Pesado')]);
+  H.skPin(bia, { id: h.id, sk: sk('Vigor'), on: true }); assert.equal(h.skPin.length, 1);
+  H.skPin(ana, { id: h.id, sk: 'g999999', on: true }); assert.equal(h.skPin.length, 1);
+  H.skPin(ana, { id: h.id, sk: sk('Golpe Pesado'), on: false }); assert.deepEqual(h.skPin, []);
+  h.skills = Object.keys(S.skills).slice(0, 14); h.skills.forEach(k => H.skPin(ana, { id: h.id, sk: k, on: true })); assert.equal(h.skPin.length, 12);
+  S.items.tpin = { name: 'Arma Pin', type: 'arma', power: 5, wt: 'punho', el: '', price: 1, sk: [{ name: 'Golpe Pin', kind: 'dmg', el: 'fis', power: 5, cost: 1, res: 'aura' }] }; h.inv.tpin = 1; h.equip.arma = 'tpin'; h.skPin = [];
+  H.skPin(ana, { id: h.id, sk: 'w:tpin:0', on: true }); H.skPin(ana, { id: h.id, sk: 'w:tpin:3', on: true }); assert.deepEqual(h.skPin, ['w:tpin:0']);
+});
+test('skUse: conta a skill do herói quando resolve; não conta ataque básico nem inimigo', () => {
+  reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 95; e.attrs.AGI = 1;
+  h.skills = [sk('Golpe Pesado')]; h.aura = 20; H.battle(gm, { on: true });
+  H.act(ana, { id: h.id, skill: sk('Golpe Pesado'), target: e.id }); assert.equal(h.skUse?.[sk('Golpe Pesado')], 1);
+  S.battle.ticks[h.id] = -1; H.act(ana, { id: h.id, skill: 'atk', target: e.id }); assert.equal(Object.keys(h.skUse).length, 1);
+  assert.equal(e.skUse, undefined);
+});
+test('lore: acerto em fraqueza ou resistência revela só aquele elemento, para todo inimigo do mesmo tipo', () => {
+  reset(); delete S.lore; const h = mk(ana, {}), e = mk(gm, { enemy: true }), e2 = mk(gm, { enemy: true }); e.name = e2.name = 'Golem';
+  e.weak = ['fuhaku', 'indra']; e2.weak = ['fuhaku', 'indra']; e.resist = ['fis']; e2.resist = ['fis'];
+  assert.deepEqual(view(ana).chars[e2.id].weak, []);
+  h.attrs.AGI = 95; e.attrs.AGI = 1; e2.attrs.AGI = 1; h.skills = [sk('Lâmina de Vento')]; h.aura = 50; H.battle(gm, { on: true });
+  fixR(.3, () => H.act(ana, { id: h.id, skill: sk('Lâmina de Vento'), target: e.id }));
+  assert.deepEqual(S.lore?.Golem?.w, ['fuhaku']);
+  const v = view(ana).chars[e2.id]; assert.deepEqual(v.weak, ['fuhaku']); assert.deepEqual(v.resist, []);
+  e2.known = 2; assert.deepEqual(view(ana).chars[e2.id].resist, ['fis']); assert.deepEqual(view(ana).chars[e2.id].weak, ['fuhaku', 'indra']);
+});
+test('lore: golpe de inimigo em herói não grava nada', () => {
+  reset(); delete S.lore; const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.weak = ['fis']; e.attrs.AGI = 95; h.attrs.AGI = 1;
+  H.battle(gm, { on: true }); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: h.id })); assert.equal(Object.keys(S.lore || {}).length, 0);
+});
+test('lore malformado (importado) não quebra a tela dos jogadores', () => {
+  reset(); mk(ana, {}); const e = mk(gm, { enemy: true }); e.weak = ['fuhaku']; H.battle(gm, { on: true });
+  S.lore = { [e.tpl || e.name]: { w: { x: 1 }, r: 'fis' } };
+  assert.deepEqual(view(ana).chars[e.id].weak, []); delete S.lore;
+});

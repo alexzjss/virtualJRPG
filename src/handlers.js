@@ -267,6 +267,13 @@ const H = {
     }
     doAct(a, m, mod);
   },
+  skPin(c, m) { // fixa ou desfixa uma skill nos Atalhos do comando de batalha (máx. 12)
+    const ch = S.chars[m.id], k = m.sk; if (!can(c, ch) || ch.enemy || typeof k !== 'string') return;
+    const w = /^w:([^:]+):(\d+)$/.exec(k), ok = ch.skills.includes(k) || (!!w && w[1] === ch.equip?.arma && !!S.items[w[1]]?.sk?.[+w[2]]);
+    const L = Array.isArray(ch.skPin) ? ch.skPin.filter(x => x !== k) : [];
+    if (m.on) { if (!ok || L.length >= 12) return; L.push(k); }
+    ch.skPin = L;
+  },
   pslot(c, m) { // liga ou desliga uma passiva ativa (só no acampamento ou pelo mestre, fora de batalha)
     const ch = S.chars[m.id];
     if (!can(c, ch) || ch.enemy || S.battle.active || !(c.role === 'gm' || S.camp.open) || !slotted(S.skills[m.skill]) || !ch.skills.includes(m.skill)) return;
