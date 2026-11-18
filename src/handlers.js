@@ -68,6 +68,7 @@ const H = {
     else if (f === 'imgF' || f === 'imgP' || (f === 'imgB' && !ch.enemy)) ch[f] = okUrl(m.v) ? m.v : ''; // imagens do palco de batalha: frente, retrato e costas (inimigo não tem costas)
     else if (f === 'imgS') ch.imgS = Math.min(2.5, Math.max(0.5, +m.v || 1));
     else if (f === 'imgK') { const v = m.v, k = v?.k, n = (x, a, b, d) => Math.min(b, Math.max(a, Number.isFinite(+x) && x !== null && x !== '' ? +x : d)); if (k === 'f' || k === 'p' || (k === 'b' && !ch.enemy)) { if (!ch.imgK || typeof ch.imgK !== 'object') ch.imgK = {}; ch.imgK[k] = { x: n(v.x, -1, 1, 0), y: n(v.y, -1, 1, 0), z: n(v.z, 0.5, 3, 1) }; } } // enquadre da imagem no palco
+    else if (f === 'fxK') { const v = m.v, k = v?.k, a = v?.a, n = x => Math.min(1, Math.max(0, Number.isFinite(+x) ? +x : .5)); if ((k === 'f' || (k === 'b' && !ch.enemy)) && ['hand', 'weapon', 'head', 'feet', 'core', 'eyes'].includes(a)) { ch.fxK ??= {}; ch.fxK[k] ??= {}; ch.fxK[k][a] = { x: n(v.x), y: n(v.y) }; } }
     else if (f === 'xp' && c.role === 'gm') ch.xp = int(m.v);
     else if (f === 'owner' && c.role === 'gm') ch.owner = String(m.v).trim().slice(0, 30);
     else if (f === 'bio') ch.bio = String(m.v).slice(0, 3000);

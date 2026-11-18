@@ -110,10 +110,12 @@ let imgkLive = null; // enquadre em edição {id, k, x, y, z}: o redesenho no me
 const IMGB = { f: ['imgF', 'Frente'], b: ['imgB', 'Costas'], p: ['imgP', 'Retrato'] };
 function imgBattle(c) {
   if (!mine(c)) return '';
+  const AD = { hand: ['Mão', .64, .42], weapon: ['Arma', .72, .46], head: ['Cabeça', .5, .18], eyes: ['Olhos', .5, .24], core: ['Peito', .5, .48], feet: ['Pés', .5, .9] };
+  const anchors = k => `<details class="fxanchors"><summary>Pontos de emissão</summary>${Object.entries(AD).map(([a, [nm, dx, dy]]) => { const p = c.fxK?.[k]?.[a] || { x: dx, y: dy }; return `<label>${nm}<span>X <input type="range" min="0" max="1" step="0.01" value="${p.x}" data-fxk="${a}" data-axis="x" data-kind="${k}" data-id="${c.id}"></span><span>Y <input type="range" min="0" max="1" step="0.01" value="${p.y}" data-fxk="${a}" data-axis="y" data-kind="${k}" data-id="${c.id}"></span></label>`; }).join('')}</details>`;
   const quadro = k => { const [f, nm] = IMGB[k], src = PALCO3D.imgSrc(c, k), live = imgkLive && imgkLive.id === c.id && imgkLive.k === k ? imgkLive : null;
     const fit = PALCO3D.imgFit(live ? { imgK: { [k]: live } } : c, k, src), own = !!c[f];
     return `<div class="iq"><em>${nm}</em><div class="imgk ${k === 'p' ? 'por' : 'fig'} ${src.fallback ? 'fb' : ''}" data-k="${k}" data-id="${c.id}" title="${src.fallback ? 'Sem imagem: a cena usa a figura padrão' : 'Arraste para mover, use a roda para aproximar'}">${k === 'p' ? '' : '<i class="chao"></i>'}<img src="${esc(src.url)}" alt="" draggable="false"${fit ? ` style="transform:${esc(fit)}"` : ''}></div>
-      <div class="row"><label class="up">Enviar<input type="file" accept="image/*" data-up="${f}" data-id="${c.id}"></label>${own ? `<button type="button" class="ghost" data-a="imgRm" data-id="${c.id}" data-k="${f}">Remover</button>` : ''}</div></div>`; };
+      <div class="row"><label class="up">Enviar<input type="file" accept="image/*" data-up="${f}" data-id="${c.id}"></label>${own ? `<button type="button" class="ghost" data-a="imgRm" data-id="${c.id}" data-k="${f}">Remover</button>` : ''}</div>${k === 'p' ? '' : anchors(k)}</div>`; };
   const sz = Math.min(2.5, Math.max(.5, +c.imgS || 1));
   return `<div class="card wide imgb"><h3>Imagens de batalha <small>como aparece no palco 3D do computador</small></h3>
     <p class="hint">Use PNG com fundo transparente para o melhor resultado.</p>

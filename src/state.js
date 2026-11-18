@@ -90,9 +90,9 @@ for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: []
 if (S.shop) { S.scenes[S.focus].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 if (isNew) S.itemsV = ITEMS_V; else migrateItems();
 fixShape();
-for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.focus, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', imgF: '', imgB: '', imgP: '', imgK: {}, imgS: 1, ...ch });
+for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.focus, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', imgF: '', imgB: '', imgP: '', imgK: {}, fxK: {}, imgS: 1, ...ch });
 for (const [id, ch] of Object.entries(S.chars)) fixChar(ch, id, true);
-for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, imgF: '', imgP: '', imgK: {}, imgS: 1, ...b, enemy: true }); fixChar(b, id, false); }
+for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, imgF: '', imgP: '', imgK: {}, fxK: {}, imgS: 1, ...b, enemy: true }); fixChar(b, id, false); }
 }
 // ---------- saneamento: um arquivo editado à mão, antigo ou importado nunca deixa o estado num formato que derrube o servidor ----------
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -143,7 +143,9 @@ function fixChar(ch, id, live) {
   ch.id = id; ch.enemy = !!ch.enemy; ch.name = String(ch.name ?? '?').slice(0, 30) || '?'; ch.owner = ch.enemy ? '' : String(ch.owner ?? '').slice(0, 30);
   if (!/^#[0-9a-f]{6}$/i.test(ch.color)) ch.color = ch.enemy ? '#e60012' : '#00b7ff';
   for (const k of ['img', 'imgF', 'imgB', 'imgP']) if (!str(ch[k])) ch[k] = '';
-  ch.imgS = Math.min(2.5, Math.max(0.5, fin(ch.imgS, 1))); if (!isObj(ch.imgK)) ch.imgK = {};
+  ch.imgS = Math.min(2.5, Math.max(0.5, fin(ch.imgS, 1))); if (!isObj(ch.imgK)) ch.imgK = {}; if (!isObj(ch.fxK)) ch.fxK = {};
+  for (const k of Object.keys(ch.fxK)) if (!['f', 'b'].includes(k)) delete ch.fxK[k];
+  for (const k of ['f', 'b']) { if (!isObj(ch.fxK[k])) { delete ch.fxK[k]; continue; } for (const a of Object.keys(ch.fxK[k])) { const p = ch.fxK[k][a]; if (!['hand', 'weapon', 'head', 'feet', 'core', 'eyes'].includes(a) || !isObj(p)) delete ch.fxK[k][a]; else ch.fxK[k][a] = { x: Math.min(1, Math.max(0, fin(p.x, .5))), y: Math.min(1, Math.max(0, fin(p.y, .5))) }; } }
   const at = isObj(ch.attrs) ? ch.attrs : {}; ch.attrs = Object.fromEntries(ATTRS.map(a => [a, Math.min(100, Math.max(1, Math.round(fin(at[a], ch.enemy ? 50 : 40))))]));
   arr('weak', e => EL.includes(e)); arr('resist', e => EL.includes(e)); arr('vinc', e => EL.includes(e)); arr('skills', str); arr('skPin', str); ch.skPin = ch.skPin.slice(0, 6);
   ch.skUse = isObj(ch.skUse) ? Object.fromEntries(Object.entries(ch.skUse).filter(([, n]) => Number.isInteger(n) && n > 0)) : {};

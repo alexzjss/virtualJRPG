@@ -4,7 +4,7 @@
 // Posições em coordenadas de 1440×860 (a câmera sempre põe o herói no mesmo lugar); o CSS escala tudo pelo --hk.
 const LEQUE = (() => {
   const state = { mode: 'menu', sel: 0 }; // mode: menu | skills (as 6 fixadas, tarefa 5) | all (lista inteira) | items | aim
-  let from = 'menu', listFrom = 'menu', turnKey = '', cx = null, gmOpen = '', hovTgt = null, camId = null; // hovTgt: alvo escolhido pelo mouse (não move a câmera); camId: alvo que a câmera enquadra // from: de onde a mira veio (Esc volta para lá); listFrom: de onde a lista completa veio (as 6 ou o menu); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
+  let from = 'menu', listFrom = 'menu', turnKey = '', cx = null, gmOpen = '', hovTgt = null, camId = null; // hovTgt: alvo escolhido pelo mouse; camId: âncora da linha de alcance na vista tática // from: de onde a mira veio (Esc volta para lá); listFrom: de onde a lista completa veio (as 6 ou o menu); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
   const donoOn = c => !c.enemy && !!c.owner && (S.online || []).includes(String(c.owner).toLowerCase()); // o jogador dono do herói está conectado (o mestre só age por ele se quiser)
   const ATK = { k: 'atk', id: 'atk' };
   const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
@@ -57,7 +57,7 @@ const LEQUE = (() => {
     // limpa tudo (a ação saiu ou a vez mudou)
     reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; },
     off() { cx = null; },
-    // alvo da câmera de mira (palco3d.js): só enquanto o leque está na mira
+    // âncora da vista tática/linha de alcance (palco3d.js): só enquanto o leque está na mira
     // linha de efeito previsto sobre o alvo (ficha): "nome · P12 · ▲ FRACO · −1 escudo"; só na mira, de golpe que dá dano
     preview(t) {
       if (!cx || !cx.my || cx.wait || state.mode !== 'aim' || !t?.enemy || pick.k === 'it') return '';
@@ -90,7 +90,7 @@ const LEQUE = (() => {
     aimList() { return cx && cx.shown && this.aimTarget() && !S.battle.cmd ? cands() : []; },
     // passar o mouse num candidato durante a mira troca o alvo (a mão vai junto; o clique confirma)
     hover(id) { if (!cx || !cx.shown || !this.aimTarget() || id === tgt || !cands().some(o => o.id === id)) return false; tgt = id; aim = null; hovTgt = id; render(); return true; },
-    // alvo que a câmera enquadra: a troca pelo mouse não move a câmera (senão o palco andaria sob o mouse e trocaria de novo); teclado e clique movem
+    // mantém uma âncora estável no hover: evita a linha de alcance correr sob o mouse; teclado e clique atualizam
     camTarget() { const a = this.aimTarget(); if (!a) { camId = null; return null; }
       if (tgt !== hovTgt || !camId || !cands().some(o => o.id === camId)) camId = a; return camId; },
     // opts.gm: leque do mestre para quem está na vez (herói ou inimigo), no lugar da barra .gcmd

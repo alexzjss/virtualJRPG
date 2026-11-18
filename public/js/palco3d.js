@@ -43,7 +43,14 @@
   const PERSP = 1000, rotP = (p, ry) => { const r = ry * Math.PI / 180, c = Math.cos(r), s = Math.sin(r); return { x: p.x * c + p.z * s, z: -p.x * s + p.z * c }; };
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
-    if (v.kind === 'table') { // ombro de quem age, olhando o centro de todos; recua até caber a mesa (quem fica atrás do ombro não conta)
+    if (v.kind === 'select') { // mira: vista neutra e estável, com todos os candidatos dentro da área útil
+      const pts = (v.pts && v.pts.length ? v.pts : [a]), xs = pts.map(p => p.x), zs = pts.map(p => p.z), C = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
+      const w = v.w || 1440, safe = w * .36, k = safe / PERSP, sx = w > 900 ? 50 : 0; // deixa respiro para a ordem à esquerda
+      const tx = sx - C.x, maxZ = Math.max(...zs); let tz = 560 - maxZ;
+      for (const p of pts) tz = Math.min(tz, PERSP - Math.abs(p.x + tx) / Math.max(k, .2) - p.z);
+      tz = clamp(Math.floor(tz / 10) * 10, -1800, 320);
+      r = { tx, ty: Math.round(Math.max(0, -tz) * .035), tz, ry: 0 };
+    } else if (v.kind === 'table') { // ombro de quem age, olhando o centro de todos; recua até caber a mesa (quem fica atrás do ombro não conta)
       const pts = (v.pts && v.pts.length ? v.pts : [a]), C = pts.reduce((m, p) => ({ x: m.x + p.x / pts.length, z: m.z + p.z / pts.length }), { x: 0, z: 0 });
       let dx = C.x - a.x, dz = C.z - a.z; if (Math.hypot(dx, dz) < 60) { dx = 0; dz = v.foe ? 1 : -1; }
       const SX = -200, ZF = 420, k = ((v.w || 1440) / 2 * .82) / PERSP, L = Math.hypot(dx, dz); // ombro: quem age fica à esquerda (SX) e o centro da mesa no meio da tela
@@ -107,7 +114,7 @@
     return { pos, approx: near < cost * .05 };
   };
 
-  const local = { aim: null, zoom: null }; // estado só deste navegador, lido por cameraFor via view()
+  const local = { aim: null, zoom: null, orbit: 0 }; // estado só deste navegador, lido por cameraFor via view()
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
   const P = { rotP, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
@@ -128,6 +135,13 @@
     root.addEventListener('click', e => { const u = e.target.closest('[data-tgt]'); if (!u || !host?.isConnected) return; const i = el('i', '', host); i.dataset.tgt = u.dataset.tgt; i.hidden = true; i.click(); i.remove(); });
     root.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-tgt]')) { e.preventDefault(); e.target.click(); } });
     // roda para cima sobre um inimigo dá zoom nele; para baixo sai
+    // botão direito + arrastar gira a câmera livremente (o palco tem pointer-events:none, então escuta a janela); só sem comando em cena
+    let drag = null; const inStage = e => { if (!root || root.style.display === 'none') return false; const r = root.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom && !e.target.closest?.('button,input,select,textarea,.result'); };
+    addEventListener('pointerdown', e => { if (e.button !== 2 || camLock || !inStage(e)) return; drag = { x: e.clientX, o: local.orbit }; world.style.transition = 'none'; e.preventDefault(); });
+    addEventListener('pointermove', e => { if (!drag) return; if (camLock) { drag = null; world.style.transition = ''; return; } local.orbit = clamp(drag.o + (e.clientX - drag.x) * .3, -180, 180); if (lastF) camera(lastF); });
+    addEventListener('pointerup', e => { if (!drag) return; drag = null; world.style.transition = ''; if (typeof HUD !== 'undefined') HUD.place(); });
+    addEventListener('contextmenu', e => { if (inStage(e)) e.preventDefault(); });
+    addEventListener('dblclick', e => { if (camLock || !inStage(e) || e.target.closest('[data-tgt]')) return; local.orbit = 0; if (lastF) camera(lastF); });
     root.addEventListener('wheel', e => { const u = e.target.closest?.('.bb.foe:not(.ko)'); if (!u || !host?.isConnected) return; e.preventDefault();
       const want = e.deltaY < 0 ? u.dataset.tgt : null; if ((local.zoom || null) === want || (!want && !local.zoom)) return; local.zoom = want; if (typeof render === 'function') render(); }, { passive: false });
     addEventListener('scroll', place, true); addEventListener('resize', place);
@@ -153,15 +167,16 @@
     const cur = S.chars[timeline(1)[0]], at = id => F.get(id) || { x: 0, z: 0 }, pts = [...F.values()], w = root?.clientWidth || 1440;
     const tbl = id => ({ kind: 'table', at: at(id), pts, w, foe: !!S.chars[id]?.enemy });
     const dt = cur?.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
-    const base = !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { ...tbl(dt), fast: true } : tbl(cur.id); // a mira não move a câmera: a mesa fica toda à vista
+    const base = local.aim ? { kind: 'select', pts, w } : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { ...tbl(dt), fast: true } : tbl(cur.id);
     if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', to: F.get(local.zoom), ry: cameraFor(base).ry };
     return base;
   };
   const setCls = (u, k, on) => { if (u.cls[k] !== on) { u.cls[k] = on; u.el.classList.toggle(k, on); } };
-  const setImg = u => { const k = unitKind(u.c, camRy), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
+  const setImg = u => { const k = unitKind(u.c, camRy), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.el.dataset.kind = k; u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e); el('i', 'ring', e);
+    u.picktag = el('b', 'picktag', e); // na mira, identifica cada candidato sem depender do tamanho ou da imagem do recorte
     u.sts = el('div', 'sts', e); // âncora das condições (.sti): as marcas de condição nova e de efeito contínuo do coreo.js caem aqui
     if (c.enemy) { u.miniEl = el('div', 'mini', e); u.sh = el('b', 'sh', u.miniEl); u.hpb = el('i', 'hp', u.miniEl); u.hpi = el('i', '', u.hpb); }
     u.inner = el('div', 'bbi', e); u.img = el('img', '', u.inner); u.img.alt = ''; // o .bbi é quem anima (cast, hit, dodge, kofall): o .bb só posiciona
@@ -187,6 +202,8 @@
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
     const fr = frameNow(inB), F = formation(inB, fr), V = new Map(); // V: onde cada um aparece agora (o inimigo da vez já avançou)
+    const picking = typeof LEQUE !== 'undefined' && !!LEQUE.aimTarget(), pickable = new Set(picking ? LEQUE.aimList().map(c => c.id) : []);
+    root.classList.toggle('selecting', picking); root.dataset.pick = picking ? '1' : '';
     for (const [id, u] of els) if (!inB.some(c => c.id === id)) { u.el.remove(); els.delete(id); }
     for (const c of inB) {
       let u = els.get(c.id); if (!u) { u = mkUnit(c); els.set(c.id, u); }
@@ -194,6 +211,8 @@
       if (u.pos !== pos && !u.lunging) { u.pos = pos; u.el.style.setProperty('--x', x); u.el.style.setProperty('--z', z); }
       const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u); { const col = colorOf(c); if (u.col !== col) { u.col = col; u.el.style.setProperty('--c', col); } }
+      { const tag = c.name + (c.hp <= 0 ? ' · CAÍDO' : ''); if (u.tag !== tag) { u.tag = tag; u.picktag.textContent = tag; } }
+      setCls(u, 'pickable', pickable.has(c.id));
       u.el.classList.toggle('ko', c.hp <= 0); if (c.hp > 0) u.el.classList.remove('kofall'); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
       { const k = c.hp > 0 ? stIcons(c) : ''; if (u.stk !== k) { u.stk = k; u.sts.innerHTML = k; } } setCls(u, 'tgt', c.id === tgt);
       if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
@@ -212,7 +231,7 @@
     return ch;
   };
   const camera = F => {
-    const v0 = view(F), v = camLock || cameraFor(v0), k = `${v.tx},${v.ty},${v.tz},${v.ry}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
+    const v0 = view(F), vb = camLock || cameraFor(v0), v = !camLock && local.orbit ? { ...vb, ry: n0(Math.round((vb.ry + local.orbit) * 10) / 10) } : vb, k = `${v.tx},${v.ty},${v.tz},${v.ry}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateY(${v.ry}deg)`;
     if (!camLock) world.dataset.cam = tr; // o enquadramento do turno (a fumaça confere a volta depois da investida)
     if (k === camKey) return; camKey = k; world.style.transform = tr; world.style.setProperty('--bry', v.ry + 'deg'); // os recortes giram de volta: sempre de frente para a câmera
     if (unitKind({}, v.ry) !== unitKind({}, camRy)) { camRy = v.ry; for (const u of els.values()) if (u.c) setImg(u); } else camRy = v.ry;
@@ -236,9 +255,20 @@
     const z0 = +a.el.style.getPropertyValue('--z') || from.z, dz = Math.sign(z0 - to.z) || 1, dx = Math.sign(from.x - to.x) || -1;
     const tx = to.x + 140 * dx, tz = to.z + 260 * dz, ms = lungeMs(Math.hypot(tx - (+a.el.style.getPropertyValue('--x') || from.x), tz - z0));
     camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to, ry: camRy } : { kind: 'table', at: to, pts: [...F.values()], w: root.clientWidth }); world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(F);
-    a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--lg', ms + 'ms'); a.el.style.setProperty('--x', tx); a.el.style.setProperty('--z', tz);
+    holdEnd = performance.now() + 4000; local.orbit = 0; a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--lg', ms + 'ms'); a.el.style.setProperty('--x', tx); a.el.style.setProperty('--z', tz);
     setTimeout(res, ms);
-    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; camLock = null; if (lastF && root.style.display !== 'none') camera(units()); setTimeout(() => { world.classList.remove('fast'); world.style.removeProperty('--lg'); }, ms); }, ms + LG_HOLD);
+    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging'); a.pos = ''; unlock(ms); }, ms + LG_HOLD);
+  });
+  // a câmera segura a cena do comando até P.hold expirar; só então volta ao enquadre do turno seguinte
+  let holdEnd = 0, unT = 0;
+  const unlock = (ms = 450) => { clearTimeout(unT); const w = holdEnd - performance.now(); if (w > 0) { unT = setTimeout(() => unlock(ms), w + 10); return; } if (!camLock) return; camLock = null; if (lastF && root?.style.display !== 'none') camera(units()); setTimeout(() => { if (camLock) return; world.classList.remove('fast'); world.style.removeProperty('--lg'); }, ms); };
+  P.hold = ms => { holdEnd = performance.now() + ms; unlock(); };
+  // técnica à distância: câmera de ombro de quem age, enquadrando quem age e os alvos; resolve quando ela chega
+  P.focus = (fromId, toIds = []) => new Promise(res => {
+    const F = lastF, from = F?.get(fromId), pts = [from, ...toIds.map(id => F?.get(id))].filter(Boolean);
+    if (!from || !root || root.style.display === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return res();
+    const only = pts.length < 2; camLock = cameraFor(only ? { kind: 'zoom', to: from, ry: camRy } : { kind: 'table', at: from, pts, w: root.clientWidth, foe: S.chars[fromId]?.enemy }); holdEnd = performance.now() + 4000; local.orbit = 0;
+    world.classList.add('fast'); world.style.setProperty('--lg', '420ms'); camera(F); setTimeout(res, 380);
   });
   // impacto no recorte: tremida curta (classe hurt por 450 ms)
   P.shake = id => { const u = els.get(id); if (!u) return; u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };

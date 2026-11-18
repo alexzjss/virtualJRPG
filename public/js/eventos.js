@@ -306,4 +306,6 @@ if (gm || asWho ? key : name && pass) connect(); else loginForm();
     const v = imgkLive && imgkLive.id === el.dataset.id && imgkLive.k === el.dataset.k ? imgkLive : (imgkLive = base(el)); v.z = clamp(v.z * Math.exp(-e.deltaY * .0015), .5, 3); show(el, v);
     clearTimeout(wT); wT = setTimeout(() => fire(v), 350); }, { passive: false });
   addEventListener('input', e => { const r = e.target; if (r.matches?.('.imgs input[type=range]')) { const o = r.parentElement.querySelector('output'); if (o) o.textContent = (+r.value).toFixed(1).replace('.', ',') + '×'; } });
+  let fxT = 0;
+  addEventListener('input', e => { const r = e.target; if (!r.matches?.('[data-fxk]')) return; const box = r.closest('.fxanchors'), a = r.dataset.fxk, pair = [...box.querySelectorAll(`[data-fxk="${a}"]`)], x = +(pair.find(i => i.dataset.axis === 'x')?.value || .5), y = +(pair.find(i => i.dataset.axis === 'y')?.value || .5); clearTimeout(fxT); fxT = setTimeout(() => send({ t: 'set', id: r.dataset.id, f: 'fxK', v: { k: r.dataset.kind, a, x, y } }), 180); });
 }

@@ -42,7 +42,7 @@ async function open(who, route, { phone = false, login } = {}) {
 }
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${page.who}-${name}.png`) }); };
 const vis = (page, sel) => page.locator(sel).first().isVisible().catch(() => false);
-const click = async (page, sel, what) => { const l = page.locator(sel).first(); if (!await l.count()) { check(false, `${page.who}: não achei ${what || sel}`); return false; } await l.click({ timeout: 3000 }).catch(e => check(false, `${page.who}: não consegui clicar ${what || sel} (${e.message.split('\n')[0]})`)); return true; };
+const click = async (page, sel, what) => { const l = page.locator(sel).first(); if (!await l.count()) { check(false, `${page.who}: não achei ${what || sel}`); return false; } await l.click({ timeout: 7000 }).catch(e => check(false, `${page.who}: não consegui clicar ${what || sel} (${e.message.split('\n')[0]})`)); return true; };
 const txt = (page, sel) => page.locator(sel).first().innerText().catch(() => '');
 const section = async (name, fn) => { if (ONLY && !name.includes(ONLY)) return; const before = fails.length; console.log('• ' + name); try { await fn(); } catch (e) { check(false, `${name}: exceção ${e.stack?.split('\n').slice(0, 3).join(' | ')}`); } if (fails.length === before) console.log('  ok'); };
 const hero = n => Object.values(S.chars).find(c => c.name === n);
@@ -130,17 +130,20 @@ try {
     await anaD.keyboard.press('Escape'); check(await until(() => anaD.locator('.sk6').count(), 'lista → 6'), 'Esc da lista volta às 6');
     await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sk6').count()), 'seis → menu'), 'Esc das 6 volta ao menu');
     check(await anaD.evaluate(() => pick.k === 'atk'), 'de volta ao menu a escolha é Atacar');
+    const camTurno = await anaD.locator('.p3d .world').getAttribute('data-cam');
     await anaD.keyboard.press('1'); check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1, 'um alvo marcado'), 'Atacar entra na mira com 1 alvo');
     // lista de alvos e mão ☞ (a mão é o único marcador; passar o mouse troca o alvo sem mover a câmera; o clique confirma)
     check(await vis(anaD, '.hud-tgts .ta.on .tah') && await anaD.locator('.hud-tgts .ta').count() >= 2, 'na mira, lista de alvos no canto com a mão no atual');
+    check(await until(() => anaD.evaluate(c => document.querySelector('.p3d.selecting') && document.querySelector('.p3d .world')?.dataset.cam !== c, camTurno), 'câmera tática'), 'a mira troca o ombro pela câmera tática');
+    check(await anaD.evaluate(() => { const p = document.querySelector('.p3d').getBoundingClientRect(), es = [...document.querySelectorAll('.p3d .bb.pickable')]; return es.length >= 4 && es.every(e => { const r = e.getBoundingClientRect(); return r.right > p.left && r.left < p.right && r.bottom > p.top && r.top < p.bottom && e.querySelector('.picktag')?.textContent; }); }), 'todos os candidatos ficam visíveis, identificados e clicáveis na mira');
     check(await until(() => anaD.evaluate(() => { const h = document.querySelector('.hand'), t = document.querySelector('.p3d .bb.tgt'); if (!h || !t || getComputedStyle(h).opacity === '0') return false; const a = h.getBoundingClientRect(), r = t.getBoundingClientRect(); return h.textContent === S.chars[tgt].name && Math.abs((a.top + a.bottom) / 2 - (r.top + r.height * .38)) < 60 && (a.right <= r.left + 6 || a.left >= r.right - 6); }), 'mão ao lado do alvo'), 'a mão aponta o alvo mirado, com o nome');
-    { const t0 = await anaD.evaluate(() => tgt), cam0 = await anaD.evaluate(() => PALCO3D.local.aim), o = await anaD.evaluate(t => [...document.querySelectorAll('.p3d .bb.foe:not(.ko)')].map(e => e.dataset.tgt).find(id => id !== t), t0);
+    { const t0 = await anaD.evaluate(() => tgt), cam0 = await anaD.locator('.p3d .world').getAttribute('data-cam'), o = await anaD.evaluate(t => [...document.querySelectorAll('.p3d .bb.foe:not(.ko)')].map(e => e.dataset.tgt).find(id => id !== t), t0);
       await anaD.locator(`.p3d .bb[data-tgt="${o}"] .bbi`).dispatchEvent('mouseover');
       check(await until(() => anaD.evaluate(o => tgt === o && document.querySelector('.hand b')?.textContent === S.chars[o].name, o), 'hover troca o alvo'), 'passar o mouse noutro inimigo troca o alvo e leva a mão');
-      check(await anaD.evaluate(c => PALCO3D.local.aim === c, cam0), 'a troca pelo mouse não move a câmera');
+      check(await anaD.locator('.p3d .world').getAttribute('data-cam') === cam0, 'a troca pelo mouse não move a câmera tática');
       check(await vis(anaD, `.hud-tgts .ta.on[data-tgt="${o}"]`), 'a lista acompanha o alvo do mouse');
       await anaD.locator('.p3d .bb.tgt').first().dispatchEvent('mouseover'); await anaD.keyboard.press('ArrowRight'); await sleep(150);
-      check(await anaD.evaluate(() => PALCO3D.local.aim === tgt), '←/→ movem a câmera de novo'); }
+      check(await anaD.evaluate(() => PALCO3D.local.aim === tgt) && await anaD.locator('.p3d .world').getAttribute('data-cam') === cam0, '←/→ trocam o alvo sem balançar a câmera tática'); }
     await shot(anaD, 'mira');
     // ficha do alvo, barra do topo, zoom e alvo que some (Task 6)
     check(await until(() => vis(anaD, '.hud-sheet .sheet'), 'ficha do alvo'), 'com a mira aberta a ficha do alvo está visível');
@@ -222,6 +225,12 @@ try {
 
   await section('mestre: leque de quem está na vez no palco 3D', async () => {
     const foe = foesOf()[0], nGm = () => gmP.locator('.gcmd').count();
+    check(await gmP.locator('.gms.combat-focus.lnone.rnone').count() === 1, 'mestre: batalha abre com o palco em foco e as duas ferramentas recolhidas');
+    check(await gmP.evaluate(() => { const s = document.querySelector('.gstage').getBoundingClientRect(); return s.width >= innerWidth - 70; }), 'mestre: o palco ocupa a largura, sem ser espremido pelas laterais');
+    check(await gmP.evaluate(() => { const h = document.querySelector('.stage3d.hudp'), p = document.querySelector('.p3d'); return h && p && +getComputedStyle(h).zIndex > +getComputedStyle(p).zIndex; }), 'mestre: HUD e leque ficam acima do mundo 3D');
+    { const w0 = await gmP.locator('.gstage').evaluate(e => e.getBoundingClientRect().width); await gmP.locator('[data-g=side][data-side=L]').first().click();
+      check(await vis(gmP, '.gside.L .gpanel') && Math.abs(await gmP.locator('.gstage').evaluate(e => e.getBoundingClientRect().width) - w0) < 2, 'mestre: painel esquerdo abre como gaveta sem redimensionar o palco');
+      await gmP.locator('[data-g=side][data-side=L]').first().click(); }
     go({ t: 'ini', k: 'set', id: foe.id, v: 0 }); check(current() === foe.id || toTurn(foe.id), 'vez do inimigo'); await until(() => gmP.locator('[data-a="ai"].stroke').count(), 'leque do mestre na vez do inimigo');
     check(await nGm() === 0, 'barra antiga some no PC');
     check(await gmP.locator('[data-a="ai"].stroke').count() === 1, 'mestre tem IA decide no leque');

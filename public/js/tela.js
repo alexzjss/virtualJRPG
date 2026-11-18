@@ -17,8 +17,16 @@ function render() {
   }
   if (gm) {
     // a batalha da cena em foco começou: o palco vem para a frente; acabou: volta a Mesa. Trocar o foco entre cenas não muda a vista.
+    const sameScene = gmWasB === null || S.focus === gmFocus;
     if (gmWasB === null) gui.view = b ? 'palco' : 'mesa';
-    else if (S.focus === gmFocus) { if (b && !gmWasB) gui.view = 'palco'; else if (!b && gmWasB) gui.view = 'mesa'; }
+    else if (sameScene) { if (b && !gmWasB) gui.view = 'palco'; else if (!b && gmWasB) gui.view = 'mesa'; }
+    // O combate começa em modo foco: o palco usa toda a largura e as ferramentas continuam disponíveis como gavetas.
+    // Ao encerrar, devolve exatamente o arranjo que o mestre usava antes da batalha.
+    if (sameScene && b && !gmWasB && !gui.battleSides) {
+      gui.battleSides = { lo: gui.lo, ro: gui.ro }; gui.lo = false; gui.ro = false; saveGui();
+    } else if (sameScene && !b && gmWasB && gui.battleSides) {
+      gui.lo = gui.battleSides.lo; gui.ro = gui.battleSides.ro; gui.battleSides = null; saveGui();
+    }
     gmWasB = b; gmFocus = S.focus;
     // Cena: o que se usa toda hora fica à mostra; mapa, grade, recursos e fundo da batalha ficam em "Mais…" (o aberto fica lembrado)
     const cena = `<div class="row prim">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1" class="own">Iniciar batalha</button>'}</div>
@@ -73,7 +81,7 @@ function render() {
   app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody,.skl').forEach((el, i) => el.scrollTop = scr[i] || 0);
   { const sc2 = S.scenes[S.scene]; if (sc2.cam && sc2.cam.n !== lastCam) { const w = mapEl()?.offsetWidth; if (w) { lastCam = sc2.cam.n; Object.assign(view, { z: sc2.cam.z, x: sc2.cam.fx * w, y: sc2.cam.fy * w }); applyView(); } } } // vista fixada pelo mestre
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
-  PALCO3D.local.aim = LEQUE.camTarget(); // a câmera enquadra o alvo enquanto o leque está na mira (a troca pelo mouse não a move)
+  PALCO3D.local.aim = LEQUE.camTarget(); // liga a vista tática da mira e ancora a linha de alcance (hover não faz o palco oscilar)
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
   fx();
 }

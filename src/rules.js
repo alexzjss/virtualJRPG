@@ -262,7 +262,7 @@ function trig(ch, ev, o) {
       const tg = f.to === 'tgt' ? (o && o !== ch ? [o] : []) : f.to === 'ally' ? battlers().filter(x => x.enemy === ch.enemy && x.hp > 0) : f.to === 'foes' ? battlers().filter(x => x.enemy !== ch.enemy && x.hp > 0) : [ch];
       for (const t of tg) txt += fx1(ch, p, t, f, { stat: at(ch, p.attr || 'SAB') });
     }
-    if (txt) log(ch.name, `${p.name}:${txt}`, 'ok');
+    if (txt) log(ch.name, `${p.name}:${txt}`, 'ok', { fx: { id: ch.id, a: ch.id, s: p.name, el: p.el, heal: 0, passive: 1 } });
   }
 }
 // um efeito da lista aplicado em um alvo; c = { d: dano causado, stat, fallen }

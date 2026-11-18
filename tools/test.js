@@ -5,6 +5,7 @@ process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
 const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, finPlan, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: true, force: true }); } catch {} }); // registrado depois do servidor: roda após a última gravação ao sair
 const { TREE } = await import('../tree.js');
+await import('../public/js/anim-profiles.js'); const AP = globalThis.ANIM_PROFILES;
 const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
 const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
@@ -1438,22 +1439,24 @@ test('lore malformado (importado) não quebra a tela dos jogadores', () => {
   assert.deepEqual(view(ana).chars[e.id].weak, []); delete S.lore;
 });
 
-test('imagens de batalha: dono e mestre gravam frente/costas/retrato, escala e enquadre com limites; outro jogador não', () => {
+test('imagens de batalha: dono e mestre gravam frente/costas/retrato, escala, enquadre e pontos de emissão com limites; outro jogador não', () => {
   reset(); const h = mk(ana, { name: 'Shin' });
   H.set(ana, { id: h.id, f: 'imgF', v: '/uploads/a.png' }); assert.equal(h.imgF, '/uploads/a.png');
   H.set(ana, { id: h.id, f: 'imgB', v: 'javascript:alert(1)' }); assert.equal(h.imgB, '');
   H.set(bia, { id: h.id, f: 'imgP', v: '/uploads/b.png' }); assert.equal(h.imgP ?? '', '');
   H.set(ana, { id: h.id, f: 'imgS', v: 9 }); assert.equal(h.imgS, 2.5);
   H.set(gm, { id: h.id, f: 'imgK', v: { k: 'f', x: 5, y: -0.2, z: 0.1 } }); assert.deepEqual(h.imgK.f, { x: 1, y: -0.2, z: 0.5 });
+  H.set(gm, { id: h.id, f: 'fxK', v: { k: 'f', a: 'weapon', x: 2, y: -1 } }); assert.deepEqual(h.fxK.f.weapon, { x: 1, y: 0 });
+  H.set(bia, { id: h.id, f: 'fxK', v: { k: 'f', a: 'hand', x: .2, y: .3 } }); assert.equal(h.fxK.f.hand, undefined);
 });
-test('bestiário: imagem de frente, retrato, escala e enquadre vão para o inimigo criado', () => {
-  reset(); const id = Object.keys(S.bestiary)[0]; Object.assign(S.bestiary[id], { imgF: '/uploads/g.png', imgP: '/uploads/gp.png', imgS: 1.8, imgK: { f: { x: 0, y: 0.1, z: 1 } } });
+test('bestiário: imagem e pontos de emissão vão para o inimigo criado', () => {
+  reset(); const id = Object.keys(S.bestiary)[0]; Object.assign(S.bestiary[id], { imgF: '/uploads/g.png', imgP: '/uploads/gp.png', imgS: 1.8, imgK: { f: { x: 0, y: 0.1, z: 1 } }, fxK: { f: { hand: { x: .2, y: .3 } } } });
   H.bSpawn(gm, { id, n: 1 }); const e = Object.values(S.chars).find(c => c.enemy);
-  assert.equal(e.imgF, '/uploads/g.png'); assert.equal(e.imgP, '/uploads/gp.png'); assert.equal(e.imgS, 1.8); assert.deepEqual(e.imgK.f, { x: 0, y: 0.1, z: 1 });
+  assert.equal(e.imgF, '/uploads/g.png'); assert.equal(e.imgP, '/uploads/gp.png'); assert.equal(e.imgS, 1.8); assert.deepEqual(e.imgK.f, { x: 0, y: 0.1, z: 1 }); assert.deepEqual(e.fxK.f.hand, { x: .2, y: .3 });
 });
-test('scrub repassa imagens de batalha do inimigo', async () => {
-  const { scrub } = await import('../src/net.js'); reset(); const e = mk(gm, { enemy: true, name: 'X' }); Object.assign(e, { imgF: '/uploads/x.png', imgS: 2 });
-  const p = scrub(e); assert.equal(p.imgF, '/uploads/x.png'); assert.equal(p.imgS, 2);
+test('scrub repassa imagens e pontos de emissão do inimigo', async () => {
+  const { scrub } = await import('../src/net.js'); reset(); const e = mk(gm, { enemy: true, name: 'X' }); Object.assign(e, { imgF: '/uploads/x.png', imgS: 2, fxK: { f: { eyes: { x: .5, y: .2 } } } });
+  const p = scrub(e); assert.equal(p.imgF, '/uploads/x.png'); assert.equal(p.imgS, 2); assert.deepEqual(p.fxK.f.eyes, { x: .5, y: .2 });
 });
 test('pickSix: fixadas primeiro, depois as mais usadas, até 6, sem repetir e só usáveis', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
@@ -1483,6 +1486,9 @@ test('palco 3D (navegador): formação, câmera e imagem de reserva', async () =
     assert.ok(Math.abs(Cr.x + v.tx) < 3 && Cr.z < A.z && A.x + v.tx < -150, 'o centro fica à frente, no meio da tela, e quem age à esquerda'); assert.ok(v.ry > 0, 'gira para a direita, onde está a mesa');
     for (const p of pts) { const q = P.rotP(p, v.ry), z = q.z + v.tz; if (q.z > A.z) continue; assert.ok(z < 1000 && Math.abs((q.x + v.tx) * 1000 / (1000 - z)) <= 720, 'no quadro: ' + JSON.stringify(p)); }
     const f = P.cameraFor({ kind: 'table', at: { x: 0, z: -1500 }, pts, w: 1440, foe: true }); assert.ok(Math.abs(f.ry) > 90, 'inimigo olha de volta para os heróis');
+    const sel = P.cameraFor({ kind: 'select', pts, w: 1440 });
+    assert.equal(sel.ry, 0, 'a seleção usa uma vista neutra e não gira ao trocar de alvo');
+    assert.ok(pts.every(p => Math.abs((p.x + sel.tx) * 1000 / (1000 - p.z - sel.tz)) <= 1440 * .38), 'todos os candidatos cabem horizontalmente na câmera de seleção');
     assert.equal(P.unitKind({}, f.ry), 'f'); assert.equal(P.unitKind({ enemy: true }, f.ry), 'f'); assert.equal(P.unitKind({}, 30), 'b');
   }
   assert.equal(P.imgSrc({ imgF: '/f.png', img: '/i.png' }, 'f').url, '/f.png');
@@ -1498,11 +1504,12 @@ test('previewSlot: posição de volta pela soma de tempo, empate pela ordem e av
   assert.equal(P.previewSlot(t, 'me', 61, ['me', 'a', 'b', 'c']).approx, true);
 });
 
-test('carregar save: fixChar sanea imagens de batalha (texto, escala 0.5..2.5, enquadre objeto)', async () => {
-  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, { name: 'Shin' }); Object.assign(h, { imgF: 5, imgB: null, imgP: {}, imgS: 99, imgK: 'x' });
+test('carregar save: fixChar sanea imagens de batalha, enquadre e pontos de emissão', async () => {
+  const { migrate } = await import('../src/state.js'); reset(); const h = mk(ana, { name: 'Shin' }); Object.assign(h, { imgF: 5, imgB: null, imgP: {}, imgS: 99, imgK: 'x', fxK: { f: { hand: { x: 2, y: -.5 }, fake: { x: .1, y: .1 } }, fake: { hand: { x: .1, y: .1 } } } });
   const e = mk(gm, { enemy: true, name: 'Oni' }); Object.assign(e, { imgS: 'abc', imgK: [1] });
   migrate(false);
   assert.deepEqual([h.imgF, h.imgB, h.imgP, h.imgS, h.imgK], ['', '', '', 2.5, {}]); assert.equal(e.imgS, 1);
+  assert.deepEqual(h.fxK, { f: { hand: { x: 1, y: 0 } } });
   h.imgS = 0.1; migrate(false); assert.equal(h.imgS, 0.5);
 });
 test('skPin: limite de 6 e migração corta saves com mais', () => {
@@ -1554,4 +1561,27 @@ test('move em batalha: jogador só move o próprio herói (minimapa)', () => {
   H.battle(gm, { on: true });
   H.move(ana, { id: b.id, x: 5, y: 5 }); assert.deepEqual([b.x, b.y], [2, 2]);
   H.move(ana, { id: a.id, x: 4, y: 3 }); assert.deepEqual([a.x, a.y], [4, 3]);
+});
+
+test('animações: toda skill ativa recebe perfil completo e determinístico', () => {
+  const active = Object.values(S.skills).filter(s => s.kind !== 'passive'), seeds = new Set();
+  for (const s of active) {
+    const a = AP.profile(s), b = AP.profile(s);
+    assert.deepEqual(a, b, 'perfil instável: ' + s.name);
+    assert.ok(AP.FAMILIES.includes(a.family), `família inválida em ${s.name}: ${a.family}`);
+    assert.equal(a.palette.length, 3, 'paleta de ' + s.name);
+    assert.ok(a.palette.every(c => /^#[0-9a-f]{6}$/i.test(c)), 'cor de ' + s.name);
+    assert.ok(['hand', 'weapon', 'head', 'core'].includes(a.origin), 'origem de ' + s.name);
+    assert.ok(a.duration >= 600 && a.duration <= 1100, 'duração de ' + s.name);
+    assert.ok(!seeds.has(a.seed), 'assinatura repetida: ' + s.name); seeds.add(a.seed);
+  }
+  assert.equal(seeds.size, active.length);
+});
+
+test('animações: cura, área, ritual e sobrescrita do mestre usam famílias próprias', () => {
+  assert.equal(AP.familyOf({ name: 'Luz Curativa', kind: 'heal' }), 'heal');
+  assert.equal(AP.familyOf({ name: 'Muralha de Pedra', kind: 'heal' }), 'barrier');
+  assert.equal(AP.familyOf({ name: 'Chuva de Fogo', kind: 'dmg', area: true }), 'rain');
+  assert.equal(AP.familyOf({ name: 'Ritual do Vazio', kind: 'dmg' }), 'ritual');
+  assert.equal(AP.familyOf({ name: 'Qualquer nome', kind: 'dmg', anim: 'musical' }), 'musical');
 });

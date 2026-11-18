@@ -123,19 +123,29 @@ function strikeFx(acts, f0, a) {
   if (crit && stage) { stage.classList.add('shake'); if (!old) setTimeout(() => stage.classList.remove('shake'), 450); }
   comandoFx(acts, stage);
   if (crit || weak) setTimeout(() => cutIn(crit ? 'crit' : 'weak', a, S.chars[(crit || weak).fx.id]), 180);
-  if (f0.dom) return;
+  const sk = skByName(f0.s), engine = typeof ANIMFX !== 'undefined';
+  if (crit && engine) ANIMFX.flash(ELC[f0.el] || '#fff', 90);
+  if (f0.dom) { if (engine) ANIMFX.play({ actorId: f0.a, targetIds: [f0.id], skill: sk, fx: f0 }); return; }
   const hits = d0 => acts.forEach((e, i) => setTimeout(() => {
     const f = e.fx, el = unitEl(f.id);
     hitSfx(f);
     if (!el) return;
     el.style.setProperty('--fx', ELC[f.el] || '#fff');
-    if (f.dmg) { if (stage3d() && typeof PALCO3D !== 'undefined') PALCO3D.shake(f.id); pulse(el, 'hit', 600); fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); } else if (f.heal) pulse(el, 'mendfx'); else if (f.miss) pulse(el, 'dodge', 600);
+    if (f.dmg) { if (stage3d() && typeof PALCO3D !== 'undefined') PALCO3D.shake(f.id); pulse(el, 'hit', 600); if (!engine) fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); } else if (f.heal) pulse(el, 'mendfx'); else if (f.miss) pulse(el, 'dodge', 600);
     const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
     if (num) fxAdd(`float ${f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : ''}`, num, 1250, fxPos(el, .22) + `;--fx:${ELC[f.el] || '#e4002b'}`);
     if (/QUEBROU!/.test(e.text)) setTimeout(() => shatter(el), 120);
     if (koHold.has(f.id)) setTimeout(() => knockout(f.id), 260);
   }, d0 + i * 90));
-  if (go) go.then(() => hits(0)); else hits(220);
+  const animate = () => {
+    if (!engine) return void hits(220);
+    const run = ANIMFX.play({ actorId: f0.a, targetIds: acts.map(e => e.fx.id), skill: sk, fx: f0 });
+    run.impact.then(() => hits(0));
+    if (cam) run.done.then(() => PALCO3D.hold(acts.length * 90 + 650)); // os números nascem antes da câmera seguir para o próximo turno
+  };
+  const cam = stage3d() && !old && typeof PALCO3D !== 'undefined' && PALCO3D.focus;
+  const aim = cam && !go ? PALCO3D.focus(f0.a, acts.map(e => e.fx.id)) : null;
+  if (go) go.then(animate); else if (aim) aim.then(animate); else animate();
 }
 function threat(c) { // turno inimigo: o palco escurece, faixa vermelha e o inimigo dá um passo à frente
   threatUntil = performance.now() + 1300; fxState();
@@ -145,6 +155,9 @@ function intro() { // abertura: os dois lados entram e a faixa "Batalha!" corta 
   enterUntil = performance.now() + 1400; fxState();
   const fs = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.enemy).map(c => esc(c.name));
   fxAdd('intro', `<i class="in-l"></i><i class="in-r"></i><div><b>Batalha!</b><small>${fs.slice(0, 4).join(' · ')}${fs.length > 4 ? ` e mais ${fs.length - 4}` : ''}</small></div>`, 1700); sfxc('start');
+  if (typeof ANIMFX !== 'undefined') setTimeout(() => Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0).forEach((c, i) => {
+    const p = (c.skills || []).map(SK).find(s => s?.kind === 'passive'); if (p) setTimeout(() => ANIMFX.play({ actorId: c.id, targetIds: [c.id], skill: { ...p, anim: 'form' }, fx: { a: c.id, id: c.id, s: p.name, el: p.el, passive: 1 } }), i * 80);
+  }), 900);
 }
 function results(e) { // fim da batalha: XP, ouro, espólios e o que cada herói fez
   document.querySelector('.result')?.remove();
@@ -162,6 +175,7 @@ function fxState() { // reaplica o que um redesenho apagaria: KO adiado, palco a
   st?.classList.toggle('threat', now < threatUntil); st?.classList.toggle('enter', now < enterUntil);
   for (const [id, until] of koHold) { if (now > until) { koHold.delete(id); if (S.chars[id]?.hp <= 0) document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.add('ko'); continue; } document.querySelector(`.unit[data-tgt="${id}"]`)?.classList.remove('ko'); }
   for (let i = fxMarks.length - 1; i >= 0; i--) { const m = fxMarks[i]; if (now > m.until) { fxMarks.splice(i, 1); continue; } document.querySelectorAll(m.sel).forEach(el => el.classList.add(m.cls)); }
+  if (typeof ANIMFX !== 'undefined') ANIMFX.sync();
 }
 function fx() {
   const news = seen == null ? [] : S.log.filter(e => e.n > seen), B = S.battle, cur = B.active ? S.chars[timeline(1)[0]] : null;
@@ -211,11 +225,11 @@ function gainWatch() {
   let n = 0;
   for (const c of my) { const p = prev[c.id]; if (!p) continue;
     const out = [];
-    for (const k of c.skills || []) if (!p.sk.includes(k)) out.push(['sk', 'Nova skill', SK(k)?.name || k]);
+    for (const k of c.skills || []) if (!p.sk.includes(k)) out.push(['sk', 'Nova skill', SK(k)?.name || k, k]);
     if (c.xp > p.xp) out.push(['xp', 'Experiência', `+${c.xp - p.xp} XP`]);
     if (c.gold !== p.gold) out.push(['gold', 'Ouro', `${c.gold > p.gold ? '+' : '−'}${Math.abs(c.gold - p.gold)}`]);
     for (const [k, q] of Object.entries(c.inv)) if (q > (p.inv[k] || 0)) out.push(['it', 'Item', `${S.items[k]?.name || k}${q - (p.inv[k] || 0) > 1 ? ' ×' + (q - (p.inv[k] || 0)) : ''}`]);
-    for (const [k, l, v] of out.slice(0, 4)) { const i = n++;
-      setTimeout(() => { fxAdd('gain g-' + k, `<small>${esc(c.name)} · ${l}</small><b>${esc(v)}</b>`, 2800, `--i:${i % 4}`); if (!snd.mute) tone(k === 'sk' ? 880 : 660, .14, { type: 'triangle', g: .08, to: k === 'sk' ? 1320 : 990 }); }, i * 320); }
+    for (const [k, l, v, id] of out.slice(0, 4)) { const i = n++;
+      setTimeout(() => { fxAdd('gain g-' + k, `<small>${esc(c.name)} · ${l}</small><b>${esc(v)}</b>`, 2800, `--i:${i % 4}`); if (k === 'sk' && typeof ANIMFX !== 'undefined') { const s = SK(id); ANIMFX.play({ actorId: c.id, targetIds: [c.id], skill: { ...s, anim: 'form' }, fx: { a: c.id, id: c.id, s: s?.name, el: s?.el, passive: s?.kind === 'passive' } }); } if (!snd.mute) tone(k === 'sk' ? 880 : 660, .14, { type: 'triangle', g: .08, to: k === 'sk' ? 1320 : 990 }); }, i * 320); }
   }
 }

@@ -6,7 +6,7 @@
 const LTABS = ['cena', 'sessao', 'best', 'items', 'skills', 'ofcat', 'armas', 'chase', 'camp', 'som'], RTABS = ['fichas', 'ini', 'chat', 'pedidos'];
 const WIDE = new Set(['best', 'skills', 'items', 'ofcat', 'armas']); // painéis largos: abrem por cima do centro (o botão ⇥ encolhe)
 const RICO = { cena: ['🎬', 'Cena'], sessao: ['📜', 'Sessão'], best: ['👹', 'Bestiário'], items: ['🎒', 'Itens'], skills: ['✨', 'Skills'], ofcat: ['🛠', 'Ofícios'], armas: ['⚔', 'Forja'], chase: ['🏃', 'Fuga'], camp: ['⛺', 'Campanha'], som: ['🎵', 'Som'] };
-const GUI0 = { L: 'cena', R: 'fichas', lo: null, ro: null, view: 'mapa', w: { L: 340, R: 380 }, nar: {}, sheet: null }; // lo/ro: null = automático (aberto só a partir de 1100px)
+const GUI0 = { L: 'cena', R: 'fichas', lo: null, ro: null, view: 'mapa', w: { L: 340, R: 380 }, nar: {}, sheet: null, battleSides: null }; // lo/ro: null = automático (aberto só a partir de 1100px)
 let gui = (() => { try { const d = JSON.parse(localStorage.vj_gui || 'null'); if (d && typeof d === 'object') return { ...structuredClone(GUI0), ...d, w: { ...GUI0.w, ...d.w }, sheet: null }; } catch {} return structuredClone(GUI0); })();
 let gdragTab = null, gres = null; // gdragTab fica só porque render() consulta (não há mais abas arrastáveis)
 const saveGui = () => { try { localStorage.vj_gui = JSON.stringify({ ...gui, sheet: null }); } catch {} };
@@ -56,7 +56,8 @@ function gmLayout(body, center) {
   const stage = center.parts ? `<div class="gstage">${center.parts.stage}</div>` : `<div class="gempty"><b>Nenhuma batalha em andamento</b><span>O palco mostra a batalha quando ela começa.</span><button class="own" data-a="battle" data-on="1">Iniciar batalha</button></div>`;
   const sh = gui.sheet && ent(gui.sheet.slice(2));
   const sheet = sh ? `<div class="gsheet-bg" data-g="sheetbg"><section class="gsheet" role="dialog" aria-modal="true" aria-label="Ficha de ${esc(sh.name)}"><header><b>${esc(tabTitle(gui.sheet))}</b><small>Esc fecha</small><button class="gs-x" data-g="x" data-id="${gui.sheet}" title="Fechar a ficha (Esc)" aria-label="Fechar ficha">✕ Fechar</button></header><div class="gs-body">${body[gui.sheet] ?? ''}</div></section></div>` : '';
-  return `<div class="gms ${wide ? 'lwide' : ''} ${lo ? '' : 'lnone'} ${ro ? '' : 'rnone'}" style="--wl:${wl}px;--wr:${wr}px" ${sh ? 'inert' : ''}>${top}${rail}<aside class="gside L" aria-label="Painel esquerdo">${lp}${lo && !wide ? '<i class="gres" data-g="res" data-side="L" title="Arraste para mudar a largura"></i>' : ''}</aside>
+  const combatFocus = inB && view === 'palco';
+  return `<div class="gms ${combatFocus ? 'combat-focus' : ''} ${wide ? 'lwide' : ''} ${lo ? '' : 'lnone'} ${ro ? '' : 'rnone'}" style="--wl:${wl}px;--wr:${wr}px" ${sh ? 'inert' : ''}>${top}${rail}<aside class="gside L" aria-label="Painel esquerdo">${lp}${lo && !wide ? '<i class="gres" data-g="res" data-side="L" title="Arraste para mudar a largura"></i>' : ''}</aside>
     <main class="gcenter">${center.parts?.bar || ''}<div class="gview" data-view="${view}">${view === 'mesa' ? center.mesa : view === 'palco' ? stage : `<div class="gmap">${center.map}</div>`}</div></main>
     <aside class="gside R" aria-label="Barra lateral">${rp}${ro ? '<i class="gres" data-g="res" data-side="R" title="Arraste para mudar a largura"></i>' : ''}</aside></div>${sheet}`;
 }

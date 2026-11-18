@@ -27,11 +27,11 @@ const CLIMA = ['', 'chuva', 'neblina', 'cinzas', 'neve', 'brasas']; // clima vis
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR', 'po']); // campos numéricos que só o mestre altera
 const EXTRA = { ofi: [], po: 0, pof: [], up: {}, dia: [], rrUsed: 0, vinc: [], aw: [], nen: '', body: {}, bon: { hpMax: 0, auraMax: 0, sanMax: 0 }, bio: '', gmNote: '', xpR: 0, goldR: 0 };
-const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', rq: null, ...o });
+const sk = (name, kind, attr, el, power, cost, gx, gy, o = {}) => ({ name, kind, attr, el, power, cost, res: 'aura', st: '', xp: 10, gx, gy, limit: false, area: false, ct: 100, pas: 'hpMax', req: '', back: '', ex: '', d: '', anim: '', rq: null, ...o });
 const it = (name, type, power, o = {}) => ({ name, type, power, eff: 'hp', attr: 'SOR', wt: '', el: '', price: 10, ...o });
 const NEW = { skills: () => sk('Nova skill', 'dmg', 'FOR', 'fis', 10, 5, 0, 0), items: () => it('Novo item', 'cons', 10) };
 const SCH = {
-  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', lk: 't', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', 'vow', 'trig', 'mod', 'amp', 'bon', ...ATTRS], req: [...WT, ...Object.keys(AR.CAT)], reqItem: 't', back: ['', ...STK], ex: 't', d: 't' },
+  skills: { name: 's', kind: KINDS, attr: ATTRS, el: EL, res: ['aura', 'san'], st: ['', ...STK], power: 'n', cost: 'n', xp: 'n', ct: 'n', gx: 'g', gy: 'g', lk: 't', anim: 't', limit: 'b', area: 'b', pas: ['hpMax', 'auraMax', 'sanMax', 'res', 'vow', 'trig', 'mod', 'amp', 'bon', ...ATTRS], req: [...WT, ...Object.keys(AR.CAT)], reqItem: 't', back: ['', ...STK], ex: 't', d: 't' },
   items: { name: 's', type: ITYPES, eff: EFF, attr: ATTRS, wt: WT, kit: 't', el: ['', ...EL], power: 'n', price: 'n' },
 };
 const TIER = { fraco: [.8, .6], normal: [1, 1], elite: [1.25, 1.6] }; // multiplicadores de atributos e de recompensa
