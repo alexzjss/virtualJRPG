@@ -11,6 +11,8 @@
     "offline": "node server.js --offline",
     "exe": "node tools/build-exe.mjs",
     "dev": "node tools/dev.js",
+    "live": "node --watch --watch-path=server.js --watch-path=content.js --watch-path=tree.js --watch-path=src --watch-path=arvore --watch-path=public/rules.js tools/live.js",
+    "tunel": "node tools/tunel.js",
     "ui": "node tools/ui-smoke.js"
   },
   "dependencies": {
