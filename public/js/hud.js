@@ -46,7 +46,7 @@ const HUD = (() => {
       <div class="row"><span>HP ${gm ? `${c.hp}/${c.hpMax}` : pct(c.hp, c.hpMax) + '%'}</span><span class="esc">ESCUDO ${c.brk ? c.brk.cur : 0}</span></div>
       <div class="hpbar"><i style="width:${pct(c.hp, c.hpMax)}%"></i></div>
       <div class="row">FRAQUEZAS <div class="wk">${wk}</div></div>${st ? `<div class="row">CONDIÇÕES <div class="cond">${st}</div></div>` : ''}
-      ${full ? `<div class="more"><p>Golpes conhecidos: ${golpes.length ? esc(golpes.join(', ')) : 'nenhum visto ainda'}.</p>${c.brk ? '<p>Quebra: perde 2 turnos e sofre +50% de dano.</p>' : ''}</div>` : ''}${preview ? `<div class="pv">${esc(preview)}</div>` : ''}</div>`;
+      ${full ? `<div class="more">${gm ? `<p>Golpes conhecidos: ${golpes.length ? esc(golpes.join(', ')) : 'nenhum'}.</p>` : ''}${c.brk ? '<p>Quebra: perde 2 turnos e sofre +50% de dano.</p>' : ''}</div>` : ''}${preview ? `<div class="pv">${esc(preview)}</div>` : ''}</div>`;
   };
   // inimigo em destaque: o do zoom ou o da mira
   const alvoId = () => { const id = PALCO3D.local.zoom || LEQUE.aimTarget(), c = id && S.chars[id]; return c && c.enemy && c.hp > 0 && id in S.battle.ticks ? id : null; };

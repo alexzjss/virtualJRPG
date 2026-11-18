@@ -129,11 +129,12 @@
   };
   // alvo que some (removido, caído ou oculto): a mira vai para o próximo inimigo de pé e o zoom fecha; devolve se algo mudou
   const vivo = id => { const c = S.chars[id]; return !!c && id in S.battle.ticks && c.hp > 0 && !c.dead; };
+  const sumiu = id => { const c = S.chars[id]; return !c || !(id in S.battle.ticks) || c.dead || (c.enemy && c.hp <= 0); }; // aliado caído continua mirável (reviver, item)
   const heal = () => {
     let ch = false;
-    if (local.zoom && !vivo(local.zoom)) { local.zoom = null; ch = true; }
+    if (local.zoom && sumiu(local.zoom)) { local.zoom = null; ch = true; }
     if (tgt && (!S.chars[tgt] || !(tgt in S.battle.ticks) || (S.chars[tgt].enemy && S.chars[tgt].hp <= 0))) { const f = Object.values(S.chars).find(c => c.enemy && vivo(c.id)); if (f) { tgt = f.id; aim = null; ch = true; } }
-    if (local.aim && !vivo(local.aim)) { local.aim = S.chars[tgt]?.enemy && vivo(tgt) ? tgt : null; ch = true; }
+    if (local.aim && sumiu(local.aim)) local.aim = S.chars[tgt] && !sumiu(tgt) ? tgt : null; // a mira local é refeita a cada desenho: não pede outro
     return ch;
   };
   const camera = F => {

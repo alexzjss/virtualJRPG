@@ -125,7 +125,7 @@ try {
     // ficha do alvo, barra do topo, zoom e alvo que some (Task 6)
     check(await until(() => vis(anaD, '.hud-sheet .sheet'), 'ficha do alvo'), 'com a mira aberta a ficha do alvo está visível');
     check(/ESCUDO/.test(await txt(anaD, '.hud-sheet .sheet')) && await vis(anaD, '.hud-top h4'), 'a ficha mostra ESCUDO e a barra do topo mostra o alvo');
-    check(await anaD.evaluate(() => { const s = document.querySelector('.hud-sheet .sheet').getBoundingClientRect(), r = document.querySelector('.p3d .bb.tgt').getBoundingClientRect(); return s.left >= 0 && s.right <= innerWidth && (s.left >= r.right - 2 || s.right <= r.left + 2); }), 'a ficha fica ao lado do recorte mirado, sem cobri-lo');
+    check(await until(() => anaD.evaluate(() => { const e = document.querySelector('.hud-sheet .sheet'), t = document.querySelector('.p3d .bb.tgt'); if (!e || !t) return false; const s = e.getBoundingClientRect(), r = t.getBoundingClientRect(); return s.left >= 0 && s.right <= innerWidth && (s.left >= r.right - 2 || s.right <= r.left + 2); }), 'ficha assentada'), 'a ficha fica ao lado do recorte mirado, sem cobri-lo');
     check(!(await anaD.locator('.hud-sheet .sheet.full').count()), 'sem zoom a ficha não é a completa');
     await anaD.keyboard.press('z'); check(await until(() => vis(anaD, '.hud-sheet .sheet.full'), 'ficha completa'), 'Z abre a ficha completa (zoom)');
     await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.sheet.full').count()), 'zoom fechou'), 'Esc fecha o zoom');
@@ -142,9 +142,18 @@ try {
       await anaD.keyboard.press('z'); await until(() => vis(anaD, '.sheet.full'), 'zoom no inimigo que vai sumir');
       go({ t: 'delChar', id: novo.id }); push();
       check(await until(async () => await anaD.locator('.p3d .bb.tgt').count() === 1 && (await anaD.locator('.p3d .bb.tgt').getAttribute('data-tgt')) !== novo.id, 'mira troca'), 'removido o inimigo mirado, a mira passa para outro');
-      check(await until(async () => !(await anaD.locator('.sheet.full').count()) && await vis(anaD, '.hud-sheet .sheet'), 'zoom fecha'), 'o zoom fecha e a ficha segue o novo alvo'); } await sleep(300);
+      check(await until(async () => !(await anaD.locator('.sheet.full').count()) && await vis(anaD, '.hud-sheet .sheet'), 'zoom fecha'), 'o zoom fecha e a ficha segue o novo alvo'); }
+    // aliado caído mirado por item: a mira fica nele e o desenho não entra em laço
+    { const it = Object.keys(S.items).find(k => S.items[k].type === 'cons'); shinkai.inv[it] = 1; thomas.hp = 0; push(); await sleep(300);
+      await anaD.evaluate(() => { window.__rn = 0; const r = render; window.render = function () { window.__rn++; return r.apply(this, arguments); }; });
+      await anaD.keyboard.press('Escape'); await anaD.keyboard.press('3'); await until(() => anaD.locator('.stroke[data-lq=item]').count(), 'lista de itens'); await anaD.keyboard.press('Enter');
+      await until(() => anaD.locator('.lq-sum').count(), 'mira do item'); check(await aimAt(anaD, thomas.id), 'mirar o aliado caído com o item');
+      const n0 = await anaD.evaluate(() => window.__rn); await sleep(1000); const n1 = await anaD.evaluate(() => window.__rn);
+      check(n1 - n0 <= 2 && await anaD.locator(`.p3d .bb.hero.tgt[data-tgt="${thomas.id}"]`).count() === 1, `a mira fica no aliado caído sem laço de desenho (${n1 - n0} desenhos em 1 s)`);
+      await anaD.keyboard.press('Escape'); await anaD.keyboard.press('Escape'); delete shinkai.inv[it]; thomas.hp = thomas.hpMax; push(); await sleep(300); await anaD.keyboard.press('1'); await until(() => anaD.locator('.p3d .bb.foe.tgt').count(), 'mira de volta em inimigo'); }
+    await until(() => vis(anaD, '.lq .stroke[data-lq=go]:not(.blk)'), 'Agir liberado'); await sleep(300); // o desenho da mira precisa ter assentado antes do Enter
     const n = S.seq; await anaD.keyboard.press('Enter');
-    await until(() => S.log.some(l => l.n > n && l.who === 'Shinkai'), 'Enter manda a ação');
+    await until(() => S.seq > n && S.log.some(l => l.n > n), 'Enter manda a ação'); // qualquer registro novo: um golpe esquivado é narrado por quem esquiva, não pela Shinkai
     // condições aparecem sobre o recorte (e nos retratos do grupo)
     minion.st.burn = 3; shinkai.st.burn = 3; push();
     await until(() => vis(anaD, `.p3d .bb[data-tgt="${minion.id}"] .sti[data-st=burn]`), 'condição do inimigo sobre o recorte');
