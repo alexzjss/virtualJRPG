@@ -1756,3 +1756,54 @@ body .p3d:not([data-biome=custom]) .envface.stage::before,body .p3d:not([data-bi
 .p3d .bb .shadow{width:calc(var(--h,300px) * .77);height:calc(var(--h,300px) * .77);margin:0 0 calc(var(--h,300px) * -.385) calc(var(--h,300px) * -.385)} /* a sombra acompanha o tamanho da figura (antes 230 px fixos) */
 .p3d .bb.cur .shadow{background:radial-gradient(closest-side,#000b 22%,color-mix(in srgb,var(--c,#fff) 50%,#0000) 58%,#0000)} /* holofote: o chão de quem tem a vez ganha o brilho da própria cor */
 @media (prefers-reduced-motion:reduce){.p3d::before{transition:none}}
+
+/* ===== leque radial no estilo Persona 5: faixas pretas inclinadas em volta do ombro, tecla num círculo, estouro na cor do herói no selecionado ===== */
+.lqm.rad-on .lqin{display:block;position:relative;width:0;height:0}
+.lqm.rad-on .lqc{position:relative;width:0;height:0;display:block}
+.lqm.rad-on .lqsub{position:absolute;left:0;top:0;margin:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.lqr{position:relative;width:0;height:0}
+.rad{position:absolute;left:calc(var(--x) * 1px);top:calc(var(--y) * 1px);transform:translate(0,-50%) rotate(var(--t));transform-origin:0 50%;pointer-events:auto}
+.rad.w{transform:translate(-100%,-50%) rotate(var(--t));transform-origin:100% 50%}
+.lq.l .rad{left:calc(var(--x) * -1px);transform:translate(-100%,-50%) rotate(calc(var(--t) * -1));transform-origin:100% 50%}
+.lq.l .rad.w{transform:translate(0,-50%) rotate(calc(var(--t) * -1));transform-origin:0 50%}
+.rad>.stroke,.rad>.hk{position:relative;display:flex;align-items:center;gap:10px;min-height:0;padding:7px 22px 7px 12px;font:400 30px/1 var(--disp);letter-spacing:1.5px;color:#fff;text-transform:uppercase;text-shadow:none;background:none;border:0;box-shadow:none;clip-path:none;white-space:nowrap;cursor:pointer;transform:none;transition:transform .06s}
+.rad>.stroke::before,.rad>.hk::before{content:"";position:absolute;inset:0;z-index:-1;background:#0a0a0a;border:3px solid #fff;border-left-width:6px;clip-path:polygon(0 8%,100% 0,94% 100%,3% 92%);box-shadow:none;transition:background .06s}
+.rad>.stroke::after{display:none}
+.rad .key,.lq .rad .stroke .key,.lq .rad .hk .key{position:static;order:-1;flex:none;min-width:34px;height:34px;padding:0 5px;border-radius:50%;border:3px solid #fff;background:#0a0a0a;color:#fff;font:700 15px/1 var(--cond);display:inline-grid;place-items:center;opacity:1;box-sizing:border-box}
+.rad>.stroke small{font:600 14px var(--cond);color:#d8d8d8;letter-spacing:.3px;text-transform:none;margin-left:2px}
+.rad>.stroke:hover::before,.rad>.hk:hover::before{background:#262626}
+/* selecionado: faixa maior, estouro na cor do herói atrás e uma tremida curta */
+.rad.sel{z-index:2}
+.rad.sel>.stroke,.rad.sel>.hk{transform:scale(1.16);color:#0a0a0a}
+.rad.sel>.stroke::before,.rad.sel>.hk::before{background:#fff;border-color:#0a0a0a}
+.rad.sel>.stroke small{color:#333}
+.rad.sel .key{background:#0a0a0a;color:#fff;border-color:#0a0a0a}
+.rad.sel::before{content:"";position:absolute;inset:-22px -40px -22px -30px;z-index:-2;background:var(--lqc,#e4002b);clip-path:polygon(0 40%,22% 30%,16% 0,44% 24%,70% 4%,74% 30%,100% 20%,86% 52%,100% 84%,68% 72%,50% 100%,36% 74%,6% 92%,18% 60%);animation:radon .32s cubic-bezier(.2,1.6,.4,1) both}
+.rad.dim{opacity:.5}
+.rad.dim:hover{opacity:.9}
+.rad .stroke.blk{filter:grayscale(1) brightness(.6)}
+.rad>.stroke.tacb{padding-left:12px}.rad .lqtac{position:absolute;top:calc(100% + 6px);left:0;margin:0}.lq.l .rad .lqtac{left:auto;right:0}
+.lqm.burst .rad{animation:radin .22s cubic-bezier(.2,1.5,.4,1) both;animation-delay:calc(var(--i) * 22ms)}
+@keyframes radin{from{opacity:0;scale:.2;translate:calc(var(--x) * -1px) calc(var(--y) * -1px)}to{opacity:1;scale:1;translate:0 0}}
+@keyframes radon{0%{scale:.3;rotate:-8deg}60%{scale:1.08;rotate:3deg}80%{rotate:-2deg}100%{scale:1;rotate:0deg}}
+@media (prefers-reduced-motion:reduce){.lqm.burst .rad,.rad.sel::before{animation:none}}
+.gmai{position:absolute;left:150px;top:150px}
+.rad>.stroke,.rad>.hk{padding-right:34px}
+/* listas (Skills, Itens, Todas) no estilo Persona 5: faixas pretas com borda branca, custo à direita, a escolhida invertida em branco com a cor do herói */
+.lqm.rad-on .lqsub>.stroke,.lqm.rad-on .sk6 .stroke{min-height:0;width:380px;padding:7px 28px 7px 16px;font:400 21px/1.1 var(--disp);letter-spacing:1px;color:#fff;text-shadow:none;transform:none}
+.lqm.rad-on .lqsub>.stroke::before,.lqm.rad-on .sk6 .stroke::before{background:#0a0a0a;border:2px solid #fff;border-left:6px solid var(--lqc,#fff);clip-path:polygon(0 0,100% 6%,97% 100%,1% 94%);box-shadow:none}
+.lqm.rad-on .lqsub>.stroke::after,.lqm.rad-on .sk6 .stroke::after{display:none}
+.lqm.rad-on .lqsub>.stroke:nth-child(even),.lqm.rad-on .sk6 .stroke:nth-child(even){margin-left:12px}
+.lqm.rad-on .lqsub>.stroke:hover::before,.lqm.rad-on .sk6 .stroke:hover::before{background:#262626}
+.lqm.rad-on .lqsub>.stroke.on,.lqm.rad-on .sk6 .stroke.on{color:#0a0a0a;transform:translateX(10px)}
+.lqm.rad-on .lqsub>.stroke.on::before,.lqm.rad-on .sk6 .stroke.on::before{background:#fff;border-color:#0a0a0a;border-left-color:var(--lqc,#e4002b);box-shadow:-10px 0 0 var(--lqc,#e4002b)}
+.lqm.rad-on .lqsub>.stroke.on small,.lqm.rad-on .sk6 .stroke.on .t,.lqm.rad-on .sk6 .stroke.on .cost{color:#333}
+.lqm.rad-on .lqsub>.stroke small{margin-left:auto;color:#cfcfcf;font:600 13px var(--cond)}
+.lqm.rad-on .sk6 .stroke.big{width:420px}
+.lqm.rad-on .sk6 .cost{margin-left:auto}
+.lqm.rad-on .lqsub>.stroke.mini{width:auto;font-size:16px;padding:4px 22px 4px 12px}
+.lqm.rad-on .lq-all{background:#0a0a0a;border:3px solid #fff;border-left:8px solid var(--lqc,#fff);transform:rotate(-2deg);clip-path:none}
+.lqm.rad-on .lq-all .opt.skr{background:#141414;border-bottom:1px solid #fff2}
+.lqm.rad-on .lq-all .opt.skr.on{background:#fff;color:#0a0a0a;box-shadow:inset 6px 0 0 var(--lqc,#e4002b)}
+.lqm.rad-on .lq-sum{background:#0a0a0a;border:2px solid #fff;border-left:6px solid var(--lqc,#fff)}
+.lqm.rad-on .lqsub>.stroke.mini{padding-left:34px}
