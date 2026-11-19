@@ -286,7 +286,7 @@ function fx1(a, s, t, f, c = {}) {
     case 'push': if (t.id in T && t.hp > 0) { bump(t.id, Math.round(delay(t) * f.v / 100)); return ' [atrasado]'; } return '';
     case 'haste': if (t.id in T && t !== a) { T[t.id] = Math.max(T[a.id] ?? 0, T[t.id] - Math.round(delay(t) * f.v / 100)); return ` [${t.name} adiantado]`; } return '';
     case 'seal': if (t.hp <= 0) return ''; t.sealD = { d: f.p + Math.floor((c.stat || 0) / R.dmgDiv), el: s.el, by: a.name }; t.st.seal = f.n + (t === a ? 1 : 0); return ' [Selo]';
-    case 'shield': { const v = Math.max(1, Math.round((f.p + Math.floor((c.stat || 0) / R.healDiv)) * (s.eff || 1))); t.shield = Math.max(t.shield || 0, v); t.st.shield = Math.max(t.st.shield || 0, 3); return ` [Escudo ${v}${t !== a ? ' em ' + t.name : ''}]`; }
+    case 'shield': { const v = Math.max(1, Math.round((f.p + Math.floor((c.stat || 0) / R.healDiv)) * (s.eff || 1))); t.shield = Math.max(t.shield || 0, Math.min(Math.ceil(t.hpMax * .5), (t.shield || 0) + v)); t.st.shield = Math.max(t.st.shield || 0, 3 + (t === a && current() === a.id ? 1 : 0)); return ` [Escudo ${v}${t !== a ? ' em ' + t.name : ''}]`; }
     case 'cleanse': { const ks = RU.NEG.filter(k => t.st[k]); for (const k of ks) delete t.st[k]; delete t.sealD; if (t.stk?.doenca) { t.stk.doenca = 0; return ' [purificado; a Doença recua]'; } return ks.length ? ' [purificado]' : ''; }
     case 'revive': if (c.fallen || (t.hp <= 0 && !t.dead)) { t.hp = Math.max(t.hp, Math.ceil(t.hpMax * f.p / 100)); delete t.dying; delete t.fell; return ` [${t.name} se reergue]`; } return '';
     case 'res': if (f.r === 'limit') addLimit(t, f.p); else t[f.r] = Math.min(t[f.r + 'Max'], t[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}${t !== a ? ' em ' + t.name : ''}]`;
@@ -315,7 +315,7 @@ function onceFx(a, s, stat) {
   }
   if (txt) log(a.name, `${s.name}:${txt}`, 'ok');
 }
-const hitFx = (a, s, t, c) => (s.fx || []).filter(f => (!f.to || f.to === 'tgt') && !(c.blk && f.t === 'st')).map(f => fx1(a, s, t, f, c)).join('');
+const hitFx = (a, s, t, c) => (s.fx || []).filter(f => (!f.to || f.to === 'tgt') && !((c.blk || c.mid) && f.t === 'st')).map(f => fx1(a, s, t, f, c)).join('');
 // Ressonância: o último a agir foi um aliado (não você) com técnica do Vínculo pedido (ou 'any'), acertando o mesmo alvo
 const resOk = (a, f, t) => { const L = S.battle?.lastAct; return !!L && L.id !== a.id && L.enemy === a.enemy && (f.k === 'any' || L.el === f.k) && L.t.includes(t.id); };
 function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por turno de condição, fúria do ferido
@@ -487,7 +487,8 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     * (t.st.broken ? 1.5 : 1) * (rx?.m || 1) * (climaOf()?.[1][s.el] || 1) * (o.noten ? 1 : TEN[a.ten || 0]) * (rea && (rea.rea.t === 'block' || rea.rea.t === 'absorb') ? 1 - rea.rea.v / 100 : 1);
   const armor = mental || t.st.exposed ? 0 : (t.armor + (eq(t, 'armadura')?.power || 0) + (t.up?.[t.equip?.armadura]?.p || 0)) * (1 - pierce / 100);
   const d = Math.max(1, Math.round((s.power + Math.floor(stat / R.dmgDiv / (s.hits || 1)) + (o.plus || 0) - armor) * mult)); // multi-golpe divide o bônus do atributo; a armadura conta em cada golpe
-  a.marks[s.attr] = true; if (s.attr2) a.marks[s.attr2] = true; tally(a, 'dmg', mental ? Math.min(d, t.san) : Math.min(d, t.hp)); if (crit) tally(a, 'crit', 1);
+  const dh = mental ? d : d - Math.min(t.shield || 0, d); // o que passa do escudo: só isso fere o corpo e conta no placar, dreno e reflexo
+  a.marks[s.attr] = true; if (s.attr2) a.marks[s.attr2] = true; tally(a, 'dmg', mental ? Math.min(d, t.san) : Math.min(dh, t.hp)); if (crit) tally(a, 'crit', 1);
   let extra = '', part = '';
   const was = t.hp > 0;
   if (mental) t.san = Math.max(0, t.san - d);
@@ -495,7 +496,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     let roll = Math.random() * 100;
     part = aim || PARTS.find(k => (roll -= BODY[k][3]) < 0) || 'torso';
     const lv = lvl(t, part);
-    t.body[part] = (t.body[part] || 0) + d;
+    t.body[part] = (t.body[part] || 0) + dh;
     extra = hurt(t, d, a);
     if (t.hp > 0 && lv < 2 && lvl(t, part) === 2) { applySt(t, BODY[part][1]); extra += ` ${PL[part]} em estado crítico!`; }
   }
@@ -504,15 +505,15 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (rx) { rx.on.forEach(k => delete t.st[k]); if (t.hp > 0 && rx.a) applySt(t, rx.a[0], rx.a[1]); extra += ` [Reação: ${rx.n}]`; }
   if (blk) extra += ' [bloqueado]';
   if (dodged) extra += ' [esquivou: metade do dano]';
-  if (t.hp > 0 && !blk) { if (s.st) applySt(t, s.st); if (down) t.st.down = 1; }
+  if (t.hp > 0 && !blk) { if (s.st && !o.mid) applySt(t, s.st); if (down) t.st.down = 1; }
   if (wu && t.hp > 0 && !mental && !blk) { // engastes e segundo elemento da liga
     for (const rn of wu.g || []) { const Ru = OF.RUNAS[rn]; if (Ru?.st && Math.random() * 100 < Ru.st[2]) { applySt(t, Ru.st[0], Ru.st[1]); extra += ` [${STN[Ru.st[0]]}: ${rn}]`; } if (Ru?.drain && a.hp > 0) a.hp = Math.min(a.hpMax, a.hp + Math.max(1, Math.round(d * Ru.drain / 100))); }
     if (wu.el2 && Math.random() < .3) { const e2 = OF.ELST[wu.el2]; if (e2) applySt(t, e2[0], e2[1]); }
   }
   if (s.el === 'susanoo' && t.hp > 0 && !mental && !rx && (S.battle.wx?.k === 'chuva' || Math.random() < .35)) applySt(t, 'wet', 2); // a água molha
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
-  extra += hitFx(a, s, t, { d, stat, blk });
-  if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
+  extra += hitFx(a, s, t, { d: dh, stat, blk, mid: o.mid });
+  if (!mental && dh > 0 && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(dh * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
   log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}), ...(dodged ? { esq: 1 } : {}) } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
   if (w) a.bt.wkNow = true;
@@ -665,7 +666,7 @@ function doAct(a, m, bonus = 0) {
     let fx = s.fx; if (cx?.turns) fx = (fx || []).map(f => f.t === 'st' && RU.POS.includes(f.k) ? { ...f, n: (f.n || 3) + cx.turns } : f);
     if (last && cx?.pf && s.pf) fx = [...(fx || []), ...s.pf]; return fx === s.fx ? s : { ...s, fx }; };
   for (const t of ts) {
-    for (let h = 0; h < total; h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, withCx(h === total - 1 && !cx?.fin), t, aim, bonus, { plus, cx, ...(h < hitsN ? { beat: h } : { mult: cx.extraMult }) }) || more; }
+    for (let h = 0; h < total; h++) { if (t.dead || (off && h && t.hp <= 0)) break; more = strike(a, withCx(h === total - 1 && !cx?.fin), t, aim, bonus, { plus, cx, mid: h < total - 1 || !!cx?.fin, ...(h < hitsN ? { beat: h } : { mult: cx.extraMult }) }) || more; }
     if (cx?.fin && !t.dead && t.hp > 0) more = strike(a, { ...withCx(true), power: cx.fin, hits: 1, name: s.name + ' (final)' }, t, aim, bonus, { plus, cx }) || more; // sequência perfeita: golpe final
     if (s.dupla && off && !t.dead && t.hp > 0) more = strike(a, { ...s, name: s.name + ' (2ª mão)' }, t, aim, bonus, { plus, mult: .5 }) || more; // arma em par: segundo golpe a 50%
   }

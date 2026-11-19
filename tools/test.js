@@ -261,6 +261,18 @@ test('roubo de vida, detonar condição e escudo', () => {
   [a, e] = duel(); e.st.burn = 4; const hp = e.hp; use(a, 'Combustão Súbita', e); assert.ok(S.log.some(l => /Detonação/.test(l.text))); assert.ok(e.hp < hp);
   [a, e] = duel(); use(a, 'Escudo de Areia', a); assert.ok(a.shield > 0); const sh = a.shield, h0 = a.hp; turn(e); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: a.id })); assert.ok(a.shield < sh || a.hp === h0);
 });
+test('escudo: soma até metade do HP, dura 3 turnos e não vaza dano', () => {
+  let [a, e] = duel(); use(a, 'Escudo de Areia', a); const v = a.shield; assert.equal(a.st.shield, 3); use(a, 'Escudo de Areia', a); assert.equal(a.shield, Math.min(2 * v, Math.ceil(a.hpMax * .5)));
+  const b = mk(ana, {}); derive(b); b.hp = b.hpMax; S.battle.ticks[b.id] = 900; use(a, 'Escudo de Areia', b); assert.equal(b.st.shield, 3);
+  [a, e] = duel(); a.shield = 999; a.st.shield = 3; a.st.reflect = 3; const h0 = a.hp, he = e.hp; turn(e); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: a.id }));
+  assert.equal(a.hp, h0); assert.equal(Object.values(a.body).reduce((x, y) => x + y, 0), 0); assert.equal(e.hp, he); assert.equal(S.battle.stats?.[e.id]?.dmg || 0, 0);
+  [a, e] = duel(); a.shield = 1; a.st.shield = 3; e.arma = 40; turn(e); fixR(.3, () => H.act(gm, { id: e.id, skill: 'atk', target: a.id }));
+  assert.ok(a.hp < a.hpMax); assert.equal(Object.values(a.body).reduce((x, y) => x + y, 0), a.hpMax - a.hp);
+});
+test('golpe de várias batidas aplica o status uma vez', () => {
+  const [a, e] = duel(); S.skills.tmpMulti = { name: 'Teste Multi', kind: 'dmg', attr: 'FOR', el: 'fis', power: 5, cost: 0, res: 'aura', hits: 3, fx: [{ t: 'st', k: 'burn', n: 2 }] };
+  try { a.skills.push('tmpMulti'); turn(a); fixR(.3, () => H.act(gm, { id: a.id, skill: 'tmpMulti', target: e.id })); assert.ok(e.hp < e.hpMax); assert.equal(e.st.burn, 2); } finally { delete S.skills.tmpMulti; }
+});
 test('purificar tira só as condições ruins; reerguer devolve um caído', () => {
   let [a, e] = duel(); const b = mk(ana, {}); S.battle.ticks[b.id] = 500; b.st = { burn: 3, fear: 2, atkUp: 2 }; use(a, 'Purificação em Massa', b); assert.deepEqual(b.st, { atkUp: 2 });
   [a, e] = duel(); const c = mk(ana, {}); S.battle.ticks[c.id] = 500; c.hp = 0; c.dying = 2; use(a, 'Ressurgir', c); assert.ok(c.hp >= Math.ceil(c.hpMax * .4)); assert.equal(c.dying, undefined);
