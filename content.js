@@ -348,12 +348,13 @@ export function buildBestiary(make) {
   const ray = el => s => solo(s) && (s.el === el && s.kind !== 'passive' && s.res !== 'san' || (s.el === el && el === 'shukketsu' && s.kind !== 'passive' && !s.back));
   // IA opcional dos chefes (campo `ia`; ausente = só ataques e transformações): dom = abre a Expansão de Domínio 1× por combate (precisa de metade da Aura);
   // defend / focus = chance por turno de Defender (vida < 40%) e de Concentrar Tensão (vida > 50%). Medido em tools/sim.js; ver DECISOES-SISTEMAS.md.
+  const DOM_CHEFE = { susanoo: 'Mar Sem Fim', hiruko: 'Reator Aberrante', shukketsu: 'Banquete Rubro' }; // o domínio de cada chefe (o setor pode ter outros)
   const BIA = { susanoo: { dom: 1, focus: .15 }, amaterasu: { defend: .2 }, hiruko: { dom: 1 }, shukketsu: { dom: 1, focus: .15 } };
   // trio de elites (campo `ia.trio`): só funciona com os três no campo, cada um com a sua parte da Tempestade Ígnea
   const TRIO = [['Oni de Brasa', '#d9480f', 'kagutsuchi', { FOR: 60, CON: 55, AGI: 45 }, ['Centelha', 'Marca Ardente']], ['Tengu do Vendaval', '#3b6ea8', 'fuhaku', { AGI: 65, DES: 60 }, ['Lâmina de Vento', 'Vendaval']], ['Raijū', '#e0b400', 'indra', { AGI: 65, INT: 55 }, ['Faísca', 'Choque']]];
   const tn = el => `Tempestade Ígnea: ${{ kagutsuchi: 'Kagutsuchi', fuhaku: 'Fuhaku', indra: 'Indra' }[el]}`;
   return [...B.map(([name, color, attrs, weak, resist, skills, o], i) => make(name, color, attrs, weak, resist, skills, { cat: i < 16 ? 'demonio' : 'humano', ...o })),
-    ...BOSS.map(([el, name, weak, attr, wp, tune]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], s => ray(el)(s) || (BIA[el]?.dom && s.dom && s.el === el), { boss: true, cat: 'chefe', ...(BIA[el] ? { ia: BIA[el] } : {}), tune: tune || {}, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 })),
+    ...BOSS.map(([el, name, weak, attr, wp, tune]) => make(name, '#111111', { [attr]: 75, CON: 70, AGI: 55, SAB: 60, FOR: 60 }, [weak], [el], s => ray(el)(s) || (BIA[el]?.dom && s.dom && s.name === DOM_CHEFE[el]), { boss: true, cat: 'chefe', ...(BIA[el] ? { ia: BIA[el] } : {}), tune: tune || {}, weakPart: wp, gmNote: `Chefe. Ponto fraco: ${PN[wp]} (mirar ali causa dano dobrado). Age duas vezes por rodada, resiste a controle e invoca lacaios ao entrar em fúria.`, bon: { hpMax: 250, auraMax: 60, sanMax: 0 }, arma: 16, armor: 4, xpR: 80, goldR: 150 })),
     ...TRIO.map(([name, color, el, attrs, sk]) => make(name, color, attrs, [], [], [...sk, tn(el)], { cat: 'demonio', ia: { trio: 1 }, xpR: 15, gmNote: 'Trio: a técnica "Tempestade Ígnea" só sai com os três (Oni, Tengu e Raijū) de pé; use-os juntos.' }))];
 }
 

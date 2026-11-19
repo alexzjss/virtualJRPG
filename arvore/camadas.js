@@ -172,7 +172,7 @@ function caber(bs, fixos) {
 export const VAGAS = [];
 const temaDe = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return ['ofensiva', 'controle', 'defesa', 'maestria', 'especial'][c.indexOf(Math.max(...c))]; };
 const vaga = (el, ramo, b, tema) => { if (b.length < CAM) VAGAS.push({ el, ramo, tem: b.length, faltam: Array.from({ length: CAM - b.length }, (_, k) => b.length + k + 1), tema: tema || temaDe(b) }); };
-export function camadas(TREE) {
+export function camadas(TREE, preencher) {
   VAGAS.length = 0;
   const plano = []; // [nó, camada, casa]: primeiro decide tudo, depois aplica (duplas acertam a camada juntas)
   const layerOf = new Map(), marca = (s, L, i) => { plano.push([s, L, i]); layerOf.set(s.n, L); };
@@ -185,6 +185,7 @@ export function camadas(TREE) {
     espalharKit([...comuns, ...novos]);
     espalharFortes([...comuns, ...novos], new Set(raiz ? [raiz[0]] : []));
     t.branches = [...t.branches.filter(b => !b.de), ...novos, ...linhas];
+    preencher?.(el, t.branches.filter(b => !b.de && !fixos.has(b))); // casas livres (arvore/leva9.js)
     for (const b of fixos) b.forEach(s => marca(s, 1, 0));
     t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; ordenar(b, b === raiz); b.forEach((s, i) => marca(s, i + 1, i)); vaga(el, bi, b); });
   }

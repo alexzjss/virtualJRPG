@@ -268,3 +268,12 @@ poder mínimo 7 por golpe (a armadura conta em cada um) e a 4ª variação com g
 Luta inteira: `L8=mix node tools/sim.js 150 enc` dá ao grupo padrão 2 a 4 técnicas da Leva 8 (Ressonância + Caça) por herói e a IA dos heróis passa a pesar
 Ressonância e Marca na escolha (poder × multiplicador, no alvo onde vale mais). Ganho medido: de 0 a +9% de vitória nos encontros (média ~+3%), igual a aprender
 técnicas novas. `L8=1` monta heróis só com Leva 8 e eles perdem para o grupo padrão: esses ramos completam o Vínculo, não o substituem.
+
+## Leva 9: preencher as camadas (`arvore/leva9*.js`, 381 nós)
+
+Feita em 18/11/2026 depois da reescrita em 10 camadas (`arvore/camadas.js`, `arvore/temas.js`). Respostas da rodada de perguntas: casas livres + ramos novos, ~360 nós, prioridade nas células magras e nas combinações, tom variado.
+
+- **Ramos novos (250, `leva9a.js` e `leva9b.js`):** 2 por Vínculo, na coluna mais magra do setor (maestria em quase todos; depois defesa, especial ou ofensiva), 2 no Marcial (posturas e dojo), 2 na Aura (estados e proteção) e 3 no Ocultismo (arsenal, proteções de casa, amarrações). O construtor `R9` (`arvore/l8.js`) dá o XP pela casa, então a ordem escrita é a camada.
+- **Combinações (90, `leva9c.js`):** 1 ramo por Vínculo com um nó `v2` de cada outro kami; é o único lugar onde os temas se misturam.
+- **Casas livres (41, `CASAS` em `leva9.js`):** entram dentro de `camadas()`, depois de o excesso ser redistribuído (`caber`), no ramo de um nó âncora; com isso, nenhuma casa fica livre fora da Árvore de Armas.
+- Chefes de domínio: cada um usa o domínio dele (`DOM_CHEFE` em `content.js`), mesmo que o setor tenha outros.

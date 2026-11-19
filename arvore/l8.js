@@ -1,3 +1,4 @@
+import { XP as XP9, RQ as RQ9 } from './camadas.js';
 // Construtor compacto da Leva 8. Um nó: N('Nome', 'descrição', 'spec', 'fx', { extras }).
 // spec = tipo + poder/custo + marcas: d dano · m mental · h cura · u suporte · p passiva · f forma · L Limite (dano).
 //   'd14/5' (poder 14, custo 5) · 'u/4' · 'L48' · marcas: a (área, ct 130) · x3 (3 golpes) · t60 (ct 60) · c1 (concentra 1 turno) · s (em si) · v (anunciado)
@@ -31,3 +32,13 @@ export function R(A, B, ...ns) {
     if (RQ[j] && !o.rq) out.rq = { [a]: RQ[j] };
     return out; });
 }
+
+// Leva 9: ramo de 10: a posição é a camada, então o XP cresce com o índice (a ordem escrita fica); atributo A, B nas casas 8–9
+export function R9(A, B, ...ns) {
+  if (ns.length !== 10) throw new Error(`Leva 9: ramo com ${ns.length} nós (${ns[0]?.n})`);
+  return ns.map((o, i) => { const a = o.a || (i === 7 || i === 8 ? B : A), out = { ...o, xp: o.xp ?? XP9[i + 1] };
+    if (o.k !== 'passive') out.a = a; else delete out.a;
+    if (RQ9[i + 1] && !o.rq) out.rq = { [a]: RQ9[i + 1] };
+    return out; });
+}
+

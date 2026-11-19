@@ -19,6 +19,7 @@ import { reorganizar } from './arvore/ordem.js';
 import { camadas } from './arvore/camadas.js';
 import { temas } from './arvore/temas.js';
 import { LEVA8 } from './arvore/leva8.js';
+import { LEVA9, preencher } from './arvore/leva9.js';
 import { variar8 } from './arvore/leva8e.js';
 import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
 import { ARMAS_ARV } from './arvore/armas.js';
@@ -741,7 +742,7 @@ TREE.armas = ARM;
 for (const [el, br] of Object.entries(CARTAS)) TREE[el].branches.push(...br);
 TREE.hiruko.branches.at(-1).push(...DOENCA_MAIS); // ramo da Doença completo
 // leva 2: dois ramos por setor (ofensivo e reações/reforços), com 3 Limites por setor
-for (const L of [LEVA2A, LEVA2B, LEVA2C, LEVA3, LEVA4, LEVA5, LEVA6, LEVA8]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);
+for (const L of [LEVA2A, LEVA2B, LEVA2C, LEVA3, LEVA4, LEVA5, LEVA6, LEVA8, LEVA9]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);
 posicionar(TREE); // arvore/posicao.js: técnicas já usadas pelos jogadores descem, as fortes sobem, e cada uma ganha uma vizinha
 variar8(TREE); // arvore/leva8e.js: 4 variações de 45 técnicas, na linha de cada uma
 nivelar(TREE); // arvore/nivel.js: evoluções somadas na base e pisos de custo das técnicas fortes
@@ -750,4 +751,4 @@ marcarComandos(TREE); // Leva 4: comandos de ação nos nós que já existiam
 variar(TREE); // arvore/variacoes.js: comandos nos disparos e golpes rápidos e 3 variações por família
 reorganizar(TREE); // arvore/ordem.js: funde ramos curtos e põe cada setor em colunas temáticas (básico perto do centro)
 temas(TREE); // arvore/temas.js: cada elemento só na árvore do dono (fora das combinações); falha o build se algo escapar
-camadas(TREE); // arvore/camadas.js: posição no ramo = camada (1–10) e a camada define o poder, por orçamento
+camadas(TREE, preencher); // arvore/camadas.js: posição no ramo = camada (1–10) e a camada define o poder, por orçamento (a Leva 9 entra nas casas livres)
