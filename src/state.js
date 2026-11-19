@@ -100,7 +100,7 @@ if (isNew) S.itemsV = ITEMS_V; else migrateItems();
 fixShape();
 for (const ch of Object.values(S.chars)) Object.assign(ch, { scene: S.focus, ...structuredClone(EXTRA), arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {}, gold: 0, img: '', imgF: '', imgB: '', imgP: '', imgK: {}, fxK: {}, imgS: 1, ...ch });
 for (const [id, ch] of Object.entries(S.chars)) fixChar(ch, id, true);
-for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, imgF: '', imgP: '', imgK: {}, fxK: {}, imgS: 1, ...b, enemy: true }); fixChar(b, id, false); }
+for (const [id, b] of Object.entries(S.bestiary)) { Object.assign(b, { ...structuredClone(EXTRA), arma: 8, armor: 0, imgF: '', imgB: '', imgP: '', imgK: {}, fxK: {}, imgS: 1, ...b, enemy: true }); fixChar(b, id, false); }
 }
 // ---------- saneamento: um arquivo editado à mão, antigo ou importado nunca deixa o estado num formato que derrube o servidor ----------
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);

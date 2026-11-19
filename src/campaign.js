@@ -73,7 +73,7 @@ function cleanDef(coll, o) { // só passam os campos do esquema, já no tipo cer
 }
 function cleanFoe(o, map) {
   const ch = newChar('', true, ''), str = (v, n) => String(v ?? '').slice(0, n), els = a => Array.isArray(a) ? [...new Set(a.filter(e => EL.includes(e)))] : [];
-  Object.assign(ch, { name: str(o.name, 30) || '?', color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : ch.color, img: okUrl(o.img) ? o.img : '', weak: els(o.weak), resist: els(o.resist), vinc: els(o.vinc),
+  Object.assign(ch, { name: str(o.name, 30) || '?', color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : ch.color, img: okUrl(o.img) ? o.img : '', imgF: okUrl(o.imgF) ? o.imgF : '', imgB: okUrl(o.imgB) ? o.imgB : '', imgP: okUrl(o.imgP) ? o.imgP : '', weak: els(o.weak), resist: els(o.resist), vinc: els(o.vinc),
     skills: [...new Set((Array.isArray(o.skills) ? o.skills : []).map(k => map.skills[k]).filter(Boolean))], xpR: int(o.xpR), goldR: int(o.goldR), arma: int(o.arma, 0, 99), armor: int(o.armor, 0, 99), boss: !!o.boss,
     cat: ['demonio', 'humano', 'chefe'].includes(o.cat) ? o.cat : 'demonio', tpl: str(o.tpl || o.name, 40), gmNote: str(o.gmNote, 3000), bio: str(o.bio, 3000) });
   if (PARTS.includes(o.weakPart)) ch.weakPart = o.weakPart;

@@ -8,12 +8,24 @@
 // Camadas 1–2: um efeito só e texto de uma frase. As casas que faltam para um ramo chegar a 10 são as VAGAS da próxima leva.
 import { ATUAIS } from './atuais.js';
 import { ANCORAS } from './ancoras.js';
+import { VINC } from './vinculos.js';
+import { MEIO } from './leva11.js';
 import { temaNo } from './ordem.js';
+import '../public/rules.js';
+import '../public/armas.js';
 
 export const CAM = 10;
 const R = (54 / 9) ** (1 / 9); // ~1,22 por camada
 export const DANO = L => 9 * R ** (L - 1);
 export const XP = [0, 10, 15, 20, 25, 30, 40, 50, 65, 85, 110];
+function encarecer(s, pai) {
+  if (!pai) return;
+  s.xp = Math.max(s.xp, pai.xp + 5);
+  for (const nen of globalThis.RULES.NEN) {
+    const minimo = globalThis.RULES.xpCost({ nen }, pai) + 5;
+    if (globalThis.RULES.xpCost({ nen }, s) < minimo) (s.xpMinNen ??= {})[nen] = minimo;
+  }
+}
 export const RQ = [0, 0, 0, 0, 50, 51, 52, 54, 56, 58, 60];
 const LIM = [4, 7, 10];
 const KIT = new Set([...ATUAIS, ...ANCORAS]);
@@ -258,7 +270,7 @@ export function camadas(TREE, preencher) {
     brs.forEach((b, j) => { ordenar(b, j === 0); b.forEach((s, i) => marca(s, i + 1, i)); vaga('armas', wt + '-' + j, b, 'arma: ' + wt); });
   }
   // linhas de variação: começam na camada da base + 1 (combinação de Vínculos, v2, + 2) e sobem uma camada por nó até a 10.
-  // Kit atual primeiro (camadas 1–5), conceitos fortes só da 7 em diante; cada nó pede o anterior (corrente linear). Passando de 10, os últimos dividem a camada 10.
+  // Cada Vínculo secundário abre um caminho próprio a partir do tronco comum.
   LINHAS.length = 0;
   for (const [el, t] of Object.entries(TREE)) for (const [bi, b] of t.branches.entries()) if (b.de) {
     const L0 = layerOf.get(b.de) ?? 1, min = s => Math.max(L0 + (s.v2 ? 2 : 1), forte(s) ? 7 : 0), rest = [...b].sort((x, y) => KIT.has(y.n) - KIT.has(x.n)), ord = [];
@@ -267,12 +279,187 @@ export function camadas(TREE, preencher) {
       ord.push(s);
     }
     b.length = 0; b.push(...ord);
-    b.forEach((s, i) => { marca(s, Math.max(min(s), Math.min(CAM, L0 + 1 + i)), 0); if (i) s.pre = b[i - 1].n; else s.pre = b.de; });
+    let tronco = b.de;
+    const pontas = new Map();
+    b.forEach((s, i) => {
+      marca(s, Math.max(min(s), Math.min(CAM, L0 + 1 + i)), 0);
+      s.pre = pontas.get(s.v2) ?? tronco;
+      if (s.v2) pontas.set(s.v2, s.n);
+      else tronco = s.n;
+    });
     if (L0 + b.length < CAM) LINHAS.push({ el, ramo: bi, base: b.de, tem: b.length, faltam: CAM - L0 - b.length });
   }
   for (const [s, L, i] of plano) aplicar(s, L, i);
   for (const [s, [p, xp]] of FLAT) { s.p = p; s.xp = xp; }
   for (const s of TREINO) s.p = s.pas === 'hpMax' ? 10 + 2 * s.cam : s.pas === 'auraMax' ? 8 + s.cam : 5 + Math.floor((s.cam - 1) / 3);
   for (const [s] of plano) delete s._xp0;
+  ligarRamos(TREE);
   return VAGAS;
+}
+
+// A montagem da grade e o preço usam a mesma árvore de pais.
+export const PAIS = new Map();
+export const REFINOS = new Map();
+function ligarRamos(tree) {
+  PAIS.clear();
+  REFINOS.clear();
+  const porNome = new Map(), centro = tree.marcial.branches[0][0];
+  const raizesAbertas = new Set(Object.values(tree).map(t => t.branches[0][0]));
+  function ligar(s, pai) {
+    porNome.set(s.n, s);
+    if (!pai) return;
+    PAIS.set(s.n, pai.n);
+  }
+  function caminho(grupo, entrada, bifurca, pontaB, bases = []) {
+    let tronco = entrada;
+    const pontas = new Map(), profundidade = new Map();
+    const misto = grupo.some(s => s.v2 || s.ex);
+    const escolhas = new Map();
+    grupo.forEach((s, i) => {
+      let pai = tronco;
+      if (misto && s.v2) pai = pontas.get(s.v2) ?? tronco;
+      if (s.ex && escolhas.has(s.ex)) pai = escolhas.get(s.ex);
+      // Uma combinação avançada sem antecessor local parte de uma técnica
+      // comum da camada anterior, escolhida pelo efeito e pela ideia do nó.
+      if (misto && !escolhas.has(s.ex) && pai === entrada && s.cam > 2) {
+        const candidatas = bases.filter(base => base.cam === s.cam - 1);
+        candidatas.sort((a, b) => proximidade(s, b) - proximidade(s, a));
+        pai = candidatas[0] ?? pai;
+      }
+      if (!misto && bifurca && grupo.length === 10) {
+        if (i === 7) pai = grupo[3];
+        if (i === 9 && !pontaB) pai = grupo[6];
+      }
+      ligar(s, pai);
+      const anteriores = pai && profundidade.has(pai) ? profundidade.get(pai) + 1 : 0;
+      profundidade.set(s, anteriores);
+      if (s.nb > anteriores) {
+        if (anteriores) s.nb = anteriores;
+        else delete s.nb;
+      }
+      if (s.ex) escolhas.set(s.ex, pai);
+      else if (s.v2) pontas.set(s.v2, s);
+      else tronco = s;
+    });
+  }
+  for (const [el, t] of Object.entries(tree)) {
+    if (el === 'armas') continue;
+    const raiz = t.branches[0][0];
+    const bases = t.branches.filter(b => !b.de && b.every(s => !s.v2)).flat()
+      .filter(s => !s.pre && !s.req && !s.ex && !s.aw && !s.limit);
+    t.branches.forEach((b, i) => {
+      if (b.de) return;
+      if (el === 'marcial' && !i) {
+        caminho(b, null, false);
+        return;
+      }
+      const entrada = i ? raiz : centro;
+      const grupos = el !== 'marcial' && b.every(s => s.req)
+        ? Object.values(b.reduce((g, s) => { (g[s.req] ??= []).push(s); return g; }, {})) : [b];
+      for (const grupo of grupos) caminho(grupo, entrada, el !== 'marcial' && grupos.length === 1, i > 0 && i % 2 === 0, bases);
+    });
+  }
+  for (const b of Object.values(tree.armas.prim)) caminho(b, null, false);
+  for (const [tipo, ramos] of Object.entries(tree.armas.tipos)) {
+    const categoria = Object.keys(globalThis.ARMAS.CAT).find(k => globalThis.ARMAS.CAT[k].includes(tipo));
+    const entrada = tree.armas.prim[categoria]?.[0];
+    ramos.forEach((b, i) => caminho(b, entrada, i === 0));
+  }
+  for (const t of Object.values(tree)) for (const b of t.branches) {
+    if (b.de) for (const s of b) ligar(s, porNome.get(s.pre));
+  }
+  // Uma melhoria por técnica-base, compartilhada pelas saídas que passam pelo mesmo treino.
+  // Os refinos publicados vêm primeiro para que os seus IDs continuem estáveis nas fichas.
+  const marcos = new Set([...porNome.values()].filter(s => [4, 7, 10].includes(s.cam) && !KIT.has(s.n)));
+  const intervalos = Object.keys(VINC).flatMap(el => {
+    const tecnicas = tree[el].branches.flat();
+    const nomes = new Set(tecnicas.map(s => s.n));
+    return tecnicas.filter(s => !marcos.has(s) && nomes.has(PAIS.get(s.n)));
+  });
+  for (const s of [...marcos, ...intervalos]) {
+    const pai = porNome.get(PAIS.get(s.n));
+    if (!pai) continue;
+    let r = REFINOS.get(pai.n);
+    if (!r) {
+      r = { n: 'Aperfeiçoamento de ' + pai.n, k: 'passive', refino: true, pre: pai.n,
+        cam: pai.cam, xp: XP[pai.cam], a: pai.a, v2: pai.v2, cat: pai.cat };
+      if (['dmg', 'mental', 'heal'].includes(pai.k) && pai.p > 0) {
+        const poder = pai.hits > 1 || pai.area ? 1 : 2;
+        Object.assign(r, { amp: pai.n, up: { p: poder }, d: `Aumenta o poder de ${pai.n} em ${poder}.` });
+      } else if (pai.k !== 'passive' && pai.c > 1) {
+        Object.assign(r, { amp: pai.n, up: { c: -1 }, d: `Reduz em 1 o custo de usar ${pai.n}.` });
+      } else {
+        const reserva = pai.res === 'san' || pai.pas === 'sanMax' ? 'sanMax' : pai.pas === 'hpMax' ? 'hpMax' : 'auraMax';
+        Object.assign(r, { pas: reserva, p: 2, d: `O treino de ${pai.n} aumenta em 2 a reserva de ${{ hpMax: 'PV', auraMax: 'Aura', sanMax: 'Sanidade' }[reserva]}.` });
+      }
+      REFINOS.set(pai.n, r);
+      ligar(r, pai);
+    }
+    PAIS.set(s.n, r.n);
+    const outros = (s.pre || '').split('|').filter(nome => nome && nome !== pai.n);
+    s.pre = [...outros, r.n].join('|');
+  }
+  // Completa somente as rotas curtas, antes da técnica final. Pontas irmãs
+  // que partem do mesmo aperfeiçoamento compartilham os graus de treino.
+  const temFilhos = new Set(PAIS.values());
+  for (const el of Object.keys(VINC)) {
+    const setor = tree[el], raiz = setor.branches[0][0].n;
+    for (const ponta of setor.branches.flat()) {
+      if (temFilhos.has(ponta.n)) continue;
+      let tamanho = 1;
+      const visitados = new Set();
+      for (let n = ponta.n; n !== raiz; n = PAIS.get(n)) {
+        if (!n || visitados.has(n)) throw new Error('Caminho inválido em ' + ponta.n);
+        visitados.add(n);
+        tamanho++;
+      }
+      if (tamanho >= 9) continue;
+      const entrada = PAIS.get(ponta.n), base = porNome.get(PAIS.get(entrada));
+      let anterior = porNome.get(entrada);
+      for (let grau = 1; grau <= 9 - tamanho; grau++) {
+        let treino = REFINOS.get(anterior.n);
+        if (!treino) {
+          const cam = Math.min(ponta.cam, anterior.cam + 1);
+          treino = { n: `Treino de ${base.n} · ${grau}`, k: 'passive', refino: true, grau,
+            pre: anterior.n, cam, xp: XP[cam], a: base.a, cat: base.cat, v2: base.v2 };
+          if (grau % 2 && base.p > 0 && ['dmg', 'mental', 'heal'].includes(base.k)) {
+            Object.assign(treino, { amp: base.n, up: { p: 1 }, d: `Aumenta em 1 o poder de ${base.n}.` });
+          } else {
+            const san = base.res === 'san' || base.pas === 'sanMax';
+            Object.assign(treino, { pas: san ? 'sanMax' : 'auraMax', p: 2, d: `O treino de ${base.n} aumenta em 2 a reserva de ${san ? 'Sanidade' : 'Aura'}.` });
+          }
+          // Leva 11: no lugar do treino genérico entra a técnica desenhada para aquele passo da corrente (arvore/leva11.js)
+          const dz = MEIO[base.n]?.[grau - 1];
+          if (dz) {
+            for (const k of ['amp', 'up', 'pas', 'p']) delete treino[k];
+            Object.assign(treino, dz, { pre: anterior.n, cam, a: dz.a || base.a, refino: true, grau });
+            if (treino.k !== 'passive' && treino.c == null) treino.c = 0;
+            aplicar(treino, cam, 0); delete treino._xp0;
+          }
+          REFINOS.set(anterior.n, treino);
+          ligar(treino, anterior);
+        }
+        anterior = treino;
+      }
+      PAIS.set(ponta.n, anterior.n);
+      ponta.pre = ponta.pre.split('|').map(n => n === entrada ? anterior.n : n).join('|');
+    }
+  }
+  const prontos = new Set(), calculando = new Set();
+  function precificar(s) {
+    if (prontos.has(s)) return;
+    if (calculando.has(s)) throw new Error('Ciclo na progressão de ' + s.n);
+    calculando.add(s);
+    const requisitos = String(s.pre || '').split('|').filter(Boolean);
+    if (!raizesAbertas.has(s) && PAIS.has(s.n)) requisitos.push(PAIS.get(s.n));
+    for (const nome of new Set(requisitos)) {
+      const pai = porNome.get(nome);
+      if (!pai) throw new Error('Pré-requisito ausente: ' + nome);
+      precificar(pai);
+      encarecer(s, pai);
+    }
+    calculando.delete(s);
+    prontos.add(s);
+  }
+  for (const s of porNome.values()) precificar(s);
 }

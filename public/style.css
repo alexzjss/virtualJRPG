@@ -1584,6 +1584,39 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .p3d .bb.end-foge{--z:900!important;transition:transform 1.1s ease-in!important}
 @media(prefers-reduced-motion:reduce){.p3d .drift,.p3d .pt,.p3d .aura i,.p3d .bb .bbi,.p3d .bb img{animation:none!important}}
 
+/* Coreografia por família: pequenas mudanças de peso e intenção no recorte, sem deslocá-lo do mundo 3D. */
+.p3d .bb[class*="act-"] img{transform-origin:50% 88%;animation-duration:760ms;animation-timing-function:cubic-bezier(.2,.75,.25,1);animation-fill-mode:both}
+.p3d .bb.act-slash img{animation-name:p3act-slash}
+.p3d .bb.act-smash img{animation-name:p3act-smash}
+.p3d .bb.act-pierce img{animation-name:p3act-pierce}
+.p3d .bb.act-dash img{animation-name:p3act-dash}
+.p3d .bb.act-projectile img{animation-name:p3act-projectile}
+.p3d .bb.act-beam img{animation-name:p3act-beam}
+.p3d .bb.act-area img{animation-name:p3act-area}
+.p3d .bb.act-rain img{animation-name:p3act-rain}
+.p3d .bb.act-ritual img{animation-name:p3act-ritual}
+.p3d .bb.act-summon img{animation-name:p3act-summon}
+.p3d .bb.act-psychic img{animation-name:p3act-psychic}
+.p3d .bb.act-musical img{animation-name:p3act-musical}
+.p3d .bb.act-heal img{animation-name:p3act-heal}
+.p3d .bb.act-barrier img{animation-name:p3act-barrier}
+.p3d .bb.act-form img{animation-name:p3act-form}
+@keyframes p3act-slash{0%,100%{translate:0 0;scale:1}22%{translate:calc(var(--act-seed,1) * -2%) 1%;scale:.98 1.02}48%{translate:calc(var(--act-seed,1) * 5%) -2%;scale:1.04 .97}68%{translate:calc(var(--act-seed,1) * -1%) 0;scale:1}}
+@keyframes p3act-smash{0%,100%{translate:0 0;scale:1}24%{translate:0 3%;scale:1.03 .94}48%{translate:0 -5%;scale:.96 1.07}67%{translate:0 1%;scale:1.04 .98}}
+@keyframes p3act-pierce{0%,100%{translate:0 0;scale:1}25%{translate:calc(var(--act-seed,1) * -3%) 1%;scale:.97 1.02}52%{translate:calc(var(--act-seed,1) * 6%) -1%;scale:1.04 .98}70%{translate:calc(var(--act-seed,1) * -1%) 0}}
+@keyframes p3act-dash{0%,100%{translate:0 0;scale:1}20%{translate:calc(var(--act-seed,1) * -4%) 1%;scale:.94 1.04}52%{translate:calc(var(--act-seed,1) * 5%) -1%;scale:1.06 .97}70%{translate:0 0;scale:1}}
+@keyframes p3act-projectile{0%,100%{translate:0 0;scale:1}25%{translate:calc(var(--act-seed,1) * -2%) 0;scale:.98 1.02}50%{translate:calc(var(--act-seed,1) * 2%) -2%;scale:1.02 .99}72%{translate:0 0}}
+@keyframes p3act-beam{0%,100%{translate:0 0;scale:1}18%{translate:0 2%;scale:.98 1.03}42%{translate:0 -2%;scale:1.03 .98}72%{translate:0 0}}
+@keyframes p3act-area{0%,100%{translate:0 0;scale:1}25%{translate:0 3%;scale:1.04 .94}48%{translate:0 -2%;scale:.98 1.04}68%{translate:0 0}}
+@keyframes p3act-rain{0%,100%{translate:0 0;scale:1}20%{translate:0 -2%;scale:.98 1.03}52%{translate:0 2%;scale:1.03 .98}72%{translate:0 0}}
+@keyframes p3act-ritual{0%,100%{translate:0 0;scale:1}28%{translate:0 1%;scale:.96 1.04}55%{translate:0 -2%;scale:1.04 .98}78%{translate:0 0}}
+@keyframes p3act-summon{0%,100%{translate:0 0;scale:1}24%{translate:0 2%;scale:1.03 .96}56%{translate:0 -3%;scale:.98 1.05}76%{translate:0 0}}
+@keyframes p3act-psychic{0%,100%{translate:0 0;scale:1}30%{translate:0 -2%;scale:1.02 .98}55%{translate:0 1%;scale:.98 1.03}76%{translate:0 0}}
+@keyframes p3act-musical{0%,100%{translate:0 0;scale:1}25%{translate:0 -2%;scale:1.02 .98}48%{translate:0 1%;scale:.98 1.03}68%{translate:0 -1%;scale:1.01}}
+@keyframes p3act-heal{0%,100%{translate:0 0;scale:1}32%{translate:0 -3%;scale:.98 1.04}58%{translate:0 1%;scale:1.03 .98}}
+@keyframes p3act-barrier{0%,100%{translate:0 0;scale:1}22%{translate:calc(var(--act-seed,1) * -2%) 2%;scale:1.03 .97}48%{translate:calc(var(--act-seed,1) * 1%) -1%;scale:.98 1.03}72%{translate:0 0}}
+@keyframes p3act-form{0%,100%{translate:0 0;scale:1}28%{translate:0 2%;scale:.94 1.04}58%{translate:0 -3%;scale:1.07 .96}82%{translate:0 0;scale:1}}
+@media(prefers-reduced-motion:reduce){.p3d .bb[class*="act-"] img{animation:none!important}}
 /* faixas: corte de turno, chefe, fim, retrato do inimigo e replay */
 .fxl .turncut{position:fixed;left:0;right:0;top:34%;height:120px;display:flex;align-items:center;gap:18px;padding-left:12vw;background:linear-gradient(90deg,var(--c,#e4002b),#000c 70%,#0000);clip-path:polygon(0 18%,100% 0,100% 82%,0 100%);color:#fff;font:900 italic 44px/1 Barlow,sans-serif;text-shadow:0 3px 0 #000;pointer-events:none;animation:p3cut .9s cubic-bezier(.2,.9,.3,1) both}
 .fxl .turncut.me{font-size:56px}@keyframes p3cut{0%{translate:-100% 0}14%{translate:0 0}75%{translate:0 0;opacity:1}100%{translate:60% 0;opacity:0}}

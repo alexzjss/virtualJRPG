@@ -3,9 +3,10 @@
 (g => {
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   // ----- orçamento e motor -----
-  const BUDGET = { high: { particles: 6000, bloom: .5, post: true }, medium: { particles: 2500, bloom: .25, post: true }, low: { particles: 0, bloom: 0, post: false } };
+  const BUDGET = { high: { particles: 6000, bloom: .5, post: true }, medium: { particles: 2500, bloom: .25, post: true }, low: { particles: 600, bloom: 0, post: false } };
   const budget = level => ({ ...(BUDGET[level] || BUDGET.medium) });
-  const engineFor = ({ style = 'luz', webgl2 = false, level = 'medium', lost = false } = {}) => style === 'classico' || !webgl2 || level === 'low' || lost ? 'classico' : 'luz';
+  // sem WebGL2 (ou com o contexto perdido) fica o desenho mínimo: brilho DOM no alvo e o número; o nível só mexe no orçamento
+  const engineFor = ({ webgl2 = false, lost = false } = {}) => !webgl2 || lost ? 'minimo' : 'luz';
   // ----- tempos -----
   const BASE = { none: 2500, line: 3000, ult: 5000 };
   const duration = (profile, { speed = 1, reduced = false, sig = 'none' } = {}) => reduced ? 400 : Math.round((BASE[sig] || BASE.none) / clamp(+speed || 1, .5, 2));

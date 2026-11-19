@@ -114,9 +114,9 @@
       for (let i = 0; i < Math.round(4 * qLevel()); i++) { const u = (t * 2.2 + i / 4) % 1; if (u < grow) motif(P, pathPoint(a, b, u, 0, 1), s * .8, ang(a, b), t, i, fade); }
       impact(P, b, fb, s, clamp((t - P.impact * (CH + (1 - CH) * .35)) / (1 - P.impact * .55)), 5);
     } else if (fam === 'slash') {
-      const hits = Math.max(1, Math.min(3, P.hits)), base = rnd(P.seed) * 1.2 - .6;
-      for (let h = 0; h < hits; h++) { const z = clamp((t - (P.impact - .2 + h * .1)) / .22); if (z <= 0 || z >= 1) continue; const R = (55 + P.tier * 10) * s, a0 = base + h * 1.1 + Math.PI * .9, sw = Math.PI * 1.1, a1 = a0 + sw * Math.min(1, z * 1.6), a2 = a0 + sw * Math.max(0, z * 1.6 - .6), m = (a1 + a2) / 2;
-        ctx.beginPath(); ctx.arc(b.x, b.y, R, a2, a1); ctx.arc(b.x + Math.cos(m) * 12 * s, b.y + Math.sin(m) * 12 * s, R * .82, a1, a2, true); ctx.closePath(); paint(P.palette[1], 1 - z * .5); ctx.beginPath(); ctx.arc(b.x, b.y, R * .96, a2, a1); stroke(P.palette[2], 2.5 * s, 1 - z); }
+      const hits = Math.max(1, Math.min(5, P.hits)), base = rnd(P.seed) * 1.2 - .6;
+      for (let h = 0; h < hits; h++) { const phase = P.impact - .24 + h * Math.min(.1, .34 / hits), z = clamp((t - phase) / .24); if (z <= 0 || z >= 1) continue; const R = (52 + P.tier * 11 + h * 3) * s, sideH = h % 2 ? -1 : 1, a0 = base + sideH * h * .32 + Math.PI * (.9 + sideH * .12), sw = Math.PI * (1.02 + rnd(P.seed + h) * .2), a1 = a0 + sideH * sw * Math.min(1, z * 1.7), a2 = a0 + sideH * sw * Math.max(0, z * 1.7 - .62), m = (a1 + a2) / 2;
+        ctx.beginPath(); ctx.arc(b.x, b.y, R, a2, a1, sideH < 0); ctx.arc(b.x + Math.cos(m) * 10 * s, b.y + Math.sin(m) * 10 * s, R * .8, a1, a2, sideH > 0); ctx.closePath(); paint(P.palette[1], .92 - z * .42); ctx.beginPath(); ctx.arc(b.x, b.y, R * .96, a2, a1, sideH < 0); stroke(P.palette[2], 2.5 * s, 1 - z); }
       impact(P, b, fb, s, k, 6);
     } else if (fam === 'pierce') {
       if (pre || k < .3) { const tip = pathPoint(a, b, Math.min(1, ease * 1.05), 0, 1), tail = pathPoint(a, b, clamp(ease - .45), 0, 1), an = ang(a, b), w = (5 + P.tier * 2) * s; poly([tip, { x: tail.x - Math.sin(an) * w, y: tail.y + Math.cos(an) * w }, { x: tail.x + Math.sin(an) * w, y: tail.y - Math.cos(an) * w }]); paint(P.palette[1], pre ? 1 : 1 - k / .3); motif(P, tip, s, an, t); }
@@ -127,12 +127,14 @@
       impact(P, b, fb, s, k, 9); if (k > 0 && k < .5) { ell(fb, 90 * s * k * 2, 24 * s * k * 2); stroke(P.palette[2], 4, 1 - k * 2); }
     } else if (fam === 'area' || fam === 'rain') {
       const z = clamp(t / P.impact), fade = t < .8 ? 1 : (1 - t) / .2; groundRunes(P, fb, s, t, 70 + z * 30, fade * .9);
+      if (fam === 'area') for (let j = 0; j < 3; j++) { const u = clamp((t - j * .13) / .62); if (u <= 0 || u >= 1) continue; ell(fb, (24 + u * (95 + P.tier * 14)) * s, (8 + u * 24) * s); stroke(P.palette[j ? 1 : 2], (3 - u * 1.5) * s, (1 - u) * fade); }
       for (let i = 0; i < Math.round(8 * qLevel()); i++) { const off = (rnd(P.seed + i) - .5) * 150 * s, d = rnd(i * 7 + P.seed) * .3;
         if (fam === 'rain') { const u = clamp((t - d) / P.impact); if (u > 0 && u < 1) motif(P, { x: fb.x + off + (1 - u) * 30 * s, y: fb.y - (1 - u) * 260 * s }, s * 1.1, Math.PI * .58, t, i); }
         else { const u = clamp((t - P.impact * .5 - d * .5) / .4); if (u > 0 && u < 1) motif(P, { x: fb.x + off, y: fb.y - Math.sin(u * Math.PI) * 70 * s }, s * 1.1, -Math.PI / 2, t, i, 1 - u * .5); } }
       impact(P, b, fb, s, k, 6);
     } else if (fam === 'ritual' || fam === 'summon') {
       const z = clamp(t / P.impact), fade = t < .85 ? 1 : (1 - t) / .15; groundRunes(P, fa, sa, t, 40 + z * 25, fade * (pre ? 1 : .5)); if (!pre || z > .6) groundRunes(P, fb, s, t, 60, fade);
+      if (fam === 'ritual' && z > .25) { const u = clamp((z - .25) / .65), count = 4 + P.tier; for (let i = 0; i < count; i++) { const an = i * TAU / count + P.seed % 7, q = { x: fb.x + Math.cos(an) * 48 * s, y: fb.y + Math.sin(an) * 14 * s }; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x, q.y - u * (70 + rnd(P.seed + i) * 100) * s); stroke(P.palette[i % 2 ? 1 : 2], 2.5 * s, fade * (1 - u * .5)); } }
       if (fam === 'summon' && z > .5) motif(P, { x: fb.x, y: fb.y - clamp((t - P.impact * .7) / .3) * 90 * s }, s * 2.4, -Math.PI / 2, t, 0, fade);
       impact(P, b, fb, s, k, 6);
     } else if (fam === 'heal' || fam === 'barrier' || fam === 'form') {
@@ -163,10 +165,10 @@
     if (!effects.length && !extras.length && now - lastP < 33) { raf = requestAnimationFrame(frame); return; } // só os anéis persistentes: 30 fps bastam
     lastP = now; resize(); if (last) { const inst = 1000 / Math.max(1, now - last); fps = fps * .94 + inst * .06; if (defaults.quality === 'auto' && (effects.length || extras.length)) { const was = autoLow; autoLow = fps < 43 ? true : fps > 56 ? false : autoLow; if (was !== autoLow) qEvt(); } } last = now;
     const vt = clockNow(); ctx.clearRect(0, 0, W, H); drawPersistent(vt);
-    effects = effects.filter(e => { drawOne(e, vt); return vt < e.start + e.profile.duration; });
-    extras = extras.filter(x => { const k = clamp((vt - x.start) / x.dur); x.draw(k); return k < 1; });
     // a câmera do palco anda durante o efeito: origem e alvo são relidos a cada quadro (o projétil acompanha a tela)
     for (const e of effects) { const ar = e.aid && rect(e.aid), tr = e.tid && rect(e.tid); if (ar) { e.from = point(e.aid, ar, e.profile.origin); e.footA = footPoint(ar); e.sa = scaleOf(ar); } if (tr) { e.to = targetPoint(tr); e.footB = footPoint(tr); e.sb = scaleOf(tr); } }
+    effects = effects.filter(e => { drawOne(e, vt); return vt < e.start + e.profile.duration; });
+    extras = extras.filter(x => { const k = clamp((vt - x.start) / x.dur); x.draw(k); return k < 1; });
     if (effects.length || persist.length || extras.length) raf = requestAnimationFrame(frame);
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };

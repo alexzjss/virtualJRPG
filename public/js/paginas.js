@@ -10,7 +10,7 @@ let skOnly = false; // só o que posso aprender
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 // aba da gaveta e gaveta aberta; skMount = o que a mandala desenha na próxima renderização; skSeen = skills já vistas por personagem (para acender as novas)
 let skTab = lsGet('vj.skTab', 'no'), skDrawer = true, skMount = null; const skSeen = {};
-const slotted = s => s && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
+const slotted = s => s && !s.refino && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
 const FUNC = { dmg: ['Dano', s => ['dmg', 'mental'].includes(s.kind)], ctrl: ['Controle', s => s.kind !== 'passive' && (RULES.CTRL.includes(s.st) || (s.fx || []).some(f => (f.t === 'st' && RULES.CTRL.includes(f.k)) || f.t === 'push' || f.t === 'seal'))],
   supp: ['Suporte', s => s.kind === 'heal' || (s.kind === 'util' && !(s.fx || []).some(f => f.t === 'shield' || f.t === 'guard'))], tank: ['Defesa', s => (s.fx || []).some(f => ['shield', 'guard', 'cleanse'].includes(f.t) || (f.t === 'st' && ['taunt', 'defUp', 'reflect', 'counter', 'evade'].includes(f.k))) || s.mod?.def > 0], pas: ['Passiva', s => s.kind === 'passive'], form: ['Forma', s => s.kind === 'form'] };
 let skAdj = null, skAdjS = null; const skDij = new WeakMap(); // ligações da árvore em índices, para achar o caminho mais barato
@@ -104,7 +104,7 @@ function skTip(id, x, y, c) {
     : `<small>${PATRON[s.el] || ''} · ${KIND[s.kind] || s.kind}${s.limit ? ' · Limite' : ''}</small><b>${esc(s.name)}</b><small>${esc(desc(s))}</small><em>${has ? 'Aprendida' : RULES.xpCost(c, s) + ' XP'}</em>`;
 }
 
-// ===== imagens de batalha (Ficha e bestiário): frente, costas (só heróis) e retrato, com enquadre e tamanho na cena =====
+// ===== imagens de batalha (Ficha e bestiário): frente, costas e retrato, com enquadre e tamanho na cena =====
 // O quadro .imgk é o editor: arrastar move a figura, a roda aproxima, soltar envia {t:'set', f:'imgK', v:{k, x, y, z}} (eventos.js)
 let imgkLive = null; // enquadre em edição {id, k, x, y, z}: o redesenho no meio do arraste não volta ao valor do servidor
 const IMGB = { f: ['imgF', 'Frente'], b: ['imgB', 'Costas'], p: ['imgP', 'Retrato'] };
@@ -119,7 +119,7 @@ function imgBattle(c) {
   const sz = Math.min(2.5, Math.max(.5, +c.imgS || 1));
   return `<div class="card wide imgb"><h3>Imagens de batalha <small>como aparece no palco 3D do computador</small></h3>
     <p class="hint">Use PNG com fundo transparente para o melhor resultado.</p>
-    <div class="imgq">${(c.enemy ? ['f', 'p'] : ['f', 'b', 'p']).map(quadro).join('')}</div>
+    <div class="imgq">${['f', 'b', 'p'].map(quadro).join('')}</div>
     <label class="imgs">Tamanho na cena <input type="range" min="0.5" max="2.5" step="0.1" data-id="${c.id}" data-f="imgS" value="${sz}"><output>${sz.toFixed(1).replace('.', ',')}×</output></label></div>`;
 }
 function persPage(c) {

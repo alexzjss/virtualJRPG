@@ -3,6 +3,7 @@
 // FORTES vão para o fim do ramo; as de JA (já aprendidas por alguém) vão para o começo, puxando junto o `pre` delas.
 // Cada técnica de JA ganha uma vizinha nova (VIZ), posta logo depois dela no mesmo ramo; depois das fortes a vizinha é mais forte ainda.
 import { ATUAIS } from './atuais.js';
+import { ANCORAS } from './ancoras.js';
 const D = (n, d, xp, a, p, c, x = {}) => ({ n, k: 'dmg', d, xp, a, p, c, ...x });
 const U = (n, d, xp, a, c, x = {}) => ({ n, k: 'util', d, xp, a, c, ...x });
 const P = (n, d, xp, x = {}) => ({ n, k: 'passive', d, xp, ...x });
@@ -69,7 +70,7 @@ export const VIZ = {
 };
 
 export function posicionar(TREE) {
-  const forte = new Set(FORTES), ja = new Set([...ATUAIS, ...Object.keys(VIZ)]), novas = [];
+  const forte = new Set(FORTES), ja = new Set([...ATUAIS, ...ANCORAS, ...Object.keys(VIZ)]), novas = [];
   const M = TREE.marcial.branches; // o ramo 0 do Marcial é o centro fixo (1 nó + 8 em volta): a vizinha do Golpe Pesado vai para os treinos, postos junto ao centro
   M[1].unshift(VIZ['Golpe Pesado']);
   for (const t of Object.values(TREE)) for (const b of t.branches) {

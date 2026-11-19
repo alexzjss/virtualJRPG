@@ -7,7 +7,7 @@
     aura: ['#15bfff', '#7fe7ff', '#ffffff'], oculto: ['#6820a5', '#db35ff', '#151020'], fis: ['#d7d9df', '#ffffff', '#ffc93c']
   };
   const ATTRS = { FOR: '#ff493d', CON: '#e39b46', AGI: '#45e6b3', DES: '#4fb6ff', INT: '#b46cff', SAB: '#ffe36c', CAR: '#ff72b6', SOR: '#ffffff' };
-  const FAMILIES = ['projectile', 'beam', 'slash', 'smash', 'pierce', 'dash', 'area', 'rain', 'ritual', 'summon', 'psychic', 'musical', 'heal', 'barrier', 'form'];
+  const FAMILIES = ['projectile', 'beam', 'slash', 'smash', 'pierce', 'dash', 'area', 'rain', 'ritual', 'summon', 'psychic', 'musical', 'heal', 'barrier', 'form'];
   // fração da duração em que o golpe acerta (o motor antigo e o luminoso usam a mesma)
   const IMPACT = Object.fromEntries(FAMILIES.map(f => [f, f === 'rain' ? .62 : f === 'ritual' || f === 'summon' ? .7 : .58]));
   const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
@@ -16,11 +16,17 @@
   function familyOf(s, f = {}) {
     if (FAMILIES.includes(s?.anim)) return s.anim;
     if (f.passive) return 'form';
-    if (f.heal || s?.kind === 'heal') return s?.fx?.some(x => x.t === 'shield') || has(s, /escudo|barreira|muralha|armadura|protec/) ? 'barrier' : 'heal';
+    const fxHas = (...types) => (s?.fx || []).some(x => types.includes(x.t) || x.t === 'st' && types.includes(x.k));
+    if (f.heal || s?.kind === 'heal') return fxHas('shield', 'guard', 'reflect') || has(s, /escudo|barreira|muralha|armadura|protec/) ? 'barrier' : 'heal';
     if (s?.kind === 'form' || s?.form || s?.aw) return 'form';
     if (s?.summon || has(s, /invoca|legiao|familiar|servo|clone/)) return 'summon';
     if (s?.kind === 'mental' || has(s, /mente|medo|pesadelo|ilusao|hipno|psiqu/)) return 'psychic';
     if (s?.req === 'instrumento' || has(s, /musica|cancao|nota|acorde|tambor|violino|flauta/)) return 'musical';
+    if (s?.kind === 'util') {
+      if (fxHas('shield', 'guard', 'reflect', 'counter') || has(s, /defesa|guarda|aparar|protec|barreira|escudo/)) return 'barrier';
+      if (has(s, /teleport|passo|investida|avanco|avanço/)) return 'dash';
+      return 'form';
+    }
     if (s?.dom || s?.circ || has(s, /ritual|selo|dominio|circulo|oracao|maldicao/)) return 'ritual';
     if (s?.area && has(s, /chuva|meteoro|cair|ceu|tempestade/)) return 'rain';
     if (s?.area) return 'area';

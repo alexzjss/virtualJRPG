@@ -53,7 +53,7 @@ addEventListener('unhandledrejection', ev => onNeed(ev.reason, ev, false));
 const DANGER = { edDel: 'Excluir esta linha do editor? Quem tinha essa skill ou item fica sem.', ctDel: 'Apagar este contrato de caça?' };
 document.addEventListener('click', e => {
   if (!e.isTrusted || e.target.closest?.('.dlg-bg')) return;
-  const el = e.target.closest?.('[data-a],[data-x]');
+  const el = e.target.closest?.('[data-a],[data-x],[data-mz]');
   clickCtx = el ? { attrs: [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => [a.name, a.value]), shift: e.shiftKey, answers: [] } : null;
   if (el && DANGER[el.dataset.a]) { e.stopPropagation(); e.preventDefault(); const c = clickCtx; dialog({ title: 'Tem certeza?', text: DANGER[el.dataset.a], ok: 'Excluir', danger: true }).then(v => v && redo(c)); }
 }, true);

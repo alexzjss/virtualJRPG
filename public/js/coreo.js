@@ -162,6 +162,7 @@ function strikeFx(acts, f0, a, o = {}) {
   if (f0.dom) { if (engine) ANIMFX.play({ actorId: f0.a, targetIds: [f0.id], skill: sk, fx: f0 }); setTimeout(done, 1200); return fin; }
   // peso do golpe (3D): hitstop, tremida na direção do golpe, recuo e luz; parry solta faíscas, esquiva deixa fantasmas; o golpe final desacelera
   const p3 = P3(), sumD = {}; acts.forEach(e => { if (e.fx.dmg) sumD[e.fx.id] = (sumD[e.fx.id] || 0) + e.fx.dmg; });
+  if (p3 && typeof PVIDA !== 'undefined' && engine) { const ap = ANIMFX.profile(sk, f0); PVIDA.action(f0.a, ap.family, ap.tier, ap.seed); }
   const pctOf = f => f.dmg ? (dropPct.get(f.id) || 0) * f.dmg / (sumD[f.id] || f.dmg) : 0, dirOf = (x, y) => { const A = PALCO3D.posOf(x), B = PALCO3D.posOf(y); return A && B ? Math.sign(B.x - A.x) || 1 : 1; };
   const foeLeft = id => Object.values(S.chars).some(c => c.enemy && c.id !== id && c.id in S.battle.ticks && c.hp > 0);
   const hit1 = (e, i, j, n, G) => {
@@ -173,7 +174,9 @@ function strikeFx(acts, f0, a, o = {}) {
     if (f.dmg) { lastEl.set(f.id, f.el);
       if (p3) { PALCO3D.recoil(f.id, f0.a, pct, f.crit); if (typeof CENA !== 'undefined') CENA.hitstop(PFX.hitstopMs(pct, f.crit, koNow)); PALCO3D.quake(PFX.shakeAmp(pct, f.crit), dirOf(f0.a, f.id)); PALCO3D.light(f.id, ELC[f.el] || '#fff'); }
       else if (stage3d() && typeof PALCO3D !== 'undefined') PALCO3D.shake(f.id);
-      pulse(el, 'hit', 600); if (!engine) fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`); }
+      pulse(el, 'hit', 600); if (!engine) fxAdd('slash', '', 420, fxPos(el, .38) + `;--fx:${ELC[f.el] || '#fff'}`);
+      const absorbed = /Escudo absorve (\d+)/i.exec(e.text)?.[1];
+      if (absorbed) fxAdd('shield-hit', `ESCUDO −${absorbed}`, 1000, fxPos(el, .55) + ';--fx:#70d8ff'); }
     else if (f.heal) pulse(el, 'mendfx');
     else if (f.miss) { pulse(el, 'dodge', 600);
       if (p3 && f.par) { const ra = PALCO3D.rectOf(f.a || f0.a), rb = PALCO3D.rectOf(f.id); if (ra && rb && engine && ANIMFX.sparks) ANIMFX.sparks((ra.left + ra.right + rb.left + rb.right) / 4, (ra.top + ra.bottom + rb.top + rb.bottom) / 4 - 20, '#ffd36a');
@@ -196,7 +199,9 @@ function strikeFx(acts, f0, a, o = {}) {
   const animate = () => {
     if (!engine) return void hits(220);
     const run = ANIMFX.play({ actorId: f0.a, targetIds: acts.map(e => e.fx.id), skill: sk, fx: f0 });
-    run.impact.then(() => hits(0));
+    let hitShown = false; const showHits = () => { if (hitShown) return; hitShown = true; hits(0); };
+    const fallback = setTimeout(showHits, Math.max(250, run.profile.duration * run.profile.impact + 350));
+    run.impact.then(() => { clearTimeout(fallback); showHits(); }).catch(() => { clearTimeout(fallback); showHits(); });
     if (cam && !go && PALCO3D.follow) PALCO3D.follow(f0.a, [...new Set(acts.map(e => e.fx.id))], Math.round(run.profile.duration * run.profile.impact)); // à distância: a câmera viaja com o efeito até o alvo
     if (cam) run.done.then(() => PALCO3D.hold(acts.length * 90 + 650)); // os números nascem antes da câmera seguir para o próximo turno
   };

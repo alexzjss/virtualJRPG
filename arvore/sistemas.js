@@ -83,7 +83,7 @@ const D = {
   hiruko: {
     clima: ['Chuva Radiante', 'Uma chuva suja e brilhante, que queima onde cai.', 'chuva'],
     quebra: ['Mutação Corrosiva', 'Uma mutação que corrói a armadura do alvo até a postura ruir.'],
-    prep: ['Secreção Oleosa', 'Uma secreção escura e viscosa cobre os inimigos e pega fogo ao menor sinal.', 'util', 'st oil 3 foes'],
+    prep: ['Secreção Oleosa', 'Uma secreção escura e viscosa cobre os inimigos e pega fogo ao menor sinal.', 'util', 'st poison 3 foes; st exposed 3 foes'],
     chamado: ['Chamado de Hiruko', 'O deus sem osso abre o corpo do caçador e deixa a vida entrar sem regra.'],
     dom: ['Reator Aberrante', 'O campo vira um reator vivo: os aliados mutam para o ataque e os inimigos adoecem em pé.', 'dur 3; ally atk 15; foe def -15; foe atk -10; tick rad'],
     key: ['Mutação Descontrolada', 'O corpo cresce além do que a mente suporta.', 'atk 25; def 10', 'sanMax -20'],

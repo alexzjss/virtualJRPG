@@ -36,6 +36,15 @@
   const ghosts = (id, dir = 1) => { const u = U(id); if (!u?.img || reduced()) return; u.el.style.setProperty('--gd', dir);
     [.45, .3, .15].forEach((a, i) => { const gh = u.img.cloneNode(); gh.className = 'ghost'; gh.style.opacity = a; gh.style.setProperty('--gi', i + 1); u.inner.appendChild(gh); setTimeout(() => gh.remove(), 520); });
     u.el.classList.remove('esquiva'); void u.el.offsetWidth; u.el.classList.add('esquiva'); setTimeout(() => u.el.classList.remove('esquiva'), 520); };
+  // Cada família ganha uma preparação corporal legível; o recorte inteiro continua preso ao seu ponto no mundo.
+  const action = (id, family, tier = 1, seed = 0) => { const u = U(id); if (!u?.img || reduced()) return;
+    const known = ['projectile', 'beam', 'slash', 'smash', 'pierce', 'dash', 'area', 'rain', 'ritual', 'summon', 'psychic', 'musical', 'heal', 'barrier', 'form'];
+    if (!known.includes(family)) return;
+    u.el.classList.remove(...known.map(k => 'act-' + k));
+    u.el.style.setProperty('--act-tier', Math.max(1, Math.min(3, tier))); u.el.style.setProperty('--act-seed', (seed % 2) ? '-1' : '1');
+    void u.el.offsetWidth; u.el.classList.add('act-' + family); clearTimeout(u.actT);
+    u.actT = setTimeout(() => { u.el.classList.remove('act-' + family); u.el.style.removeProperty('--act-tier'); u.el.style.removeProperty('--act-seed'); }, 860);
+  };
   // anel do QTE deitado no chão do herói: o de fora encolhe até o alvo no instante do golpe
   const qteRing = (id, closeAt) => { const u = U(id); if (!u) return { grade() {}, close() {} };
     u.el.querySelector(':scope > .qring')?.remove();
@@ -53,5 +62,5 @@
   // pose final: vit (pulo e brilho), cai (deitam um a um), foge (correm para a câmera com poeira)
   const pose = (ids, cls, step = 150) => ids.forEach((id, i) => setTimeout(() => { const u = U(id); if (!u) return; u.el.classList.add('end-' + cls);
     if (cls === 'foge') { const p = mk('i', 'puff', u.el); setTimeout(() => p.remove(), 900); } }, reduced() ? 0 : i * step));
-  g.PVIDA = { unit, ghosts, qteRing, inkOut, enter, pose };
+  g.PVIDA = { unit, ghosts, action, qteRing, inkOut, enter, pose };
 })(globalThis);

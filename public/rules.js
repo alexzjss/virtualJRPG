@@ -83,7 +83,10 @@
   const NEN = ['int', 'tra', 'con', 'esp', 'man', 'emi'], NENN = { int: 'Intensificação', tra: 'Transformação', con: 'Conjuração', esp: 'Especialização', man: 'Manipulação', emi: 'Emissão' };
   const nenD = (a, b) => { const d = Math.abs(NEN.indexOf(a) - NEN.indexOf(b)); return Math.min(d, 6 - d); };
   const nenEff = (ch, s) => !s.cat || !ch.nen ? 1 : [1, .8, .6, .4][nenD(ch.nen, s.cat)];
-  const xpCost = (ch, s) => !s.cat || !ch.nen ? s.xp : Math.ceil(s.xp * [1, 1.25, 1.5, 2][nenD(ch.nen, s.cat)] / 5) * 5;
+  const xpCost = (ch, s) => {
+    const preco = !s.cat || !ch.nen ? s.xp : Math.ceil(s.xp * [1, 1.25, 1.5, 2][nenD(ch.nen, s.cat)] / 5) * 5;
+    return Math.max(preco, s.xpMinNen?.[ch.nen] ?? 0);
+  };
   // itens exigidos por técnicas (campo `reqItem` da skill; o item do catálogo traz a(s) tag(s) em `kit`, separadas por espaço): a técnica só sai com um item da tag no inventário
   const KIT = { explosivo: 'Explosivos', armadilha: 'Ferragem de armadilha', medico: 'Material médico' };
   const hasKit = (ch, items, tag) => Object.entries(ch.inv || {}).some(([k, n]) => n > 0 && String(items[k]?.kit || '').split(' ').includes(tag));
@@ -108,6 +111,7 @@
     if (pre.length) return `Precisa aprender antes: ${pre.join(', ')}.`;
     if (s.nb && own.filter(o => o.br === s.br).length < s.nb) return `Precisa de ${s.nb} nós deste ramo (tem ${own.filter(o => o.br === s.br).length}).`;
     if (s.cs && CS[s.cs] && !CS[s.cs][1](ch, sk)) return `Exige ${CS[s.cs][0]}.`;
+    if (!own.length && !s.open && s.cam > 1) return 'Comece por uma técnica de entrada.';
     if (soft) return '';
     const rq = s.rq ? Object.entries(s.rq).filter(([a, v]) => att(ch, a, items) < v) : [];
     if (rq.length) return rq.map(([a, v]) => `Requer ${a} ${v} (você tem ${att(ch, a, items)}).`).join(' ');
@@ -256,7 +260,7 @@
     if (s.on) o.push(`${ON[s.on]}${s.ch && s.ch < 100 ? ` (${s.ch}%)` : ''}: ${fxText(s.fx)}`);
     if (s.mod) o.push(modText(s.mod) + (s.sc ? ' ' + (SCN[s.sc] || (String(s.sc).startsWith('wc:') ? 'com armas de ' + (g.ARMAS?.CAT_N[s.sc.slice(3)] || s.sc.slice(3)).toLowerCase() + ' (básico e técnicas)' : String(s.sc).startsWith('wt:') ? 'com ' + (g.ARMAS?.TIPOS[s.sc.slice(3)]?.n || s.sc.slice(3)).toLowerCase() + ' (básico e técnicas)' : 'com ' + (g.RULES.PATRON[s.sc] || s.sc))) : ''));
     if (s.bon) o.push(Object.entries(s.bon).map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ hpMax: 'HP máx', auraMax: 'Aura máx', sanMax: 'Sanidade máx' })[k] || k}`).join(', '));
-    if (s.amp) o.push(`amplia "${s.amp}": ${[s.up?.p && `+${s.up.p} poder`, s.up?.c && `+${s.up.c} custo`, s.up?.san && `+${s.up.san} Sanidade`, s.up?.area && 'passa a ser em área', s.up?.hits && `${s.up.hits} golpes`, s.up?.fx && fxText(s.up.fx)].filter(Boolean).join(', ')}`);
+    if (s.amp) o.push(`amplia "${s.amp}": ${[s.up?.p && `+${s.up.p} poder`, s.up?.c && `${s.up.c > 0 ? "+" : ""}${s.up.c} custo`, s.up?.san && `+${s.up.san} Sanidade`, s.up?.area && 'passa a ser em área', s.up?.hits && `${s.up.hits} golpes`, s.up?.fx && fxText(s.up.fx)].filter(Boolean).join(', ')}`);
     if (s.cat) o.push(`Aura · ${NENN[s.cat]}`);
     return o.join(' · ');
   }

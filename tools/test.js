@@ -7,7 +7,8 @@ process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: tru
 const { TREE } = await import('../tree.js');
 await import('../public/js/anim-profiles.js'); const AP = globalThis.ANIM_PROFILES;
 const { LEVA4: L4 } = await import('../arvore/leva4.js'), L4N = new Set(Object.values(L4).flat(2).map(o => o.n)); // nós novos da Leva 4
-const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, 0);
+const { REFINOS } = await import('../arvore/camadas.js');
+const TOTAL = Object.values(TREE).reduce((a, v) => a + v.branches.flat().length, REFINOS.size);
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
 // golpe do inimigo escolhido à mão pelo mestre abre a janela de defesa; nos testes antigos ela fecha na hora (H.actWin deixa a janela aberta)
 H.actWin = H.act; H.act = (c, m) => { H.actWin(c, m); if (c.role === 'gm' && S.battle.cmd && S.chars[m.id]?.enemy) H.cmdSkip(gm); };
@@ -70,8 +71,8 @@ test('mandala (navegador): edges sem repetição, só entre visíveis, com o nú
   assert.ok(keys.includes(['g0', 'g1'].sort().join('|'))); assert.ok(E.length >= vis.size - 12);
 });
 test('ligações: ramo de 10 nós segue tronco 1-4, A 5-7, B 8-9 e final', () => {
-  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'kagutsuchi-0'); assert.equal(br.length, 10);
-  const id = i => br[i][0], L = i => br[i][1].ln;
+  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'kagutsuchi-0' && !s.refino); assert.equal(br.length, 10);
+  const id = i => br[i][0], L = i => br[i][1].ln.flatMap(k => S.skills[k].refino ? S.skills[k].ln : [k]);
   assert.ok(L(1).includes(id(0)) && L(2).includes(id(1)) && L(3).includes(id(2)));
   assert.ok(L(4).includes(id(3)) && L(7).includes(id(3)));
   assert.ok(L(5).includes(id(4)) && L(6).includes(id(5)) && L(8).includes(id(7)));
@@ -229,7 +230,7 @@ test('herói caído morre após 3 turnos sem cura; cura interrompe', () => {
   assert.equal(h.dead, true);
 });
 test('passiva aprendida soma bônus permanente e gasta XP', () => {
-  reset(); const h = mk(ana, {}); h.xp = 10; const before = h.hpMax;
+  reset(); const h = mk(ana, {}); h.xp = 15; const before = h.hpMax;
   H.learn(ana, { id: h.id, skill: sk('Vigor') }); derive(h); assert.equal(h.hpMax, before + 10); assert.equal(h.xp, 0);
 });
 test('jogadores não recebem números de inimigos, notas nem sussurros alheios', () => {
@@ -331,7 +332,7 @@ test('requisitos novos: Despertar, nó anterior, nós do ramo, estado e afinidad
   reset(); const n = mk(ana, {}); n.xp = 999; n.skills = [id('Hatsu: Liberar')]; const root = Object.keys(S.skills).find(k => S.skills[k].br === 'aura-2' && Math.max(Math.abs(S.skills[k].gx - S.skills[id('Hatsu: Liberar')].gx), Math.abs(S.skills[k].gy - S.skills[id('Hatsu: Liberar')].gy)) <= 3);
   n.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'aura-0'); const pr = id('Punho Reforçado'); n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === S.skills[pr].br && k !== pr));
   H.learn(ana, { id: n.id, skill: pr }); assert.equal(n.nen, 'int'); // a primeira categoria vira a natureza
-  const em = id('Projétil de Aura'), xp = n.xp; n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === S.skills[em].br && k !== em)); H.learn(ana, { id: n.id, skill: em }); assert.equal(xp - n.xp, 15); // Emissão é vizinha: 10 × 1,25 → 15
+  const em = id('Projétil de Aura'), xp = n.xp; n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === S.skills[em].br && k !== em)); H.learn(ana, { id: n.id, skill: em }); assert.equal(xp - n.xp, 20); // Emissão é vizinha: 15 × 1,25 → 20
   assert.equal(globalThis.RULES.nenEff(n, S.skills[id('Aura de Navalha')]), .8); assert.equal(globalThis.RULES.nenEff(n, S.skills[id('Antena de Aura')]), .6);
   const es = id('Tempo Imperial'); n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === 'aura-5' && k !== es)); H.learn(ana, { id: n.id, skill: es }); assert.ok(!n.skills.includes(es)); // Especialização exige Despertar
 });
@@ -512,7 +513,7 @@ test('laços: conversar no acampamento sobe o laço, que reforça a dupla em bat
   reset(); const c = mk(ana, {}); assert.match(RU.whyNot(c, S.skills[n], S.skills, S.items, n, true), /laço/);
 });
 test('slots de passivas: 4 + 1 a cada 100 XP gasto; só as ativas valem; trocar exige o acampamento', () => {
-  reset(); S.camp = { open: false, acts: {}, with: {} }; const h = mk(ana, {}); const votos = ['Voto de Sangue', 'Voto da Presa', 'Voto do Corpo Fechado', 'Voto do Último Fôlego', 'Seiyaku: Silêncio', 'Seiyaku: Pureza'].map(sk).filter(Boolean);
+  reset(); S.camp = { open: false, acts: {}, with: {} }; const h = mk(ana, {}); const votos = Object.keys(S.skills).filter(k => S.skills[k].vow).sort((a, b) => S.skills[a].xp - S.skills[b].xp).slice(0, 6);
   assert.ok(votos.length >= 6); h.skills = votos.slice(0, 6); handle(gm, { t: 'set', id: h.id, f: 'name', v: h.name });
   assert.equal(h.pslots.length, slotMaxOf(h)); assert.ok(slotMaxOf(h) < 6); assert.ok(!h.pslots.includes(votos[5])); // o último ficou sem slot
   H.pslot(ana, { id: h.id, skill: votos[0] }); assert.ok(h.pslots.includes(votos[0])); // fora do acampamento: nada muda
@@ -763,7 +764,7 @@ test('armas (expansão): distância não sofre contra-ataque, flechas no slot de
   assert.ok(AR.make('sabresg').dupla && AR.make('tonfas').dupla && AR.make('sai').dupla && AR.make('pistolas').dupla);
   // trilhas novas: 10 nós por tipo, com req, postura, reação, maestria e golpe final com requisito 55
   for (const wt of ['pesada', 'foco', 'corrente', 'arremesso', 'arco', 'escudo', 'instrumento']) {
-    const ns = Object.values(S.skills).filter(x => x.br === 'armas-' + wt + '-0'); assert.equal(ns.length, 10, wt); // o ramo clássico do tipo na Árvore de Armas (os outros 2 ramos e as técnicas de comando da Leva 4 não contam)
+    const ns = Object.values(S.skills).filter(x => x.br === 'armas-' + wt + '-0' && !x.refino); assert.equal(ns.length, 10, wt);
     const tri = Object.values(S.skills).filter(x => String(x.br).startsWith('armas-' + wt + '-')); // camadas: os 3 ramos do tipo trocam nós entre si
     assert.ok(tri.some(x => x.kind === 'form') && tri.some(x => x.kind === 'util') && tri.some(x => x.rq && Object.values(x.rq)[0] >= 54), wt);
     assert.ok(ns.some(x => x.kind === 'passive' && x.sc === 'wt:' + wt), wt + ': maestria');
@@ -836,7 +837,7 @@ test('cartas do Canva: nós existem, pré-requisitos e amplificações apontam p
   let n = 0;
   for (const brs of Object.values(CARTAS)) for (const b of brs) for (const o of b) {
     n++; assert.ok(nomes.has(o.n), o.n);
-    for (const k of ['pre', 'amp', 'duo']) if (o[k]) assert.ok(nomes.has(o[k]), `${o.n}: ${k} ${o[k]}`);
+    for (const k of ['pre', 'amp', 'duo']) for (const nome of (o[k] || '').split('|').filter(Boolean)) assert.ok(nomes.has(nome), `${o.n}: ${k} ${nome}`);
   }
   assert.ok(n >= 70);
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.FOR = 80; h.aura = 40; e.hpMax = e.hp = 999; e.attrs.AGI = 1; h.skills = [sk('Chute Doentio')]; H.battle(gm, { on: true });
@@ -878,13 +879,13 @@ test('núcleo Marcial e raízes dos setores: abertos sem exigir vizinho aprendid
   assert.match(RU.whyNot(h, S.skills[susRoot], S.skills, S.items, susRoot, true), /Vínculo/);
 });
 // par do mesmo setor vizinho na grade mas sem ligação (existe entre ramos que se encostam)
-const unlinkedPair = el => { const ids = Object.keys(S.skills).filter(k => S.skills[k].el === el && !S.skills[k].open && !S.skills[k].pre && !S.skills[k].rq && !S.skills[k].nb && !S.skills[k].cs && !S.skills[k].ex && !S.skills[k].aw && !S.skills[k].v2);
+const unlinkedPair = el => { const ids = Object.keys(S.skills).filter(k => S.skills[k].el === el && !S.skills[k].open && S.skills[k].refino && !S.skills[k].rq && !S.skills[k].nb && !S.skills[k].cs && !S.skills[k].ex && !S.skills[k].aw && !S.skills[k].v2);
   for (const a of ids) for (const b of ids) if (a !== b && RU.near(S.skills[a], S.skills[b]) && !S.skills[a].ln.includes(b) && !S.skills[b].ln.some(j => RU.near(S.skills[j], S.skills[a]) && S.skills[a].ln.includes(j))) return [a, b];
 };
 test('regras: vizinho de grade sem ligação não basta; ligação basta', () => {
   reset(); const h = mk(ana, {}); h.vinc = ['kagutsuchi']; h.xp = 999; const [a, b] = unlinkedPair('kagutsuchi');
   h.skills = [a]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), 'Precisa de um nó vizinho já aprendido.');
-  h.skills = [S.skills[b].ln[0]]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), '');
+  h.skills = [sk(S.skills[b].pre)]; assert.equal(RU.whyNot(h, S.skills[b], S.skills, S.items, b), '');
 });
 test('regras: skill do mestre sem ln encostada na grade continua aprendível', () => {
   reset(); const h = mk(ana, {}); h.xp = 999; const before = new Set(Object.keys(S.skills)); H.edAdd(gm, { coll: 'skills' }); const nid = Object.keys(S.skills).find(k => !before.has(k));
@@ -924,11 +925,12 @@ test('revisão: skill solta do mestre continua ligada pela grade mesmo depois de
   H.edSet(gm, { coll: 'skills', id: x, f: 'lk', v: '' }); assert.equal(RU.whyNot(h, S.skills[y], S.skills, S.items, y), ''); assert.equal(S.skills[y].ln, undefined);
   delete S.skills[x]; delete S.skills[y];
 });
-test('revisão: apagar um nó do meio do ramo religa os vizinhos dele', () => {
-  const br = Object.entries(S.skills).filter(([, s]) => s.br === 'susanoo-1'), [a, b, cc] = br.slice(0, 3).map(([k]) => k), saved = structuredClone(S.skills);
+test('revisão: apagar um nó do meio do ramo religa os vizinhos dele', t => {
+  const [b, meio] = Object.entries(S.skills).find(([, s]) => s.br === 'susanoo-1' && s.refino && s.ln.length === 2);
+  const [a, cc] = meio.ln, saved = structuredClone(S.skills);
+  t.after(() => { S.skills = saved; });
   H.edDel(gm, { coll: 'skills', id: b });
   assert.ok(S.skills[a].ln.includes(cc) || S.skills[cc].ln.includes(a)); assert.ok(!Object.values(S.skills).some(s => (s.ln || []).includes(b)));
-  S.skills = saved;
 });
 test('revisão: duplicar não copia ligações nem posição; mover X/Y tira a posição da mandala', () => {
   const id = sk('Brasa Viva'), before = new Set(Object.keys(S.skills)), saved = structuredClone(S.skills[id]); H.edDup(gm, { coll: 'skills', id });
@@ -962,7 +964,7 @@ test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo'
   const hid = net.hiddenSkills({ role: 'player', name: 'Ana' });
   assert.ok(hid.length > 100); assert.ok(!hid.includes(sk('Faísca'))); assert.equal(net.hiddenSkills({ role: 'gm' }).length, 0);
   assert.ok(hid.includes(sk('Kamikaze'))); // Fuhaku, sem Vínculo
-  const viz = Object.keys(S.skills).find(k => S.skills[k].el === 'indra' && k !== sk('Faísca') && RU.near(S.skills[k], S.skills[sk('Faísca')]));
+  const viz = Object.keys(S.skills).find(k => S.skills[k].el === 'indra' && S.skills[sk('Faísca')].ln.includes(k));
   if (viz) assert.ok(!hid.includes(viz));
   const d = net.defsFor({ role: 'player', name: 'Ana' }, net.curDefs()); const sks = JSON.parse(d.json).skills;
   assert.equal(sks[sk('Kamikaze')].name, '???'); assert.equal(sks[sk('Faísca')].name, 'Faísca'); assert.match(String(d.v), /\./);
@@ -1345,7 +1347,7 @@ test('Ordo: Loucura (mad) cresce com a Sanidade que falta e os 82 nós entram na
 // ---------- Árvore de Armas: bloco isolado, requisitos por categoria e por item ----------
 test('Árvore de Armas: bloco isolado na grade, ramos primordiais abertos e ramos dos tipos ancorados nele', () => {
   const arm = Object.entries(S.skills).filter(([, s]) => isArm(s)), fora = Object.entries(S.skills).filter(([, s]) => !isArm(s));
-  assert.equal(arm.length, TREE.armas.branches.flat().length); assert.ok(arm.every(([, s]) => s.el === 'fis'));
+  assert.equal(arm.filter(([, s]) => !s.refino).length, TREE.armas.branches.flat().length); assert.ok(arm.every(([, s]) => s.el === 'fis'));
   const gx = arm.map(([, s]) => s.gx), gy = arm.map(([, s]) => s.gy);
   for (const [, s] of fora) assert.ok(s.gx < Math.min(...gx) - 2 || s.gx > Math.max(...gx) + 2 || s.gy < Math.min(...gy) - 2 || s.gy > Math.max(...gy) + 2, s.name + ' invade o bloco das Armas');
   // dentro do bloco tudo se alcança andando por ln a partir dos nós abertos (4 primordiais + os ramos de foco e instrumento)
@@ -1699,16 +1701,102 @@ test('camadas e temas: ramos de até 10, posição = camada, kit atual até a 5,
   const all = Object.values(TREE).flatMap(t => t.branches.flat());
   for (const s of all.filter(s => ATUAIS.has(s.n))) assert.ok(s.cam <= 5, `${s.n} na camada ${s.cam}`);
   assert.ok(all.filter(s => forte(s)).filter(s => s.cam < 7).length <= 2, 'fortes abaixo da 7');
-  // Leva 10: toda linha de variação sobe uma camada por nó até a 10 (os que passam disso dividem a 10), cada nó pede o anterior
+  // Cada linha alcança a camada 10; variantes de outro Vínculo são opcionais.
   const cam = new Map(all.map(s => [s.n, s.cam]));
   for (const [el, t] of Object.entries(TREE)) for (const b of t.branches) if (b.de) {
     const L0 = cam.get(b.de), cams = b.map(s => s.cam);
     assert.equal(Math.max(...cams), CAM, `${el}: linha de ${b.de} não chega à camada ${CAM}`);
     assert.ok(Math.min(...cams) > L0, `${el}: linha de ${b.de} começa antes da base`);
-    b.forEach((s, i) => assert.equal(s.pre, i ? b[i - 1].n : b.de, `${s.n}: pré-requisito fora da corrente`));
+    b.forEach((s, i) => {
+      const antes = b.slice(0, i);
+      const pai = (s.v2 && antes.findLast(p => p.v2 === s.v2)) || antes.findLast(p => !p.v2);
+      const base = pai?.n ?? b.de;
+      let pre = REFINOS.get(base);
+      while (pre && pre.n !== s.pre) pre = REFINOS.get(pre.n);
+      assert.ok(s.pre === base || pre, s.n);
+    });
     for (let i = 1; i < b.length; i++) assert.ok(b[i].cam >= b[i - 1].cam, `${el}: ${b[i].n} fica antes de ${b[i - 1].n}`);
   }
   assert.deepEqual(validar(TREE), []);
+});
+
+test('a mandala liga todos os caminhos e o preço cresce para cada afinidade e pré-requisito', async () => {
+  const { PAIS } = await import('../arvore/camadas.js');
+  const ids = new Map(Object.entries(S.skills).map(([id, s]) => [s.name, id]));
+  for (const t of Object.values(TREE)) for (const b of t.branches) for (const s of b) {
+    const id = ids.get(s.n), filho = S.skills[id], nomePai = PAIS.get(s.n);
+    const requisitos = new Set((s.pre || '').split('|').filter(Boolean));
+    if (nomePai) {
+      const pid = ids.get(nomePai), pai = S.skills[pid];
+      assert.ok(filho.ln.includes(pid) && pai.ln.includes(id), s.n);
+      if (!b.de) assert.ok(!pai.v2 || pai.v2 === s.v2, s.n);
+      if (!filho.open) requisitos.add(nomePai);
+    } else {
+      assert.ok(filho.open, s.n);
+    }
+    for (const nome of requisitos) for (const nen of ['', ...RU.NEN]) {
+      const pai = S.skills[ids.get(nome)];
+      assert.ok(RU.xpCost({ nen }, filho) >= RU.xpCost({ nen }, pai) + 5, s.n + ' / ' + nen);
+    }
+  }
+  assert.equal(PAIS.get('Fornalha do Céu'), REFINOS.get('Faísca na Brasa').n);
+  const { VINC } = await import('../arvore/vinculos.js');
+  for (const el of Object.keys(VINC)) {
+    const setor = TREE[el];
+    for (const s of setor.branches.flat()) {
+      if (s === setor.branches[0][0]) continue;
+      const nome = PAIS.get(s.n), refino = S.skills[ids.get(nome)];
+      assert.ok(refino.refino && refino.el === el, s.n);
+      assert.ok(s.pre.split('|').includes(nome), s.n);
+    }
+  }
+  assert.equal(PAIS.get('Soco Que Abre o Chão'), REFINOS.get('Punhos Pesados').n);
+  for (const [nome, r] of REFINOS) {
+    const refino = S.skills[ids.get(r.n)], base = S.skills[ids.get(nome)];
+    assert.equal(refino.pre, nome);
+    assert.ok(refino.ln.includes(ids.get(nome)));
+    for (const nen of ['', ...RU.NEN]) assert.ok(RU.xpCost({ nen }, refino) >= RU.xpCost({ nen }, base) + 5);
+  }
+});
+
+test('todos os caminhos publicados de cada Vínculo têm pelo menos nove nós', async () => {
+  const { VINC } = await import('../arvore/vinculos.js');
+  for (const el of Object.keys(VINC)) {
+    const setor = Object.entries(S.skills).filter(([, s]) => s.el === el);
+    const [[raiz]] = setor.filter(([, s]) => s.root);
+    const vistos = new Set([raiz]), fila = [[raiz, null, 1]];
+    for (const [id, anterior, tamanho] of fila) {
+      const filhos = S.skills[id].ln.filter(k => k !== anterior && S.skills[k].el === el);
+      if (!filhos.length) assert.ok(tamanho >= 9, `${el}: ${S.skills[id].name} termina com ${tamanho} nós`);
+      for (const k of filhos) {
+        assert.ok(!vistos.has(k), 'Ciclo em ' + S.skills[k].name);
+        vistos.add(k);
+        fila.push([k, id, tamanho + 1]);
+      }
+    }
+    assert.equal(vistos.size, setor.length, 'Nós desconectados em ' + el);
+  }
+});
+
+test('comprar o aperfeiçoamento melhora Wakaze Disco e libera Olho do Furacão', async () => {
+  const { effSkill } = await import('../src/rules.js');
+  reset();
+  const h = mk(ana, {}), base = sk('Wakaze Disco'), fim = sk('Wakaze: Olho do Furacão');
+  const refino = sk(REFINOS.get('Wakaze Disco').n);
+  h.skills = [base];
+  h.vinc = ['fuhaku'];
+  h.xp = 1000;
+  for (const a of Object.keys(h.attrs)) h.attrs[a] = 99;
+  const poder = effSkill(h, base).power;
+  H.learn(ana, { id: h.id, skill: fim });
+  assert.ok(!h.skills.includes(fim));
+  H.learn(ana, { id: h.id, skill: refino });
+  assert.ok(h.skills.includes(refino));
+  assert.ok(!h.pslots.includes(refino));
+  assert.equal(effSkill(h, base).power, poder + 1);
+  assert.equal(h.xp, 1000 - RU.xpCost(h, S.skills[refino]));
+  H.learn(ana, { id: h.id, skill: fim });
+  assert.ok(h.skills.includes(fim));
 });
 
 test('Leva 10: efeitos conv (converte condição) e solo (único inimigo de pé)', () => {

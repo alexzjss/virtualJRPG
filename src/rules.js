@@ -68,7 +68,7 @@ function breakCheck(ch) { // Sanidade em zero: teste de SAB. Falha = Aflição, 
 }
 // ---------- sistema de skills: passivas, modificadores, votos, transformações ----------
 // passivas lidas pelo motor (modificador, gatilho, voto, amplificação) ocupam slots: 4, mais 1 a cada 100 XP gasto em skills; as trocas são feitas no acampamento
-const slotted = s => s && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
+const slotted = s => s && !s.refino && s.kind === 'passive' && ['mod', 'trig', 'vow', 'amp'].includes(s.pas);
 const spentXp = ch => (ch.skills || []).reduce((a, k) => a + (S.skills[k]?.xp || 0), 0);
 const slotMax = ch => 4 + Math.floor(spentXp(ch) / 100);
 function normSlots(ch) { // mantém só passivas aprendidas, respeita o limite e ocupa vagas livres na ordem em que foram aprendidas

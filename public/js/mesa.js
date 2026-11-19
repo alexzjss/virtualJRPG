@@ -1,7 +1,7 @@
 // Mesa: tela principal do mestre. Uma coluna por cena e uma coluna "Fora de cena"; arrastar retratos move os heróis
 // (Ctrl+clique seleciona vários). O painel lateral mostra a cena em foco: mini mapa com as saídas, pedidos de passagem e "ver como".
 let mzDrag = false; // arrastando um retrato: o redesenho espera (tela.js)
-const MZ = { sel: new Set(), modal: null, pov: null, nk: 'blank', nn: '', take: false, ex: null, exTo: '', exBoth: true };
+const MZ = { sel: new Set(), modal: null, pov: null, sideOpen: true, nk: 'blank', nn: '', take: false, ex: null, exTo: '', exBoth: true };
 const MESA = (() => {
   const heroes = () => Object.values(S.chars).filter(c => !c.enemy && !c.summon);
   const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
@@ -22,6 +22,7 @@ const MESA = (() => {
       <button class="mz-thumb" data-mz="focus" data-id="${id}" style="${bgOf(sc)}" title="Pôr o foco nesta cena"><span class="mz-tags">${id === S.tv ? '<em class="tv">TV</em>' : ''}${sc.clima ? `<em>${esc(sc.clima)}</em>` : ''}${sc.shop?.open ? '<em>Loja</em>' : ''}${sc.fogOn ? '<em>Névoa</em>' : ''}${(sc.enc || []).length ? `<em title="Encontros preparados">⚔ ${sc.enc.length}</em>` : ''}${sc.note ? '<em title="Tem notas">✎</em>' : ''}</span><b>${esc(sc.name)}</b></button>
       ${badge(id, sc)}
       <div class="mz-meta"><span>${pl(hs.length, 'herói', 'heróis')}</span><span>${pl(foes, 'inimigo', 'inimigos')}</span><span>${pl((sc.exits || []).length, 'saída', 'saídas')}</span></div>
+      <div class="mz-actions"><button data-mz="edit" data-id="${id}" title="Editar o mapa e as opções desta cena">Editar</button><button data-mz="rename" data-id="${id}" title="Editar o nome desta cena">Renomear</button><button data-mz="del" data-id="${id}" ${sc.battle?.active || Object.keys(S.scenes).length < 2 ? 'disabled' : ''} title="${sc.battle?.active ? 'Encerre a batalha antes de excluir' : Object.keys(S.scenes).length < 2 ? 'Não é possível excluir a única cena' : hs.length ? `Os heróis serão transferidos para outra cena` : 'Excluir esta cena'}">Excluir</button></div>
       <div class="mz-drop">${hs.map(hero).join('') || '<small class="mz-empty">arraste heróis para cá</small>'}</div></section>`;
   };
   const offCol = () => { const hs = heroes().filter(c => !okSc(c.scene)); return `<section class="mz-col off" data-mzdrop="">
@@ -38,7 +39,7 @@ const MESA = (() => {
   const side = () => {
     const id = S.focus, sc = S.scenes[id], hs = heroes().filter(c => c.scene === id), others = Object.entries(S.scenes).filter(([k]) => k !== id);
     const rq = Object.entries(S.reqs || {}).filter(([, r]) => r.cat === 'pass');
-    return `<aside class="mz-side"><div><small class="mz-h">Cena em foco</small><h2>${esc(sc.name)}</h2><button data-mz="rename" title="Editar o nome desta cena">Renomear</button></div>
+    return `<aside class="mz-side"><div class="mz-side-head"><div><small class="mz-h">Cena em foco</small><h2>${esc(sc.name)}</h2></div><button data-mz="sideClose" title="Fechar edição da cena" aria-label="Fechar edição da cena">×</button></div><button data-mz="rename" title="Editar o nome desta cena">Renomear</button>
       <div class="row"><button data-mz="go" data-v="mapa">Editar mapa</button>${sc.battle?.active ? `<button class="own" data-mz="palco" data-id="${id}">Abrir palco</button>` : '<button class="own" data-mz="fight">Iniciar batalha aqui</button>'}${S.tv === id ? '' : `<button data-mz="tv" data-id="${id}">Mostrar na TV</button>`}<button data-mz="dup">Duplicar</button><button data-mz="del" ${sc.battle?.active || others.length < 1 ? 'disabled' : ''} title="${sc.battle?.active ? 'Encerre a batalha antes de excluir' : others.length < 1 ? 'Não é possível excluir a única cena' : hs.length ? `Os heróis serão transferidos para ${esc(others[0][1].name)}` : 'Excluir esta cena'}">Excluir</button></div>
       <div><small class="mz-h">Mapa e saídas</small>${mini(id, sc)}<small class="mz-note">${others.length ? 'Clique numa casa para pôr uma saída; clique numa saída para removê-la.' : 'Crie outra cena para poder ligar as duas por uma saída.'}</small></div>
       <div><small class="mz-h">Notas e encontros (só você vê)</small>
@@ -69,7 +70,7 @@ const MESA = (() => {
     return `<div class="mesa"><header class="mz-top"><button class="own" data-mz="new">+ Nova cena</button><button data-mz="all" title="Leva todos os heróis para a cena em foco">Reunir todos no foco</button><span class="mz-sp"></span>
       <label class="mz-note">Ver como <select data-mzf="pov" aria-label="Ver a tela de um jogador"><option value="">— jogador —</option>${owners.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select></label>
       <button data-mz="tv" data-id="${S.focus}" title="A TV mostra a cena em foco">TV: ${esc(tv?.name || '?')}</button></header>
-      <div class="mz-main"><div class="mz-board">${Object.entries(S.scenes).map(([k, o]) => col(k, o)).join('')}${offCol()}<button class="mz-col add" data-mz="new">+<small>Nova cena</small></button></div>${side()}</div>
+      <div class="mz-main ${MZ.sideOpen ? '' : 'side-closed'}"><div class="mz-board">${Object.entries(S.scenes).map(([k, o]) => col(k, o)).join('')}${offCol()}<button class="mz-col add" data-mz="new">+<small>Nova cena</small></button></div>${MZ.sideOpen ? side() : '<button class="mz-side-open" data-mz="sideOpen">Editar cena</button>'}</div>
       ${selbar()}${modal()}${pov()}</div>`;
   };
   const moveSel = to => { const ids = [...MZ.sel]; MZ.sel.clear(); if (ids.length) send({ t: 'moveTo', ids, scene: to || null }); render(); };
@@ -85,12 +86,15 @@ const MESA = (() => {
     if (d.mz === 'go') return gView(d.v);
     if (d.mz === 'fight') { send({ t: 'battle', on: true }); return gView('palco'); }
     if (d.mz === 'tv') return send({ t: 'tvSet', id: d.id });
-    if (d.mz === 'rename') { const name = prompt('Nome da cena:', S.scenes[S.focus].name); if (name !== null && name.trim()) send({ t: 'map', f: 'name', v: name.trim() }); return; }
+    if (d.mz === 'sideClose') { MZ.sideOpen = false; return render(); }
+    if (d.mz === 'sideOpen') { MZ.sideOpen = true; return render(); }
+    if (d.mz === 'edit') { if (d.id !== S.focus) send({ t: 'sceneGo', id: d.id }); return gView('mapa'); }
+    if (d.mz === 'rename') { const id = d.id || S.focus, sc = S.scenes[id]; if (!sc) return; const name = prompt('Nome da cena:', sc.name); if (name !== null && name.trim()) { if (id !== S.focus) send({ t: 'sceneGo', id }); send({ t: 'map', f: 'name', v: name.trim() }); } return; }
     if (d.mz === 'mv') return moveSel(d.id);
     if (d.mz === 'unsel') { MZ.sel.clear(); return render(); }
     if (d.mz === 'out') return send({ t: 'moveTo', ids: [d.id], scene: null });
     if (d.mz === 'all') return send({ t: 'moveTo', ids: heroes().map(c => c.id), scene: S.focus });
-    if (d.mz === 'del') { const hs = heroes().filter(c => c.scene === S.focus), target = Object.entries(S.scenes).find(([id]) => id !== S.focus); if (!target || S.scenes[S.focus].battle?.active) return; const transfer = hs.length ? ` ${hs.map(c => c.name).join(', ')} serão transferidos para ${target[1].name}.` : ''; if (confirm(`Excluir a cena ${S.scenes[S.focus].name}? Os inimigos dela vão junto.${transfer}`)) send({ t: 'sceneDel', id: S.focus, to: target[0] }); return; }
+    if (d.mz === 'del') { const id = d.id || S.focus, sc = S.scenes[id], hs = heroes().filter(c => c.scene === id), target = Object.entries(S.scenes).find(([k]) => k !== id); if (!sc || !target || sc.battle?.active) return; const transfer = hs.length ? ` ${hs.map(c => c.name).join(', ')} serão transferidos para ${target[1].name}.` : ''; if (confirm(`Excluir a cena ${sc.name}? Os inimigos dela vão junto.${transfer}`)) send({ t: 'sceneDel', id, to: target[0] }); return; }
     if (d.mz === 'dup') return send({ t: 'sceneAdd', dup: S.focus });
     if (d.mz === 'new') { MZ.modal = 'new'; MZ.nn = ''; MZ.nk = 'blank'; MZ.take = MZ.sel.size > 0; render(); return app.querySelector('[data-mzf="nn"]')?.focus(); }
     if (d.mz === 'nk') { MZ.nk = d.k; return render(); }

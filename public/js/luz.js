@@ -3,12 +3,13 @@
 //  · lote de sprites refeito a cada quadro (o que acompanha a câmera: núcleo do projétil, círculo mágico, feixe);
 //  · partículas "dispara e esquece" num anel na GPU — a posição sai da fórmula (p0 + v·t + g·t²/2 com arrasto), a CPU não as atualiza.
 // O blend pré-multiplicado (ONE, ONE_MINUS_SRC_ALPHA) mistura aditivo (alfa de saída 0) e normal na mesma passada.
-// Instala uma fachada ANIMFX: quando LUZP.engineFor diz 'classico' (chave, sem WebGL2, Baixa, contexto perdido), tudo vai ao motor antigo.
+// Instala a fachada ANIMFX. Sem WebGL2 (ou com o contexto perdido) fica o desenho mínimo: brilho DOM no alvo; os números e selos são da coreo.
+// Do anim-engine.js só restam as configurações, o perfil e o flash DOM: o desenho 2D antigo não é mais chamado.
 (g => {
   if (typeof document === 'undefined' || !g.ANIMFX || !g.LUZP) return;
   const C = g.ANIMFX, LP = g.LUZP, TAU = Math.PI * 2;
   g.ANIMFX_CLASSICO = C;
-  const settings = C.settings; settings.style = localStorage.getItem('vj_fx_style') === 'classico' ? 'classico' : 'luz';
+  const settings = C.settings; delete settings.style; try { localStorage.removeItem('vj_fx_style'); } catch {} // a chave Luminoso/Clássico saiu
   const reduced = () => matchMedia('(prefers-reduced-motion:reduce)').matches;
   const clockNow = () => typeof g.CENA !== 'undefined' ? g.CENA.now() : performance.now();
   const later = ms => typeof g.CENA !== 'undefined' ? g.CENA.wait(ms) : new Promise(r => setTimeout(r, ms));
@@ -20,10 +21,10 @@
   const L = { canvas: cvs, gl, atlas: {}, W: 0, H: 0, dpr: 1 };
   g.LUZ = L;
 
-  // ----- nível (Auto começa em Média e cai para Baixa = motor antigo quando o fps cai nos golpes) -----
+  // ----- nível (Auto começa em Média e cai para Baixa, com menos partículas e sem pós, quando o fps cai nos golpes) -----
   let autoLvl = 'medium', fps = 60, lastT = 0;
   const level = () => settings.quality === 'auto' ? autoLvl : settings.quality;
-  const engine = () => LP.engineFor({ style: settings.style, webgl2: !!gl, level: level(), lost });
+  const engine = () => LP.engineFor({ webgl2: !!gl, lost });
   L.active = () => engine() === 'luz';
   const mark = () => { const on = L.active(); document.documentElement.classList.toggle('luz', on); };
 
@@ -213,7 +214,7 @@
   // provisório até luz-fx: um brilho no alvo no instante do impacto
   const placeholder = e => L.onFrame(now => { const k = (now - e.start) / e.dur; if (k > 1) return false; const imp = e.profile.impact; if (k < imp) return true; const z = (k - imp) / (1 - imp), b = e.to(); L.sprite({ x: b.x, y: b.y, size: 70 * e.sb() * (1 + z), color: e.profile.palette[1], alpha: 1 - z, tex: 'glow' }); return true; });
   function play({ actorId, targetIds = [], skill, fx = {}, delay = 0, sig } = {}) {
-    if (!L.active()) return C.play({ actorId, targetIds, skill, fx, delay });
+    if (!L.active()) return minimo({ actorId, targetIds, skill, fx, delay });
     const s = skill || skillByName(fx.s), P = C.profile(s, fx), kind = sig || sigFor(s, fx), dur = LP.duration(P, { speed: settings.speed, reduced: reduced(), sig: kind === 'line' ? 'line' : 'none' }), T = LP.promiseTimes(P, dur);
     const aid = actorId || fx.a, ids = [...new Set(targetIds.filter(Boolean))], targets = ids.length ? ids : [fx.id].filter(Boolean), start = clockNow() + delay;
     sound(P, dur);
@@ -225,21 +226,27 @@
     });
     return { profile: { ...P, duration: dur }, impact: later(T.impact + delay), done: later(T.done + delay) };
   }
+  // desenho mínimo (sem WebGL2): um brilho DOM no alvo no instante do impacto, com as mesmas promessas de tempo
+  const glowXY = (x, y, col, size) => { const d = document.createElement('i'); d.className = 'luz-min'; d.style.cssText = `left:${x}px;top:${y}px;--c:${col};--s:${Math.round(size)}px`; document.body.append(d); setTimeout(() => d.remove(), 560); };
+  function minimo({ actorId, targetIds = [], skill, fx = {}, delay = 0 } = {}) {
+    const s = skill || skillByName(fx.s), P = C.profile(s, fx), dur = LP.duration(P, { speed: settings.speed, reduced: reduced() }), T = LP.promiseTimes(P, dur), ids = targetIds.filter(Boolean).length ? targetIds.filter(Boolean) : [fx.id].filter(Boolean);
+    sound(P, dur);
+    if (!reduced()) setTimeout(() => ids.forEach(id => { const r = rect(id); if (r) { const p = target(r); glowXY(p.x, p.y, P.palette?.[1] || '#ffffff', Math.max(60, r.height * .8)); } }), T.impact + delay);
+    return { profile: { ...P, duration: dur }, impact: later(T.impact + delay), done: later(T.done + delay) };
+  }
   // faíscas do parry: explosão curta de partículas aditivas
-  function sparks(x, y, color = '#ffd36a', n = 14) { if (!L.active()) return C.sparks(x, y, color, n); if (reduced()) return;
+  function sparks(x, y, color = '#ffd36a', n = 14) { if (reduced()) return; if (!L.active()) return glowXY(x, y, color, 70);
     for (let i = 0; i < n * 2; i++) { const an = Math.random() * TAU, v = 260 + Math.random() * 520; L.emit({ x, y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, drag: 5, life: 260 + Math.random() * 260, size: 18, size1: 4, rot: an, tex: 'spark', sx: 2.4, sy: .6, color: i % 3 ? color : '#ffffff' }); }
     L.emit({ x, y, life: 220, size: 60, size1: 140, tex: 'glow', color }); }
 
   // batalha nova: a Auto volta a tentar o motor novo (sync roda a cada estado, pela coreo)
   let wasOn = false; const battleEdge = () => { const on = !!g.S?.battle?.active; if (on && !wasOn && settings.quality === 'auto' && autoLvl === 'low') { autoLvl = 'medium'; qEvt(); } wasOn = on; };
   // ----- fachada -----
-  const F = { ...C, settings, palette: C.palette, familyOf: C.familyOf, profile: C.profile, play, sparks,
-    level: () => L.active() ? level() : C.level(),
-    sync: () => { battleEdge(); if (!L.active()) C.sync(); else kick(); },
-    ink: (r, color, ms) => C.ink(r, color, ms), // tinta do KO: o motor novo troca por fagulhas (luz-fx)
-    flash: (color, ms) => C.flash(color, ms),
-    setQuality: v => { C.setQuality(v); if (gl && !lost) sizeParticles(); mark(); kick(); },
-    setStyle: v => { if (!['luz', 'classico'].includes(v)) return; settings.style = v; try { localStorage.setItem('vj_fx_style', v); } catch {} mark(); kick(); try { dispatchEvent(new Event('vj-quality')); } catch {} } };
+  const F = { settings, palette: C.palette, familyOf: C.familyOf, profile: C.profile, play, sparks, level,
+    sync: () => { battleEdge(); if (L.active()) kick(); },
+    ink: () => {}, // tinta do KO saiu: o KO de inimigo vira fagulhas (LUZFX.dissolve); sem WebGL o recorte só apaga (.inked)
+    flash: (color, ms) => C.flash(color, ms), setSpeed: v => C.setSpeed(v), setFlashes: v => C.setFlashes(v),
+    setQuality: v => { C.setQuality(v); if (gl && !lost) sizeParticles(); mark(); kick(); } };
   g.ANIMFX = F;
 
   // ----- ciclo de vida -----

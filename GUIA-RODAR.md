@@ -49,6 +49,8 @@ A própria página de entrada tem esta ajuda e as soluções para "não conecta"
 
 ## Com Node, sem o programa pronto
 
+No Windows, `iniciar.bat` acompanha as mudanças no código-fonte e reinicia o servidor quando a árvore, as regras ou o catálogo mudam. A página no navegador atualiza ao recarregar. Essa atualização automática vale para a pasta do projeto; o executável distribuído continua usando o código que foi compilado nele.
+
 ```
 git clone https://github.com/alexzjss/virtualJRPG
 cd virtualJRPG

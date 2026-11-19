@@ -22,6 +22,8 @@
 .mz-bat.wait{background:var(--red);animation:mzpul 1.2s ease-in-out infinite alternate}
 @keyframes mzpul{to{background:var(--red2)}}
 .mz-meta{display:flex;gap:8px;padding:6px 10px;font:600 12px var(--cond);color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line)}
+.mz-actions{display:flex;gap:6px;padding:6px 8px 0}.mz-actions button{flex:1;padding:4px 6px;font-size:12px}
+.mz-side-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.mz-side-head h2{margin:2px 0}.mz-side-head>button{font-size:22px;line-height:1;padding:2px 9px}.mz-main.side-closed{grid-template-columns:minmax(0,1fr)}.mz-side-open{position:sticky;right:8px;bottom:8px;justify-self:end;align-self:end}
 .mz-drop{min-height:116px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
 .mz-empty{color:#5b5966;font:600 12px var(--cond);text-transform:uppercase;margin:auto}
 .mz-hero{width:58px;cursor:grab;text-align:center;position:relative}

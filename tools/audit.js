@@ -2,12 +2,16 @@
 //   node tools/audit.js            relatório completo
 //   node tools/audit.js --quiet    só o resumo (e código de saída 1 se houver erro)
 import { TREE } from '../tree.js';
-import { CAM, DANO, forte } from '../arvore/camadas.js';
+import { CAM, DANO, forte, REFINOS } from '../arvore/camadas.js';
 import { ATUAIS } from '../arvore/atuais.js';
 
 const quiet = process.argv.includes('--quiet');
 const nodes = [];
 for (const [el, t] of Object.entries(TREE)) t.branches.forEach((br, bi) => br.forEach((n, ni) => nodes.push({ ...n, el, bi, ni, id: `${el}-${bi}.${ni}` })));
+for (const base of nodes) {
+  const refino = REFINOS.get(base.n);
+  if (refino) nodes.push({ ...refino, el: base.el, id: base.id + '.refino' });
+}
 const found = { erro: [], aviso: [] };
 const add = (lvl, kind, n, msg) => found[lvl].push({ kind, id: n.id, nome: n.n, msg });
 const fx = n => n.fx || '';

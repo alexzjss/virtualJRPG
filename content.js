@@ -1,6 +1,8 @@
 // Conteúdo padrão da campanha: fantasia mística com demônios e caçadores, tecnologia dos anos 1910-1920.
 // buildSkills → grade compartilhada; buildItems → catálogo; buildBestiary → modelos de inimigos.
 import { TREE } from './tree.js';
+import { PAIS, REFINOS } from './arvore/camadas.js';
+import { ANCORAS } from './arvore/ancoras.js';
 import './public/rules.js'; // parseFx e parseForm são compartilhados com o navegador (globalThis.RULES)
 import './public/armas.js'; // modelos de arma (globalThis.ARMAS)
 export const { parseFx, parseForm } = globalThis.RULES;
@@ -55,9 +57,13 @@ export function buildSkills(sk) {
   let CX = C, CY = C, zone = null; // centro da grade em uso e zona dos nós postos agora: a Árvore de Armas é um bloco à parte, com centro próprio
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !used.has(x + ',' + y);
   const node = (o, el, extra = {}) => { const { n, k, a, p, c, ...rest } = expand(o); return sk(n, k, a || 'FOR', el, p || 0, c || 0, 0, 0, { ...rest, ...extra }); };
-  // put grava o nó na casa e, se houver, a ligação (ln, simétrica) com o nó da casa pai
-  const idAt = new Map(), put = (x, y, s, parent) => { const id = 'g' + Object.keys(G).length; used.set(x + ',' + y, zone || s.el); idAt.set(x + ',' + y, id); G[id] = { ...s, gx: x, gy: y, ln: [] };
-    const pid = parent && idAt.get(parent.join(',')); if (pid && !G[pid].ln.includes(id)) { G[pid].ln.push(id); G[id].ln.push(pid); } return [x, y]; };
+  // A ordem das casas mantém os IDs do catálogo; PAIS fornece as ligações de aprendizado.
+  let proximoId = 0;
+  const put = (x, y, s) => {
+    used.set(x + ',' + y, zone || s.el);
+    G['g' + proximoId++] = { ...s, gx: x, gy: y, ln: [] };
+    return [x, y];
+  };
   const around = (x, y) => { const o = []; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) o.push([x + dx, y + dy]); return o; };
   const at = k => k.split(',').map(Number), dist = k => Math.hypot(...at(k).map(v => v - C));
   // encadeia nós para fora do centro; o primeiro precisa encostar numa casa já usada que sirva de âncora (anchor)
@@ -65,16 +71,15 @@ export function buildSkills(sk) {
     let prev = start || null; const placed = [];
     nodes.forEach((s, i) => {
       const a = deg * Math.PI / 180, tx = CX + (r0 + i) * Math.cos(a), ty = CY + (r0 + i) * Math.sin(a);
-      // cada candidato lembra a casa de onde saiu (o pai da ligação)
-      const from = keys => keys.flatMap(k => around(...at(k)).map(p => [...p, at(k)])).filter(p => free(p[0], p[1]));
-      let cand = prev ? around(...prev).map(p => [...p, prev]).filter(p => free(p[0], p[1])) : from([...used.keys()].filter(k => anchor(k)));
-      if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === (zone || s.el) || (!zone && used.get(k) === 'fis')));
+      const from = keys => keys.flatMap(k => around(...at(k))).filter(p => free(p[0], p[1]));
+      let cand = prev ? around(...prev).filter(p => free(p[0], p[1])) : from([...used.keys()].filter(k => anchor(k)));
       // cercado: a corrente não pode se soltar, então procura a casa livre mais perto de quem veio antes (até 4 casas) e liga a ele mesmo sem encostar
-      for (let r = 2; r <= 4 && prev && !cand.length; r++) for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && free(prev[0] + dx, prev[1] + dy)) cand.push([prev[0] + dx, prev[1] + dy, prev]);
+      for (let r = 2; r <= 4 && prev && !cand.length; r++) for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && free(prev[0] + dx, prev[1] + dy)) cand.push([prev[0] + dx, prev[1] + dy]);
       if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === (zone || s.el))); // lotado em volta da âncora: liga a uma casa do próprio setor
+      if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === (zone || s.el) || (!zone && used.get(k) === 'fis')));
       if (!cand.length) throw new Error('grade sem espaço para ' + s.name);
-      const [bx, by, par] = cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0];
-      prev = put(bx, by, s, par); placed.push(prev.join(','));
+      const [bx, by] = cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0];
+      prev = put(bx, by, s); placed.push(prev.join(','));
     });
     return placed;
   };
@@ -91,24 +96,24 @@ export function buildSkills(sk) {
     const a = Math.atan2(by - CY, bx - CX), tx = bx + 2 * Math.cos(a), ty = by + 2 * Math.sin(a); let best = null;
     for (const r of [6, 10, 16]) { for (let x = bx - r; x <= bx + r; x++) for (let y = by - r; y <= by + r; y++) if (free(x, y)) { const d = (x - tx) ** 2 + (y - ty) ** 2; if (!best || d < best[2]) best = [x, y, d]; } if (best) break; } // centro lotado: procura mais longe
     if (!best) throw new Error('grade sem espaço para a linha de ' + br.de);
-    const mk = o => node(o, el, label ? { br: label } : {}), s0 = put(best[0], best[1], mk(br[0]), [bx, by]);
+    const mk = o => node(o, el, label ? { br: label } : {}), s0 = put(best[0], best[1], mk(br[0]));
     return [s0.join(','), ...chain(a * 180 / Math.PI, Math.hypot(bx - CX, by - CY) + 2, br.slice(1).map(mk), null, s0)];
   };
   // tronco Marcial: ramo 0 no centro, estilos de arma e ramos novos em raios, treinos nas casas livres junto ao centro
   // núcleo Marcial (centro e o anel em volta): aberto a todos, sem exigir vizinho aprendido; dele se anda para o resto do tronco
   put(C, C, node(M[0][0], 'fis', { open: 1 }));
-  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 }), [C, C]));
+  around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', i < 2 ? { open: 1 } : {})));
   for (const o of M[0].slice(9)) { // a 10ª casa do ramo inicial: a livre mais perto do centro, encostada no núcleo
-    let at = null; for (let r = 2; r <= 6 && !at; r++) for (let x = C - r; x <= C + r && !at; x++) for (let y = C - r; y <= C + r && !at; y++) if (free(x, y)) { const v = around(x, y).find(p => used.get(p.join(',')) === 'fis'); if (v) at = [x, y, v]; }
-    if (at) put(at[0], at[1], node(o, 'fis', { open: 1 }), at[2]);
+    let at = null; for (let r = 2; r <= 6 && !at; r++) for (let x = C - r; x <= C + r && !at; x++) for (let y = C - r; y <= C + r && !at; y++) if (free(x, y)) { const v = around(x, y).find(p => used.get(p.join(',')) === 'fis'); if (v) at = [x, y]; }
+    if (at) put(at[0], at[1], node(o, 'fis'));
   }
   const rays = M.slice(2).filter(b => !b.de); // M[1] são os treinos; as armas saíram para TREE.armas
   rays.forEach((br, i) => chain(i * 360 / rays.length + 360 / ORDER.length / 2, 2, br.map(o => node(o, 'fis')), fis));
   const train = M[1].map(o => node(o, 'fis'));
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
-    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift(), around(x, y).find(p => used.get(p.join(',')) === 'fis'));
-  M.filter(b => b.de).forEach(b => line(b, 'fis'));
+    if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift());
   const fisCore = new Set([...used.keys()].filter(fis)); // casas do núcleo e das pontas dos raios: só elas recebem as raízes dos setores (as linhas de variação do Marcial vão mais longe)
+  M.filter(b => b.de).forEach(b => line(b, 'fis'));
   // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó, aberta a quem tem o Vínculo, sem exigir vizinho); depois um ramo de cada setor por vez,
   // para nenhum setor cercar o vizinho. Um ramo em que todo nó exige arma vira uma trilha por tipo de arma.
   const SEC = 360 / ORDER.length, R0 = 13, RING = 10, SLOT = [0, -1, 1, -2, 2], W = SEC / 5.2, cells = {};
@@ -119,7 +124,10 @@ export function buildSkills(sk) {
     if (!br) return;
     if (br.de) { cells[el][b] = line(br, el, el + '-' + b); return; }
     const ring = Math.floor(b / 5), deg = i * SEC + SLOT[b % 5] * W, mk = o => node(o, el, { br: el + '-' + b });
-    const tip = ring ? new Set(cells[el][b - 5].slice().sort((p, q) => dist(q) - dist(p)).slice(0, 3)) : new Set(cells[el][0].slice(0, 5));
+    // Um ramo que começa com skill da campanha parte da raiz do Vínculo. Sem isso,
+    // a primeira técnica aprendida podia ficar atrás da ponta de outro ramo avançado.
+    const kit = br.some(o => ANCORAS.has(o.n));
+    const tip = ring && !kit ? new Set(cells[el][b - 5].slice().sort((p, q) => dist(q) - dist(p)).slice(0, 3)) : new Set(cells[el][0].slice(0, 5));
     const anchor = k => tip.has(k), r0 = ring ? R0 + ring * RING : R0 + 2;
     const groups = br.every(o => o.req) ? Object.values(br.reduce((g, o) => ((g[o.req] ||= []).push(o), g), {})) : [br];
     cells[el][b] = groups.flatMap((g, m) => groups.length > 1 ? chain(deg + (m - (groups.length - 1) / 2) * 2.5, r0, g.map(mk), anchor) : forked(deg, r0, g.map(mk), anchor, b % 2 === 0));
@@ -146,7 +154,39 @@ export function buildSkills(sk) {
     b ? chain(deg, 10, nodes, anchor) : forked(deg, 10, nodes, anchor, false);
   }
   zone = null; CX = C; CY = C;
+  const ids = new Map(Object.entries(G).map(([id, s]) => [s.name, id]));
+  for (const [nome, refino] of REFINOS) {
+    const base = G[ids.get(nome)];
+    // Uma casa livre perto da base; os IDs das técnicas antigas já foram atribuídos.
+    let pos;
+    for (let r = 1; r < N && !pos; r++) {
+      for (let dx = -r; dx <= r && !pos; dx++) for (let dy = -r; dy <= r; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !free(base.gx + dx, base.gy + dy)) continue;
+        pos = [base.gx + dx, base.gy + dy];
+        break;
+      }
+    }
+    if (!pos) throw new Error('Grade sem espaço para ' + refino.n);
+    const id = 'g' + proximoId;
+    put(...pos, node(refino, base.el, { br: base.br }));
+    ids.set(refino.n, id);
+  }
+  for (const [filho, pai] of PAIS) {
+    const f = ids.get(filho), p = ids.get(pai);
+    G[f].ln.push(p);
+    G[p].ln.push(f);
+  }
   ringLayout(G);
+  // Técnicas exclusivas de Satan (Renascido): o requisito Corte mantém os golpes
+  // físicos ligados às katanas, e `hits` representa as lâminas que ele encadeia.
+  G['satan-katana-1'] = sk('Dança das Quatro Katanas', 'dmg', 'FOR', 'fis', 17, 12, C, C, {
+    req: 'corte', hits: 4, ct: 115, xp: 55, br: 'custom-satan', anim: 'corte',
+    d: 'Satan materializa quatro katanas e desfere quatro cortes pesados em sequência.'
+  });
+  G['satan-katana-2'] = sk('Dilúvio das Lâminas Renascidas', 'dmg', 'DES', 'fis', 15, 18, C, C, {
+    req: 'corte', hits: 6, area: true, ct: 145, xp: 70, br: 'custom-satan', anim: 'corte',
+    d: 'Seis katanas surgem ao redor de Satan e cruzam o campo contra todos os adversários.'
+  });
   return G;
 }
 // Posição na mandala (wx, wy): anéis concêntricos, como um sphere grid. O centro é dividido ao meio: Marcial na metade esquerda, Armas na direita.
@@ -395,6 +435,11 @@ export function buildBestiary(make) {
     ['Cultista', '#581c87', { INT: 55, SAB: 30 }, ['amaterasu'], ['shukketsu'], ['Sangria', 'Sussurro Sombrio'], { goldR: 15 }],
     ['Ocultista', '#3730a3', { INT: 70, SAB: 55, CON: 35 }, [], ['tsukuyomi'], ['Centelha', 'Faísca', 'Pesadelo', 'Manto da Noite'], { xpR: 25, goldR: 40 }],
     ['Caçador Rival', '#0f766e', { FOR: 60, DES: 60, AGI: 55 }, [], [], ['Golpe Pesado', 'Tiro Certeiro', 'Passo Rápido', 'Luz Curativa'], { arma: 14, armor: 3, xpR: 30, goldR: 60 }],
+    ['Satan (Renascido)', '#8f0019', { FOR: 95, CON: 95, DES: 90, AGI: 85, INT: 70, SAB: 75, CAR: 65, SOR: 65 }, ['aura'], [...EL9, 'oculto'], ['Dança das Quatro Katanas', 'Dilúvio das Lâminas Renascidas'], {
+      cat: 'chefe', boss: true, arma: 20, armor: 6, bon: { hpMax: 500, auraMax: 0, sanMax: 0 }, xpR: 120, goldR: 250,
+      imgF: '/enemies/satan-renascido-frente.png', imgB: '/enemies/satan-renascido-costas.png',
+      gmNote: 'Chefe customizado. Tem 700 HP. Resiste aos nove Vínculos elementais e ao Ocultismo; sua única fraqueza é Aura (conjuração). Seus golpes exclusivos invocam quatro ou seis katanas ao mesmo tempo.'
+    }],
   ];
   // um chefe por patrono: usa o raio inteiro do elemento, tem muito HP e entra em fúria com metade da vida
   const BOSS = [['kagutsuchi', 'Ifrit das Fornalhas', 'susanoo', 'INT', 'torso'], ['susanoo', 'Leviatã do Porto', 'indra', 'INT', 'head', { hp: 1.4 }], ['atlas', 'Colosso de Ferro', 'fuhaku', 'FOR', 'legL', { hp: .7 }], ['indra', 'Arconte da Tempestade', 'atlas', 'INT', 'armR'], ['fuhaku', 'Rainha dos Corvos', 'kagutsuchi', 'DES', 'armL'],

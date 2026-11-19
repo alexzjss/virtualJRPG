@@ -2,7 +2,8 @@
 rem Inicia o virtualJRPG a partir dos arquivos do projeto (sem .exe).
 rem Duplo clique neste arquivo. Precisa do Node.js 22 ou mais novo.
 rem Instala as dependencias na primeira vez, cria a chave do mestre em data\gm-key.txt
-rem e sobe o servidor, que ja abre o tunel do Cloudflare e mostra o codigo da sessao.
+rem e sobe o servidor em modo watch: mudancas no codigo/skills reiniciam o jogo sozinhas.
+rem O servidor abre o tunel do Cloudflare e mostra o codigo da sessao.
 cd /d "%~dp0"
 
 where node >nul 2>&1
@@ -34,5 +35,5 @@ set /p GM_KEY=<data\gm-key.txt
 :subir
 rem "iniciar.bat offline" (ou o arquivo iniciar-sem-internet.bat) nao abre o tunel: so este computador e a rede Wi-Fi entram.
 if /i "%~1"=="offline" set VJ_TUNNEL=0
-node server.js
+npm run start:watch
 pause
