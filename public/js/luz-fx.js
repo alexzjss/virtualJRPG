@@ -175,13 +175,14 @@
     const col = color, n = Math.round(46 * q()), t0 = g.CENA ? g.CENA.now() : performance.now();
     if (!L.corpo?.fade?.(id, 1150, col)) { el.style.transition = 'opacity .9s .25s'; el.style.opacity = '0'; } // sem malha: o DOM apaga junto
     const cracks = Array.from({ length: 7 }, (_, i) => { const a = { x: .5 + (rnd(i * 7 + 1) - .5) * .3, y: .25 + rnd(i * 7 + 2) * .5 }, an = rnd(i * 7 + 3) * TAU, l = .18 + rnd(i * 7 + 4) * .25; return [a, { x: a.x + Math.cos(an) * l * .6, y: a.y + Math.sin(an) * l }]; });
-    let burst = false;
-    return new Promise(res => { L.onFrame(now => { const k = (now - t0) / 1150, rr = img.getBoundingClientRect(), P = p => ({ x: rr.left + rr.width * p.x, y: rr.top + rr.height * p.y });
+    let burst = false, done = false;
+    return new Promise(res => { setTimeout(() => { if (!done) { done = true; end(); el.style.opacity = ''; el.style.transition = ''; res(); } }, 1800); // trocou de motor no meio: não fica sem .inked
+      L.onFrame(now => { if (done) return false; const k = (now - t0) / 1150, rr = img.getBoundingClientRect(), P = p => ({ x: rr.left + rr.width * p.x, y: rr.top + rr.height * p.y });
       if (k < .25) { const u = k / .25; for (const [a, b] of cracks) L.line(P(a), lerp(P(a), P(b), easeOut(u)), 3 + 3 * u, col, .9, true, 1, 'beam'); }
       else if (!burst) { burst = true; g.LUZ.pos?.fire('bloom'); for (let i = 0; i < n; i++) { const p = P({ x: .15 + rnd(i * 3 + 11) * .7, y: .08 + rnd(i * 3 + 12) * .85 });
         L.emit({ x: p.x, y: p.y, vx: (rnd(i + 40) - .5) * 90, vy: -60 - rnd(i + 50) * 160, grav: -140, drag: 1.2, life: 600 + rnd(i + 60) * 500, size: 14 + rnd(i + 70) * 14, size1: 2, tex: i % 3 ? 'spark' : 'star4', rot: rnd(i + 80) * TAU, spin: 3, color: i % 4 ? col : '#ffffff' }); }
         L.emit({ x: rr.left + rr.width / 2, y: rr.top + rr.height * .5, life: 380, size: rr.height * .6, size1: rr.height * 1.1, tex: 'glow', color: col, alpha: .8 }); }
-      if (k >= 1) { end(); el.style.opacity = ''; el.style.transition = ''; res(); return false; } }); });
+      if (k >= 1) { done = true; end(); el.style.opacity = ''; el.style.transition = ''; res(); return false; } }); });
   }
   g.LUZFX = { dissolve, run, DRAW, circle, spray, motionOf, impactBurst, glow, core };
 })(globalThis);
