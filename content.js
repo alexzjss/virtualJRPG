@@ -305,9 +305,9 @@ export const SUMMONS = Object.fromEntries([
   ['Carniçal', '#6b7280', '', ['FOR'], ['Golpe Pesado'], .35, 3],
   ['Esqueleto de Trincheira', '#d6d3d1', '', ['DES'], ['Tiro Certeiro'], .35, 4, { armor: 2, arma: 12 }],
   ['Legião de Mortos', '#57534e', '', ['FOR', 'CON'], ['Golpe Giratório'], .6, 3],
-  ['Ceifador', '#111827', '', ['INT', 'FOR'], ['Ritual: Toque Gélido', 'Ritual: Colher Vida'], .7, 3],
+  ['Ceifador', '#111827', '', ['INT', 'FOR'], ['Ritual: Toque da Morte', 'Ritual: Colher Vida'], .7, 3],
   ['Familiar', '#1f2937', '', ['AGI', 'INT'], ['Ilusão Menor'], .25, 4],
-  ['Coisa do Poço', '#334155', '', ['FOR', 'CON'], ['Ritual: Toque Gélido', 'Golpe Pesado'], .5, 3],
+  ['Coisa do Poço', '#334155', '', ['FOR', 'CON'], ['Ritual: Toque da Morte', 'Golpe Pesado'], .5, 3],
   ['O Sem-Nome', '#000000', '', ['INT', 'FOR', 'CON'], ['Ritual: Pavor', 'Ritual: Rosto Sem Face', 'Ritual: Colher Vida'], .9, 3, { armor: 3 }],
 ].map(([n, c, el, a, sk, hp, ttl, o]) => [n, { c, el, a, sk, hp, ttl, ...o }]));
 

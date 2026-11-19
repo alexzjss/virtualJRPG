@@ -332,7 +332,7 @@ test('requisitos novos: Despertar, nó anterior, nós do ramo, estado e afinidad
   n.skills = Object.keys(S.skills).filter(k => S.skills[k].br === 'aura-0'); const pr = id('Punho Reforçado'); n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === S.skills[pr].br && k !== pr));
   H.learn(ana, { id: n.id, skill: pr }); assert.equal(n.nen, 'int'); // a primeira categoria vira a natureza
   const em = id('Projétil de Aura'), xp = n.xp; n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === S.skills[em].br && k !== em)); H.learn(ana, { id: n.id, skill: em }); assert.equal(xp - n.xp, 15); // Emissão é vizinha: 10 × 1,25 → 15
-  assert.equal(globalThis.RULES.nenEff(n, S.skills[id('Aura Elétrica')]), .8); assert.equal(globalThis.RULES.nenEff(n, S.skills[id('Antena de Aura')]), .6);
+  assert.equal(globalThis.RULES.nenEff(n, S.skills[id('Aura de Navalha')]), .8); assert.equal(globalThis.RULES.nenEff(n, S.skills[id('Antena de Aura')]), .6);
   const es = id('Tempo Imperial'); n.skills.push(...Object.keys(S.skills).filter(k => S.skills[k].br === 'aura-5' && k !== es)); H.learn(ana, { id: n.id, skill: es }); assert.ok(!n.skills.includes(es)); // Especialização exige Despertar
 });
 test('a IA dos inimigos usa transformação, cura e ataques sem travar a fila', () => {
@@ -512,7 +512,7 @@ test('laços: conversar no acampamento sobe o laço, que reforça a dupla em bat
   reset(); const c = mk(ana, {}); assert.match(RU.whyNot(c, S.skills[n], S.skills, S.items, n, true), /laço/);
 });
 test('slots de passivas: 4 + 1 a cada 100 XP gasto; só as ativas valem; trocar exige o acampamento', () => {
-  reset(); S.camp = { open: false, acts: {}, with: {} }; const h = mk(ana, {}); const votos = ['Voto de Sangue', 'Voto da Presa', 'Voto do Corpo Fechado', 'Voto da Última Chama', 'Seiyaku: Silêncio', 'Seiyaku: Pureza'].map(sk).filter(Boolean);
+  reset(); S.camp = { open: false, acts: {}, with: {} }; const h = mk(ana, {}); const votos = ['Voto de Sangue', 'Voto da Presa', 'Voto do Corpo Fechado', 'Voto do Último Fôlego', 'Seiyaku: Silêncio', 'Seiyaku: Pureza'].map(sk).filter(Boolean);
   assert.ok(votos.length >= 6); h.skills = votos.slice(0, 6); handle(gm, { t: 'set', id: h.id, f: 'name', v: h.name });
   assert.equal(h.pslots.length, slotMaxOf(h)); assert.ok(slotMaxOf(h) < 6); assert.ok(!h.pslots.includes(votos[5])); // o último ficou sem slot
   H.pslot(ana, { id: h.id, skill: votos[0] }); assert.ok(h.pslots.includes(votos[0])); // fora do acampamento: nada muda
@@ -969,8 +969,8 @@ test('segredo: jogador recebe "???" nos nós fora de alcance; o mestre vê tudo'
 });
 test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e clones', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h);
-  h.skills = [sk('Tempestade Negra')]; H.battle(gm, { on: true }); assert.ok(S.skills[sk('Tempestade Negra')].bf === 10);
-  const kT = sk('Tempestade Negra'); assert.equal(S.skills[kT].cmd, 'tempo', 'todo bf nasce como Golpe no tempo');
+  h.skills = [sk('Turbilhão Negro')]; H.battle(gm, { on: true }); assert.ok(S.skills[sk('Turbilhão Negro')].bf === 10);
+  const kT = sk('Turbilhão Negro'); assert.equal(S.skills[kT].cmd, 'tempo', 'todo bf nasce como Golpe no tempo');
   for (let i = 0; i < 6; i++) { S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; fixR(.3, () => H.act(ana, { id: h.id, skill: kT, target: e.id })); assert.ok(!S.log.some(l => /BLACK FLASH/.test(l.text || '')), 'sem Perfeito não há Black Flash'); }
   S.battle.ticks[h.id] = -1; h.limit = 100; e.hp = e.hpMax; h.aura = 0; fixR(.3, () => H.act(ana, { id: h.id, skill: kT, target: e.id, cmd: { g: 'perf', n: 0, acc: 1 } })); const bf = S.log.some(l => /BLACK FLASH/.test(l.text || ''));
   assert.ok(bf, 'Black Flash sai no Perfeito'); assert.ok(h.aura > 0, 'devolve Aura');
@@ -980,9 +980,9 @@ test('leva 3: Black Flash, cicatriz até o descanso longo, Marca no HP baixo e c
   assert.ok(m.st.mark, 'Marca desperta'); assert.ok(m.hpMax < hp0 && m.sanMax < san0, 'cicatriz no HP e Sanidade máx.');
   assert.ok(modsOf(m).atk >= 30);
   H.battle(gm, { on: false }); H.rest(gm, { long: true }); assert.equal(m.hpMax, hp0); assert.equal(m.sanMax, san0);
-  reset(); const c = mk(ana, {}), g = mk(gm, { enemy: true }); c.attrs.AGI = 99; g.attrs.AGI = 1; c.skills = [sk('Fábrica de Cópias'), sk('Fagulha Negra')]; derive(c);
+  reset(); const c = mk(ana, {}), g = mk(gm, { enemy: true }); c.attrs.AGI = 99; g.attrs.AGI = 1; c.skills = [sk('Fábrica de Cópias'), sk('Estalo Negro')]; derive(c);
   H.battle(gm, { on: true }); c.hp = c.hpMax; c.aura = 99; const hpC = c.hp; S.battle.ticks[c.id] = -1; H.act(ana, { id: c.id, skill: sk('Fábrica de Cópias'), target: c.id });
-  const cl = Object.values(S.chars).filter(o => o.clone === c.id); assert.equal(cl.length, 2); assert.ok(c.hp < hpC); assert.ok(cl.every(o => o.hp > 0 && o.id in S.battle.ticks && o.skills.includes(sk('Fagulha Negra'))));
+  const cl = Object.values(S.chars).filter(o => o.clone === c.id); assert.equal(cl.length, 2); assert.ok(c.hp < hpC); assert.ok(cl.every(o => o.hp > 0 && o.id in S.battle.ticks && o.skills.includes(sk('Estalo Negro'))));
 });
 // ---- comandos de ação: janela de defesa (Aparar e Esquiva) ----
 const dfx = (names = ['Aparar'], heroes = 1) => { // um inimigo rápido e `heroes` heróis; o inimigo só tem o ataque básico
@@ -1316,7 +1316,7 @@ test('cinemáticos: descrição cita Ótimo/Erro e as janelas do nível', () => 
   assert.match(E({ kind: 'util', cmd: 'ritmo', nt: 6, rq: { FOR: 50 } }, null), /8 notas/); assert.match(E({ kind: 'dmg', cmd: 'mira' }, null), /×0,85/);
 });
 test('cinemáticos: o servidor aplica Erro e Ótimo no ataque e anuncia a nota', () => {
-  const kT = sk('Tempestade Negra'), kPlain = sk('Faísca');
+  const kT = sk('Turbilhão Negro'), kPlain = sk('Faísca');
   const hit = (key, cmd) => { reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); h.attrs.AGI = 99; e.attrs.AGI = 1; h.vinc = []; derive(h); h.skills = [key]; e.hpMax = e.hp = 9999;
     H.battle(gm, { on: true }); S.battle.ticks[h.id] = -1; h.limit = 100; h.aura = 99; fixR(.3, () => H.act(ana, { id: h.id, skill: key, target: e.id, ...(cmd ? { cmd } : {}) }));
     return { dmg: e.hpMax - e.hp, fx: S.log.map(l => l.fx).filter(f => f && f.cg), txt: S.log.map(l => l.text || '').join('\n') }; };

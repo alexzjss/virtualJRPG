@@ -61,7 +61,7 @@
     corpo: ['Voto do Corpo Fechado', '+30% de dano. Curar a si mesmo (skill ou item) rompe o voto até o fim da batalha e custa 20% da Sanidade máxima.'],
     pureza: ['Voto da Pureza', 'Skills do seu Vínculo causam +30%; ataque básico e skills marciais causam −40%.'],
     sangue: ['Voto de Sangue', '+40% de dano, mas toda skill custa também 8% do HP máximo.'],
-    chama: ['Voto da Última Chama', '+60% de dano com HP até 40%; −15% acima disso.'],
+    chama: ['Voto do Último Fôlego', '+60% de dano com HP até 40%; −15% acima disso.'],
     silencio: ['Voto do Silêncio', 'Não pode usar skills em área; skills de alvo único causam +35%.'],
     cacador: ['Voto do Caçador de Demônios', '+40% de dano contra demônios e chefes; −50% contra humanos.'],
     arma: ['Voto da Arma Única', 'Ataque básico e técnicas de arma causam +35%; outras skills ativas ficam proibidas.'],
