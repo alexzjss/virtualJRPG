@@ -25,3 +25,20 @@ html.luz .fxl .turncut.me{font-size:40px}
 html.luz .fxl .turncut::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;margin-top:30px;background:linear-gradient(90deg,#0000,#fff,#0000);transform:translateX(-100%);animation:luzRun .8s .05s ease-out forwards}
 @keyframes luzRun{to{transform:translateX(100%)}}
 @media (prefers-reduced-motion:reduce){html.luz .fxl .seal b::after,html.luz .fxl .turncut::after{animation:none;display:none}}
+/* splash de Limite/Domínio (luz-cenas.js): véu, faixa diagonal com o material, arte grande do herói e nome em letra fina */
+.ultsplash{position:fixed;inset:0;z-index:70;pointer-events:none;overflow:hidden}
+.ultsplash .us-dim{position:absolute;inset:0;background:radial-gradient(ellipse at 60% 50%,#0008,#000d 70%)}
+.ultsplash .us-bg{position:absolute;left:-10%;right:-10%;top:12%;bottom:12%;overflow:hidden;background:linear-gradient(100deg,color-mix(in srgb,var(--rim) 85%,#000) 0%,var(--rim) 35%,color-mix(in srgb,var(--core) 70%,var(--rim)) 60%,color-mix(in srgb,var(--rim) 60%,#000) 100%);box-shadow:0 0 0 2px #fff6,0 0 60px var(--rim)}
+.ultsplash .us-grad{position:absolute;inset:0;background:repeating-linear-gradient(100deg,#fff0 0 22px,#ffffff14 22px 24px),radial-gradient(ellipse at 70% 50%,#fff8,#fff0 55%)}
+.ultsplash .us-streaks i{position:absolute;left:-40%;height:2px;width:var(--w);background:linear-gradient(90deg,#fff0,var(--core),#fff0);animation:usStreak .7s var(--d) linear infinite}
+@keyframes usStreak{from{transform:translateX(0)}to{transform:translateX(260%)}}
+.ultsplash .us-glyph{position:absolute;left:50%;top:50%;font:800 78vh/1 'Shippori Mincho B1',serif;color:#fff;opacity:.3}
+.ultsplash .us-art{position:absolute;right:4%;top:-6%;bottom:-6%;width:62%;display:flex;align-items:flex-end;justify-content:center;transform-origin:60% 40%}
+.ultsplash .us-art img{height:118%;width:auto;max-width:none;object-fit:contain}
+.ultsplash .us-art span{font:900 60vh/1 Barlow,sans-serif;color:#fff;opacity:.85}
+.ultsplash .us-name{position:absolute;left:7%;bottom:18%;display:flex;flex-direction:column;gap:.5em;color:#fff;max-width:52%}
+.ultsplash .us-name small{font:600 clamp(12px,1.5vw,18px)/1 Barlow,sans-serif;letter-spacing:.42em;text-transform:uppercase;opacity:.9}
+.ultsplash .us-name b{font:500 clamp(30px,5.4vw,76px)/1.05 Barlow,sans-serif;letter-spacing:.14em;text-shadow:0 0 18px var(--rim),0 2px 0 #0009}
+.ultsplash .us-line{display:block;height:2px;width:100%;background:linear-gradient(90deg,#fff,var(--rim),#fff0);transform-origin:left}
+.ultsplash.foe .us-bg{background:linear-gradient(100deg,#1a0006,#e4002b 40%,#3a0010)}
+@media (prefers-reduced-motion:reduce){.ultsplash .us-streaks{display:none}}

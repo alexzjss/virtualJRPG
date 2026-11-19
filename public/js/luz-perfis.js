@@ -77,5 +77,8 @@
   const numberStyle = ({ crit = false, weak = false, total = false, miss = false } = {}) => {
     const [scale, lifeMs] = total ? [1.6, 1200] : crit ? [1.45, 1100] : miss ? [.85, 700] : [1, 900];
     return { scale, star: !!crit && !total, tag: weak ? 'Fraqueza' : '', lifeMs }; };
-  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle };
+  // ----- Limite/Domínio: splash (véu → fundo → arte → nome → volta ao palco) e o golpe; 5000 ms escala linear com a velocidade -----
+  const ULT = [['dim', 0, 300], ['bg', 200, 1600], ['art', 300, 1500], ['name', 700, 1100], ['back', 1800, 400], ['strike', 2200, 2800]];
+  const ultTimeline = totalMs => { const f = Math.max(1, +totalMs || 5000) / 5000; return ULT.map(([k, at, ms]) => ({ k, at: Math.round(at * f), ms: Math.round((at + ms) * f) - Math.round(at * f) })); };
+  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle, ultTimeline };
 })(globalThis);

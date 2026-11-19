@@ -47,3 +47,11 @@ test('LUZP: estilo dos números', () => {
   assert.equal(n({ weak: true }).tag, 'Fraqueza'); assert.equal(n({ total: true }).scale, 1.6); assert.equal(n({ total: true }).lifeMs, 1200); assert.equal(n({ miss: true }).lifeMs, 700); assert.equal(n({ miss: true }).scale, .85);
   assert.deepEqual(n({ heal: true }), { scale: 1, star: false, tag: '', lifeMs: 900 });
 });
+
+test('LUZP: linha do tempo do Limite', () => {
+  const T = L.ultTimeline(5000);
+  assert.deepEqual(T.map(x => x.k), ['dim', 'bg', 'art', 'name', 'back', 'strike']);
+  assert.deepEqual(T.map(x => [x.at, x.ms]), [[0, 300], [200, 1600], [300, 1500], [700, 1100], [1800, 400], [2200, 2800]]);
+  const end = T.at(-1); assert.equal(end.at + end.ms, 5000); const back = T.find(x => x.k === 'back'); assert.equal(back.at + back.ms, end.at);
+  const T2 = L.ultTimeline(2500); assert.equal(T2.at(-1).at + T2.at(-1).ms, 2500); assert.equal(T2.find(x => x.k === 'strike').at, 1100);
+});

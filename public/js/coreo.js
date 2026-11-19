@@ -120,7 +120,8 @@ async function impact(acts, o = {}) {
   try { for (const seg of (typeof PFX !== 'undefined' ? PFX.segments(acts) : [acts])) {
     const f0 = seg[0].fx, a = S.chars[f0.a], big = (f0.lim || f0.dom) && a;
     if (f0.ctr && P3()) await PALCO3D.focus(f0.a, [f0.id], 260);
-    if (big) { cutscene(a, f0); if (P3()) PALCO3D.orbitShot(a.id, 45, 1000); await new Promise(r => setTimeout(r, 1050)); }
+    if (big && luzOn() && typeof LUZCENAS !== 'undefined') { sfxc('limit'); await LUZCENAS.ult(a, f0); } // splash luminosa: volta ao palco e o golpe sai
+    else if (big) { cutscene(a, f0); if (P3()) PALCO3D.orbitShot(a.id, 45, 1000); await new Promise(r => setTimeout(r, 1050)); }
     await strikeFx(seg, f0, a, o);
   } } finally { busyUntil = 0; }
 }
