@@ -47,11 +47,12 @@
   const rotX = (p, rx) => { const r = rx * Math.PI / 180, c = Math.cos(r), s = Math.sin(r); return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c }; };
   // enquadre genérico: gira (ry, rx), centra e aproxima o máximo possível com todos os pontos (pés e cabeça) dentro da fração m da tela.
   // A perspectiva nasce em 50% 40% da tela e a origem do mundo fica em 62%: um ponto do mundo aparece 22% da altura abaixo do centro da perspectiva.
-  const OY = .22, fitCam = ({ pts, ry = 0, rx = 0, w = 1440, h = 860, m = .8, up = 330 }) => {
-    const Q = []; for (const p of pts) for (const y of [0, -(p.h || up)]) { const a = rotP(p, ry), b = rotX({ x: a.x, y, z: a.z }, rx); Q.push(b); }
+  // dmin: distância mínima da câmera a qualquer ponto (nunca fecha em close); hk: folga acima da cabeça (o efeito da habilidade sobe além do corpo)
+  const OY = .22, fitCam = ({ pts, ry = 0, rx = 0, w = 1440, h = 860, m = .8, up = 330, dmin = 160, hk = 1 }) => {
+    const Q = []; for (const p of pts) for (const y of [0, -(p.h || up) * hk]) { const a = rotP(p, ry), b = rotX({ x: a.x, y, z: a.z }, rx); Q.push(b); }
     const xs = Q.map(q => q.x), ys = Q.map(q => q.y), tx = -(Math.min(...xs) + Math.max(...xs)) / 2, ty = h * .05 - (Math.min(...ys) + Math.max(...ys)) / 2 - h * OY; // centro do quadro um pouco abaixo do meio (o topo tem a ordem e os ícones)
     const W2 = w / 2 * m, top = h * .4 * m, bot = h * .5 * m; // embaixo fica a HUD do grupo
-    const ok = tz => Q.every(q => { const d = PERSP - (q.z + tz); if (d < 160) return false; const k = PERSP / d, sx = (q.x + tx) * k, sy = (q.y + ty + h * OY) * k; return Math.abs(sx) <= W2 && sy >= -top && sy <= bot; });
+    const ok = tz => Q.every(q => { const d = PERSP - (q.z + tz); if (d < dmin) return false; const k = PERSP / d, sx = (q.x + tx) * k, sy = (q.y + ty + h * OY) * k; return Math.abs(sx) <= W2 && sy >= -top && sy <= bot; });
     let lo = -9000, hi = 900; if (!ok(lo)) return { tx, ty, tz: lo, ry, rx };
     for (let i = 0; i < 26; i++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; }
     return { tx, ty, tz: lo, ry, rx };
@@ -75,15 +76,17 @@
   };
   const mood = sc => { const t = [sc?.mood, sc?.hora, /-(dia|tarde|noite)$/.exec(String(sc?.bbg || ''))?.[1]].find(v => v === 'dia' || v === 'tarde' || v === 'noite'); return t || 'dia'; }; // hora do dia da cena: campo mood/hora, ou o sufixo do cenário pronto (tema-hora)
   const ZMIN = 420, ZMAX = 2600; // zoom: distância extra mínima e máxima do alvo
+  // plano de ação (golpes, técnicas, contra-ataque): aberto, com folga para o efeito e distância mínima; um plano só por golpe
+  const ACT = { m: .52, dmin: 1350, hk: 1.45, rx: -12 }, ORB = 1400; // ORB: distância da órbita do Limite/Domínio
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
     if (PRESET[v.kind] || v.kind === 'wide') { // vistas de fora travadas (ver PRESET) e plano aberto de área
-      const pts = v.pts && v.pts.length ? v.pts : [a], p = PRESET[v.kind] || { ry: v.ry0 || 0, rx: -22, m: .78 };
-      r = fitCam({ pts, ry: p.ry, rx: p.rx, w: v.w, h: v.h, m: p.m });
+      const pts = v.pts && v.pts.length ? v.pts : [a], p = PRESET[v.kind] || { ry: v.ry0 || 0, rx: v.rx ?? -22, m: v.m || .78 };
+      r = fitCam({ pts, ry: p.ry, rx: p.rx, w: v.w, h: v.h, m: p.m, dmin: v.dmin, hk: v.hk });
     } else if (v.kind === 'two') { // plano a dois, visto de fora e de lado: a linha atacante→alvo fica deitada na tela, atacante à esquerda (ou o lado mais perto da câmera atual)
       const b = v.to || a, base = Math.atan2(b.z - a.z, b.x - a.x) * 180 / Math.PI, ref = v.ry0 || 0, c1 = angNear(base, ref), c2 = angNear(base + 180, ref);
       const ry = Math.abs(c1 - ref) <= 110 ? c1 : c2, pts = [a, b, ...(v.pts || [])];
-      r = fitCam({ pts, ry: Math.round(ry * 10) / 10, rx: -9, w: v.w, h: v.h, m: v.m || .66 });
+      r = fitCam({ pts, ry: Math.round(ry * 10) / 10, rx: v.rx ?? -9, w: v.w, h: v.h, m: v.m || .66, dmin: v.dmin, hk: v.hk });
     } else if (v.kind === 'select') { // mira: vista neutra e estável, com todos os candidatos dentro da área útil
       const pts = (v.pts && v.pts.length ? v.pts : [a]), xs = pts.map(p => p.x), zs = pts.map(p => p.z), C = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
       const w = v.w || 1440, safe = w * .36, k = safe / PERSP, sx = w > 900 ? 50 : 0; // deixa respiro para a ordem à esquerda
@@ -102,7 +105,7 @@
       r = { tx, ty: Math.round(b * .08), tz: tz0 - b, ry };
       if (ln) { const ka = PERSP / Math.max(160, PERSP - (A.z + r.tz)); const W = v.w || 1440, mx = ln.side > 0 ? W / 2 + SX * ka - W * .3 : W * .7 - (W / 2 + SX * ka); r.tx = tx - ln.side * Math.max(0, Math.min(ln.w * .55, W * .25, mx)) / ka; } // a faixa da coluna: o ator sai da frente dela, em pixels de tela (ka: escala do ator depois do recuo)
     } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x, ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 2.8), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
-    else if (v.kind === 'orbit') { const ry = (v.ry0 || 0) + (v.deg || 0), A = rotP(a, ry); r = { tx: -A.x, ty: -60, tz: -A.z - 620 - (v.back || 0), ry }; } // arco cinematográfico em volta de quem age
+    else if (v.kind === 'orbit') { const ry = (v.ry0 || 0) + (v.deg || 0), A = rotP(a, ry); r = { tx: -A.x, ty: -60, tz: -A.z - ORB - (v.back || 0), ry }; } // arco cinematográfico em volta de quem age (de longe: a figura e a aura cabem)
     else if (v.kind === 'aim') r = { tx: -(a.x * .55 + t.x * .45) - 120, ty: 0, tz: -a.z + 380, ry: a.x < 0 ? -4 : 4 };
     else if (v.kind === 'foe') r = { tx: -a.x * .3, ty: 0, tz: 180, ry: 0 };
     else r = { tx: -a.x - 110, ty: 0, tz: -a.z + 560, ry: a.x < 0 ? -6 : 6 };
@@ -167,7 +170,7 @@
   const QCYCLE = ['auto', 'high', 'medium', 'low'], QNAME = { auto: 'Auto', high: 'Alta', medium: 'Média', low: 'Baixa' };
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
-  const P = { lane: { w: 0, side: 1 }, pickSide, mood, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { lane: { w: 0, side: 1 }, ACT, ORB, pickSide, mood, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let floor = null, rl = null, rb = null, floorKey = '', root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', biomeClass = '', settle = 0, hs1 = 0, hs2 = 0;
@@ -258,7 +261,8 @@
     const tbl = id => ({ kind: 'table', at: at(id), pts, w, h: root?.clientHeight || 860, foe: !!S.chars[id]?.enemy, lane: P.lane });
     const dt = cur?.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
     const out = local.mode !== 'ombro' && !local.aim ? { kind: local.mode, pts, w, h: root?.clientHeight || 860, fast: !!dt } : null; // vista de fora escolhida: lateral ou aérea, com todos no quadro
-    const base = local.aim ? { kind: 'select', pts, w } : out ? out : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { ...tbl(dt), fast: true } : tbl(cur.id);
+    const hp = id => ({ ...at(id), h: parseFloat(els.get(id)?.h) || 330 }); // janela de defesa: plano aberto do inimigo com o alvo (o mesmo da investida que vem depois: sem corte)
+    const base = local.aim ? { kind: 'select', pts, w } : out ? out : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { kind: 'two', at: hp(cur.id), to: hp(dt), ry0: camRy, ...ACT, w, h: root?.clientHeight || 860, fast: true } : tbl(cur.id);
     if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', to: { ...F.get(local.zoom), h: parseFloat(els.get(local.zoom)?.h) || 330 }, ry: cameraFor(base).ry };
     return base;
   };
@@ -365,7 +369,7 @@
     const z0 = +a.el.style.getPropertyValue('--z') || from.z, x0 = +a.el.style.getPropertyValue('--x') || from.x, dz = Math.sign(z0 - to.z) || 1, dx = Math.sign(from.x - to.x) || -1;
     const tx = to.x + 140 * dx, tz = to.z + 260 * dz, ms = lungeMs(Math.hypot(tx - x0, tz - z0));
     // câmera de fora: plano a dois, de lado, com atacante e alvo inteiros no quadro (volta à vista escolhida depois)
-    camLock = cameraFor({ kind: 'two', at: ptOf(fromId, { x: tx, z: tz }), to: ptOf(toId), pts: [ptOf(fromId, { x: x0, z: z0 })], ry0: camRy, ...hw() }); /* de lado para o ponto de chegada: no impacto os dois ficam lado a lado */ world.classList.add('fast'); world.style.setProperty('--lg', (ms + WU) + 'ms'); camera(F);
+    camLock = cameraFor({ kind: 'two', at: ptOf(fromId, { x: tx, z: tz }), to: ptOf(toId), pts: [ptOf(fromId, { x: x0, z: z0 })], ry0: camRy, ...ACT, ...hw() }); /* de lado para o ponto de chegada, aberto: a ida, o impacto e o efeito cabem num plano só */ world.classList.add('fast'); world.style.setProperty('--lg', Math.max(CAM_MS, ms + WU) + 'ms'); camera(F);
     holdEnd = performance.now() + 4000; a.lunging = true; lungeN++; document.documentElement.classList.add('p3-golpe');
     const st = a.el.style, L = Math.hypot(tx - x0, tz - z0) || 1; st.setProperty('--wx', Math.round(-(tx - x0) / L * 40)); st.setProperty('--wz', Math.round(-(tz - z0) / L * 40)); // recuo curto no sentido contrário
     a.el.classList.remove('hopb', 'walk'); a.el.classList.add('windup');
@@ -384,22 +388,21 @@
   let holdEnd = 0, unT = 0;
   const unlock = (ms = 450) => { clearTimeout(unT); const w = holdEnd - performance.now(); if (w > 0) { unT = setTimeout(() => unlock(ms), w + 10); return; } if (!camLock) return; camLock = null; if (lastF && root?.style.display !== 'none' && S.battle?.active) camera(units()); /* depois do fim, units() apagaria a pose final */ setTimeout(() => { if (camLock) return; world.classList.remove('fast'); world.style.removeProperty('--lg'); }, ms); };
   P.hold = ms => { holdEnd = performance.now() + ms; unlock(); };
-  // técnica à distância: a câmera abre de lado no atacante (com um pedaço do caminho); P.follow leva até o alvo junto com o efeito.
-  // Vários alvos: plano aberto de área com todos. Em si mesmo: aproxima de quem age.
-  const lerp = (p, q, k) => ({ x: p.x + (q.x - p.x) * k, z: p.z + (q.z - p.z) * k, h: p.h });
-  const shotOf = (fromId, toIds, k) => { const F = lastF, from = ptOf(fromId), tg = toIds.map(id => ptOf(id)).filter(Boolean).filter(p => Math.hypot(p.x - from.x, p.z - from.z) > 1);
-    if (!tg.length) return cameraFor({ kind: 'zoom', to: F.get(fromId), ry: camRy });
-    if (tg.length > 1) return cameraFor({ kind: 'wide', pts: [from, ...tg], ry0: camRy, ...hw() });
-    const t = tg[0]; return cameraFor({ kind: 'two', at: lerp(from, t, Math.max(0, k - .4)), to: lerp(from, t, Math.min(1, k + .35)), ry0: camRy, m: .62, ...hw() }); };
-  P.focus = (fromId, toIds = [], ms = 420) => new Promise(res => {
+  // técnica: um plano aberto e parado com quem age e todos os alvos desde o começo; o efeito atravessa a tela sem a câmera andar.
+  // Um alvo: de lado, a dois. Vários: plano de área. Em si mesmo: plano médio de quem age (nunca close).
+  const CAM_MS = 650; // a câmera nunca chega em menos que isso (corte brusco parece bug)
+  const shotOf = (fromId, toIds) => { const from = ptOf(fromId), tg = toIds.map(id => ptOf(id)).filter(Boolean).filter(p => Math.hypot(p.x - from.x, p.z - from.z) > 1);
+    if (!tg.length) return cameraFor({ kind: 'wide', pts: [from], ry0: camRy, ...ACT, m: .42, ...hw() });
+    if (tg.length > 1) return cameraFor({ kind: 'wide', pts: [from, ...tg], ry0: camRy, ...ACT, m: .7, ...hw() });
+    return cameraFor({ kind: 'two', at: from, to: tg[0], ry0: camRy, ...ACT, ...hw() }); };
+  P.focus = (fromId, toIds = [], ms = CAM_MS) => new Promise(res => {
     const F = lastF, from = F?.get(fromId);
     if (!from || !root || root.style.display === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return res();
-    camLock = shotOf(fromId, toIds, 0); holdEnd = performance.now() + 4000;
-    world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(F); setTimeout(res, Math.max(0, ms - 40));
+    camLock = shotOf(fromId, toIds); holdEnd = performance.now() + 4000;
+    world.classList.add('fast'); world.style.setProperty('--lg', Math.max(CAM_MS, ms) + 'ms'); camera(F); setTimeout(res, Math.max(0, Math.min(ms, 420) - 40)); // o efeito já sai enquanto a câmera assenta
   });
-  // seguir o efeito: a câmera viaja do atacante até o alvo no tempo do voo (ms até o impacto); só com um alvo
-  P.follow = (fromId, toIds = [], ms = 500) => { const F = lastF; if (!live() || reducedM() || !F?.get(fromId) || toIds.filter(id => id !== fromId && F.get(id)).length !== 1) return;
-    camLock = shotOf(fromId, toIds, 1); holdEnd = Math.max(holdEnd, performance.now() + ms + 400); world.classList.add('fast'); world.style.setProperty('--lg', Math.max(260, ms) + 'ms'); camera(F); };
+  // o efeito voa até o alvo: a câmera fica parada no plano do focus; só segura a cena até o impacto
+  P.follow = (fromId, toIds = [], ms = 500) => { if (!live() || !camLock) return; holdEnd = Math.max(holdEnd, performance.now() + ms + 400); };
   // impacto no recorte: tremida curta (classe hurt por 450 ms)
   P.shake = id => { const u = els.get(id); if (!u) return; if (g.LUZ?.corpo?.has(id)) g.LUZ.corpo.flash(id); u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };
   const reducedM = () => matchMedia('(prefers-reduced-motion: reduce)').matches, live = () => !!root && root.style.display !== 'none';

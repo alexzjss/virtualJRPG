@@ -1686,9 +1686,18 @@ test('palco 3D: posições fixas de câmera enquadram todos e são distintas', a
 test('palco 3D: órbita e contracampo do inimigo', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, at = { x: 200, z: -300 };
   const o = P.cameraFor({ kind: 'orbit', at, ry0: 10, deg: 45 }), A = P.rotP(at, 55);
-  assert.equal(o.ry, 55); assert.equal(o.tx, Math.round(-A.x)); assert.equal(o.tz, Math.round(-A.z - 620)); assert.equal(o.ty, -60);
+  assert.equal(o.ry, 55); assert.equal(o.tx, Math.round(-A.x)); assert.equal(o.tz, Math.round(-A.z - P.ORB)); assert.equal(o.ty, -60);
   const foe = { x: 0, z: -2000 }, hero = { x: 0, z: 0 }, c = P.cameraFor({ kind: 'table', at: foe, pts: [foe, hero], w: 1440, foe: true });
   assert.equal(P.unitKind({}, c.ry), 'f');
+});
+test('palco 3D: plano de ação aberto, nunca em close', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, a = { x: 0, z: -1240, h: 330 }, b = { x: 140, z: -1500, h: 330 };
+  const near = (v, pts) => Math.min(...pts.map(p => 1000 - (P.rotP(p, v.ry).z + v.tz)));
+  const tight = P.cameraFor({ kind: 'two', at: a, to: b, w: 1440, h: 860 }), act = P.cameraFor({ kind: 'two', at: a, to: b, ...P.ACT, w: 1440, h: 860 });
+  assert.ok(act.tz < tight.tz, 'investida: mais longe que o plano justo');
+  assert.ok(near(act, [a, b]) >= P.ACT.dmin - 1, 'investida: respeita a distância mínima');
+  const solo = P.cameraFor({ kind: 'wide', pts: [a], ry0: 0, ...P.ACT, m: .42, w: 1440, h: 860 });
+  assert.ok(near(solo, [a]) >= P.ACT.dmin - 1, 'em si mesmo: plano médio, sem close');
 });
 test('palco 3D: zoom e mesa respeitam a altura real e a faixa da coluna', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, to = h => ({ x: 0, z: -1500, h });

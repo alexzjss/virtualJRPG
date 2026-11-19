@@ -207,7 +207,7 @@ function strikeFx(acts, f0, a, o = {}) {
     if (/QUEBROU!/.test(e.text)) setTimeout(() => shatter(el), 120);
     if (koNow) { setTimeout(() => knockout(f.id), 260);
       const sl = p3 && PFX.slowFor({ ko: true, lastFoe: !!S.chars[f.id]?.enemy && !foeLeft(f.id), reduced: calm() });
-      if (sl && typeof CENA !== 'undefined') { CENA.slow(sl.f, sl.ms); if (sl.zoom) { PALCO3D.focus(f.id, [], 300); PALCO3D.vignette(sl.ms); posFx('invert'); posFx('shock', f.id, { strength: 1 }); } } }
+      if (sl && typeof CENA !== 'undefined') { CENA.slow(sl.f, sl.ms); if (sl.zoom) { PALCO3D.vignette(sl.ms); /* a câmera fica no plano aberto do golpe: sem zoom no último que cai */ posFx('invert'); posFx('shock', f.id, { strength: 1 }); } } }
   };
   // golpes do mesmo grupo (multi-hit) caem a 140 ms um do outro; devolve quando o último cai
   const hits = d0 => { let k = 0, last = d0; for (const G of (typeof PFX !== 'undefined' ? PFX.groupHits(acts) : acts.map(e => ({ parts: [e], total: 0 }))))
