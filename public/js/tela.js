@@ -89,6 +89,7 @@ function render() {
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   PALCO3D.local.aim = LEQUE.camTarget(); // liga a vista tática da mira e ancora a linha de alcance (hover não faz o palco oscilar)
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
+  if (typeof LEQUE !== 'undefined') LEQUE.lift(); // a coluna de comandos vai para o topo do #app (acima do palco)
   fx();
 }
 

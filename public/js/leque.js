@@ -54,12 +54,19 @@ const LEQUE = (() => {
   const stroke = (lq, key, label, small, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''} ${o.cls || ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
 
   // ===== coluna presa ao herói: segue o recorte da vez (suave), espelha na borda e some durante a investida =====
-  // .lqm (comandos + lista aberta ao lado) fica no ombro; .lqt (comandos de turno) do lado oposto do recorte
+  // .lqm: uma só coluna (comandos, traço, comandos de turno) no ombro, com a lista aberta ao lado
   const fol = { x: null, y: null, tx: null, ty: null, side: 1, raf: 0, tmo: 0, id: null, last: 0 };
   const GAP = 22, DEAD = 40; // DEAD: px que o herói anda antes da coluna ir atrás
+  // a coluna sobe para ser filha direta do #app, fixa sobre o retângulo do palco: fora de qualquer contexto de empilhamento do mestre/jogador, fica sempre acima do mundo 3D e dos recortes (z-index 16 contra 10)
+  const lift = () => {
+    const lq = app.querySelector('.lq'), host = app.querySelector('[data-p3d]'); if (!lq || !host) return lq || null;
+    if (lq.parentElement !== app) app.append(lq);
+    const r = host.getBoundingClientRect(), st = lq.style; st.position = 'fixed'; st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px'; st.height = r.height + 'px'; st.right = st.bottom = 'auto';
+    return lq;
+  };
   // step(snap): mede e posiciona; snap pula a suavização (aba em segundo plano, onde o requestAnimationFrame não roda)
   const step = (snap = false) => {
-    const lq = app.querySelector('.lq'), m = lq?.querySelector('.lqm'); if (!lq || !m || !cx) { fol.id = null; PALCO3D.lane.w = 0; return false; }
+    const lq = lift(), m = lq?.querySelector('.lqm'); if (!lq || !m || !cx) { fol.id = null; PALCO3D.lane.w = 0; return false; }
     const r = PALCO3D.rectOf(cx.actor.id), L = lq.getBoundingClientRect(), mi = m.firstElementChild.getBoundingClientRect();
     if (!L.width) return true;
     // sem recorte na tela (câmera de longe, fora do quadro): fica no meio, um pouco à direita
@@ -81,14 +88,6 @@ const LEQUE = (() => {
     const nx = ease('x', x), ny = ease('y', y); fol.mv = { ...fol.mv, x: Math.abs(x - nx) >= 3, y: Math.abs(y - ny) >= 3 }; fol.x = nx; fol.y = ny;
     lq.classList.toggle('l', fol.side < 0);
     fol.l = fol.x - sx; m.style.transform = `translate(${Math.round(fol.l)}px,${Math.round(fol.y)}px)`; m.style.visibility = '';
-    const t = lq.querySelector('.lqt');
-    if (t) { const ti = t.firstElementChild.getBoundingClientRect(), tw = ti.width;
-      let tx = fol.side > 0 ? rl - GAP - tw : rr + GAP, ty = rt + rh * .3;
-      // herói colado na borda (câmera de ombro): sem espaço do outro lado, desce para baixo da coluna em vez de cobrir o recorte
-      if (fol.side > 0 ? tx < 8 : tx + tw > L.width - 8) { const ci = m.querySelector('.lqc').getBoundingClientRect(); tx = fol.side > 0 ? x : x - tw; ty = y + (ci.bottom - mi.top) + 12; }
-      const stx = side > 0 ? tw : 0; tx = Math.max(8, Math.min(L.width - tw - 8, tx)) + stx; ty = Math.max(8, Math.min(L.height - ti.height - 8, ty)); // também pela borda voltada ao herói
-      const ntx = ease('tx', tx), nty = ease('ty', ty); fol.mv = { ...fol.mv, tx: Math.abs(tx - ntx) >= 3, ty: Math.abs(ty - nty) >= 3 }; fol.tx = ntx; fol.ty = nty;
-      fol.tl = fol.tx - stx; t.style.transform = `translate(${Math.round(fol.tl)}px,${Math.round(fol.ty)}px)`; t.style.visibility = ''; }
     return true;
   };
   // a câmera anda por ~1,1 s e a investida mexe o recorte: acompanha a cada quadro
@@ -98,8 +97,8 @@ const LEQUE = (() => {
     if (!fol.raf) fol.raf = requestAnimationFrame(follow);
     queueMicrotask(() => step(performance.now() - fol.last > 250)); // logo depois do desenho entrar na página, sem esperar o próximo quadro
     if (!fol.tmo) fol.tmo = setTimeout(function reserva() { fol.tmo = 0; const idle = performance.now() - fol.last > 250; if (step(idle) !== false && idle) fol.tmo = setTimeout(reserva, 300); }, 300); // reserva enquanto o requestAnimationFrame está parado
-    return `<div class="lq ${fol.side < 0 ? 'l' : ''}" ${fol.s < 1 ? `style="--hk:${(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) * fol.s).toFixed(3)}"` : ''} aria-label="Comandos de ${esc(cx.actor.name)}"><div class="lqa lqm" style="${pos(fol.x == null ? null : fol.l, fol.y)}"><div class="lqin"><div class="lqc">${main}</div>${sub ? `<div class="lqsub" style="--row:${row}">${sub}</div>` : ''}</div></div>`
-      + (turn ? `<div class="lqa lqt" style="${pos(fol.tx == null ? null : fol.tl, fol.ty)}"><div class="lqin">${turn}</div></div>` : '') + '</div>';
+    const col = /^#[0-9a-f]{6}$/i.test(cx.actor.color) ? cx.actor.color : cx.actor.enemy ? '#e60012' : '#00b7ff'; // cor do herói da vez: borda e realce da coluna
+    return `<div class="lq ${fol.side < 0 ? 'l' : ''}" style="--lqc:${col};${fol.s < 1 ? `--hk:${(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) * fol.s).toFixed(3)}` : ''}" aria-label="Comandos de ${esc(cx.actor.name)}"><div class="lqa lqm" style="${pos(fol.x == null ? null : fol.l, fol.y)}"><div class="lqin"><div class="lqc">${main}${turn ? `<div class="lqturn" role="group" aria-label="Comandos de turno">${turn}</div>` : ''}</div>${sub ? `<div class="lqsub" style="--row:${row}">${sub}</div>` : ''}</div></div></div>`;
   };
 
   return {
@@ -107,6 +106,7 @@ const LEQUE = (() => {
     // limpa tudo (a ação saiu ou a vez mudou)
     reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; },
     off() { cx = null; },
+    lift,
     // âncora da vista tática/linha de alcance (palco3d.js): só enquanto o leque está na mira
     // linha de efeito previsto sobre o alvo (ficha): "nome · P12 · ▲ FRACO · −1 escudo"; só na mira, de golpe que dá dano
     preview(t) {
