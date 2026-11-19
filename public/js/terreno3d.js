@@ -407,14 +407,15 @@
   // miniaturas do seletor do mestre (mesmas cores do 3D)
   function thumbs() {
     if (typeof document === 'undefined' || document.getElementById('terr-thumbs')) return;
-    const sky = `<defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a5fe0"/><stop offset=".7" stop-color="#9fd8ff"/></linearGradient></defs><rect width="64" height="36" fill="url(#c)"/><circle cx="10" cy="8" r="4" fill="#fffdf0"/>`;
+    const sky = h => `<defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="!${SKY[h][0]}"/><stop offset=".7" stop-color="!${SKY[h][2]}"/></linearGradient></defs><rect width="64" height="36" fill="url(#c)"/>`
+      + (h === 'noite' ? `<circle cx="10" cy="8" r="3.4" fill="!#eef2ff"/><circle cx="30" cy="5" r=".6" fill="!#fff"/><circle cx="48" cy="9" r=".6" fill="!#fff"/><circle cx="56" cy="4" r=".5" fill="!#fff"/>` : h === 'tarde' ? `<circle cx="10" cy="15" r="5" fill="!#ffd090"/>` : `<circle cx="10" cy="8" r="4" fill="#fffdf0"/>`);
     const art = {
       floresta: `<path d="M0 22Q16 14 32 20T64 18V36H0Z" fill="#9ccbf0"/><rect y="27" width="64" height="9" fill="#5fbd3c"/><path d="M26 36L30 28H36L40 36Z" fill="#d9ae6a"/>` + [[6, 22, 8], [17, 18, 9], [48, 19, 9], [58, 23, 7], [3, 29, 5], [61, 29, 5]].map(([x, y, r]) => `<rect x="${x - 1.5}" y="${y}" width="3" height="${30 - y}" fill="#8f5a34"/><circle cx="${x}" cy="${y}" r="${r}" fill="#4fb54a"/><circle cx="${x - r * .3}" cy="${y - r * .3}" r="${r * .55}" fill="#b2ea5a"/>`).join(''),
       castelo: `<rect y="27" width="64" height="9" fill="#eadfc4"/><rect x="0" y="17" width="64" height="11" fill="#e0d1b0"/>` + [4, 12, 20, 28, 36, 44, 52, 60].map(x => `<rect x="${x - 2}" y="14" width="4" height="3" fill="#e0d1b0"/>`).join('') + [[8, 9], [56, 9], [32, 4]].map(([x, y]) => `<rect x="${x - 4}" y="${y + 4}" width="8" height="${24 - y}" fill="#fbf1d8"/><path d="M${x - 5} ${y + 4}L${x} ${y - 4}L${x + 5} ${y + 4}Z" fill="#3566e0"/>`).join('') + `<path d="M28 28V22Q32 18 36 22V28Z" fill="#7a4a34"/><rect x="18" y="18" width="4" height="7" fill="#c8102e"/><rect x="42" y="18" width="4" height="7" fill="#c8102e"/>`,
       praia: `<rect y="20" width="64" height="16" fill="#1f84dc"/><path d="M0 36V26Q20 24 34 30T64 33V36Z" fill="#f8dfa2"/><path d="M30 29Q40 31 64 31" stroke="#fff" stroke-width="1.2" fill="none"/><path d="M10 30Q12 20 16 12" stroke="#c38750" stroke-width="2" fill="none"/><path d="M16 12l-8 3M16 12l8 2M16 12l-5 -5M16 12l6 -4M16 12l1 8" stroke="#52b83a" stroke-width="2.4" stroke-linecap="round"/>`,
     };
     const st = document.createElement('style'); st.id = 'terr-thumbs';
-    st.textContent = Object.entries(art).map(([k, a]) => `.bbthumb.bb-${k}-dia{background:${svgUrl(64, 36, sky + a, 'xMidYMid slice')} center/cover}.bbthumb.bb-${k}-dia .bbfx,.bbthumb.bb-${k}-dia::before{display:none}`).join('');
+    st.textContent = Object.entries(art).flatMap(([k, a]) => HORAS.map(h => `.bbthumb.bb-${k}-${h}{background:${gradeAll(svgUrl(64, 36, sky(h) + a, 'xMidYMid slice'), h)} center/cover}.bbthumb.bb-${k}-${h} .bbfx,.bbthumb.bb-${k}-${h}::before{display:none}`)).join('');
     document.head.appendChild(st);
   }
   if (typeof document !== 'undefined') { if (document.head) thumbs(); else addEventListener('DOMContentLoaded', thumbs); }

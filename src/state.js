@@ -4,7 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { SUBST } from '../arvore/substitutas.js';
 import { DATA, FILE, OF } from './config.js';
-import { ATTRS, CLIMA, EL, EXTRA, it, sk } from './consts.js';
+import { ATTRS, BBG, BBHORAS, BBTEMAS, CLIMA, EL, EXTRA, it, sk } from './consts.js';
 
 
 // ---------- estado ----------
@@ -67,8 +67,9 @@ S.items ??= buildItems(it);
 // Preserva mapas e URLs personalizados ao abrir campanhas do catálogo anterior.
 function migrateBackdrop(sc) {
   if (!/^[a-z]+(?:-[a-z]+)*$/.test(sc.bbg || '')) return;
+  if (BBG.includes(sc.bbg)) return; // tema e horário válidos
   const family = sc.bbg.split('-')[0];
-  sc.bbg = ['floresta','castelo','praia'].includes(family) ? family + '-dia' : 'floresta-dia';
+  sc.bbg = BBTEMAS.includes(family) ? family + '-' + BBHORAS[0] : 'floresta-dia';
 }
 function migrateItems() { // catálogo v5: nomes novos dos consumáveis e equipamentos (RENAME) e o catálogo completo de armas com modelo (armas forjadas e itens do mestre ficam); as chaves mudam, então tudo é remapeado pelo nome
   if (S.itemsV === ITEMS_V) return;
@@ -216,4 +217,4 @@ function adopt(o, isNew = false, after = () => {}) {
   }
 }
 
-export { BK, BLANK, S, inScene, ctxScene, adopt, backup, backupOnStart, diaryFile, fin, flush, flushDiary, fresh, isObj, log, migrate, migrateItems, newScene, save, saveT, slug, writeState };
+export { BK, BLANK, S, inScene, migrateBackdrop, ctxScene, adopt, backup, backupOnStart, diaryFile, fin, flush, flushDiary, fresh, isObj, log, migrate, migrateItems, newScene, save, saveT, slug, writeState };

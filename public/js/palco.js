@@ -29,8 +29,9 @@ const STK = { possess: '憑', curse: '呪', frozen: '氷', marked: '印', brand:
 const STGOOD = new Set(['atkUp', 'defUp', 'agiUp', 'shield', 'regen', 'taunt', 'guarded', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'charge', 'form', 'endure']);
 const stIcons = c => [sanSt(c) && `<i class="sti bad" title="${esc(sanSt(c))}: sanidade baixa pesa em todas as rolagens">狂</i>`, ...Object.entries(c.st).map(([k, n]) => { const nm = k === 'shield' && c.shield ? ST[k] + ' ' + c.shield : (ST[k] || k) + (n < 90 ? ' · ' + n : '');
   return `<i class="sti ${STGOOD.has(k) ? 'good' : /Dn$/.test(k) ? 'bad dn' : /Up$/.test(k) ? '' : 'bad'} ${/Up$/.test(k) ? 'up' : ''}" data-st="${esc(k)}" title="${esc(nm + (STD[k] ? ': ' + STD[k] : ''))}" aria-label="${esc(nm)}">${STK[k] || esc((ST[k] || k).slice(0, 1))}${n < 90 ? `<sub>${n}</sub>` : ''}</i>`; })].filter(Boolean).join('');
-const BBG = { 'floresta-dia': 'Floresta', 'castelo-dia': 'Castelo', 'praia-dia': 'Praia' };
-const BBGRP = [['Cenários', Object.keys(BBG)]], CLIMAV = { chuva: 'Chuva', neblina: 'Neblina', cinzas: 'Cinzas', neve: 'Neve', brasas: 'Brasas' }; // grupos do seletor e climas visuais sobrepostos
+const BBTEMA = { floresta: 'Floresta', castelo: 'Castelo', praia: 'Praia', neve: 'Montanha', deserto: 'Deserto', caverna: 'Caverna', ruinas: 'Ruínas', pantano: 'Pântano', vulcao: 'Vulcão', campo: 'Campo' }, BBHORA = { dia: 'Dia', tarde: 'Tarde', noite: 'Noite' };
+const BBG = Object.fromEntries(Object.keys(BBTEMA).flatMap(t => Object.keys(BBHORA).map(h => [`${t}-${h}`, `${BBTEMA[t]} · ${BBHORA[h]}`]))); // cenários 3D prontos: tema-horário
+const CLIMAV = { chuva: 'Chuva', neblina: 'Neblina', cinzas: 'Cinzas', neve: 'Neve', brasas: 'Brasas' }; // grupos do seletor e climas visuais sobrepostos
 const bbfx = '<i class="bbfx" aria-hidden="true"><b></b><s></s></i>'; // camadas do fundo animado: ::before, ::after, b (terceira) e s (flash do golpe crítico)
 function battle(split, over = '') { // split (só o mestre): devolve { stage, bar }; over (PC): HUD e leque desenhados por cima do palco 3D
   const tl = timeline(), cur = S.chars[tl[0]], sc = S.scenes[S.scene], inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks);
