@@ -1071,6 +1071,15 @@ details.mais>.row{margin:8px 10px}
 .skchips .chip:hover,.skchips .chip:focus-visible{transform:scale(1.12);box-shadow:0 0 12px var(--e)}
 .skchips .chip.mine{border-color:var(--e);box-shadow:0 0 0 2px #0b0b14,0 0 0 3px var(--e)}
 @media(max-width:999px){.skchips{left:170px;right:8px}}
+/* abas da árvore: só o kanji; a aba aberta mostra o nome junto */
+.sktabsv .chip{width:auto;min-width:34px;grid-auto-flow:column;gap:6px;border-radius:17px;padding:0 8px}
+.sktabsv .chip i{font-style:normal}.sktabsv .chip span{display:none;font:600 13px var(--ui,system-ui,sans-serif)}
+.sktabsv .chip.on{background:color-mix(in srgb,var(--e) 32%,#0b0b14);border-color:var(--e);box-shadow:0 0 12px color-mix(in srgb,var(--e) 60%,transparent)}.sktabsv .chip.on span{display:inline}
+/* busca e filtros em cima do mapa */
+.skfind2{position:absolute;top:54px;left:176px;z-index:2;display:flex;gap:5px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 300px)}
+.skfind2 .bq{width:200px;min-height:34px;background:#0b0b14e6}.skfind2 button{min-height:34px;padding:4px 10px;font-size:12px;background:#0b0b14e6}
+.skp:not(.closed) .skfind2{max-width:calc(100% - 560px)}
+@media(max-width:999px){.skfind2{left:170px;max-width:calc(100% - 180px)}.skfind2 .bq{width:140px}}
 /* girar a mandala: botões de um caractere só ficavam com 31px no celular (mínimo de toque: 34px) */
 .skhint [data-a=skRotL],.skhint [data-a=skRotR]{min-width:40px}
 

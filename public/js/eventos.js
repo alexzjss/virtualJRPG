@@ -25,6 +25,8 @@ app.addEventListener('change', e => {
   else if (d.qa) qa[d.qa] = v;
 });
 app.addEventListener('input', e => { const ds = e.target.dataset; if (ds.rqtxt && reqUi[ds.rqtxt]) reqUi[ds.rqtxt].txt = e.target.value; if (ds.sess) sess[ds.sess] = e.target.value; if (ds.qa) qa[ds.qa] = e.target.type === 'number' ? +e.target.value : e.target.value; const k = ds.bf; if (!k) return; bf[k] = e.target.value; if (['q', 'giveq', 'skq', 'wq', 'wsq'].includes(k)) render(); }); // filtros e buscas
+// busca da árvore: Enter (ou ↵) leva a câmera ao próximo resultado, trocando de aba se ele estiver em outra
+function skNextHit() { if (!skHits.length) return toast('Nada encontrado com essa busca.'); const id = skHits[skHitI++ % skHits.length]; const v = skView(); MANDALA.focus(id); if (skView() !== v) render(); }
 app.addEventListener('toggle', e => { const k = e.target.dataset?.oper; if (k) oOpen[k] = e.target.open; }, true); // lembra as perícias abertas e fechadas
 app.addEventListener('keydown', e => { const el = e.target; if (!el.dataset?.edin) return; if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.stopPropagation(); el.value = ''; el.blur(); } }, true);
 app.addEventListener('keydown', e => { // elementos clicáveis que não são <button> também respondem ao teclado
@@ -38,7 +40,7 @@ function goAct(id) { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt =
   send(msg);
 }
 const sayChat = el => { if (el?.value.trim()) { send({ t: 'chat', text: el.value, secret }); el.value = ''; } };
-app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.chat) sayChat(e.target); if (e.key === 'Enter' && e.target.dataset.rqtxt) { e.preventDefault(); send({ t: 'reqOk', id: e.target.dataset.rqtxt, ...reqUi[e.target.dataset.rqtxt] }); } });
+app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest?.('.skfind2')) { e.preventDefault(); e.stopPropagation(); return skNextHit(); } if (e.key === 'Enter' && e.target.dataset.chat) sayChat(e.target); if (e.key === 'Enter' && e.target.dataset.rqtxt) { e.preventDefault(); send({ t: 'reqOk', id: e.target.dataset.rqtxt, ...reqUi[e.target.dataset.rqtxt] }); } });
 app.addEventListener('focusout', e => {
   if (e.target.dataset?.edin && editing) return commitEd(e.target);
   // campo restaurado após redesenho não dispara "change" sozinho: dispara aqui para não perder a edição
@@ -97,6 +99,9 @@ app.addEventListener('click', e => {
   if (d.a === 'skArmas') return MANDALA.focus('armas'); // Árvore de Armas (bloco à parte)
   if (d.a === 'skAll') return MANDALA.focus('all');
   if (d.a === 'skFocus') return MANDALA.focus(d.el);
+  if (d.a === 'skView') { MANDALA.view(d.el); return render(); } // abas da árvore: Tudo, Marcial, Armas e cada setor
+  if (d.a === 'skHit') return skNextHit();
+  if (d.a === 'skQclr') { bf.skq = ''; bf.skf = ''; bf.skc = ''; return render(); }
   if (d.a === 'skRotL') return MANDALA.rotate(-1);
   if (d.a === 'skRotR') return MANDALA.rotate(1);
   if (d.a === 'skTab') { skTab = d.v; lsSet('vj.skTab', d.v); return render(); }
