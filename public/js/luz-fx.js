@@ -157,9 +157,11 @@
     const P = e.profile, M = { ...LP.material(P.el) }; if (P.palette?.[1] && P.el === 'fis') M.rim = P.palette[2] || M.rim;
     const ph = LP.phases(P.family, e.dur), fam = DRAW[P.family], B = LP.budget(g.ANIMFX?.level?.() || 'medium'), sh = LP.share(B.particles, e.n || 1, P.hits || 1), nImp = clamp(Math.min(sh.perHit / 6, 24) * q(), 4, 24) | 0;
     e.k = 0; let hit = false;
+    const SG = e.sig === 'line' && e.skill ? LP.sigOf(e.skill) : null; if (SG?.kind === 'line') e.sigI = SG.intensity; const sigFn = SG?.kind === 'line' ? g.LUZCENAS?.line?.(SG.key, e) : null; // assinatura das camadas 8–10
     if (reduced()) return L.onFrame(now => { const t = now - e.start; if (t > e.dur) return false; if (t >= 0) { const b = e.to(); glow(b, 90 * e.sb(), M.rim, 1 - t / e.dur); } return true; });
     return L.onFrame(now => { const t = now - e.start; if (t < 0) return true; if (t > e.dur + 1400) return false; e.now = t;
       if (t <= e.dur) fam(e, M, t, ph, P);
+      if (sigFn) sigFn(e, M, t, ph, P);
       if (!hit && t >= ph.impact[0]) { hit = true; impactBurst(e, M, e.to(), e.footB(), e.sb(), nImp); }
       groundAfter(e, M, e.sb(), t); return true; });
   }

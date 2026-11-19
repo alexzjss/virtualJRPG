@@ -55,3 +55,20 @@ test('LUZP: linha do tempo do Limite', () => {
   const end = T.at(-1); assert.equal(end.at + end.ms, 5000); const back = T.find(x => x.k === 'back'); assert.equal(back.at + back.ms, end.at);
   const T2 = L.ultTimeline(2500); assert.equal(T2.at(-1).at + T2.at(-1).ms, 2500); assert.equal(T2.find(x => x.k === 'strike').at, 1100);
 });
+
+test('LUZP: assinaturas das camadas 8–10 por tema × grupo de família', () => {
+  for (const [f, gk] of [['projectile', 'dist'], ['beam', 'dist'], ['psychic', 'dist'], ['musical', 'dist'], ['slash', 'corpo'], ['smash', 'corpo'], ['pierce', 'corpo'], ['dash', 'corpo'], ['area', 'area'], ['rain', 'area'], ['ritual', 'rito'], ['summon', 'rito'], ['heal', 'apoio'], ['barrier', 'apoio'], ['form', 'apoio']]) assert.equal(L.famGroup(f), gk, f);
+  // tema como arvore/ordem.js temaNo, sobre o formato das skills no cliente
+  assert.equal(L.temaOf({ kind: 'dmg', fx: [{ t: 'pierce', p: 60 }] }), 0);
+  assert.equal(L.temaOf({ kind: 'dmg', fx: [{ t: 'st', k: 'stun', ch: 40 }] }), 1); assert.equal(L.temaOf({ kind: 'util', st: 'atkUp' }), 1); assert.equal(L.temaOf({ kind: 'dmg', st: 'burn' }), 1);
+  assert.equal(L.temaOf({ kind: 'heal', st: 'atkUp' }), 2); assert.equal(L.temaOf({ kind: 'util', fx: [{ t: 'shield' }] }), 2); assert.equal(L.temaOf({ kind: 'dmg', rea: 1 }), 2); assert.equal(L.temaOf({ kind: 'passive', on: 'hurt' }), 2);
+  assert.equal(L.temaOf({ kind: 'passive', on: 'turn' }), 3);
+  for (const o of [{ kind: 'form' }, { circ: 1 }, { dom: 1 }, { duo: 'x' }, { summon: 1 }, { vow: 1 }, { aw: 1 }]) assert.equal(L.temaOf({ kind: 'dmg', ...o }), 4, JSON.stringify(o));
+  assert.equal(L.temaOf({ kind: 'dmg', tm: 3 }), 3, 'tm gravado no servidor vence');
+  const s10 = { name: 'Golpe Perfeito', el: 'fis', kind: 'dmg', cam: 10, fx: [{ t: 'pierce', p: 60 }, { t: 'st', k: 'stun', ch: 40, n: 1 }] };
+  assert.deepEqual(L.sigOf({ name: 'A', el: 'fis', kind: 'dmg', cam: 7 }), { kind: 'none' }); assert.deepEqual(L.sigOf({ name: 'A', el: 'fis', kind: 'dmg' }), { kind: 'none' });
+  const r = L.sigOf(s10); assert.equal(r.kind, 'line'); assert.equal(r.intensity, 1); assert.match(r.key, /^1-(dist|corpo|area|rito|apoio)$/);
+  assert.equal(L.sigOf({ ...s10, cam: 8 }).intensity, 1 / 3);
+  assert.deepEqual(L.sigOf({ ...s10, limit: true }), { kind: 'none' }); assert.deepEqual(L.sigOf({ ...s10, dom: true }), { kind: 'none' });
+  assert.deepEqual(L.sigOf(null), { kind: 'none' });
+});

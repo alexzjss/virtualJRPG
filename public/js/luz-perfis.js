@@ -80,5 +80,20 @@
   // ----- Limite/Domínio: splash (véu → fundo → arte → nome → volta ao palco) e o golpe; 5000 ms escala linear com a velocidade -----
   const ULT = [['dim', 0, 300], ['bg', 200, 1600], ['art', 300, 1500], ['name', 700, 1100], ['back', 1800, 400], ['strike', 2200, 2800]];
   const ultTimeline = totalMs => { const f = Math.max(1, +totalMs || 5000) / 5000; return ULT.map(([k, at, ms]) => ({ k, at: Math.round(at * f), ms: Math.round((at + ms) * f) - Math.round(at * f) })); };
-  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle, ultTimeline };
+  // ----- assinaturas das camadas 8–10: tema da skill (como arvore/ordem.js temaNo) × grupo da família -----
+  const GROUP = { projectile: 'dist', beam: 'dist', psychic: 'dist', musical: 'dist', slash: 'corpo', smash: 'corpo', pierce: 'corpo', dash: 'corpo', area: 'area', rain: 'area', ritual: 'rito', summon: 'rito', heal: 'apoio', barrier: 'apoio', form: 'apoio' };
+  const famGroup = f => GROUP[f] || 'dist';
+  const CTL = new Set('stun sleep frozen para root silence confuse fear blind down atkDn defDn agiDn curse marked exposed wet oil brand poison burn bleed rad'.split(' ')), CTLT = new Set('push seal det spread strip steal brk brand lose'.split(' '));
+  const DEFS = new Set('evade counter reflect regen endure taunt defUp guarded'.split(' ')), DEFT = new Set('shield cleanse revive guard'.split(' '));
+  const fxl = s => Array.isArray(s.fx) ? s.fx : [];
+  const temaOf = s => { if (Number.isInteger(s?.tm)) return s.tm; s = s || {};
+    if (s.kind === 'form' || s.circ || s.dom || s.duo || s.trio || s.summon || s.vow || s.aw) return 4;
+    const def = fxl(s).some(x => DEFT.has(x.t) || (x.t === 'res' && x.k === 'hp') || (x.t === 'st' && DEFS.has(x.k)));
+    if (s.rea || s.kind === 'heal' || (s.kind === 'util' && def) || (s.kind === 'passive' && /^(hurt|fall|low)$/.test(s.on || ''))) return 2;
+    if (s.kind === 'passive') return 3;
+    if (s.kind === 'util' || CTL.has(s.st) || fxl(s).some(x => CTLT.has(x.t) || (x.t === 'st' && CTL.has(x.k)))) return 1;
+    return 0; };
+  const sigOf = s => { if (!s || !(s.cam >= 8) || s.limit || s.dom) return { kind: 'none' }; const fam = g.ANIM_PROFILES?.familyOf?.(s) || 'projectile';
+    return { kind: 'line', key: `${temaOf(s)}-${famGroup(fam)}`, intensity: (Math.min(10, s.cam) - 7) / 3 }; };
+  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle, ultTimeline, famGroup, temaOf, sigOf };
 })(globalThis);
