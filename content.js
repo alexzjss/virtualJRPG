@@ -219,14 +219,40 @@ function ringLayout(G) {
   // Faixas por camada: cada camada é uma faixa concêntrica (a 1 por dentro, a 10 por fora), igual para todos os grupos de um mesmo anel,
   // então a mesma distância do centro é o mesmo nível de poder. Dentro da faixa os nós ficam numa grade polar de colunas (ângulo) × linhas (raio),
   // compacta, com as linhas ímpares deslocadas meia coluna (colmeia) para as ligações não passarem por cima de outra esfera.
-  const ROW = 92, BAND = 150, band = {}; // band[g][c] = { r, cols, rows }
+  const m = .05, wt = {}, weigh = id => wt[id] ??= 1 + (kids[id] || []).reduce((a, k) => a + weigh(k), 0);
+  // leque da árvore: cada nó recebe uma fatia do ângulo do pai proporcional ao tamanho do seu ramo, então os ramos se espalham pela fatia sem se cruzar
+  const fan = (list, lo, hi) => { const tot = list.reduce((a, k) => a + weigh(k), 0); let x = lo;
+    for (const k of list) { const w = (hi - lo) * weigh(k) / tot; ang0[k] = x + w / 2; fan(kids[k] || [], x, x + w); x += w; } };
+  const span = { marcial: [Math.PI / 2 + m, Math.PI * 1.5 - m], armas: [-Math.PI / 2 + m, Math.PI / 2 - m] };
+  ORDER.forEach((el, i) => span[el] = [i * SEC - WEDGE / 2, i * SEC + WEDGE / 2]);
+  for (const g of Object.keys(by)) { const [lo, hi] = span[g], roots = g === 'marcial' ? kids.g0 || [] : rootsOf[g]; fan(roots, lo, hi); }
+  const ROW = 92, BAND = 150, PITCH = 38, band = {}; // band[g][c] = { r, cols, n }
+  // Linhas (ramos, br): cada linha vira um raio reto — um ângulo só, do centro para fora, uma camada atrás da outra. Só o Marcial (sem ramos) usa a grade polar.
+  // As linhas vizinhas ficam deslocadas meia casa no raio (colmeia), então cabem mais juntas sem as esferas se encostarem. A ordem dos raios segue as ligações entre ramos.
+  const laned = g => g !== 'marcial' && by[g], lane = {}, mean = ids => ids.reduce((a, i) => a + (ang0[i] ?? 0), 0) / ids.length;
+  for (const g of Object.keys(by)) if (laned(g)) { const m = new Map(); for (const i of by[g]) if (i !== 'g0') (m.get(G[i].br || '-') || m.set(G[i].br || '-', []).get(G[i].br || '-')).push(i);
+    const adj = new Map(); for (const [b, l] of m) for (const i of l) for (const j of G[i].ln || []) { const o = G[j]?.br || '-'; if (G[j] && o !== b && m.has(o)) (adj.get(b) || adj.set(b, new Map()).get(b)).set(o, ((adj.get(b).get(o)) || 0) + 1); }
+    const ord = [...m.keys()].sort((a, b) => mean(m.get(a)) - mean(m.get(b))), seenB = new Set(), out = [];
+    const dfs = b => { seenB.add(b); out.push(b); [...(adj.get(b)?.keys() || [])].filter(o => !seenB.has(o)).sort((a, c) => mean(m.get(a)) - mean(m.get(c))).forEach(o => seenB.has(o) || dfs(o)); };
+    const first = ord.filter(b => m.get(b).some(i => G[i].open)); [...first, ...ord].forEach(b => seenB.has(b) || dfs(b));
+    const W = (a, b) => adj.get(a)?.get(b) || 0, cost = o => { let v = 0; for (let x = 0; x < o.length; x++) for (let y = x + 1; y < o.length; y++) v += W(o[x], o[y]) * (y - x); return v; };
+    for (let pass = 0, best = cost(out); pass < 6; pass++) { let any = false; // melhora a ordem: cada raio vai para a posição que mais encurta as ligações com os outros ramos
+      for (const b of [...out]) { const rest = out.filter(x => x !== b); let at = out.indexOf(b), bc = best;
+        for (let k = 0; k <= rest.length; k++) { const o = [...rest.slice(0, k), b, ...rest.slice(k)], c = cost(o); if (c < bc) { bc = c; at = k; } }
+        if (bc < best) { out.splice(0, out.length, ...rest.slice(0, at), b, ...rest.slice(at)); best = bc; any = true; } }
+      if (!any) break; }
+    lane[g] = out.map(b => m.get(b).sort((p, q) => cam(p) - cam(q) || dep[p] - dep[q] || parseInt(p.slice(1)) - parseInt(q.slice(1)))); }
   const bands = (gs, wedge, r0) => { let r = r0;
-    for (let c = 1; c <= 10; c++) { let rows = 0;
-      for (const g of gs) { const n = (by[g] || []).filter(i => i !== 'g0' && cam(i) === c).length, cols = Math.max(1, Math.floor(wedge * r / SP));
+    for (const g of gs) if (lane[g]) r = Math.max(r, Math.ceil(lane[g].length * PITCH / wedge));
+    for (let c = 1; c <= 10; c++) { let rows = 0, st = 0;
+      for (const g of gs) { if (lane[g]) { let k = 0; for (const l of lane[g]) k = Math.max(k, l.filter(i => cam(i) === c).length); (band[g] ||= {})[c] = { r, n: k }; rows = Math.max(rows, k); st = ROW / 2; continue; }
+        const n = (by[g] || []).filter(i => i !== 'g0' && cam(i) === c).length, cols = Math.max(1, Math.floor(wedge * r / SP));
         (band[g] ||= {})[c] = { r, cols, n }; rows = Math.max(rows, Math.ceil(n / cols)); }
-      if (rows) r += (rows - 1) * ROW + BAND; }
+      if (rows) r += (rows - 1) * ROW + st + BAND; }
     return r; };
   const sec = ORDER.filter(el => by[el]), Rc = bands(['marcial', 'armas'], HALF, 220); bands(sec, WEDGE, Rc + GAP * 2);
+  const lanes = (g, lo, hi) => { const L = lane[g], w = (hi - lo) / L.length; // cada linha: um ângulo, esferas em fila reta de dentro para fora
+    L.forEach((l, k) => { const cnt = {}; for (const id of l) { const c = cam(id), j = cnt[c] = (cnt[c] ?? -1) + 1; ang[id] = lo + (k + .5) * w; rad[id] = band[g][c].r + j * ROW + (k % 2 ? ROW / 2 : 0); } }); };
   const place = (ids, g, lo, hi) => { // uma faixa de um grupo: ordem pelo ângulo do leque; o varrimento põe cada nó na casa livre mais perto do seu ângulo
     const { r, cols } = band[g][cam(ids[0])], rows = Math.ceil(ids.length / cols), tot = cols * rows, w = (hi - lo) / cols;
     const L = ids.map(id => [id, ang0[id] ?? (lo + hi) / 2]).sort((p, q) => p[1] - q[1] || dep[p[0]] - dep[q[0]] || parseInt(p[0].slice(1)) - parseInt(q[0].slice(1))), pos = [];
@@ -266,17 +292,10 @@ function ringLayout(G) {
     }
     if (!moved) break; } };
   const run = (ids, g, lo, hi) => { const b = []; ids.forEach(i => (b[cam(i)] ||= []).push(i)); b.forEach(l => l && place(l, g, lo, hi)); };
-  const m = .05, wt = {}, weigh = id => wt[id] ??= 1 + (kids[id] || []).reduce((a, k) => a + weigh(k), 0);
-  // leque da árvore: cada nó recebe uma fatia do ângulo do pai proporcional ao tamanho do seu ramo, então os ramos se espalham pela fatia sem se cruzar
-  const fan = (list, lo, hi) => { const tot = list.reduce((a, k) => a + weigh(k), 0); let x = lo;
-    for (const k of list) { const w = (hi - lo) * weigh(k) / tot; ang0[k] = x + w / 2; fan(kids[k] || [], x, x + w); x += w; } };
-  const span = { marcial: [Math.PI / 2 + m, Math.PI * 1.5 - m], armas: [-Math.PI / 2 + m, Math.PI / 2 - m] };
-  ORDER.forEach((el, i) => span[el] = [i * SEC - WEDGE / 2, i * SEC + WEDGE / 2]);
-  for (const g of Object.keys(by)) { const [lo, hi] = span[g], roots = g === 'marcial' ? kids.g0 || [] : rootsOf[g]; fan(roots, lo, hi); }
   rad.g0 = 0; ang.g0 = Math.PI;
   run((by.marcial || []).filter(i => i !== 'g0'), 'marcial', Math.PI / 2 + m, Math.PI * 1.5 - m);
-  run(by.armas || [], 'armas', -Math.PI / 2 + m, Math.PI / 2 - m);
-  sec.forEach(el => { const c = ORDER.indexOf(el) * SEC; run(by[el], el, c - WEDGE / 2, c + WEDGE / 2); });
+  lanes('armas', -Math.PI / 2 + m, Math.PI / 2 - m);
+  sec.forEach(el => { const c = ORDER.indexOf(el) * SEC; lanes(el, c - WEDGE / 2, c + WEDGE / 2); });
   polish();
   for (const [id, s] of Object.entries(G)) { s.wx = Math.round(rad[id] * Math.cos(ang[id])); s.wy = Math.round(rad[id] * Math.sin(ang[id])); }
 }
