@@ -25,7 +25,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const d100 = () => 1 + Math.floor(Math.random() * 100);
 const rid = () => crypto.randomBytes(4).toString('hex');
 const int = (v, lo = 0, hi = 9999) => Math.min(hi, Math.max(lo, Math.round(+v) || 0));
-const okUrl = v => /^(https?:\/\/[^\s'"()<>]+|\/(uploads|maps)\/[\w.-]+)$/.test(v);
+const okUrl = v => /^(https?:\/\/[^\s'"()<>]+|\/(uploads|maps|enemies)\/[\w.-]+)$/.test(v);
 const can = (c, ch) => ch && (c.role === 'gm' || (c.role === 'player' && ch.owner === c.name));
 const scene = () => S.scenes[S.scene];
 const eq = (ch, slot) => slot === 'arma' && ch.st?.disarm ? undefined : S.items[ch.equip[slot]]; // Desarmado: a arma não conta
@@ -292,6 +292,7 @@ function fx1(a, s, t, f, c = {}) {
     case 'res': if (f.r === 'limit') addLimit(t, f.p); else t[f.r] = Math.min(t[f.r + 'Max'], t[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}${t !== a ? ' em ' + t.name : ''}]`;
     case 'gain': if (f.r === 'limit') addLimit(a, f.p); else a[f.r] = Math.min(a[f.r + 'Max'], a[f.r] + f.p); return ` [+${f.p} ${RESN[f.r]}]`;
     case 'lose': if (f.r === 'hp') return t.hp > 0 ? ` (−${f.p} HP)${hurt(t, f.p, a)}` : ''; if (f.r === 'limit') t.limit = Math.max(0, t.limit - f.p); else t[f.r] = Math.max(0, t[f.r] - f.p); return ` [−${f.p} ${RESN[f.r]}]`;
+    case 'conv': { const n = t.st[f.k]; if (!n || t.hp <= 0) return ''; delete t.st[f.k]; applySt(t, f.k2, n); return ` [${STN[f.k]} vira ${STN[f.k2]}]`; }
     case 'spread': if (t.st[f.k]) { const o = battlers().filter(x => x.enemy === t.enemy && x !== t && x.hp > 0); o.forEach(x => applySt(x, f.k, t.st[f.k])); return o.length ? ` [${STN[f.k]} se espalha]` : ''; } return '';
     case 'clima': { const wx = S.battle.wx ??= { k: '', ttl: 0 }; wx.k = f.k; wx.ttl = f.n * Math.max(2, battlers().length); log(a.name, `o clima muda: ${RU.CLIMA[f.k]?.[0] || f.k}.`, 'ok'); return ` [${RU.CLIMA[f.k]?.[0] || f.k}]`; }
     case 'stack': { a.stk ??= {}; a.stk[f.k] = Math.min(f.n, (a.stk[f.k] || 0) + 1); return ` [${RU.STK[f.k][0]} ${a.stk[f.k]}]`; }
@@ -322,6 +323,7 @@ function fxMult(a, s, t) { // escalonamentos: execução, contra condição, por
   for (const f of s.fx || []) {
     if (f.t === 'exec' && t.hp <= t.hpMax * f.p / 100) m *= f.m;
     if (f.t === 'vs' && (f.k === 'neg' ? RU.NEG.some(k => t.st[k]) : f.k === 'demon' ? t.enemy && t.cat !== 'humano' : t.st[f.k])) m *= f.m;
+    if (f.t === 'solo' && battlers().filter(x => x.enemy === t.enemy && x.hp > 0).length === 1) m *= f.m;
     if (f.t === 'per' && t.st[f.k]) m *= 1 + f.p / 100 * t.st[f.k];
     if (f.t === 'rage') m *= 1 + f.m * (1 - a.hp / (a.hpMax || 1));
     if (f.t === 'mad' && a.sanMax) m *= 1 + f.m * (1 - Math.max(0, a.san) / a.sanMax); // Loucura: quanto menos Sanidade, mais forte

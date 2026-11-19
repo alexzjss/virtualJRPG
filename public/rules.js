@@ -119,9 +119,9 @@
   // fm: 'dur 3; atk 25; def 10; agi 20; hit 10; crit 5; atkP 6; heal 20; dr aura 3; end st exaus 2' → transformação.
   const FXTO = new Set(['self', 'ally', 'foes', 'tgt']);
   const FXARGS = { st: ['k', 'n'], det: ['k', 'm'], drain: ['r', 'p'], res: ['r', 'p'], gain: ['r', 'p'], lose: ['r', 'p'], exec: ['p', 'm'], vs: ['k', 'm'], per: ['k', 'p'], rage: ['m'], mad: ['m'], pierce: ['p'], chain: ['n', 'm'], stack: ['k', 'n'], burst: ['k', 'm'],
-    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], scar: ['r', 'p'], clone: ['n', 'p'], echo: ['p'], brand: ['n'], pop: ['m'], every: ['n', 'm'], rs: ['k', 'm'], ovr: [], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
-  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 }, clone: { n: 1, p: 20 }, echo: { p: 50 }, brand: { n: 3 }, pop: { m: 1.6 }, every: { m: 1.8 }, rs: { m: 1.5 } };
-  const FXTXT = new Set(['k', 'r']);
+    push: ['v'], haste: ['v'], seal: ['p', 'n'], shield: ['p'], revive: ['p'], spread: ['k'], conv: ['k', 'k2'], solo: ['m'], guard: ['n'], clima: ['k', 'n'], brk: ['n'], scar: ['r', 'p'], clone: ['n', 'p'], echo: ['p'], brand: ['n'], pop: ['m'], every: ['n', 'm'], rs: ['k', 'm'], ovr: [], sure: [], strip: [], steal: [], cleanse: [], turn: [] };
+  const FXDEF = { stack: { n: 5 }, burst: { m: .25 }, st: { n: 3 }, det: { m: 6 }, pierce: { p: 100 }, chain: { m: .6 }, seal: { n: 3 }, guard: { n: 3 }, clone: { n: 1, p: 20 }, echo: { p: 50 }, brand: { n: 3 }, pop: { m: 1.6 }, every: { m: 1.8 }, solo: { m: 1.5 }, rs: { m: 1.5 } };
+  const FXTXT = new Set(['k', 'k2', 'r']);
   function parseFx(str, where = '') {
     if (!str) return undefined;
     return String(str).split(';').map(x => x.trim()).filter(Boolean).map(item => {
@@ -132,6 +132,7 @@
       if (keys.some(k => o[k] == null)) throw new Error(`faltam argumentos em "${item}" (${where})`);
       const ch = w.find(x => x.endsWith('%')), to = w.find(x => FXTO.has(x));
       if ((t === 'stack' || t === 'burst') && !STK[o.k]) throw new Error(`carga desconhecida "${o.k}" em ${where}`);
+      if (t === 'conv' && (!ST[o.k] || !ST[o.k2])) throw new Error(`conversão desconhecida "${item}" em ${where}`);
       if (t === 'st') { o.ch = ch ? parseInt(ch) : 100; if (!ST[o.k]) throw new Error(`condição desconhecida "${o.k}" em ${where}`); }
       if (to) o.to = to;
       return o;
@@ -183,6 +184,8 @@
       case 'res': return `restaura ${f.p} de ${RESN[f.r]}${to}`;
       case 'gain': return `você recupera ${f.p} de ${RESN[f.r]}`;
       case 'lose': return `o alvo perde ${f.p} de ${RESN[f.r]}`;
+      case 'conv': return `converte ${ST[f.k] || f.k} do alvo em ${ST[f.k2] || f.k2} (mesma duração)`;
+      case 'solo': return `×${f.m} se o alvo for o único inimigo de pé`;
       case 'spread': return `espalha ${ST[f.k] || f.k} do alvo para os aliados dele`;
       case 'guard': return `protege o alvo por ${f.n}t (recebe os golpes dele)`;
       case 'turn': return 'você age de novo';

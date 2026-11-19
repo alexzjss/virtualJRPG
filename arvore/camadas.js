@@ -7,6 +7,7 @@
 // ninguém antes do próprio `pre`. Linhas de variação (ramo com `de`): camada da base + 1 (combinação de Vínculos, + 2).
 // Camadas 1–2: um efeito só e texto de uma frase. As casas que faltam para um ramo chegar a 10 são as VAGAS da próxima leva.
 import { ATUAIS } from './atuais.js';
+import { ANCORAS } from './ancoras.js';
 import { temaNo } from './ordem.js';
 
 export const CAM = 10;
@@ -15,6 +16,7 @@ export const DANO = L => 9 * R ** (L - 1);
 export const XP = [0, 10, 15, 20, 25, 30, 40, 50, 65, 85, 110];
 export const RQ = [0, 0, 0, 0, 50, 51, 52, 54, 56, 58, 60];
 const LIM = [4, 7, 10];
+const KIT = new Set([...ATUAIS, ...ANCORAS]);
 // camada antiga, estimada pelo XP da curva anterior (básico 10–15, intermediário 20–35, avançado 40–60, ápice 70–110, domínio 150)
 const OLD = [[10, 1], [15, 2], [20, 3], [25, 3.5], [30, 4], [35, 4.5], [40, 5], [45, 5.5], [50, 6], [55, 6.5], [60, 7], [70, 8], [80, 8.5], [90, 9], [110, 10], [150, 10]];
 const oldLayer = xp => { if (xp <= 10) return 1; for (let i = 1; i < OLD.length; i++) if (xp <= OLD[i][0]) { const [x0, l0] = OLD[i - 1], [x1, l1] = OLD[i]; return l0 + (l1 - l0) * (xp - x0) / (x1 - x0); } return 10; };
@@ -31,7 +33,7 @@ function fxCost(s) {
 }
 // números de cada efeito que sobem e descem com a camada (o resto, como turnos e tipos, fica)
 const NUM = { shield: [1], drain: [2], res: [2], gain: [2], lose: [2], revive: [1], clone: [2], push: [1], haste: [1], seal: [1], echo: [1], pierce: [1], exec: [1] };
-const MUL = { vs: 2, det: 2, burst: 2, pop: 1, every: 2, chain: 2 };
+const MUL = { vs: 2, det: 2, burst: 2, pop: 1, every: 2, chain: 2, solo: 1 };
 const CAP = { echo: 100, pierce: 100, exec: 35, push: 80, haste: 60, drain: 60, revive: 60 };
 const r2 = v => Math.round(v * 100) / 100;
 function scaleFx(fx, f) {
@@ -55,7 +57,7 @@ const scaleDom = (d, f) => d && d.split(';').map(x => x.trim()).map(it => { cons
 
 // conceitos fortes: só da camada 7 em diante
 const FORTE_NOME = /\b(Conjurar|Invoca[rç]|Clone|Clones|Cópia|Copiar|Reviver|Ressurrei|Imortal|Exército|Legião|Arsenal|Fábrica de Cópias|Parar o Tempo|Tempo Parado|Possess)/i;
-export const forte = s => !ATUAIS.has(s.n) && (s.summon || (s.dom && !ATUAIS.has(s.n)) || s.aw || /\b(clone|revive|steal|turn|exec)\b/.test(s.fx || '') || /\bst possess\b/.test(s.fx || '') || s.st === 'possess' || FORTE_NOME.test(s.n));
+export const forte = s => !KIT.has(s.n) && (s.summon || (s.dom && !KIT.has(s.n)) || s.aw || /\b(clone|revive|steal|turn|exec)\b/.test(s.fx || '') || /\bst possess\b/.test(s.fx || '') || s.st === 'possess' || FORTE_NOME.test(s.n));
 // camadas 1–2: um efeito só (cargas, reações de combinação e ganho de recurso próprio não contam)
 const LIVRE = new Set(['stack', 'gain', 'rs']);
 // o efeito que o nome promete é o que fica (Muralha → escudo, Sangria → sangramento...)
@@ -87,9 +89,9 @@ function aplicar(s, L, idx) {
   if (s.mod) s.mod = scaleKV(s.mod, f, ['atk', 'def', 'hit', 'crit', 'agi', 'atkP', 'heal', 'esq']); if (s.bon) s.bon = scaleKV(s.bon, f, ['hpMax', 'auraMax', 'sanMax']);
   if (s.dom) s.dom = scaleDom(s.dom, f);
   let xp = XP[L]; if (s.duo) xp *= 1.3; if (s.trio) xp *= 1.5; if (s.summon || /\b(clone|revive)\b/.test(s.fx || '')) xp *= 1.2;
-  if (s.limit) xp *= 1.5; if (s.aw) xp *= 1.3; if (s.dom && !ATUAIS.has(s.n)) xp = Math.max(xp * 1.3, L >= 8 ? 120 : 0);
+  if (s.limit) xp *= 1.5; if (s.aw) xp *= 1.3; if (s.dom && !KIT.has(s.n)) xp = Math.max(xp * 1.3, L >= 8 ? 120 : 0);
   s.xp = Math.round(xp / 5) * 5;
-  const rq = RQ[L] + (s.dom && !ATUAIS.has(s.n) ? 2 : 0);
+  const rq = RQ[L] + (s.dom && !KIT.has(s.n) ? 2 : 0);
   // requisito de atributo: só onde já havia um (a densidade de requisitos da árvore fica); o valor vem da camada
   if (s.rq) { if (!rq) delete s.rq; else s.rq = Object.fromEntries(Object.keys(s.rq).map(k => [k, rq])); }
   if (L >= 4 && idx) s.nb = Math.min(Math.floor((L - 1) / 2), idx); else delete s.nb;
@@ -102,14 +104,66 @@ function aplicar(s, L, idx) {
 const ANCORA = { 'Canhão de Aura': 4 };
 const LIMT = new Map(); // Limite → camada (4, 7 ou 10) pelo terço de poder dele dentro do setor
 const terços = nos => { const ls = nos.filter(s => s.limit).sort((x, y) => (x.xp || 0) - (y.xp || 0)); ls.forEach((s, i) => LIMT.set(s, Math.max(forte(s) ? 7 : 0, LIM[Math.min(2, Math.floor(i * 3 / ls.length))]))); };
+// Impressão semântica usada para ordenar técnicas de função próxima dentro do mesmo ramo.
+// A camada continua limitada pelo custo e pelas regras de kit, Limite, técnicas fortes e pré-requisitos.
+const familia = s => {
+  const out = new Set([`k:${s.k}`]);
+  for (const f of String(s.fx || '').split(';').map(x => x.trim()).filter(Boolean)) {
+    const w = f.split(/\s+/); if (!w[0]) continue;
+    out.add(`fx:${w[0]}`); if (w[0] === 'st' && w[1]) out.add(`st:${w[1]}`);
+  }
+  if (s.st) out.add(`st:${s.st}`);
+  if (s.req) out.add(`req:${s.req}`);
+  if (s.cat) out.add(`cat:${s.cat}`);
+  if (s.rea) out.add(`rea:${s.rea.t || s.rea}`);
+  if (s.form || s.fm) out.add('special:form');
+  if (s.dom) out.add('special:domain');
+  if (s.duo || s.trio) out.add('special:team');
+  if (s.summon) out.add('special:summon');
+  const words = `${s.n} ${s.d || ''}`.toLocaleLowerCase('pt-BR');
+  for (const [tag, re] of [
+    ['fire', /fogo|chama|brasa|incend|ígneo|ígnea|calor|fornalha/],
+    ['water', /água|maré|mar|onda|chuva|gelo|geada|neve|frio/],
+    ['lightning', /raio|trovão|elétr|faísca|choque/],
+    ['blood', /sangue|sangr|hemorr|venoso|vida/],
+    ['shadow', /sombra|escuro|treva|lua negra|ilusão|medo/],
+    ['guard', /guarda|escudo|muralha|barreira|proteg|defesa|aparar|bloque/],
+    ['mobility', /passo|corrida|investida|esquiva|veloz|rápido|movimento/],
+    ['ritual', /ritual|círculo|sigilo|grimório|relíquia|pacto/],
+    ['summon', /invoc|conjur|familiar|clone|cópia|legião/],
+    ['support', /cura|curar|restaur|socorro|reerguer|reviver|ressuscit/],
+    ['weapon', /lâmina|espada|corte|estocada|lança|tiro|bala|flecha|punho|soco|chute|martelo/],
+  ]) if (re.test(words)) out.add(`theme:${tag}`);
+  if (s.area) out.add('shape:area');
+  if ((s.hits || 1) > 1) out.add('shape:multi');
+  return out;
+};
+const proximidade = (a, b) => {
+  if (!a || !b) return 0;
+  const A = familia(a), B = familia(b); let same = 0;
+  for (const x of A) if (B.has(x)) same++;
+  return same / Math.max(1, A.size + B.size - same);
+};
 function ordenar(b, fixo) {
   const head = fixo ? b[0] : null, key = s => (s.xp || 0) + (s.limit ? .5 : 0), n = b.length, nm = new Map(b.map(s => [s.n, s]));
-  const kit = new Set(b.filter(s => ATUAIS.has(s.n) && s !== head));
+  const kit = new Set(b.filter(s => KIT.has(s.n) && s !== head));
   for (let k = 0; k < 5; k++) for (const s of [...kit]) for (const p of String(s.pre || '').split('|')) if (nm.has(p) && nm.get(p) !== head) kit.add(nm.get(p));
   const rest = b.filter(s => s !== head).sort((x, y) => key(x) - key(y));
   const slot = new Array(n).fill(null); if (head) slot[0] = head;
-  // cada grupo (já em ordem de nível) ocupa as casas livres da faixa dele em ordem crescente: ninguém mais caro fica antes de um mais barato
-  const fill = (grp, lo, hi) => { for (const s of grp) { let i = -1; for (let j = Math.max(0, lo); j <= Math.min(n - 1, hi); j++) if (!slot[j]) { i = j; break; } if (i < 0) for (let j = n - 1; j >= 0; j--) if (!slot[j]) { i = j; break; } slot[i] = s; } };
+  // Cada grupo ocupa sua faixa de camadas. A proximidade temática desempata custos próximos,
+  // preservando avanço gradual e formando sequências reconhecíveis de ataque, controle ou suporte.
+  const fill = (grp, lo, hi) => {
+    const todo = [...grp].sort((x, y) => key(x) - key(y)); let prev = head;
+    while (todo.length) {
+      const min = key(todo[0]);
+      const pool = todo.filter(s => key(s) <= min + 15);
+      pool.sort((x, y) => proximidade(prev, y) - proximidade(prev, x) || key(x) - key(y));
+      const s = pool[0], at = todo.indexOf(s); todo.splice(at, 1);
+      let i = -1; for (let j = Math.max(0, lo); j <= Math.min(n - 1, hi); j++) if (!slot[j]) { i = j; break; }
+      if (i < 0) for (let j = n - 1; j >= 0; j--) if (!slot[j]) { i = j; break; }
+      slot[i] = s; prev = s;
+    }
+  };
   // Skills já usadas pelos personagens ocupam as primeiras casas do ramo (após a raiz).
   // A ordem interna é XP crescente, preservando os pré-requisitos explícitos.
   const faixa = s => s.n in ANCORA ? [ANCORA[s.n], ANCORA[s.n]] : kit.has(s) ? [0, Math.min(4, n - 1)] : forte(s) ? [Math.min(6, n - 1), n - 1] : [0, n - 1];
@@ -133,16 +187,16 @@ function ordenar(b, fixo) {
 }
 // no máximo 5 técnicas do kit atual por ramo (contando os `pre` delas): o excesso troca de lugar com um nó comum de outro ramo do setor
 function espalharKit(bs) {
-  const kitDe = b => { const nm = new Map(b.map(s => [s.n, s])), set = new Set(b.filter(s => ATUAIS.has(s.n)));
+  const kitDe = b => { const nm = new Map(b.map(s => [s.n, s])), set = new Set(b.filter(s => KIT.has(s.n)));
     for (let k = 0; k < 5; k++) for (const s of [...set]) for (const p of String(s.pre || '').split('|')) if (nm.has(p)) set.add(nm.get(p)); return set; };
   for (let guard = 0; guard < 200; guard++) {
     const cheio = bs.find(b => kitDe(b).size > 5); if (!cheio) return;
     const ks = kitDe(cheio), nm = new Set(cheio.map(s => s.pre || '').join('|').split('|'));
-    const mover = [...ks].filter(s => ATUAIS.has(s.n) && !nm.has(s.n) && s !== cheio[0]).sort((x, y) => (y.xp || 0) - (x.xp || 0))[0]; if (!mover) return;
+    const mover = [...ks].filter(s => KIT.has(s.n) && !nm.has(s.n) && s !== cheio[0]).sort((x, y) => (y.xp || 0) - (x.xp || 0))[0]; if (!mover) return;
     const tm = temaNo(mover), alvo = bs.filter(b => b !== cheio && kitDe(b).size < 5).sort((x, y) => (temaNo(y[1] || y[0]) === tm) - (temaNo(x[1] || x[0]) === tm) || kitDe(x).size - kitDe(y).size)[0]; if (!alvo) return;
-    const troca = alvo.filter((s, i) => i && !ATUAIS.has(s.n) && !s.limit && !s.duo && !forte(s) && !kitDe(alvo).has(s)).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0];
+    const troca = alvo.filter((s, i) => i && !KIT.has(s.n) && !s.limit && !s.duo && !forte(s) && !kitDe(alvo).has(s)).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0];
     cheio.splice(cheio.indexOf(mover), 1); alvo.push(mover); if (troca) { alvo.splice(alvo.indexOf(troca), 1); cheio.push(troca); }
-    for (const p of String(mover.pre || '').split('|')) { const pi = cheio.findIndex(s => s.n === p); if (pi > 0 && ATUAIS.has(p) === false) { /* o pre comum fica: o pedido atravessa ramos */ } }
+    for (const p of String(mover.pre || '').split('|')) { const pi = cheio.findIndex(s => s.n === p); if (pi > 0 && !KIT.has(p)) { /* o pre comum fica: o pedido atravessa ramos */ } }
   }
 }
 
@@ -153,7 +207,7 @@ function espalharFortes(bs, cabeca = new Set()) {
     const cheio = bs.find(b => fs(b).length > cap(b)); if (!cheio) return;
     const mover = fs(cheio).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0];
     const alvo = bs.filter(b => b !== cheio && fs(b).length < cap(b)).sort((x, y) => (cap(y) - fs(y).length) - (cap(x) - fs(x).length))[0]; if (!alvo) return;
-    const troca = alvo.filter(s => !cabeca.has(s) && !forte(s) && !ATUAIS.has(s.n) && !s.limit && !s.duo).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0]; if (!troca) return;
+    const troca = alvo.filter(s => !cabeca.has(s) && !forte(s) && !KIT.has(s.n) && !s.limit && !s.duo).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0]; if (!troca) return;
     cheio.splice(cheio.indexOf(mover), 1, troca); alvo.splice(alvo.indexOf(troca), 1, mover);
   }
 }
@@ -162,7 +216,7 @@ function espalharFortes(bs, cabeca = new Set()) {
 function caber(bs, fixos) {
   const tema = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return c.indexOf(Math.max(...c)); };
   const sobra = [];
-  for (const b of bs) if (b.length > CAM) { const head = fixos.has(b) ? b[0] : null, pode = b.filter(s => s !== head && !ATUAIS.has(s.n)).sort((x, y) => (y.xp || 0) - (x.xp || 0)).slice(0, b.length - CAM); for (const s of pode) b.splice(b.indexOf(s), 1); sobra.push(...pode); }
+  for (const b of bs) if (b.length > CAM) { const head = fixos.has(b) ? b[0] : null, pode = b.filter(s => s !== head && !KIT.has(s.n)).sort((x, y) => (y.xp || 0) - (x.xp || 0)).slice(0, b.length - CAM); for (const s of pode) b.splice(b.indexOf(s), 1); sobra.push(...pode); }
   const novos = [];
   for (const s of sobra) {
     const tm = temaNo(s), alvo = [...bs, ...novos].filter(b => !fixos.has(b) && b.length < CAM).sort((x, y) => (tema(y) === tm) - (tema(x) === tm) || x.length - y.length)[0];
@@ -172,6 +226,7 @@ function caber(bs, fixos) {
 }
 
 export const VAGAS = [];
+export const LINHAS = []; // linhas de variação que não chegam à camada 10 (a Leva 10 completa todas)
 const temaDe = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return ['ofensiva', 'controle', 'defesa', 'maestria', 'especial'][c.indexOf(Math.max(...c))]; };
 const vaga = (el, ramo, b, tema) => { if (b.length < CAM) VAGAS.push({ el, ramo, tem: b.length, faltam: Array.from({ length: CAM - b.length }, (_, k) => b.length + k + 1), tema: tema || temaDe(b) }); };
 export function camadas(TREE, preencher) {
@@ -200,10 +255,18 @@ export function camadas(TREE, preencher) {
     espalharFortes(brs, new Set([brs[0][0]]));
     brs.forEach((b, j) => { ordenar(b, j === 0); b.forEach((s, i) => marca(s, i + 1, i)); vaga('armas', wt + '-' + j, b, 'arma: ' + wt); });
   }
-  // linhas de variação: base + 1; combinação de Vínculos (v2), + 2; fortes no mínimo na 7
-  for (const t of Object.values(TREE)) for (const b of t.branches) if (b.de) {
-    const L0 = layerOf.get(b.de) ?? 1;
-    b.forEach(s => { const L = Math.min(CAM, L0 + (s.v2 ? 2 : 1)); marca(s, forte(s) ? Math.max(L, 7) : L, 0); });
+  // linhas de variação: começam na camada da base + 1 (combinação de Vínculos, v2, + 2) e sobem uma camada por nó até a 10.
+  // Kit atual primeiro (camadas 1–5), conceitos fortes só da 7 em diante; cada nó pede o anterior (corrente linear). Passando de 10, os últimos dividem a camada 10.
+  LINHAS.length = 0;
+  for (const [el, t] of Object.entries(TREE)) for (const [bi, b] of t.branches.entries()) if (b.de) {
+    const L0 = layerOf.get(b.de) ?? 1, min = s => Math.max(L0 + (s.v2 ? 2 : 1), forte(s) ? 7 : 0), rest = [...b].sort((x, y) => KIT.has(y.n) - KIT.has(x.n)), ord = [];
+    while (rest.length) {
+      const c = Math.min(CAM, L0 + 1 + ord.length), i = rest.findIndex(s => min(s) <= c), s = rest.splice(i < 0 ? rest.reduce((m, x, k) => min(x) < min(rest[m]) ? k : m, 0) : i, 1)[0];
+      ord.push(s);
+    }
+    b.length = 0; b.push(...ord);
+    b.forEach((s, i) => { marca(s, Math.max(min(s), Math.min(CAM, L0 + 1 + i)), 0); if (i) s.pre = b[i - 1].n; else s.pre = b.de; });
+    if (L0 + b.length < CAM) LINHAS.push({ el, ramo: bi, base: b.de, tem: b.length, faltam: CAM - L0 - b.length });
   }
   for (const [s, L, i] of plano) aplicar(s, L, i);
   for (const [s] of plano) delete s._xp0;
