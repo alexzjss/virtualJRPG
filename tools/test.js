@@ -1701,7 +1701,7 @@ test('palco 3D: zoom e mesa respeitam a altura real e a faixa da coluna', async 
   assert.deepEqual(mk(380, { w: 0, side: 1 }), mk(380), 'faixa zero não muda nada');
   assert.deepEqual(P.cameraFor({ kind: 'table', at: { x: -430, z: 0 }, pts: [{ x: -430, z: 0 }, { x: 0, z: -1500 }], w: 700, lane: { w: 400, side: 1 } }), P.cameraFor({ kind: 'table', at: { x: -430, z: 0 }, pts: [{ x: -430, z: 0 }, { x: 0, z: -1500 }], w: 700 }), 'janela estreita ignora a faixa');
   const R = mk(380, { w: 420, side: 1 }), L = mk(380, { w: 420, side: -1 }), N = mk(380);
-  assert.ok(R.tx !== N.tx && L.tx > R.tx, 'coluna à direita desloca o ator para a esquerda, à esquerda para a direita');
+  assert.ok(R.tx <= N.tx && L.tx > N.tx, 'coluna à esquerda empurra o ator para a direita; à direita só o leva para a esquerda se houver espaço (o ator já fica à esquerda no ombro)');
   for (const v of [R, L, mk(1200, { w: 420, side: 1 })]) assert.ok(Number.isFinite(v.tx) && Number.isFinite(v.tz) && v.tz > -9000);
   const one = P.cameraFor({ kind: 'table', at: { x: 0, z: 0, h: 1200 }, pts: [{ x: 0, z: 0, h: 1200 }], w: 1440, h: 860 }); assert.ok(Number.isFinite(one.tz) && one.tz > -9000, 'um combatente gigante');
 });
@@ -1712,6 +1712,12 @@ test('palco 3D: a coluna de comandos escolhe o lado que cabe e encolhe só se ne
   const big = P.pickSide({ left: 300, right: 1100 }, L, 200, 420, 22); assert.equal(big.side, 1); assert.ok(big.scale < 1 && big.scale >= .6, 'recorte enorme: encolhe, nunca abaixo de .6');
   assert.deepEqual(P.pickSide(null, L, 200, 420, 22), { side: 1, scale: 1 });
   const tiny = P.pickSide({ left: 0, right: 1400 }, { width: 1440 }, 200, 420, 22); assert.ok(tiny.scale === .6 && Number.isFinite(tiny.side));
+});
+test('palco 3D: a hora do dia vem do campo da cena, do sufixo do cenário ou cai em dia', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D;
+  assert.equal(P.mood({ mood: 'noite' }), 'noite'); assert.equal(P.mood({ hora: 'tarde', bbg: 'praia-dia' }), 'tarde');
+  assert.equal(P.mood({ bbg: 'floresta-tarde' }), 'tarde'); assert.equal(P.mood({ bbg: 'castelo-noite' }), 'noite');
+  assert.equal(P.mood({}), 'dia'); assert.equal(P.mood(null), 'dia'); assert.equal(P.mood({ mood: 'lava', bbg: 'x.png' }), 'dia');
 });
 test('palco 3D: chefe no centro ao fundo, lacaios abrindo o arco, ninguém colado', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, fr = P.frame({ a: 0, cx: 0, cy: 0, d: 8 }, 20, 10);

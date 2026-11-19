@@ -1735,3 +1735,15 @@ body .p3d:not([data-biome=custom]) .envface.stage::before,body .p3d:not([data-bi
 
 /* escudo sobre a barra de HP */
 .hpbar,.bar.hp{position:relative}.shbar{position:absolute;top:0;bottom:0;display:block;background:linear-gradient(#e6fbff,#70d8ff);box-shadow:0 0 6px #70d8ffaa,inset 0 0 0 1px #fff8;transition:left .7s cubic-bezier(.2,.8,.2,1),width .7s cubic-bezier(.2,.8,.2,1);z-index:2;pointer-events:none}.p3d .mini .hp{position:relative}.p3d .mini .hp>b.shbar{z-index:2}
+
+/* ===== luz anime luminoso do palco: hora do dia, holofote, tinta do elemento e sombra proporcional (só véus e gradientes; sem filter nas camadas 3D) ===== */
+.p3d::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .35s,background .35s}
+.p3d[data-mood=dia]::before{background:radial-gradient(ellipse at 18% -8%,#fff4c433,#0000 60%);opacity:1}
+.p3d[data-mood=tarde][data-biome=custom]::before{background:linear-gradient(200deg,#ff8a3a2e,#ff4a6a14 55%,#0000);opacity:1} /* os cenários prontos (tema-hora) já pintam tarde e noite: o véu só vale em imagem própria */
+.p3d[data-mood=noite][data-biome=custom]::before{background:radial-gradient(ellipse at 50% 30%,#4a6cff1a,#0a1450 140%);opacity:1;mix-blend-mode:multiply}
+.p3d[data-mood=dia]:not([data-biome=custom])::before{opacity:.6}
+.p3d.tinted::before{background:radial-gradient(ellipse at 50% 60%,var(--tint,#fff),#0000 70%);opacity:.22;transition:opacity .08s}
+.p3d[data-q=low]::before{transition:none}.p3d[data-q=low].tinted::before{opacity:0}
+.p3d .bb .shadow{width:calc(var(--h,300px) * .77);height:calc(var(--h,300px) * .77);margin:0 0 calc(var(--h,300px) * -.385) calc(var(--h,300px) * -.385)} /* a sombra acompanha o tamanho da figura (antes 230 px fixos) */
+.p3d .bb.cur .shadow{background:radial-gradient(closest-side,#000b 22%,color-mix(in srgb,var(--c,#fff) 50%,#0000) 58%,#0000)} /* holofote: o chão de quem tem a vez ganha o brilho da própria cor */
+@media (prefers-reduced-motion:reduce){.p3d::before{transition:none}}

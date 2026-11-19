@@ -73,6 +73,7 @@
     if (R >= wr) return { side: 1, scale: 1 }; if (Lf >= wr) return { side: -1, scale: 1 };
     const side = R >= Lf ? 1 : -1; return { side, scale: Math.round(clamp(Math.max(R, Lf) / wr, .6, 1) * 100) / 100 };
   };
+  const mood = sc => { const t = [sc?.mood, sc?.hora, /-(dia|tarde|noite)$/.exec(String(sc?.bbg || ''))?.[1]].find(v => v === 'dia' || v === 'tarde' || v === 'noite'); return t || 'dia'; }; // hora do dia da cena: campo mood/hora, ou o sufixo do cenário pronto (tema-hora)
   const ZMIN = 420, ZMAX = 1700; // zoom: distância extra mínima e máxima do alvo
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
@@ -99,7 +100,7 @@
       for (const p of pts) { const q = rotP(p, ry); if (q.z > A.z + 300) continue; b = Math.max(b, q.z + tz0 - PERSP + Math.abs(q.x + tx) / k); if (p.h > 380) b = Math.max(b, p.h * PERSP / ((v.h || 860) * .5) - PERSP + q.z + tz0); } // figura alta: a cabeça projetada cabe na metade de cima do quadro (recua a câmera)
       b = clamp(Math.ceil(b / 10) * 10, 0, 1400);
       r = { tx, ty: Math.round(b * .08), tz: tz0 - b, ry };
-      if (ln) { const ka = PERSP / Math.max(160, PERSP - (A.z + r.tz)); r.tx = tx - ln.side * Math.min(ln.w * .55, (v.w || 1440) * .25) / ka; } // a faixa da coluna: o ator sai da frente dela, em pixels de tela (ka: escala do ator depois do recuo)
+      if (ln) { const ka = PERSP / Math.max(160, PERSP - (A.z + r.tz)); const W = v.w || 1440, mx = ln.side > 0 ? W / 2 + SX * ka - W * .3 : W * .7 - (W / 2 + SX * ka); r.tx = tx - ln.side * Math.max(0, Math.min(ln.w * .55, W * .25, mx)) / ka; } // a faixa da coluna: o ator sai da frente dela, em pixels de tela (ka: escala do ator depois do recuo)
     } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x, ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 1.2), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
     else if (v.kind === 'orbit') { const ry = (v.ry0 || 0) + (v.deg || 0), A = rotP(a, ry); r = { tx: -A.x, ty: -60, tz: -A.z - 620 - (v.back || 0), ry }; } // arco cinematográfico em volta de quem age
     else if (v.kind === 'aim') r = { tx: -(a.x * .55 + t.x * .45) - 120, ty: 0, tz: -a.z + 380, ry: a.x < 0 ? -4 : 4 };
@@ -166,7 +167,7 @@
   const QCYCLE = ['auto', 'high', 'medium', 'low'], QNAME = { auto: 'Auto', high: 'Alta', medium: 'Média', low: 'Baixa' };
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
-  const P = { lane: { w: 0, side: 1 }, pickSide, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { lane: { w: 0, side: 1 }, pickSide, mood, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let floor = null, rl = null, rb = null, floorKey = '', root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', biomeClass = '', settle = 0, hs1 = 0, hs2 = 0;
@@ -235,8 +236,9 @@
 
   // cenário: só refaz quando muda o fundo, o clima ou a cena
   const scene = () => {
-    const q = qNow(), sc = S.scenes[S.scene] || {}, key = [S.scene, sc.bbg, sc.bg, sc.clima, JSON.stringify(sc.bbL || {}), q].join('|'); if (key === scnKey) return; scnKey = key;
+    const q = qNow(), sc = S.scenes[S.scene] || {}, key = [S.scene, sc.bbg, sc.bg, sc.mood, sc.hora, sc.clima, JSON.stringify(sc.bbL || {}), q].join('|'); if (key === scnKey) return; scnKey = key;
     const pre = BBG[sc.bbg], img = !pre ? (sc.bbg || sc.bg || '') : '', biome = pre ? sc.bbg : 'custom';
+    root.dataset.mood = mood(sc); // luz da hora do dia (véu em style.css)
     root.dataset.biome = biome; // o piso e as paredes acompanham a mesma seleção
     if (biomeClass) root.classList.remove(biomeClass); biomeClass = pre ? 'bb-' + sc.bbg : ''; if (biomeClass) root.classList.add(biomeClass); // as cores do tema também chegam ao piso e ao teto
     const ps = typeof PFX !== 'undefined' ? PFX.particlesFor(sc.clima, PFX.particleCount(q, matchMedia('(prefers-reduced-motion: reduce)').matches), 7) : [];
@@ -416,6 +418,7 @@
   // luz do elemento: quem está perto do impacto se tinge, e um clarão pinta o chão
   P.light = (id, color) => { const c = lastF?.get(id); if (!c || !live() || typeof PFX === 'undefined') return;
     for (const { id: j, k } of PFX.litUnits(lastF, c)) { const u = els.get(j); if (!u) continue; if (g.LUZ?.corpo?.has(j)) { g.LUZ.corpo.tint(j, color, k, 500); continue; } u.el.style.setProperty('--lit', color); u.el.style.setProperty('--litk', k); u.el.classList.add('lit'); clearTimeout(u.litT); u.litT = setTimeout(() => u.el.classList.remove('lit'), 500); }
+    if (qNow() !== 'low' && !reducedM()) { root.style.setProperty('--tint', color); root.classList.add('tinted'); clearTimeout(P.tintT); P.tintT = setTimeout(() => root.classList.remove('tinted'), 450); } // o cenário se tinge por um instante
     const f = el('i', 'flare', atw); f.style.cssText = `--lit:${color};transform:translate3d(${c.x}px,-2px,${c.z}px) translate(-50%,-50%) rotateX(90deg)`; setTimeout(() => f.remove(), 520); };
   const rectOfU = id => els.get(id)?.el.getBoundingClientRect() || null;
   P.linger = ms => { lingerUntil = Math.max(lingerUntil, performance.now() + ms); };
