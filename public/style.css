@@ -1807,3 +1807,26 @@ body .p3d:not([data-biome=custom]) .envface.stage::before,body .p3d:not([data-bi
 .lqm.rad-on .lq-all .opt.skr.on{background:#fff;color:#0a0a0a;box-shadow:inset 6px 0 0 var(--lqc,#e4002b)}
 .lqm.rad-on .lq-sum{background:#0a0a0a;border:2px solid #fff;border-left:6px solid var(--lqc,#fff)}
 .lqm.rad-on .lqsub>.stroke.mini{padding-left:34px}
+/* ===== fichas do grupo no estilo Persona 5: menores (55%), recorte preto torto com borda branca, retrato P&B inclinado, HP e Aura em números grandes ===== */
+.hud-party{transform:scale(.55);transform-origin:100% 100%;gap:0}
+.hud-party .pm{width:210px;margin-left:-6px}
+.hud-party .pm.now{width:240px;z-index:3;transform:scale(1.18);transform-origin:50% 100%}
+.hud-party .pm .ink{background:#fff;clip-path:polygon(6% 16%,34% 0,100% 10%,95% 100%,0 94%);top:38px}
+.hud-party .pm .ink::before{inset:4px;background:#0a0a0a;clip-path:polygon(6% 16%,34% 0,100% 10%,95% 100%,0 94%)}
+.hud-party .pm .por{left:18px;top:-6px;width:128px;height:118px;clip-path:polygon(10% 0,100% 8%,92% 100%,0 90%);background:#fff;transform:rotate(-7deg);padding:5px;box-sizing:border-box}
+.hud-party .pm.now .por{top:-30px;width:150px;height:138px}
+.hud-party .pm .por img,.hud-party .pm .por svg{filter:grayscale(1) contrast(1.7) brightness(1.08);clip-path:polygon(10% 0,100% 8%,92% 100%,0 90%);background:#0a0a0a}
+.hud-party .pm .pnm{color:#fff;font:700 18px var(--disp);letter-spacing:1.5px}
+.hud-party .pm .hpn2,.hud-party .pm .dia2{display:none}
+.hud-party .p5n{display:flex;align-items:flex-end;justify-content:flex-end;gap:10px;margin:4px 0 4px;transform:rotate(-3deg)}
+.hud-party .pm .in{padding:40px 14px 8px 18px}
+.hud-party .pm .pnm{position:absolute;right:14px;top:12px;z-index:3;padding:1px 8px;background:#0a0a0a;font-size:15px;transform:rotate(-3deg)}
+.hud-party .p5n span{display:flex;align-items:flex-end;gap:3px}
+.hud-party .p5n small{font:700 15px var(--cond);color:#fff;letter-spacing:.5px;margin-bottom:5px}
+.hud-party .p5n b{font:400 50px/0.9 var(--disp);color:#fff;-webkit-text-stroke:1px #000;text-shadow:3px 3px 0 var(--c,#e4002b)}
+.hud-party .p5n .a b{color:#9fe8ff;text-shadow:3px 3px 0 #0a3a6a}
+.hud-party .pm .hpbar{height:6px;border:1px solid #fff;background:#300}
+.hud-party .pm .segs i{height:5px}
+.hud-party .pm .sanl{height:3px}
+.hud-party .pm .sanr small{font-size:10px}
+.hud-party .pm.ko .por img{filter:grayscale(1) brightness(.5)}

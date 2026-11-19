@@ -86,7 +86,7 @@ const HUD = (() => {
       <i class="ink"></i><div class="por">${photo(c, 'p')}</div>
       <div class="hlim ${c.limit >= 100 ? 'full' : ''}" title="Limite ${c.limit}%"><i style="height:${pct(c.limit, 100)}%"></i></div>
       <div class="pst">${c.hp > 0 ? stIcons(c) : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}${c.st.defUp ? '<span>Defendendo</span>' : ''}${form ? `<span>Forma: ${esc(form.name)}</span>` : ''}</div>
-      <div class="in"><b class="pnm">${esc(c.name)}</b><div class="hpn2"><b>${c.hp}</b><small>/${c.hpMax}</small><em>HP</em></div>
+      <div class="in"><b class="pnm">${esc(c.name)}</b><div class="p5n" aria-hidden="true"><span class="h"><small>HP</small><b>${c.hp}</b></span><span class="a"><small>AU</small><b>${c.aura}</b></span></div><div class="hpn2"><b>${c.hp}</b><small>/${c.hpMax}</small><em>HP</em></div>
         <div class="hpbar"><i data-bid="${c.id}:hp" data-p="${hp}" style="width:${hp}%"></i>${shBar(c)}</div>
         <div class="au" title="Aura ${c.aura}/${c.auraMax}"><span class="dia2"><b>${c.aura}</b></span><span class="segs">${Array.from({ length: 10 }, (_, i) => `<i class="${i < au ? 'f' : ''}"></i>`).join('')}</span></div>
         <div class="sanr" title="Sanidade ${c.san}/${c.sanMax}"><small>SAN ${c.san}</small><div class="sanl"><i style="width:${pct(c.san, c.sanMax)}%"></i></div></div></div></div>`; }).join('')}</div>`;
