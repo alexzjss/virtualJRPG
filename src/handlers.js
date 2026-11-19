@@ -62,7 +62,8 @@ const H = {
     else if ((GMF.has(f) || NUM[f] || f === 'limit') && !g) return; // recursos e posição só pelo mestre (o jogador move o token com 'move')
     else if (f === 'limit') ch.limit = int(m.v, 0, 100);
     else if (NUM[f]) { ch[f] = int(m.v); if (f === 'hp' && ch.hp > 0) { delete ch.dead; delete ch.dying; } }
-    else if (f === 'name') ch.name = String(m.v).slice(0, 30) || '?';
+    else if (f === 'name') { ch.name = String(m.v).slice(0, 30) || '?'; if (ch.enemy && S.bestiary[ch.id] === ch) ch.tpl = ch.name; }
+    else if (f === 'boss' && g && ch.enemy) ch.boss = !!m.v;
     else if (f === 'color' && /^#[0-9a-f]{6}$/i.test(m.v)) ch.color = m.v;
     else if (f === 'img') ch.img = okUrl(m.v) ? m.v : '';
     else if (f === 'imgF' || f === 'imgP' || (f === 'imgB' && !ch.enemy)) ch[f] = okUrl(m.v) ? m.v : ''; // imagens do palco de batalha: frente, retrato e costas (inimigo não tem costas)
@@ -493,6 +494,18 @@ const H = {
   ctAdd(c, m) { const b = S.bestiary[m.id]; if (c.role === 'gm' && b) S.contracts[rid()] = { target: b.tpl || b.name, gold: int(m.gold, 0, 99999), xp: int(m.xp, 0, 999), done: false }; },
   ctDel(c, m) { if (c.role === 'gm') delete S.contracts[m.id]; },
   // ----- bestiário -----
+  bNew(c, m) { // cria um modelo editável; a ficha do bestiário serve como preset persistente
+    if (c.role !== 'gm') return;
+    const id = /^[a-f0-9]{8}$/i.test(m.id || '') && !Object.hasOwn(S.bestiary, m.id) ? m.id : rid(), ch = newChar(id, true, '');
+    Object.assign(ch, { name: 'Novo inimigo', tpl: 'Novo inimigo', cat: 'demonio', xpR: 10, goldR: 20 });
+    S.bestiary[id] = ch;
+  },
+  bDup(c, m) { // duplica um preset para criar uma variante sem alterar o original
+    if (c.role !== 'gm' || !S.bestiary[m.id]) return;
+    const id = rid(), ch = structuredClone(S.bestiary[m.id]);
+    Object.assign(ch, { id, name: `${ch.name} (cópia)`.slice(0, 30), tpl: `${ch.name} (cópia)`.slice(0, 30), enemy: true, owner: '', x: 0, y: 0, scene: S.scene, st: {}, marks: {}, body: {}, rage: false });
+    S.bestiary[id] = ch;
+  },
   bSave(c, m) { const ch = S.chars[m.id]; if (c.role === 'gm' && ch) S.bestiary[rid()] = structuredClone({ ...ch, st: {}, marks: {}, body: {}, rage: false, tpl: ch.name, cat: ch.cat || (ch.boss ? 'chefe' : 'demonio') }); },
   bSpawn(c, m) {
     if (c.role !== 'gm' || !Object.hasOwn(S.bestiary, m.id)) return;

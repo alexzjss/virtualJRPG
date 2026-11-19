@@ -144,6 +144,8 @@ app.addEventListener('click', e => {
   if (d.a === 'genSet') { gen[d.k] = d.v; return render(); }
   if (d.a === 'foeGen') return send({ t: 'foeGen', ...gen, n: gen.rank === 'chefe' ? 1 : +bf.n || 1, save: !!d.save });
   if (d.a === 'foeEnc') return send({ t: 'foeEnc', el: gen.el, diff: d.diff });
+  if (d.a === 'bNew') { const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), n => n.toString(16).padStart(2, '0')).join(''); window.vjOpenAfterState = id; send({ t: 'bNew', id }); return; }
+  if (d.a === 'bDup') { window.vjOpenAfterState = { before: Object.keys(S.bestiary), source: d.id }; send({ t: 'bDup', id: d.id }); return; }
   if (d.a === 'bfSet') { bf[d.k] = bf[d.k] === d.v ? '' : d.v; return render(); }
   if (d.a === 'encAdd') { const e = encDraft.find(x => x.b === d.id && x.tier === tier); if (e) e.n = Math.min(12, e.n + (+bf.n || 1)); else encDraft.push({ b: d.id, tier, n: +bf.n || 1 }); return render(); }
   if (d.a === 'encRm') { encDraft.splice(+d.k, 1); return render(); }

@@ -153,7 +153,7 @@ function connect() {
   ws.onmessage = e => {
     let m; try { m = JSON.parse(e.data); } catch { return; }
     if (m.t === 'defs') { DEFS = m.d; DEFV = m.v; return; }
-    if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; syncOfi(); render(); }
+    if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; syncOfi(); if (gm && window.vjOpenAfterState) { const q = window.vjOpenAfterState, id = typeof q === 'string' ? q : S.bestiary?.[q.id] ? q.id : Object.keys(S.bestiary || {}).find(k => !q.before.includes(k)); if (id && S.bestiary?.[id]) { gOpen('f_' + id); window.vjOpenAfterState = ''; } } render(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }
     if (m.t === 'sfx') playSfx(m.k);
     if (m.t === 'note') { if (m.id && gm && wf.d) wf.id = m.id; /* arma salva na Forja: continua editando ela */ toast(m.text, m.kind, m.why); if (m.kind === 'no') navigator.vibrate?.(120); }
