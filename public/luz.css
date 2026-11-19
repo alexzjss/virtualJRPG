@@ -8,3 +8,20 @@ html.luz .p3d .bb.malha .bbi{animation:none!important;scale:none!important;trans
 html.luz .p3d .bb.malha .ghost{display:none}
 /* flash invertido do motor luminoso: inverte a tela inteira por um instante (mix-blend, sem filter em camada 3D) */
 .luz-invert{position:fixed;inset:0;z-index:60;background:#fff;mix-blend-mode:difference;pointer-events:none}
+/* números luminosos: fonte larga e fina, contorno escuro de 1 px e brilho na cor do elemento; sobem e somem (coreo.floatNum) */
+html.luz .fxl .float.lz{translate:none;animation:none;display:flex;align-items:center;gap:.18em;font:600 clamp(24px,calc(var(--uw,120px)*.3),72px)/1 'Barlow',sans-serif;letter-spacing:.04em;color:#fff;-webkit-text-stroke:1px #0009;text-shadow:0 0 6px var(--fx),0 0 18px var(--fx),0 2px 0 #0008}
+html.luz .fxl .float.lz.crit{color:#fff6dc}
+html.luz .fxl .float.lz.heal{color:#d8ffe6;--fx:#3ddc84}
+html.luz .fxl .float.lz.miss{color:#c8cbd6;font-size:clamp(16px,calc(var(--uw,120px)*.18),38px);text-shadow:0 0 8px #0008}
+html.luz .fxl .float.lz .lz-star{font-style:normal;font-size:.62em;color:#fff;text-shadow:0 0 8px var(--fx),0 0 16px #fff}
+html.luz .fxl .float.lz em{font:600 italic .34em/1 'Barlow',sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:.25em .5em;border:1px solid #fff8;border-radius:2px;color:#fff;background:linear-gradient(90deg,var(--fx),#0000);-webkit-text-stroke:0;text-shadow:none;align-self:flex-end}
+/* selos e corte de turno: letras finas e largas, gradiente claro e uma linha de luz que corre */
+html.luz .fxl .seal b{position:relative;overflow:hidden;font:500 clamp(30px,7.5vw,80px)/1 'Barlow',sans-serif;letter-spacing:.32em;padding:.15em .1em .15em .42em;transform:none;color:transparent;background:linear-gradient(180deg,#fff 30%,var(--sc,#ffb84a) 140%);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 0 14px var(--sc,#ffb84a))}
+html.luz .fxl .seal b::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,#0000,#fff,#0000);transform:translateX(-100%);animation:luzRun .9s .1s cubic-bezier(.3,.7,.3,1) forwards}
+html.luz .fxl .seal.bom b{font-size:clamp(22px,5vw,50px)}html.luz .fxl .seal.otimo b{font-size:clamp(26px,6.5vw,64px)}html.luz .fxl .seal.erro b{font-size:clamp(18px,4.2vw,40px);letter-spacing:.24em}
+html.luz .fxl .seal.bf b{font-weight:800;color:#fff;background:none;-webkit-background-clip:border-box;background-clip:border-box;text-shadow:0 0 2px #000,3px 3px 0 #e4002b;filter:drop-shadow(0 0 24px #e4002b)}
+html.luz .fxl .turncut{height:84px;font:500 34px/1 'Barlow',sans-serif;letter-spacing:.3em;text-transform:uppercase;text-shadow:0 0 14px var(--c,#e4002b);background:linear-gradient(90deg,color-mix(in srgb,var(--c,#e4002b) 70%,#0000),#0008 60%,#0000);clip-path:polygon(0 30%,100% 22%,100% 78%,0 70%)}
+html.luz .fxl .turncut.me{font-size:40px}
+html.luz .fxl .turncut::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;margin-top:30px;background:linear-gradient(90deg,#0000,#fff,#0000);transform:translateX(-100%);animation:luzRun .8s .05s ease-out forwards}
+@keyframes luzRun{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){html.luz .fxl .seal b::after,html.luz .fxl .turncut::after{animation:none;display:none}}

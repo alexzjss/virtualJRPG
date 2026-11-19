@@ -80,7 +80,8 @@ function cutscene(a, f) { // Limite e Domínio: retrato (ou a inicial gigante) a
     <div class="cs-name"><small>${f.dom ? 'Domínio' : 'Limite'} · ${esc(a.name)}</small><b>${esc(f.s || '')}</b></div>`, 1250, `--c:${esc(a.color || '#e4002b')};--fx:${ELC[el] || '#e4002b'}`);
   sfxc('limit');
 }
-function cutIn(kind, a, t) { // Crítico e Fraqueza: corte de tela com o olhar de quem golpeou
+function cutIn(kind, a, t) { // Crítico e Fraqueza: corte de tela com o olhar de quem golpeou (no modo luminoso ficam no mundo: clarão + estrela/etiqueta no número)
+  if (luzOn()) { posFx('bloom'); sfxc(kind === 'crit' ? 'cut' : 'weak'); return; }
   fxl.querySelector('.cutin')?.remove();
   fxAdd(`cutin ${kind} ${a?.enemy ? 'foe' : ''}`, `<div class="ci-strip">${face(a)}</div><div class="ci-txt"><b>${kind === 'crit' ? 'Crítico!' : 'Fraqueza!'}</b><small>${esc(a?.name || '')}${t ? ' → ' + esc(t.name) : ''}</small></div>`, 900, `--c:${esc(a?.color || '#e4002b')}`);
   sfxc(kind === 'crit' ? 'cut' : 'weak');
@@ -94,10 +95,12 @@ function knockout(id) { // nocaute: corte em diagonal, o cartão cai e apaga
   const el = unitEl(id), c = S.chars[id]; if (!el || !c) return;
   el.classList.add('ko'); mark(`.unit[data-tgt="${id}"]`, 'kofall', 900);
   el.classList.add('kofall');
-  if (c.enemy && stage3d() && typeof PVIDA !== 'undefined') PVIDA.inkOut(id, ELC[lastEl.get(id)] || '#e4002b'); else fxAdd('kofx', `<i></i><b>${c.enemy ? 'Abatido' : 'Caído'}</b>`, 1000, fxPos(el, .45));
+  if (c.enemy && stage3d() && luzOn() && typeof LUZFX !== 'undefined') LUZFX.dissolve(id, ELC[lastEl.get(id)] || '#e4002b');
+  else if (c.enemy && stage3d() && typeof PVIDA !== 'undefined') PVIDA.inkOut(id, ELC[lastEl.get(id)] || '#e4002b'); else fxAdd('kofx', `<i></i><b>${c.enemy ? 'Abatido' : 'Caído'}</b>`, 1000, fxPos(el, .45));
   sfxc('ko');
 }
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const luzOn = () => document.documentElement.classList.contains('luz') && typeof LUZP !== 'undefined';
 const posFx = (k, id, o = {}) => { const P = globalThis.LUZ?.pos; if (!P) return; const r = id && document.querySelector(`.p3d .bb[data-tgt="${CSS.escape(id)}"] > .bbi > img`)?.getBoundingClientRect(); P.fire(k, r?.width ? { x: r.left + r.width / 2, y: r.top + r.height * .45, ...o } : o); }; // pós de tela do motor luminoso (aberração, velocidade, choque, inversão)
 function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CHOQUE!, BLACK FLASH!
   fxl.querySelector('.seal')?.remove();
@@ -124,6 +127,12 @@ async function impact(acts, o = {}) {
 // números com física: arco, quique e cor do elemento (no 3D); no 2D e com movimento reduzido ficam como antes
 function floatNum(el, txt, cls, i, f) {
   const col = f.dmg ? (typeof ANIM_PROFILES !== 'undefined' && ANIM_PROFILES.PALETTES[f.el]?.[1]) || ELC[f.el] || '#e4002b' : ELC[f.el] || '#e4002b';
+  if (luzOn()) { // números luminosos: sobem e somem sem quique; crítico com estrela, fraqueza com etiqueta
+    const ns = LUZP.numberStyle({ crit: !!f.crit, weak: !!f.w, total: /total/.test(cls), heal: !!f.heal, miss: !!f.miss });
+    const d = fxAdd(`float lz ${cls}`, `${ns.star ? '<i class="lz-star">✦</i>' : ''}<span>${txt}</span>${ns.tag && !f.miss ? `<em>${ns.tag}</em>` : ''}`, ns.lifeMs + 100, fxPos(el, .22) + `;--fx:${col}`);
+    if (d.animate && !calm()) { const dx = (i % 3 - 1) * 18; d.animate([{ transform: `translate(-50%,-50%) translate(${dx}px,6px) scale(${ns.scale * .7})`, opacity: 0 }, { transform: `translate(-50%,-50%) translate(${dx}px,-10px) scale(${ns.scale * 1.08})`, opacity: 1, offset: .12 },
+      { transform: `translate(-50%,-50%) translate(${dx}px,-22px) scale(${ns.scale})`, opacity: 1, offset: .7 }, { transform: `translate(-50%,-50%) translate(${dx}px,-46px) scale(${ns.scale})`, opacity: 0 }], { duration: ns.lifeMs, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' }); }
+    return d; }
   const d = fxAdd(`float ${cls}`, txt, 1250, fxPos(el, .22) + `;--fx:${col}`);
   if (!P3() || calm() || !d.animate) return d;
   const sd = PFX.numberSeed(i, f.crit), sc = /total/.test(cls) ? 1.35 : f.crit ? 1.25 : 1; d.classList.add('phys');

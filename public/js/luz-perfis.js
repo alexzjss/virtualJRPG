@@ -73,5 +73,9 @@
   const PULSE = { bloom: 220, shock: 450, invert: 34, chroma: 260, speed: 400 };
   const pulse = (kind, t, strength = 1) => { const ms = PULSE[kind]; if (!ms || t < 0 || t > ms) return 0; const u = t / ms, k = kind === 'invert' ? 1 : kind === 'shock' ? Math.sin(Math.PI * Math.min(1, u * 1.15)) * (1 - u) + (1 - u) * .25 : 1 - u * u;
     return Math.max(0, Math.min(1, k * clamp(strength, 0, 1))); };
-  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE };
+  // ----- números de dano (estilo luminoso): escala, estrela do crítico, etiqueta de fraqueza e quanto tempo ficam -----
+  const numberStyle = ({ crit = false, weak = false, total = false, miss = false } = {}) => {
+    const [scale, lifeMs] = total ? [1.6, 1200] : crit ? [1.45, 1100] : miss ? [.85, 700] : [1, 900];
+    return { scale, star: !!crit && !total, tag: weak ? 'Fraqueza' : '', lifeMs }; };
+  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle };
 })(globalThis);

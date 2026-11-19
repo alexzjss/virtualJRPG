@@ -82,6 +82,7 @@
   const play = (id, kind, opts = {}) => { if (reduced() || !has(id)) return; const s = S0(id), ms = (MS[kind] || 860) / Math.max(.5, Math.min(2, g.ANIMFX?.settings?.speed || 1));
     s.curves = s.curves.filter(c => c.kind !== kind); s.curves.push({ kind, t0: now(), ms, opts: { dir: facing(id), ...opts }, hold: kind === 'cai' || kind === 'ko' }); L.kick(); };
   const tint = (id, col, k = 1, ms = 500) => { if (!has(id)) return; S0(id).tint = { col, k, t0: now(), ms }; L.kick(); };
+  const fade = (id, ms = 1150, col = '#ffffff') => { if (!has(id)) return false; const s = S0(id); s.fade = { t0: now(), ms }; s.fadeCol = col; L.kick(); return true; }; // KO luminoso: trinca em luz e some
   const flash = (id, ms = 160) => { if (!has(id)) return; S0(id).flash = now() + ms; L.kick(); };
   const ghosts = (id, dir = 1) => { if (reduced() || !has(id)) return; S0(id).ghost = { t0: now(), dir }; play(id, 'dodge', { dir: -dir }); };
   // ----- vento do clima -----
@@ -115,9 +116,12 @@
       if (s) { s.curves = s.curves.filter(cv => { const k = (t - cv.t0) / cv.ms; if (k >= 1 && !cv.hold) return false; const b = LP.bodyCurve(cv.kind, Math.min(1, k), cv.opts); for (const p in d) d[p] += b[p]; dir = cv.opts.dir || dir; if (k < 1) anim = true; return true; }); }
       const ko = pose.includes('ko') && !(s?.curves.some(cv => cv.hold));
       if (ko && !c.enemy) { d.bend -= 1.4; d.dy += .08; d.squash -= .1; }
-      const inked = u.el.classList.contains('inked'), alpha = inked ? 0 : 1; if (!alpha) continue;
+      const inked = u.el.classList.contains('inked'); let alpha = inked && !s?.fade ? 0 : 1, fk = 0;
+      if (s?.fade) { const k = (t - s.fade.t0) / s.fade.ms; if (k >= 1) { s.fade = null; alpha = 0; } else { anim = true; fk = Math.min(1, k / .22); alpha = k < .22 ? 1 : 1 - (k - .22) / .78; } }
+      if (!alpha) continue;
       const lim = pose.includes('limite');
       let tr = 0, tg = 0, tb = 0, tk = 0;
+      if (fk) { [tr, tg, tb] = L.rgb(s.fadeCol || '#ffffff'); tk = .35 + fk * .65; }
       if (s?.tint) { const k = (t - s.tint.t0) / s.tint.ms; if (k < 1) { [tr, tg, tb] = L.rgb(s.tint.col); tk = s.tint.k * (1 - k); anim = true; } else s.tint = null; }
       if (lim && !tk) { [tr, tg, tb] = L.rgb('#ffd36a'); tk = .35 + .25 * Math.sin(t / 220); anim = true; }
       const fl = s && t < s.flash ? (s.flash - t) / 160 * .7 : 0; if (fl) anim = true;
@@ -140,7 +144,7 @@
   L.bodiesIdle = () => still > 2;
   // troca para o motor antigo: devolve as imagens ao DOM
   addEventListener('vj-quality', () => { if (!L.active()) document.querySelectorAll('.p3d .bb.malha').forEach(e => e.classList.remove('malha')); else L.kick(); });
-  L.corpo = { play, tint, flash, ghosts, has, textures: texs };
+  L.corpo = { play, tint, flash, ghosts, fade, has, textures: texs };
   // o palco-vida chama action/ghosts/pose para o corpo; com a malha ativa, quem mexe o corpo é ela
   const V = g.PVIDA; if (V) {
     if (V.action) { const a0 = V.action; V.action = (id, family, tier = 1, seed = 0) => has(id) ? play(id, family, { tier, seed }) : a0(id, family, tier, seed); }

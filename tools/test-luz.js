@@ -39,3 +39,11 @@ test('LUZP: pulsos de pós nascem e somem na janela', () => {
   for (const [k, ms] of [['bloom', 220], ['shock', 450], ['invert', 34], ['chroma', 260], ['speed', 400]]) {
     assert.ok(L.pulse(k, 0, 1) > 0, k); assert.equal(L.pulse(k, ms + 1, 1), 0, k); assert.equal(L.pulse(k, -1, 1), 0, k); assert.ok(L.pulse(k, ms / 2, .5) <= .5, k); }
 });
+
+test('LUZP: estilo dos números', () => {
+  const n = o => L.numberStyle({ crit: false, weak: false, total: false, heal: false, miss: false, ...o });
+  assert.deepEqual(n({}), { scale: 1, star: false, tag: '', lifeMs: 900 });
+  assert.deepEqual(n({ crit: true }), { scale: 1.45, star: true, tag: '', lifeMs: 1100 });
+  assert.equal(n({ weak: true }).tag, 'Fraqueza'); assert.equal(n({ total: true }).scale, 1.6); assert.equal(n({ total: true }).lifeMs, 1200); assert.equal(n({ miss: true }).lifeMs, 700); assert.equal(n({ miss: true }).scale, .85);
+  assert.deepEqual(n({ heal: true }), { scale: 1, star: false, tag: '', lifeMs: 900 });
+});
