@@ -110,10 +110,12 @@ function ordenar(b, fixo) {
   const slot = new Array(n).fill(null); if (head) slot[0] = head;
   // cada grupo (já em ordem de nível) ocupa as casas livres da faixa dele em ordem crescente: ninguém mais caro fica antes de um mais barato
   const fill = (grp, lo, hi) => { for (const s of grp) { let i = -1; for (let j = Math.max(0, lo); j <= Math.min(n - 1, hi); j++) if (!slot[j]) { i = j; break; } if (i < 0) for (let j = n - 1; j >= 0; j--) if (!slot[j]) { i = j; break; } slot[i] = s; } };
-  const faixa = s => s.n in ANCORA ? [ANCORA[s.n], ANCORA[s.n]] : kit.has(s) ? (s.dom ? [4, 4] : [0, 4]) : forte(s) ? [Math.min(6, n - 1), n - 1] : [0, n - 1];
-  fill(rest.filter(s => s.n in ANCORA), 4, 4);
-  fill(rest.filter(s => kit.has(s) && s.dom && !(s.n in ANCORA)), 4, 4);
-  fill(rest.filter(s => kit.has(s) && !s.dom && !(s.n in ANCORA)), 0, 4);
+  // Skills já usadas pelos personagens ocupam as primeiras casas do ramo (após a raiz).
+  // A ordem interna é XP crescente, preservando os pré-requisitos explícitos.
+  const faixa = s => s.n in ANCORA ? [ANCORA[s.n], ANCORA[s.n]] : kit.has(s) ? [0, Math.min(4, n - 1)] : forte(s) ? [Math.min(6, n - 1), n - 1] : [0, n - 1];
+  fill(rest.filter(s => kit.has(s) && s.n in ANCORA), ANCORA['Canhão de Aura'], ANCORA['Canhão de Aura']);
+  fill(rest.filter(s => kit.has(s) && s.dom && !(s.n in ANCORA)), 0, Math.min(4, n - 1));
+  fill(rest.filter(s => kit.has(s) && !s.dom && !(s.n in ANCORA)), 0, Math.min(4, n - 1));
   // Limites depois do kit, na casa do terço deles no setor (4, 7 ou 10); ocupada, vai para a próxima livre
   for (const s of rest.filter(s => s.limit && !kit.has(s))) { const w = Math.min(n, LIMT.get(s) ?? 4) - 1; fill([s], w, n - 1); }
   // fortes da 7 em diante, de trás para frente, para os comuns não ficarem sem casa no fim
