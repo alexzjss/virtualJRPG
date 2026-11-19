@@ -14,6 +14,27 @@
   const f1 = v => Math.round(v * 10) / 10, f4 = v => Math.round(v * 1e4) / 1e4;
   const rng = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const svgUrl = (w, h, body, pa = 'none') => `url('data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="${pa}">${body}</svg>`).replace(/'/g, '%27')}')`;
+  // ----- horário: toda cor gerada passa por grade() ao montar (custo zero na luta). "!#hex" marca cor que não grada (céu, lava, cristal) -----
+  const HORAS = ['dia', 'tarde', 'noite'];
+  const horaDe = id => { const p = String(id || '').split('-'); return p.length === 2 && HORAS.includes(p[1]) ? p[1] : 'dia'; };
+  function grade(hex, hora) {
+    if (hora !== 'tarde' && hora !== 'noite') return hex;
+    const v = hex.replace(/^#/, ''), short = v.length <= 4, s = short ? [...v.slice(0, 3)].map(ch => ch + ch).join('') : v.slice(0, 6);
+    let c = [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16) / 255);
+    const gray = () => .2126 * c[0] + .7152 * c[1] + .0722 * c[2], l = gray();
+    const mix = (t, k) => { c = c.map((x, i) => x + (t[i] - x) * k); }, sat = k => { const y = gray(); c = c.map(x => y + (x - y) * k); };
+    if (hora === 'tarde') { mix([1, .6, .29], .24 * l + .06); mix([.54, .23, .48], .2 * (1 - l)); sat(1.1); } // luz dourada, sombra puxando para o magenta
+    else { sat(.7); mix([.16, .23, .54], .35); c = c.map(x => x * .42 + .04); } // noite azulada, com piso de luminância
+    c = c.map(x => Math.max(0, Math.min(1, x)));
+    return '#' + (short ? c.map(x => Math.round(x * 15).toString(16)).join('') + v.slice(3) : c.map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('') + v.slice(6));
+  }
+  // também dentro dos SVG já codificados (%23 = #, %21 = !)
+  const HEX = /(!|%21)?(#|%23)([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/g;
+  const gradeAll = (str, hora) => str.replace(HEX, (m, keep, h, v) => h + (keep ? v : grade('#' + v, hora).slice(1)));
+  const SKY = { dia: ['#1a5fe0', '#3994f4', '#86ccff', '#e2f7ff'], tarde: ['#3a2a7a', '#c0508a', '#ff9a5a', '#ffd89a'], noite: ['#060a26', '#121e4a', '#24366e', '#3a4a80'] };
+  const CEIL = { dia: ['#4aa2f6', '#1a5fe0'], tarde: ['#8a4a9a', '#3a2a7a'], noite: ['#16224e', '#060a26'] };
+  const FREST = { dia: '#2a7be8', tarde: '#9a4a8a', noite: '#0e1840' }; // fundo atrás das frestas entre céu e paredes
+  const stars = (W, H, n, R) => Array.from({ length: n }, () => `<circle cx="${f1(R() * W)}" cy="${f1(R() * H)}" r="${f1(.8 + R() * 1.8)}" fill="!#ffffff" opacity="${f1(.4 + R() * .6)}"/>`).join('');
   // chão: 1800×1500 no plano local ↔ x ±3600, z ±3000 no mundo
   const GX = x => f1(x / 4 + 900), GZ = z => f1(z / 4 + 750), GR = r => f1(r / 4);
 
@@ -108,16 +129,20 @@
   const bumps = (W, base, r0, r1, R, col, from = 0, to = W) => { let s = `<rect x="${from}" y="${base}" width="${to - from}" height="${650 - base}" fill="${col}"/>`;
     for (let x = from - r1 * .3; x < to + r1 * .3; x += r0 * 1.1 + R() * r0) { const r = r0 + R() * (r1 - r0); s += `<circle cx="${f1(x)}" cy="${f1(base + r * .35)}" r="${f1(r)}" fill="${col}"/>`; }
     return s; };
-  const skyDefs = `<defs><linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a5fe0"/><stop offset=".36" stop-color="#3994f4"/><stop offset=".62" stop-color="#86ccff"/><stop offset=".77" stop-color="#e2f7ff"/></linearGradient></defs>`;
+  const skyDefs = hora => { const k = SKY[hora] || SKY.dia; return `<defs><linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="!${k[0]}"/><stop offset=".36" stop-color="!${k[1]}"/><stop offset=".62" stop-color="!${k[2]}"/><stop offset=".77" stop-color="!${k[3]}"/></linearGradient></defs>`; };
+  // sol da manhã, sol baixo da tarde ou lua: sempre no mesmo lado (a luz do cenário não muda de direção)
+  const astro = hora => hora === 'tarde' ? `<circle cx="425" cy="300" r="240" fill="!#ffb060" opacity=".22"/><circle cx="425" cy="300" r="130" fill="!#ffc070" opacity=".35"/><circle cx="425" cy="300" r="70" fill="!#ffe0a0"/>`
+    : hora === 'noite' ? `<circle cx="425" cy="140" r="180" fill="!#c8d6ff" opacity=".1"/><circle cx="425" cy="140" r="52" fill="!#eef2ff"/><circle cx="410" cy="128" r="9" fill="!#d6deff"/><circle cx="440" cy="156" r="6" fill="!#d6deff"/>`
+    : `<circle cx="425" cy="120" r="210" fill="#fff6c8" opacity=".18"/><circle cx="425" cy="120" r="110" fill="#fff6c8" opacity=".35"/><circle cx="425" cy="120" r="46" fill="#fffdf0"/>`;
   // horizonte de cada parede: céu, sol (na esquerda), nuvens paradas e camadas de silhueta que clareiam com a distância
   const FACE = { 'env-back': [1800, lx => [(lx - 900) * 4, -3000]], 'env-left': [1500, lx => [-3600, -(lx - 750) * 4]], 'env-right': [1500, lx => [3600, (lx - 750) * 4]], 'env-front': [1800, lx => [(lx - 900) * 4, 3000]], 'env-ceiling': [1800] };
-  function horizonte(tema, face, seed) {
-    const R = rng(seed), [W, wc] = FACE[face];
-    if (face === 'env-ceiling') { let s = `<defs><radialGradient id="z" cx=".2" cy=".7" r=".9"><stop offset="0" stop-color="#4aa2f6"/><stop offset="1" stop-color="#1a5fe0"/></radialGradient></defs><rect width="1800" height="1500" fill="url(#z)"/>`;
+  function horizonte(tema, face, seed, hora = 'dia') {
+    const R = rng(seed), [W, wc] = FACE[face], night = hora === 'noite';
+    if (face === 'env-ceiling') { const k = CEIL[hora] || CEIL.dia; let s = `<defs><radialGradient id="z" cx=".2" cy=".7" r=".9"><stop offset="0" stop-color="!${k[0]}"/><stop offset="1" stop-color="!${k[1]}"/></radialGradient></defs><rect width="1800" height="1500" fill="url(#z)"/>` + (night ? stars(1800, 1500, 60, R) : '');
       for (let i = 0; i < 7; i++) s += cloudSvg(150 + R() * 1500, 150 + R() * 1200, 1.6 + R() * 1.4, R, '#ffffffd9', '#cfe2fbcc');
       return svgUrl(1800, 1500, s); }
-    let s = skyDefs + `<rect width="${W}" height="650" fill="url(#ceu)"/>`;
-    if (face === 'env-left') s += `<circle cx="425" cy="120" r="210" fill="#fff6c8" opacity=".18"/><circle cx="425" cy="120" r="110" fill="#fff6c8" opacity=".35"/><circle cx="425" cy="120" r="46" fill="#fffdf0"/>`;
+    let s = skyDefs(hora) + `<rect width="${W}" height="650" fill="url(#ceu)"/>` + (night ? stars(W, 380, 40, R) : '');
+    if (face === 'env-left') s += astro(hora);
     for (let i = 0, n = 2 + Math.floor(R() * 2); i < n; i++) s += cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R);
     if (tema === 'floresta') {
       s += ridge(W, 395, 85, R, '#9ccbf0') + ridge(W, 440, 45, R, '#6fb4a8') + bumps(W, 452, 16, 30, R, '#4ca066') + bumps(W, 474, 22, 40, R, '#348550') + bumps(W, 492, 26, 44, R, '#24693f');
@@ -332,16 +357,30 @@
 
   // ----- montar -----
   let live = []; // grupos do cenário atual: { el, c, r }
-  function montar(parent, tema, q = 'medium') {
-    const Q = q === 'low' ? 0 : q === 'high' ? 2 : 1, R = rng({ floresta: 11, castelo: 23, praia: 37 }[tema] || 5), B = Builder(), gnd = [], extra = [];
-    if (tema === 'floresta') floresta(B, Q, R, gnd); else if (tema === 'castelo') castelo(B, Q, R, gnd); else if (tema === 'praia') praia(B, Q, R, gnd, extra); else return;
+  // cada tema: função que monta as peças, semente fixa e as frestas (null = usa a do céu do horário)
+  const BUILD = { floresta: [(B, Q, R, gnd) => floresta(B, Q, R, gnd), 11], castelo: [(B, Q, R, gnd) => castelo(B, Q, R, gnd), 23], praia: [praia, 37] };
+  const TEMAS = Object.keys(BUILD);
+  // monta o cenário sem tocar no DOM: html do terreno, horizonte de cada face e grupos (para sumir na frente da câmera), já no horário
+  function construir(tema, Q, hora = 'dia') {
+    const b = BUILD[tema]; if (!b) return null;
+    const R = rng(b[1]), B = Builder(), gnd = [], extra = [];
+    b[0](B, Q, R, gnd, extra);
     ceuVivo(B, Q, rng(99), tema);
-    const terr = document.createElement('div'); terr.className = 'terr t-' + tema;
-    terr.innerHTML = `<div class="tgnd" style="background-image:${svgUrl(1800, 1500, gnd.join(''))}"></div>${extra.join('')}` + B.html();
+    const raw = `<div class="tgnd" style="background-image:${svgUrl(1800, 1500, gnd.join(''))}"></div>${extra.join('')}` + B.html();
+    const faces = Object.fromEntries(Object.keys(FACE).map(f => [f, gradeAll(horizonte(tema, f, f.length * 7 + tema.length, hora), hora)]));
+    return { html: gradeAll(raw, hora), faces, groups: B.groups.map(G => ({ c: G.c, r: G.r })), n: (raw.match(/<(?:i class="tf|b class="tb|s class="tc)/g) || []).length, frest: (b[2] || FREST)[hora] || FREST.dia };
+  }
+  function montar(parent, tema, q = 'medium', hora) {
+    const Q = q === 'low' ? 0 : q === 'high' ? 2 : 1, host = parent.closest?.('[data-biome]');
+    hora = HORAS.includes(hora) ? hora : horaDe(host?.dataset.biome);
+    const r = construir(tema, Q, hora); if (!r) return;
+    const terr = document.createElement('div'); terr.className = `terr t-${tema} h-${hora}`;
+    terr.innerHTML = r.html;
     parent.appendChild(terr);
-    for (const el of parent.querySelectorAll(':scope > .envface')) { const f = Object.keys(FACE).find(k => el.classList.contains(k)); if (f) { el.style.backgroundImage = horizonte(tema, f, f.length * 7 + tema.length); el.style.backgroundSize = '100% 100%'; } }
+    host?.style.setProperty('--frest', r.frest);
+    for (const el of parent.querySelectorAll(':scope > .envface')) { const f = Object.keys(FACE).find(k => el.classList.contains(k)); if (f) { el.style.backgroundImage = r.faces[f]; el.style.backgroundSize = '100% 100%'; } }
     ceil = parent.querySelector(':scope > .env-ceiling');
-    live = B.groups.map((G, i) => ({ el: terr.querySelector(`[data-tg="${i}"]`), c: G.c, r: G.r }));
+    live = r.groups.map((G, i) => ({ el: terr.querySelector(`[data-tg="${i}"]`), c: G.c, r: G.r }));
     if (lastCam) cam(...lastCam);
   }
   // câmera → olho no mundo (inverso de translate3d(tx,ty,tz) rotateX(rx) rotateY(ry), perspectiva de 1000 px nascendo 22% acima da origem)
@@ -380,6 +419,6 @@
   }
   if (typeof document !== 'undefined') { if (document.head) thumbs(); else addEventListener('DOMContentLoaded', thumbs); }
   const sd = ry => { const r = ry * Math.PI / 180; return SUN[0] * Math.cos(r) + SUN[2] * Math.sin(r) > 0 ? -1 : 1; }; // recortes: espelha quando o sol fica à direita na tela
-  g.TERRENO3D = { montar, cam, hx, sd, shore };
+  g.TERRENO3D = { montar, construir, cam, hx, sd, shore, grade, gradeAll, horaDe, HORAS, TEMAS };
   g.montarTerreno3D = montar;
 })(globalThis);
