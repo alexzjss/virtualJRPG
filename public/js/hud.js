@@ -150,7 +150,7 @@ const HUD = (() => {
     // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
     html({ actorId = null, dim = false, unread = 0, table = false, gm: gmO = false } = {}) {
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table, gm: gmO }, x = gmO ? LEQUE.ctx() : null;
-      const cm = table ? '' : gmO ? (x?.shown ? alvos() + cmds(x.actor, x.cur, inB, true) : '') : alvos() + cmds(S.chars[actorId], cur, inB);
+      const cm = table ? '' : gmO ? (x?.shown ? cmds(x.actor, x.cur, inB, true) : '') : cmds(S.chars[actorId], cur, inB); // sem a fileira de alvos: na mira escolhe-se pelas setas, pelo clique no recorte ou no minimapa (câmera aérea)
       return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''} ${gmO ? 'gmh' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${cm}${grupo(inB, cur)}</div>${alvo()}${faixa()}${gmO ? pedidos() : ''}</div>`;
     },
   };

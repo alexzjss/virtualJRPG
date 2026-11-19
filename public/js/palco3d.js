@@ -262,7 +262,7 @@
     const dt = cur?.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
     const out = local.mode !== 'ombro' && !local.aim ? { kind: local.mode, pts, w, h: root?.clientHeight || 860, fast: !!dt } : null; // vista de fora escolhida: lateral ou aérea, com todos no quadro
     const hp = id => ({ ...at(id), h: parseFloat(els.get(id)?.h) || 330 }); // janela de defesa: plano aberto do inimigo com o alvo (o mesmo da investida que vem depois: sem corte)
-    const base = local.aim ? { kind: 'select', pts, w } : out ? out : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { kind: 'two', at: hp(cur.id), to: hp(dt), ry0: camRy, ...ACT, w, h: root?.clientHeight || 860, fast: true } : tbl(cur.id);
+    const base = local.aim ? { kind: 'aerial', pts, w, h: root?.clientHeight || 860 } : out ? out : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { kind: 'two', at: hp(cur.id), to: hp(dt), ry0: camRy, ...ACT, w, h: root?.clientHeight || 860, fast: true } : tbl(cur.id);
     if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', to: { ...F.get(local.zoom), h: parseFloat(els.get(local.zoom)?.h) || 330 }, ry: cameraFor(base).ry };
     return base;
   };
