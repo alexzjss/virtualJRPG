@@ -22,35 +22,6 @@ Toda técnica nova precisa respeitar o tema do Vínculo dono (arvore/temas.js): 
 
 ## Casas livres (ramos com menos de 10 nós)
 
-### Armas — 99 casas
-
-- ramo prim-corte (arma: corte, 7 nós): camadas 8, 9, 10
-- ramo prim-esmag (arma: esmag, 6 nós): camadas 7, 8, 9, 10
-- ramo prim-perf (arma: perf, 6 nós): camadas 7, 8, 9, 10
-- ramo prim-dist (arma: dist, 7 nós): camadas 8, 9, 10
-- ramo lamina-1 (arma: lamina, 5 nós): camadas 6, 7, 8, 9, 10
-- ramo lamina-2 (arma: lamina, 6 nós): camadas 7, 8, 9, 10
-- ramo lanca-1 (arma: lanca, 6 nós): camadas 7, 8, 9, 10
-- ramo lanca-2 (arma: lanca, 6 nós): camadas 7, 8, 9, 10
-- ramo fogo-1 (arma: fogo, 6 nós): camadas 7, 8, 9, 10
-- ramo fogo-2 (arma: fogo, 6 nós): camadas 7, 8, 9, 10
-- ramo punho-1 (arma: punho, 8 nós): camadas 9, 10
-- ramo punho-2 (arma: punho, 8 nós): camadas 9, 10
-- ramo pesada-1 (arma: pesada, 6 nós): camadas 7, 8, 9, 10
-- ramo pesada-2 (arma: pesada, 6 nós): camadas 7, 8, 9, 10
-- ramo foco-1 (arma: foco, 6 nós): camadas 7, 8, 9, 10
-- ramo foco-2 (arma: foco, 6 nós): camadas 7, 8, 9, 10
-- ramo corrente-1 (arma: corrente, 6 nós): camadas 7, 8, 9, 10
-- ramo corrente-2 (arma: corrente, 6 nós): camadas 7, 8, 9, 10
-- ramo arremesso-1 (arma: arremesso, 6 nós): camadas 7, 8, 9, 10
-- ramo arremesso-2 (arma: arremesso, 6 nós): camadas 7, 8, 9, 10
-- ramo arco-1 (arma: arco, 6 nós): camadas 7, 8, 9, 10
-- ramo arco-2 (arma: arco, 6 nós): camadas 7, 8, 9, 10
-- ramo escudo-1 (arma: escudo, 6 nós): camadas 7, 8, 9, 10
-- ramo escudo-2 (arma: escudo, 6 nós): camadas 7, 8, 9, 10
-- ramo instrumento-1 (arma: instrumento, 6 nós): camadas 7, 8, 9, 10
-- ramo instrumento-2 (arma: instrumento, 6 nós): camadas 7, 8, 9, 10
-
 ## Células magras (setor × coluna × camada)
 
 Cada célula conta os nós daquele tema naquela camada; "—" é zero. Em negrito, células abaixo da metade da média do setor.

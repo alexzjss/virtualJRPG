@@ -23,6 +23,7 @@ import { LEVA9, preencher } from './arvore/leva9.js';
 import { variar8 } from './arvore/leva8e.js';
 import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
 import { ARMAS_ARV } from './arvore/armas.js';
+import './arvore/armas9.js'; // Leva 9: completa os ramos de ARMAS_ARV (tem de vir antes de montar TREE.armas)
 import { SISTEMAS, AURA_SIN, OCULTO_PONTE, MARCIAL_SIST, MARCIAL_LACOS } from './arvore/sistemas.js';
 // Em cada ramo de 10 nós: 1-4 tronco, 5-7 caminho A (atributo principal), 8-9 caminho B (atributo secundário), 10 nó final.
 // rq = requisito de atributo para aprender, ex.: rq: { INT: 50 }.

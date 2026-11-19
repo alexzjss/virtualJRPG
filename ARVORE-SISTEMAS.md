@@ -275,5 +275,6 @@ Feita em 18/11/2026 depois da reescrita em 10 camadas (`arvore/camadas.js`, `arv
 
 - **Ramos novos (250, `leva9a.js` e `leva9b.js`):** 2 por Vínculo, na coluna mais magra do setor (maestria em quase todos; depois defesa, especial ou ofensiva), 2 no Marcial (posturas e dojo), 2 na Aura (estados e proteção) e 3 no Ocultismo (arsenal, proteções de casa, amarrações). O construtor `R9` (`arvore/l8.js`) dá o XP pela casa, então a ordem escrita é a camada.
 - **Combinações (90, `leva9c.js`):** 1 ramo por Vínculo com um nó `v2` de cada outro kami; é o único lugar onde os temas se misturam.
-- **Casas livres (41, `CASAS` em `leva9.js`):** entram dentro de `camadas()`, depois de o excesso ser redistribuído (`caber`), no ramo de um nó âncora; com isso, nenhuma casa fica livre fora da Árvore de Armas.
+- **Casas livres (41, `CASAS` em `leva9.js`):** entram dentro de `camadas()`, depois de o excesso ser redistribuído (`caber`), no ramo de um nó âncora; com isso, nenhuma casa fica livre nos setores.
 - Chefes de domínio: cada um usa o domínio dele (`DOM_CHEFE` em `content.js`), mesmo que o setor tenha outros.
+- **Armas (99, `arvore/armas9.js`):** completa as camadas 6–10 dos 4 ramos primordiais e dos 2 ramos de estilo de cada tipo (duas lâminas e bainha, falange e bastão, pistola e fuzil, manoplas e monge, martelo e machado, livro e sino, chicote e mangual, ninja e circo, arco e besta, bastião e escudo de ataque, cordas e sopros). Com isso, a árvore inteira fica sem casa livre.
