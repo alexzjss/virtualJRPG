@@ -226,23 +226,9 @@
     // O campo fica dentro de um skybox 3D; a mesma arte envolve fundo, quatro paredes e teto.
     // Cada face tem 1/4 do tamanho e é ampliada ×4 (PK): o Chromium rasteriza camadas 3D no tamanho CSS delas, e as faces que cruzam a câmera
     // são rasterizadas inteiras; em tamanho cheio (7200 px) isso estourava a memória de vídeo de PCs fracos e o palco ficava preto nos golpes.
-    const faces = face('env-back', `translateZ(-3000px) scale(${PK})`) + face('env-left', `translate3d(-3600px,0,0) rotateY(90deg) scale(${PK})`) + face('env-right', `translate3d(3600px,0,0) rotateY(-90deg) scale(${PK})`) + (q === 'low' ? '' : face('env-front', `translateZ(3000px) scale(${PK})`) + face('env-ceiling', `translate3d(0,700px,0) rotateX(90deg) scale(${PK})`));
+    const faces = face('env-back', `translateZ(-3000px) scale(${PK})`) + face('env-left', `translate3d(-3600px,0,0) rotateY(90deg) scale(${PK})`) + face('env-right', `translate3d(3600px,0,0) rotateY(-90deg) scale(${PK})`) + (q === 'low' && !pre ? '' : face('env-front', `translateZ(3000px) scale(${PK})`) + face('env-ceiling', `translate3d(0,-2000px,0) rotateX(-90deg) scale(${PK})`));
     scn.innerHTML = faces + (typeof PFX !== 'undefined' ? PFX.layerPlanes(sc).map(L => `<div class="bbplane layer ly-${L.key}" style="background-image:url('${esc(L.url)}');transform:translateZ(${L.z}px) scale(${+(L.k * PK).toFixed(3)})"></div>`).join('') : '');
-    const kits = { floresta: ['arvore', 'pedra'], castelo: ['bandeira', 'pedra'], praia: ['palmeira', 'pedra'] };
-    const kit = Object.hasOwn(kits, biome.split('-')[0]) && kits[biome.split('-')[0]];
-    if (kit) {
-      const spots = [[-1550,-1600,1], [1450,-2400,.85], [-1180,470,.62], [1690,270,.78]];
-      spots.forEach(([x,z,size], i) => {
-        const prop = el('div', 'scene-prop', scn);
-        prop.style.transform = `translate3d(${x}px,0,${z}px) scale3d(${size},${size},${size})`;
-        for (const angle of [0,90]) {
-          const panel = el('img', '', prop);
-          panel.alt = '';
-          panel.src = '/scenery/' + kit[i === 2 ? 1 : 0] + '.svg';
-          panel.style.transform = `translate(-50%,-100%) rotateY(${angle}deg)`;
-        }
-      });
-    }
+    if (pre && typeof TERRENO3D !== 'undefined') TERRENO3D.montar(scn, biome.split('-')[0], q); // bosque, pátio ou praia em 3D (a quantidade de peças segue a qualidade)
     pcl.innerHTML = ps.map(p => `<i class="pt pt-${p.kind}" style="--x:${p.x};--z:${p.z};--y:${p.y0};--s:${p.s};animation-duration:${p.dur}s;animation-delay:-${p.delay}s"></i>`).join(''); // clima em 3D: entre os recortes, com profundidade
   };
 
@@ -327,7 +313,7 @@
     const rx = v.rx || 0, k = `${v.tx},${v.ty},${v.tz},${v.ry},${rx}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateX(${rx}deg) rotateY(${v.ry}deg)`; // rotateX sempre presente: a transição interpola função a função
     if (!camLock) world.dataset.cam = tr; // o enquadramento do turno (a fumaça confere a volta depois da investida)
     if (rst) rst.hidden = !!camLock || !mine;
-    if (k === camKey) return; camKey = k; world.style.transform = tr; world.style.setProperty('--bry', v.ry + 'deg'); world.style.setProperty('--brx', rx + 'deg'); // os recortes giram de volta: sempre de frente para a câmera (a figura também inclina para ela)
+    if (k === camKey) return; camKey = k; world.style.transform = tr; world.style.setProperty('--bry', v.ry + 'deg'); world.style.setProperty('--brx', rx + 'deg'); if (typeof TERRENO3D !== 'undefined') { world.style.setProperty('--hx', TERRENO3D.hx(v.ry)); world.style.setProperty('--sd', TERRENO3D.sd(v.ry)); TERRENO3D.cam(v, root.clientHeight || 860); } // copas com o brilho do lado do sol; some o que tapar a luta // os recortes giram de volta: sempre de frente para a câmera (a figura também inclina para ela)
     if (unitKind({}, v.ry) !== unitKind({}, camRy)) { camRy = v.ry; for (const u of els.values()) if (u.c) setImg(u); } else camRy = v.ry;
     if (!camLock && v0.fast) { world.classList.add('fast'); clearTimeout(fastT); fastT = setTimeout(() => !camLock && world.classList.remove('fast'), 500); } // o anel de defesa dura ~1,3 s: a câmera não pode levar 1,1 s para chegar
   };

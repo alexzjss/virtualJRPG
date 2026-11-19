@@ -64,6 +64,12 @@ pointers();
 }
 S.items ??= buildItems(it);
 }
+// Preserva mapas e URLs personalizados ao abrir campanhas do catálogo anterior.
+function migrateBackdrop(sc) {
+  if (!/^[a-z]+(?:-[a-z]+)*$/.test(sc.bbg || '')) return;
+  const family = sc.bbg.split('-')[0];
+  sc.bbg = ['floresta','castelo','praia'].includes(family) ? family + '-dia' : 'floresta-dia';
+}
 function migrateItems() { // catálogo v5: nomes novos dos consumáveis e equipamentos (RENAME) e o catálogo completo de armas com modelo (armas forjadas e itens do mestre ficam); as chaves mudam, então tudo é remapeado pelo nome
   if (S.itemsV === ITEMS_V) return;
   const old = S.items, fresh = buildItems(it), byName = n => Object.keys(fresh).find(k => fresh[k].name === n), map = {};
@@ -80,6 +86,7 @@ function migrateItems() { // catálogo v5: nomes novos dos consumáveis e equipa
   for (const sc of Object.values(S.scenes)) if (sc.shop) sc.shop.stock = [...new Set(sc.shop.stock.map(tr).filter(k => k && fresh[k]))];
   S.itemsV = ITEMS_V;
 }
+
 function migrateB(isNew) {
 for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??= ''; s.d ??= ''; s.rq ??= null; }
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; if (i.kit === undefined && kitOf(i.name)) i.kit = kitOf(i.name); } // kit: tag que cumpre o reqItem das técnicas (o que o mestre já editou fica)
@@ -87,7 +94,7 @@ Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, user
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
 S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, pass: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
-for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; sc.clima ??= ''; sc.gather ??= []; }
+for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; migrateBackdrop(sc); sc.clima ??= ''; sc.gather ??= []; }
 if (S.shop) { S.scenes[S.focus].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual
 if (isNew) S.itemsV = ITEMS_V; else migrateItems();
 fixShape();
@@ -128,7 +135,7 @@ function fixShape() {
     if (!Array.isArray(sc.shop.stock)) sc.shop.stock = [];
     sc.shop.open = !!sc.shop.open;
     if (sc.cam !== null && !isObj(sc.cam)) sc.cam = null;
-    for (const k of ['bg', 'bbg']) if (typeof sc[k] !== 'string') sc[k] = ''; if (!CLIMA.includes(sc.clima)) sc.clima = '';
+    for (const k of ['bg', 'bbg']) if (typeof sc[k] !== 'string') sc[k] = ''; migrateBackdrop(sc); if (!CLIMA.includes(sc.clima)) sc.clima = '';
     sc.fogOn = !!sc.fogOn;
     if (!isObj(sc.battle)) sc.battle = BATTLE0();
     const B = sc.battle; if (!isObj(B.ticks)) B.ticks = {};

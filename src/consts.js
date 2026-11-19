@@ -22,7 +22,7 @@ const ITYPES = ['cons', 'arma', 'armadura', 'acess', 'mat', 'mun'], WT = ['', ..
 // partes do corpo: atributos penalizados (−10 cada enquanto crítica), status ao ficar crítica, penalidade para mirar, peso no sorteio
 const BODY = { head: [['INT', 'SAB'], 'stun', 30, 6], torso: [['CON'], 'bleed', 0, 40], armL: [['FOR', 'DES'], 'atkDn', 15, 15], armR: [['FOR', 'DES'], 'atkDn', 15, 15], legL: [['AGI'], 'agiDn', 15, 12], legR: [['AGI'], 'agiDn', 15, 12] };
 const PARTS = Object.keys(BODY), PL = { head: 'cabeça', torso: 'torso', armL: 'braço esq.', armR: 'braço dir.', legL: 'perna esq.', legR: 'perna dir.' };
-const BBG = ['rubro', 'noite', 'floresta', 'brasa', 'gelo', 'vazio', 'santuario', 'tempestade', 'sangue', 'morte', 'conhecimento', 'energia', 'medo', 'estrelas', 'ruinas', 'abismo', 'entardecer', 'nuvens', 'sombrio', 'aurora'];
+const BBG = ['floresta-dia', 'castelo-dia', 'praia-dia'];
 const CLIMA = ['', 'chuva', 'neblina', 'cinzas', 'neve', 'brasas']; // clima visual da cena, sobreposto a qualquer fundo (não confundir com RU.CLIMA, o clima mecânico da batalha)
 const CAMP = ['vigiar', 'cozinhar', 'conversar', 'treinar', 'meditar'];
 const GMF = new Set(['arma', 'armor', 'gold', 'xpR', 'goldR', 'po']); // campos numéricos que só o mestre altera
