@@ -69,6 +69,9 @@ export function buildSkills(sk) {
       const from = keys => keys.flatMap(k => around(...at(k)).map(p => [...p, at(k)])).filter(p => free(p[0], p[1]));
       let cand = prev ? around(...prev).map(p => [...p, prev]).filter(p => free(p[0], p[1])) : from([...used.keys()].filter(k => anchor(k)));
       if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === (zone || s.el) || (!zone && used.get(k) === 'fis')));
+      // cercado: a corrente não pode se soltar, então procura a casa livre mais perto de quem veio antes (até 4 casas) e liga a ele mesmo sem encostar
+      for (let r = 2; r <= 4 && prev && !cand.length; r++) for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && free(prev[0] + dx, prev[1] + dy)) cand.push([prev[0] + dx, prev[1] + dy, prev]);
+      if (!cand.length) cand = from([...used.keys()].filter(k => used.get(k) === (zone || s.el))); // lotado em volta da âncora: liga a uma casa do próprio setor
       if (!cand.length) throw new Error('grade sem espaço para ' + s.name);
       const [bx, by, par] = cand.sort((p, q) => (p[0] - tx) ** 2 + (p[1] - ty) ** 2 - (q[0] - tx) ** 2 - (q[1] - ty) ** 2)[0];
       prev = put(bx, by, s, par); placed.push(prev.join(','));
@@ -105,10 +108,11 @@ export function buildSkills(sk) {
   for (let r = 2; r <= 14 && train.length; r++) for (let x = C - r; x <= C + r; x++) for (let y = C - r; y <= C + r; y++)
     if (train.length && free(x, y) && around(x, y).some(p => used.get(p.join(',')) === 'fis')) put(x, y, train.shift(), around(x, y).find(p => used.get(p.join(',')) === 'fis'));
   M.filter(b => b.de).forEach(b => line(b, 'fis'));
+  const fisCore = new Set([...used.keys()].filter(fis)); // casas do núcleo e das pontas dos raios: só elas recebem as raízes dos setores (as linhas de variação do Marcial vão mais longe)
   // setores: o ramo 0 de cada um abre o eixo (a raiz do Vínculo é o primeiro nó, aberta a quem tem o Vínculo, sem exigir vizinho); depois um ramo de cada setor por vez,
   // para nenhum setor cercar o vizinho. Um ramo em que todo nó exige arma vira uma trilha por tipo de arma.
   const SEC = 360 / ORDER.length, R0 = 13, RING = 10, SLOT = [0, -1, 1, -2, 2], W = SEC / 5.2, cells = {};
-  ORDER.forEach((el, i) => { cells[el] = [forked(i * SEC, R0, TREE[el].branches[0].map((o, n) => node(o, el, { br: el + '-0', ...(n ? {} : { root: true, open: 1 }) })), fis, false)]; });
+  ORDER.forEach((el, i) => { cells[el] = [forked(i * SEC, R0, TREE[el].branches[0].map((o, n) => node(o, el, { br: el + '-0', ...(n ? {} : { root: true, open: 1 }) })), key => fisCore.has(key), false)]; });
   const most = Math.max(...ORDER.map(el => TREE[el].branches.length));
   for (let b = 1; b < most; b++) ORDER.forEach((el, i) => {
     const br = TREE[el].branches[b];
@@ -172,6 +176,16 @@ function ringLayout(G) {
     L.forEach(([, w], i) => pos[i] = Math.max(Math.min(Math.max(w, lo), hi), i ? pos[i - 1] + gap : lo));
     for (let i = L.length - 1; i >= 0; i--) pos[i] = Math.min(pos[i], i < L.length - 1 ? pos[i + 1] - gap : hi);
     L.forEach(([id], i) => { ang[id] = pos[i]; rad[id] = r; });
+    // nós soltos do setor (ligados ao resto só por casas do Marcial, quando a grade lotou): não podem virar profundidade 0, que infla o 1º anel de todos os setores.
+    // Entram pela casa de grade mais próxima de um nó já ligado, e a profundidade continua de nó em nó pelas ligações deles.
+    const gd = (p, q) => Math.max(Math.abs(G[p].gx - G[q].gx), Math.abs(G[p].gy - G[q].gy));
+    for (let guard = 0; guard < 400; guard++) {
+      const un = ids.filter(i => dep[i] == null); if (!un.length) break;
+      const done = ids.filter(i => dep[i] != null); if (!done.length) break;
+      const near = i => done.reduce((b, j) => (gd(i, j) < gd(i, b) ? j : b), done[0]), seed = un.map(i => [i, near(i)]).sort((p, q) => gd(p[0], p[1]) - gd(q[0], q[1]))[0];
+      const [s0, p0] = seed; dep[s0] = dep[p0] + 1; par[s0] = p0; (kids[p0] ||= []).push(s0);
+      const qq = [s0]; for (let n = 0; n < qq.length; n++) for (const j of G[qq[n]].ln || []) if (set.has(j) && dep[j] == null) { dep[j] = dep[qq[n]] + 1; par[j] = qq[n]; (kids[qq[n]] ||= []).push(j); qq.push(j); }
+    }
   };
   const run = (ids, radius, lo, hi, mid, fn) => { const b = []; ids.forEach(i => (b[fn(i)] ||= []).push(i)); b.forEach((l, k) => l && place(l, radius(k), lo, hi, mid)); };
   const m = .05, wt = {}, weigh = id => wt[id] ??= 1 + (kids[id] || []).reduce((a, k) => a + weigh(k), 0);

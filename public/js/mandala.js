@@ -100,6 +100,7 @@
     cx.lineCap = 'round';
     for (const [a, b] of E) { const pa = P.get(a), pb = P.get(b), [x1, y1] = w2s(...pa), [x2, y2] = w2s(...pb);
       if (Math.max(x1, x2) < -40 || Math.min(x1, x2) > W + 40 || Math.max(y1, y2) < -40 || Math.min(y1, y2) > H + 40) continue;
+      if (cam.z < .1 && !(o.state(a) === 'own' && o.state(b) === 'own')) continue;
       cx.globalAlpha = hg && grp(o.skills[a]) !== hg ? .22 : 1;
       const sa = o.state(a), sb = o.state(b), on = sa === 'own' && sb === 'own', out = sa === 'out' || sb === 'out', sec = sa === 'secret' || sb === 'secret';
       const el = o.skills[a].el === 'fis' ? o.skills[b].el : o.skills[a].el, c = col(el), mx = (x1 + x2) / 2 + (y2 - y1) * .16, my = (y1 + y2) / 2 - (x2 - x1) * .16;
@@ -120,7 +121,11 @@
     const r0 = Math.max(1.5, R * cam.z); let pulse = false;
     for (const id of o.ids) { const s = o.skills[id], [x, y] = w2s(...P.get(id)); if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
       const st = o.state(id), mk = o.marks(id), c = col(s.el), r = r0 * (s.limit || s.back ? 1.25 : 1);
-      if (far) { cx.fillStyle = st === 'own' ? c : hexA(c, st === 'out' || st === 'secret' ? .14 : .45); cx.beginPath(); cx.arc(x, y, Math.max(1.2, r * .7), 0, TAU); cx.fill(); continue; }
+      if (far) { const own = st === 'own', av = st === 'av', rr = own ? Math.max(2.6, r * 1.15) : av ? Math.max(2, r * .9) : Math.max(1.2, r * .65);
+        cx.fillStyle = own ? '#ffffff' : hexA(c, st === 'out' || st === 'secret' ? .1 : av ? .95 : .38); cx.beginPath(); cx.arc(x, y, rr, 0, TAU); cx.fill();
+        if (own || av) { cx.strokeStyle = hexA(c, own ? .9 : .6 + .3 * Math.sin(T * 3 + x * .01)); cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, rr + 2.5, 0, TAU); cx.stroke(); if (av) pulse = true; }
+        if (mk.hit) { cx.strokeStyle = 'rgba(255,240,150,.95)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, rr + 6 + Math.sin(T * 4) * 1.5, 0, TAU); cx.stroke(); }
+        continue; }
       cx.globalAlpha = (mk.dim ? .25 : 1) * (hg && grp(s) !== hg ? .3 : 1); orb(x, y, r, s, c, st);
       if (st === 'av') { pulse = true; cx.strokeStyle = hexA(c, .5 + .4 * Math.sin(T * 3 + x * .01)); cx.lineWidth = Math.max(1.5, 3 * cam.z); cx.beginPath(); cx.arc(x, y, r * 1.55, 0, TAU); cx.stroke(); }
       if (mk.hit) { cx.strokeStyle = 'rgba(255,240,150,.95)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r * 1.9 + Math.sin(T * 4) * 2, 0, TAU); cx.stroke(); }
@@ -148,7 +153,7 @@
   const kick = () => { dirty = true; touched = performance.now(); if (!raf) raf = requestAnimationFrame(draw); };
 
   // ---------- câmera e entrada ----------
-  const clampZ = z => Math.min(3, Math.max(.06, z));
+  const clampZ = z => Math.min(3, Math.max(.025, z));
   let flying = 0;
   const fly = (x, y, z) => { const a = { ...cam }, t0 = performance.now(), id = ++flying; (function step() { if (id !== flying) return; const k = Math.min(1, (performance.now() - t0) / 550), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; cam.x = a.x + (x - a.x) * e; cam.y = a.y + (y - a.y) * e; cam.z = a.z * Math.pow(clampZ(z) / a.z, e); kick(); if (k < 1) requestAnimationFrame(step); })(); };
   const zoomAt = (px, py, z) => { const [wx, wy] = s2w(px, py); cam.z = clampZ(z); const [nx, ny] = s2w(px, py); cam.x += wx - nx; cam.y += wy - ny; kick(); };

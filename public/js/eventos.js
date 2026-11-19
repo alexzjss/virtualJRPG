@@ -116,6 +116,7 @@ app.addEventListener('click', e => {
   if (d.a?.startsWith('wf') && gm) return wfClick(d);
   if (d.a === 'ofiNota') return send({ t: 'ofiNota', id: d.id, e: d.k, del: true });
   if (d.a === 'skF') { bf.skf = bf.skf === d.v ? '' : d.v; return render(); }
+  if (d.a === 'skC') { bf.skc = String(bf.skc) === d.v ? '' : d.v; return render(); } // filtro por camada
   if (d.a === 'planT') { const k = 'vj.plan.' + d.id, p = lsGet(k, []); lsSet(k, p.includes(d.name) ? p.filter(n => n !== d.name) : [...p, d.name]); return render(); }
   if (d.a === 'planClear') { lsSet('vj.plan.' + d.id, []); return render(); }
   if (d.a === 'planSave') { const n = prompt('Nome da build?'); if (!n) return; lsSet('vj.builds', [...lsGet('vj.builds', []).filter(b => b.name !== n), { name: n.slice(0, 40), nodes: lsGet('vj.plan.' + d.id, []) }].slice(-12)); return render(); }
