@@ -161,8 +161,16 @@ const reachable = (ch, s, id) => {
   const own = ch.skills.filter(k => S.skills[k]?.gx != null);
   return own.length ? own.some(k => { const o = S.skills[k]; return RUL.linked(o, s, k, id) && (o.el === s.el || o.el === 'fis' || s.el === 'fis'); }) : s.el === 'fis' && !!S.skills.g0 && Math.max(Math.abs(s.gx - S.skills.g0.gx), Math.abs(s.gy - S.skills.g0.gy)) <= 1; // sem nada aprendido: só o centro Marcial
 };
+// cache: o cálculo varre as ~3700 técnicas; só muda quando mudam as definições ou o que os heróis sabem/são (skills, Vínculos, Despertares, dono)
+const hidCache = new Map();
 const hiddenSkills = c => {
   if (c.role === 'gm' || !c.role) return [];
+  const sig = defs.v + '|' + c.role + '|' + (c.role === 'table' ? '' : c.name) + '|' + Object.values(S.chars).filter(ch => !ch.enemy).map(ch => [ch.id, ch.owner, (ch.skills || []).join(','), (ch.vinc || []).join(','), (ch.aw || []).join(',')].join(':')).join(';');
+  const hit = hidCache.get(sig); if (hit) return hit;
+  if (hidCache.size > 64) hidCache.clear();
+  const out = hiddenRaw(c); hidCache.set(sig, out); return out;
+};
+const hiddenRaw = c => {
   const heroes = Object.values(S.chars).filter(ch => !ch.enemy), owned = new Set(heroes.flatMap(ch => ch.skills || []));
   const mine = c.role === 'table' ? heroes : heroes.filter(ch => ch.owner === c.name);
   return Object.keys(S.skills).filter(id => { const s = S.skills[id]; return s.gx != null && !owned.has(id) && !mine.some(ch => reachable(ch, s, id)); });
@@ -196,7 +204,8 @@ const battleWatch = () => {
   if (end && B.end !== end) log('Sistema', (end === 'won' ? 'Todos os inimigos caíram. Clique em "Vitória" para distribuir as recompensas.' : 'Todos os heróis estão caídos.') + where, end === 'won' ? 'ok' : 'bad', { to: GM });
   B.end = end;
 };
-const push = () => {
+// dirty: as definições (skills/itens) podem ter mudado; só o mestre as edita, então ações de jogador e timers de comando passam false
+const push = (dirty = true) => {
   try {
     ofiSync(); pruneReqs();
     // cada personagem é preparado dentro da cena dele (fichas, bloqueios e fila leem a batalha daquela cena)
@@ -205,7 +214,7 @@ const push = () => {
     for (const [sid, list] of groups) inScene(sid, () => { list.forEach(breakCheck); prep(list, false); reseat(list); usable(list); if (sid !== null) { battleWatch(); S.battle.order = S.battle.active ? order() : []; } });
     prep([], true);
   } catch (e) { console.error('Falha ao preparar o estado:', e); }
-  defsDirty = true;
+  if (dirty) defsDirty = true;
   wss.clients.forEach(c => { try { sendState(c); } catch (e) { console.error('Falha ao enviar o estado:', e.message); } });
   save();
 };
@@ -230,9 +239,9 @@ function handleIn(c, m, sid) {
     for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
     S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq, sc: sid,
       m: { node: m.node, rec: m.rec, rune: m.rune, el2: m.el2, sig: m.sig, nm: m.nm, part: m.part, part2: m.part2, id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
-    return push();
+    return push(false);
   }
-  try { H[m.t](c, m); } catch (e) { console.error(e); } push();
+  try { H[m.t](c, m); } catch (e) { console.error(e); } push(c.role === 'gm');
 }
 // o que o jogador pede e o mestre precisa aprovar, por tipo (S.auto[tipo] = true dispensa a aprovação)
 const GATE = { roll: 'roll', act: 'act', learn: 'learn', use: 'item', equip: 'item', drop: 'item', buy: 'item', sell: 'item', forge: 'item', campAct: 'camp', ofiUse: 'roll', ofiLearn: 'learn', craft: 'item', reroll: 'roll', defend: 'act', focus: 'act', allOut: 'act' };

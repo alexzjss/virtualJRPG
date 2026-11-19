@@ -12,7 +12,7 @@ function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo execu
 // plano do inimigo que espera a janela de defesa fechar (fica fora do estado enviado aos clientes), um por cena: batalhas simultâneas não se cruzam
 const cmdBy = {}, cmdOf = () => cmdBy[S.scene] ??= { plan: null, for: null, timer: null };
 // o temporizador volta para a cena em que a janela abriu antes de disparar
-const cmdArm = (C, a) => { const K = cmdOf(), sid = S.scene; clearTimeout(K.timer); K.timer = setTimeout(() => inScene(sid, () => { if (S.battle.cmd === C) { fireCmd(C, a); push(); } }), C.w + RU.CMD.DEF.grace + 50); };
+const cmdArm = (C, a) => { const K = cmdOf(), sid = S.scene; clearTimeout(K.timer); K.timer = setTimeout(() => inScene(sid, () => { if (S.battle.cmd === C) { fireCmd(C, a); push(false); } }), C.w + RU.CMD.DEF.grace + 50); };
 function openCmd(C, plan, a) { S.battle.cmd = C; const K = cmdOf(); K.plan = plan; K.for = C; cmdArm(C, a); }
 const planOf = (C, a) => { const K = cmdOf(); if (K.for !== C || !K.plan) { K.plan = aiPlan(a); K.for = C; } return K.plan; }; // janela salva sem o plano (servidor reiniciado): planeja de novo, uma vez
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
