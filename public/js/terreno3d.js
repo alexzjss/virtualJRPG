@@ -469,7 +469,7 @@
   function ruinas(B, Q, R, gnd) {
     gnd.push(`<rect width="1800" height="1500" fill="#78c850"/>`);
     for (let i = 0; i < 26; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 90)}" ry="${f1(25 + R() * 50)}" fill="${R() < .5 ? '#8ed65a' : '#62b044'}"/>`);
-    for (let z = -2900; z < 2900; z += 120) for (let k = -3; k <= 3; k++) { if (R() < .45 + Math.abs(k) * .12) continue; // lajes soltas, mais raras longe do meio const x = k * 130 + (R() - .5) * 30; gnd.push(`<rect x="${f1(GX(x) - 14)}" y="${f1(GZ(z) - 12)}" width="${f1(26 + R() * 6)}" height="${f1(22 + R() * 4)}" rx="3" fill="${R() < .5 ? '#e8dcc4' : '#d6c8ae'}"/>`); }
+    for (let z = -2900; z < 2900; z += 120) for (let k = -3; k <= 3; k++) { if (R() < .45 + Math.abs(k) * .12) continue; /* lajes soltas, mais raras longe do meio */ const x = k * 130 + (R() - .5) * 30; gnd.push(`<rect x="${f1(GX(x) - 14)}" y="${f1(GZ(z) - 12)}" width="${f1(26 + R() * 6)}" height="${f1(22 + R() * 4)}" rx="3" fill="${R() < .5 ? '#e8dcc4' : '#d6c8ae'}"/>`); }
     const okC = (x, z) => !inArena(x, z, 200) && !(Math.abs(x + 430) < 700 && z > 600 && z < 1700);
     const cols = scatter(R, [6, 10, 13][Q], 480, okC);
     for (const [x, z] of cols) { const h = R() < .35 ? 700 + R() * 80 : 200 + R() * 400;
