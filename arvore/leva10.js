@@ -4,8 +4,11 @@
 // Notação dos nós: arvore/l8.js (N). Só o desenho importa aqui: dano, custo, XP e requisito vêm da camada.
 // Mecânicas novas: `conv A B` (converte a condição A do alvo em B) e `solo M` (×M se o alvo for o único inimigo de pé).
 import { LEVA10K } from './leva10k.js';
+import { LEVA10S } from './leva10s.js';
+import { LEVA10A } from './leva10a.js';
+import { LEVA10I } from './leva10i.js';
 
-export const LEVA10 = { ...LEVA10K };
+export const LEVA10 = { ...LEVA10K, ...LEVA10S, ...LEVA10A, ...LEVA10I };
 
 // base → nós novos. Herdam do primeiro nó da linha o atributo, o tipo de aura (cat) e a arma exigida (req).
 export function completar(TREE) {
