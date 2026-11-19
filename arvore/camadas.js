@@ -126,6 +126,7 @@ function ordenar(b, fixo) {
     slot.forEach((s, i) => { for (const p of String(s.pre || '').split('|')) { const j = slot.findIndex(o => o.n === p); if (j > i && ok(slot[j], i) && ok(s, j)) { [slot[i], slot[j]] = [slot[j], slot[i]]; moved = true; } } });
     if (!moved) break;
   }
+  for (const s of [...slot]) if (s.duo && s.duo !== s.n) { const j = slot.findIndex(o => o.n === s.duo), i = slot.indexOf(s); if (j > i + 1 && slot[j] !== head) { const [o] = slot.splice(j, 1); slot.splice(i + 1, 0, o); } }
   b.length = 0; b.push(...slot);
 }
 // no máximo 5 técnicas do kit atual por ramo (contando os `pre` delas): o excesso troca de lugar com um nó comum de outro ramo do setor
@@ -137,7 +138,7 @@ function espalharKit(bs) {
     const ks = kitDe(cheio), nm = new Set(cheio.map(s => s.pre || '').join('|').split('|'));
     const mover = [...ks].filter(s => ATUAIS.has(s.n) && !nm.has(s.n) && s !== cheio[0]).sort((x, y) => (y.xp || 0) - (x.xp || 0))[0]; if (!mover) return;
     const tm = temaNo(mover), alvo = bs.filter(b => b !== cheio && kitDe(b).size < 5).sort((x, y) => (temaNo(y[1] || y[0]) === tm) - (temaNo(x[1] || x[0]) === tm) || kitDe(x).size - kitDe(y).size)[0]; if (!alvo) return;
-    const troca = alvo.filter((s, i) => i && !ATUAIS.has(s.n) && !s.limit && !forte(s) && !kitDe(alvo).has(s)).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0];
+    const troca = alvo.filter((s, i) => i && !ATUAIS.has(s.n) && !s.limit && !s.duo && !forte(s) && !kitDe(alvo).has(s)).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0];
     cheio.splice(cheio.indexOf(mover), 1); alvo.push(mover); if (troca) { alvo.splice(alvo.indexOf(troca), 1); cheio.push(troca); }
     for (const p of String(mover.pre || '').split('|')) { const pi = cheio.findIndex(s => s.n === p); if (pi > 0 && ATUAIS.has(p) === false) { /* o pre comum fica: o pedido atravessa ramos */ } }
   }
@@ -150,7 +151,7 @@ function espalharFortes(bs, cabeca = new Set()) {
     const cheio = bs.find(b => fs(b).length > cap(b)); if (!cheio) return;
     const mover = fs(cheio).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0];
     const alvo = bs.filter(b => b !== cheio && fs(b).length < cap(b)).sort((x, y) => (cap(y) - fs(y).length) - (cap(x) - fs(x).length))[0]; if (!alvo) return;
-    const troca = alvo.filter(s => !cabeca.has(s) && !forte(s) && !ATUAIS.has(s.n) && !s.limit).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0]; if (!troca) return;
+    const troca = alvo.filter(s => !cabeca.has(s) && !forte(s) && !ATUAIS.has(s.n) && !s.limit && !s.duo).sort((x, y) => (x.xp || 0) - (y.xp || 0))[0]; if (!troca) return;
     cheio.splice(cheio.indexOf(mover), 1, troca); alvo.splice(alvo.indexOf(troca), 1, mover);
   }
 }
@@ -201,10 +202,7 @@ export function camadas(TREE) {
     const L0 = layerOf.get(b.de) ?? 1;
     b.forEach(s => { const L = Math.min(CAM, L0 + (s.v2 ? 2 : 1)); marca(s, forte(s) ? Math.max(L, 7) : L, 0); });
   }
-  // duplas: as duas metades ficam na mesma camada (a menor das duas, para a dupla não ficar mais cara que as partes)
-  const Lde = new Map(plano.map(([s, L]) => [s, L])), porNome = new Map(plano.map(([s]) => [s.n, s]));
-  for (const [s] of plano) if (s.duo && s.duo !== s.n && porNome.has(s.duo)) { const o = porNome.get(s.duo), L = Math.min(Lde.get(s), Lde.get(o)); Lde.set(s, L); Lde.set(o, L); }
-  for (const [s, , i] of plano) aplicar(s, Lde.get(s), i);
+  for (const [s, L, i] of plano) aplicar(s, L, i);
   for (const [s] of plano) delete s._xp0;
   return VAGAS;
 }

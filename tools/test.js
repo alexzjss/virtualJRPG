@@ -301,7 +301,7 @@ test('invocação entra na fila, age sozinha e some com o fim da batalha', () =>
 test('técnica em dupla: exige o parceiro com a skill par, que paga e perde o próximo turno', () => {
   const [a, e] = duel(); const aura = a.aura; use(a, 'Pinça: Flanco Esquerdo', e); assert.equal(a.aura, aura); // sem parceiro: recusado
   const b = mk(ana, {}); b.skills = [sk('Pinça: Flanco Direito')]; b.aura = 20; S.battle.ticks[b.id] = 500; use(a, 'Pinça: Flanco Esquerdo', e);
-  assert.equal(b.aura, 16); assert.ok(S.battle.ticks[b.id] > 500); assert.ok(S.log.some(l => /executam juntos/.test(l.text)));
+  assert.equal(b.aura, 20 - S.skills[sk('Pinça: Flanco Direito')].cost); assert.ok(S.battle.ticks[b.id] > 500); assert.ok(S.log.some(l => /executam juntos/.test(l.text)));
 });
 test('provocar puxa o golpe; guarda-costas recebe no lugar; esquiva e contra-ataque', () => {
   let [a, e] = duel(); const b = mk(ana, {}); S.battle.ticks[b.id] = 500; use(a, 'Desafio', a); const hb = b.hp; fixR(.3, () => { turn(e); H.act(gm, { id: e.id, skill: 'atk', target: b.id }); }); assert.equal(b.hp, hb); assert.ok(a.hp < a.hpMax);
@@ -1689,4 +1689,15 @@ test('fim de batalha marca vitória, derrota ou fuga no log', () => {
   reset(); let h = mk(ana, {}), e = mk(gm, { enemy: true }); H.battle(gm, { on: true }); e.hp = 0; H.battle(gm, { on: false, win: true }); assert.equal(end(), 'win');
   reset(); h = mk(ana, {}); e = mk(gm, { enemy: true }); H.battle(gm, { on: true }); h.hp = 0; H.battle(gm, { on: false }); assert.equal(end(), 'lose');
   reset(); h = mk(ana, {}); e = mk(gm, { enemy: true }); H.battle(gm, { on: true }); H.battle(gm, { on: false }); assert.equal(end(), 'flee');
+});
+test('camadas e temas: ramos de até 10, posição = camada, kit atual até a 5, fortes da 7 em diante e cada elemento no dono', async () => {
+  const { TREE } = await import('../tree.js'), { CAM, forte } = await import('../arvore/camadas.js'), { ATUAIS } = await import('../arvore/atuais.js'), { validar } = await import('../arvore/temas.js');
+  for (const [el, t] of Object.entries(TREE)) t.branches.forEach((b, bi) => {
+    if (b.de) return; assert.ok(b.length <= CAM, `${el}-${bi}: ${b.length} nós`);
+    if (!(el === 'marcial' && bi < 2)) b.forEach((s, i) => assert.equal(s.cam, i + 1, `${s.n}: casa ${i + 1}, camada ${s.cam}`));
+  });
+  const all = Object.values(TREE).flatMap(t => t.branches.flat());
+  for (const s of all.filter(s => ATUAIS.has(s.n))) assert.ok(s.cam <= 5, `${s.n} na camada ${s.cam}`);
+  assert.ok(all.filter(s => forte(s)).filter(s => s.cam < 7).length <= 2, 'fortes abaixo da 7');
+  assert.deepEqual(validar(TREE), []);
 });
