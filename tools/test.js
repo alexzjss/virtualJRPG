@@ -1365,7 +1365,7 @@ test('Árvore de Armas: req por categoria (corte, esmag, perf, dist), maestria w
   arma('Rifle de Ferrolho'); assert.equal(cantUse(h, ski('Disparo Firme')), ''); assert.ok(!/Exige/.test(cantUse(h, ski('Tiro Certeiro')))); arma('Soqueira'); assert.match(cantUse(h, ski('Tiro Certeiro')), /Exige Distância/); arma('Rifle de Ferrolho');
   assert.match(cantUse(h, ski('Estocada Funda')), /Exige Perfuração/); arma('Lança de Caça'); assert.equal(cantUse(h, ski('Estocada Funda')), '');
   // maestria de categoria: só vale com arma da categoria
-  const fio = sk('Fio Afiado'); h.skills.push(fio); h.pslots = [fio]; const sem = mods(h, { basic: true }).atk; arma('Katana de Caçador'); assert.equal(mods(h, { basic: true }).atk - sem, 5, 'Fio Afiado: +5 atq com arma de corte'); arma('Lança de Caça'); assert.equal(mods(h, { basic: true }).atk, sem, 'lança não é corte');
+  const fio = sk('Fio Afiado'); h.skills.push(fio); h.pslots = [fio]; const sem = mods(h, { basic: true }).atk; arma('Katana de Caçador'); assert.equal(mods(h, { basic: true }).atk - sem, 4, 'Fio Afiado: +4 atq com arma de corte'); arma('Lança de Caça'); assert.equal(mods(h, { basic: true }).atk, sem, 'lança não é corte');
   // reqItem: precisa de item com a tag no inventário; inimigos não pedem
   const g = ski('Granada de Mão'); assert.equal(g.reqItem, 'explosivo'); assert.match(cantUse(h, g), /Exige Explosivos/);
   h.inv[nome('Bomba do Feiticeiro')] = 1; assert.equal(cantUse(h, g), ''); delete h.inv[nome('Bomba do Feiticeiro')]; assert.match(cantUse(h, g), /Exige/);

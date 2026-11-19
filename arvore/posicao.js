@@ -1,6 +1,6 @@
 // Posição das técnicas que os jogadores já usam (passa antes de arvore/nivel.js, em tree.js).
 // Subir/descer de nível = mudar de lugar no ramo: o começo do ramo fica perto do centro da mandala, o fim fica longe.
-// FORTES vão para o fim do ramo; as outras de JA (já aprendidas por alguém) vão para o começo, puxando junto o `pre` delas.
+// FORTES vão para o fim do ramo; as de JA (já aprendidas por alguém) vão para o começo, puxando junto o `pre` delas.
 // Cada técnica de JA ganha uma vizinha nova (VIZ), posta logo depois dela no mesmo ramo; depois das fortes a vizinha é mais forte ainda.
 import { ATUAIS } from './atuais.js';
 const D = (n, d, xp, a, p, c, x = {}) => ({ n, k: 'dmg', d, xp, a, p, c, ...x });
@@ -9,7 +9,8 @@ const P = (n, d, xp, x = {}) => ({ n, k: 'passive', d, xp, ...x });
 const F = (n, d, xp, a, c, fm, x = {}) => ({ n, k: 'form', d, xp, a, c, fm, ...x });
 const DOM = (n, d, a, aw, dom, x = {}) => ({ n, k: 'util', d, xp: 180, a, c: 0, ct: 150, tg: 'self', aw, dom, ...x });
 
-export const FORTES = ['Mundo do Tsukuyomi', 'Dente-de-leão', 'Cólera', 'Kai', 'Inconsciência', 'Canhão de Aura Gélido', 'Wakaze', 'Chute Doentio', 'Evolução Forçada', 'Soco da Dualidade', 'Lâmina da Irmandade', 'Ataque de Trio'];
+// O kit atual dos personagens desceu um nível (arvore/atuais.js): nenhuma técnica já aprendida fica mais no fim do ramo.
+export const FORTES = ['Ataque de Trio'];
 
 export const VIZ = {
   // Marcial
@@ -17,11 +18,11 @@ export const VIZ = {
   'Carregar': P('Carga Contínua', 'O corpo aprende a puxar a energia do lugar mesmo lutando.', 25, { on: 'turn', fx: 'gain aura 2' }),
   'Intuição': P('Arrepio na Nuca', 'Um arrepio na nuca avisa antes do golpe chegar.', 20, { on: 'hurt', ch: 25, fx: 'st evade 1 self' }),
   'Clareza': U('Clareza Compartilhada', 'A leitura do combate passa para os aliados em poucas palavras.', 30, 'INT', 4, { area: true, fx: 'st focus 2' }),
-  'Cólera': F('Cólera Sem Fim', 'A cólera não para no fim do fôlego: o corpo continua até cair.', 70, 'FOR', 4, 'dur 4; atk 60; dr hp 14; end st exaus 3', { pre: 'Cólera', rq: { FOR: 60 } }),
-  'Kai': F('Kai Absoluto', 'Toda a reserva espiritual queima de uma vez, sem guardar nada.', 70, 'SAB', 4, 'dur 3; atkP 16; dr aura 6; end lose aura 99', { pre: 'Kai', rq: { SAB: 60 } }),
-  'Inconsciência': F('Instinto Animal', 'Abaixo da Inconsciência só resta o bicho: rápido, faminto e sem medo.', 70, 'FOR', 5, 'dur 5; atk 25; agi 25; hit 10; end st exaus 3', { pre: 'Inconsciência', rq: { FOR: 60 } }),
-  'Soco da Dualidade': D('Eco da Dualidade', 'O segundo impacto da dupla volta pela mesma corrente e derruba.', 80, 'FOR', 30, 10, { duo: 'Eco da Dualidade', pre: 'Soco da Dualidade', fx: 'st down 1', rq: { FOR: 57 } }),
-  'Lâmina da Irmandade': D('Cruz da Irmandade', 'Duas lâminas em cruz sobre o mesmo alvo, cada uma abrindo a outra.', 70, 'DES', 22, 9, { duo: 'Cruz da Irmandade', hits: 2, st: 'bleed', pre: 'Lâmina da Irmandade', rq: { DES: 57 } }),
+  'Cólera': F('Cólera Sem Fim', 'A cólera não para no fim do fôlego: o corpo continua até cair.', 55, 'FOR', 4, 'dur 4; atk 40; dr hp 12; end st exaus 3', { pre: 'Cólera', rq: { FOR: 55 } }),
+  'Kai': F('Kai Absoluto', 'Toda a reserva espiritual queima de uma vez, sem guardar nada.', 55, 'SAB', 4, 'dur 3; atkP 10; dr aura 6; end lose aura 99', { pre: 'Kai', rq: { SAB: 56 } }),
+  'Inconsciência': F('Instinto Animal', 'Abaixo da Inconsciência só resta o bicho: rápido, faminto e sem medo.', 55, 'FOR', 5, 'dur 5; atk 20; agi 20; hit 8; end st exaus 3', { pre: 'Inconsciência', rq: { FOR: 56 } }),
+  'Soco da Dualidade': D('Eco da Dualidade', 'O segundo impacto da dupla volta pela mesma corrente e derruba.', 40, 'FOR', 30, 10, { duo: 'Eco da Dualidade', pre: 'Soco da Dualidade', fx: 'st down 1', rq: { FOR: 55 } }),
+  'Lâmina da Irmandade': D('Cruz da Irmandade', 'Duas lâminas em cruz sobre o mesmo alvo, cada uma abrindo a outra.', 40, 'DES', 16, 9, { duo: 'Cruz da Irmandade', hits: 2, st: 'bleed', pre: 'Lâmina da Irmandade', rq: { DES: 55 } }),
   'Aparar': P('Contragolpe Firme', 'Depois de aparar, a mão já está no caminho da resposta.', 15, { on: 'hurt', ch: 25, fx: 'st counter 1' }),
   // Armas
   'Fio Afiado': P('Fio Cortante', 'O fio bem cuidado acha a fresta da armadura.', 15, { mod: 'crit 3', sc: 'wc:corte' }),
@@ -40,7 +41,7 @@ export const VIZ = {
   'Empurrão': U('Parede de Vento', 'Uma parede de vento na frente do corpo segura e empurra quem vem.', 20, 'DES', 3, { tg: 'self', fx: 'shield 8 self; push 30 foes' }),
   'Tentáculo de Vento': D('Tentáculo Agarrador', 'O tentáculo de vento se enrola no alvo e não solta.', 25, 'DES', 6, 5, { hits: 2, fx: 'st root 2' }),
   'Atirar Vento': D('Chuva de Detritos', 'Tudo o que está solto no chão sobe e cai sobre os inimigos.', 25, 'DES', 8, 6, { area: true, ct: 120, fx: 'push 15' }),
-  'Wakaze': D('Wakaze: Rajada Tripla', 'Três esferas de Wakaze, uma atrás da outra.', 70, 'DES', 16, 14, { hits: 3, fx: 'push 20', pre: 'Wakaze', rq: { DES: 58 } }),
+  'Wakaze': D('Wakaze: Rajada Tripla', 'Três esferas de Wakaze, uma atrás da outra.', 50, 'DES', 11, 12, { hits: 3, fx: 'push 20', pre: 'Wakaze', rq: { DES: 54 } }),
   'Salto de Ventania': D('Queda do Vento', 'Do alto do salto, o corpo cai sobre o inimigo com o peso do vento.', 15, 'AGI', 14, 4, { fx: 'st down 1 30%' }),
   'Asa-Branca': D('Voo Rasante', 'Planando baixo, o corpo passa pelo inimigo e deixa a guarda dele aberta.', 25, 'AGI', 16, 5, { fx: 'st exposed 1' }),
   'Dente-de-leão': DOM('Dente-de-leão: Semeadura', 'As sementes do vento se espalham por todo o campo e o domínio cresce.', 'DES', 'fuhaku', 'dur 4; ally agi 25; ally hit 15; foe hit -15', { pre: 'Dente-de-leão', rq: { DES: 64 } }),
@@ -48,11 +49,11 @@ export const VIZ = {
   'Passo do Cão-de-Caça': U('Faro do Cão-de-Caça', 'O cão sente o cheiro do medo e marca a presa.', 15, 'INT', 2, { fx: 'st marked 2' }),
   'Mundo do Tsukuyomi': DOM('Mundo do Tsukuyomi: Lua Rubra', 'A lua do Reino das Trevas fica vermelha: o domínio fica mais fundo e cobra da mente.', 'INT', 'tsukuyomi', 'dur 4; ally hit 15; ally agi 10; foe hit -20; tick fear', { pre: 'Mundo do Tsukuyomi', pay: { san: 6 }, rq: { INT: 64 } }),
   // Hiruko
-  'Evolução Forçada': { n: 'Evolução Descontrolada', k: 'heal', d: 'A evolução passa do ponto: o corpo se refaz maior e mais forte, e cobra o preço.', xp: 70, a: 'CON', p: 34, c: 12, st: 'atkUp', pay: { hp: 6 }, pre: 'Evolução Forçada', rq: { CON: 58 } },
+  'Evolução Forçada': { n: 'Evolução Descontrolada', k: 'heal', d: 'A evolução passa do ponto: o corpo se refaz maior e mais forte, e cobra o preço.', xp: 45, a: 'CON', p: 26, c: 10, st: 'atkUp', pay: { hp: 6 }, pre: 'Evolução Forçada', rq: { CON: 54 } },
   'Suplex': D('Suplex Duplo', 'Agarra, arremessa e agarra de novo antes do alvo levantar.', 20, 'FOR', 9, 4, { hits: 2, fx: 'stack doenca 5 self' }),
   'Esquiva Doentia': U('Recuo Doentio', 'Um salto para trás que endurece a pele no caminho.', 20, 'AGI', 2, { ct: 40, tg: 'self', fx: 'st evade 1 self; st defUp 1 self; stack doenca 5 self' }),
   'Força Doentia': D('Agarrão Doentio', 'Mãos que apertam com força de doença e não soltam.', 25, 'FOR', 18, 5, { fx: 'st root 1; stack doenca 5 self' }),
-  'Chute Doentio': D('Chute Doentio: Contágio', 'O chute espalha a doença de quem foi atingido para quem está perto.', 70, 'FOR', 36, 9, { st: 'poison', fx: 'spread poison; stack doenca 5 self', pre: 'Chute Doentio', rq: { FOR: 58 } }),
+  'Chute Doentio': D('Chute Doentio: Contágio', 'O chute espalha a doença de quem foi atingido para quem está perto.', 45, 'FOR', 27, 8, { st: 'poison', fx: 'spread poison; stack doenca 5 self', pre: 'Chute Doentio', rq: { FOR: 54 } }),
   // Aura
   'Ten: Envolver': P('Ten Atento', 'O Ten já começa a luta firme como couro curtido.', 15, { on: 'start', fx: 'st defUp 1 self' }),
   'Zetsu: Ocultar': U('Zetsu Respirado', 'No silêncio do Zetsu a respiração fecha as feridas.', 15, 'SAB', 0, { ct: 80, tg: 'self', fx: 'gain aura 6; res hp 4' }),
@@ -64,7 +65,7 @@ export const VIZ = {
   'Força de Aura': D('Impacto de Aura', 'A pancada reforçada empurra o alvo para longe.', 15, 'FOR', 14, 4, { cat: 'int', fx: 'push 25' }),
   'Teia de Aura': D('Teia Grudenta', 'A teia se abre numa rede e prende todos que tocar.', 20, 'DES', 4, 4, { area: true, ct: 120, cat: 'tra', fx: 'st root 1' }),
   'Canhão de Aura': D('Canhão Disperso', 'O canhão se abre antes de chegar e atinge todos os inimigos.', 40, 'SAB', 14, 9, { area: true, ct: 120, cat: 'emi' }),
-  'Canhão de Aura Gélido': D('Canhão de Aura: Zero Absoluto', 'O frio do canhão chega ao zero: o que ele toca para de se mexer.', 80, 'SAB', 40, 18, { area: true, ct: 150, cat: 'emi', v2: 'fuhaku', fx: 'st frozen 1 60%; st wet 2', pre: 'Canhão de Aura Gélido', rq: { SAB: 60 } }),
+  'Canhão de Aura Gélido': D('Canhão de Aura: Zero Absoluto', 'O frio do canhão chega ao zero: o que ele toca para de se mexer.', 70, 'SAB', 28, 15, { area: true, ct: 150, cat: 'emi', v2: 'fuhaku', fx: 'st frozen 1 50%; st wet 2', pre: 'Canhão de Aura Gélido', rq: { SAB: 58 } }),
 };
 
 export function posicionar(TREE) {
