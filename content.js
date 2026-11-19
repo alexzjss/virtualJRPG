@@ -162,20 +162,6 @@ function ringLayout(G) {
     roots.forEach(r => dep[r] = 0);
     for (let k = 0; k < q.length; k++) for (const j of G[q[k]].ln || []) if (set.has(j) && dep[j] == null) { dep[j] = dep[q[k]] + 1; par[j] = q[k]; (kids[q[k]] ||= []).push(j); q.push(j); }
     rootsOf[g] = roots;
-    for (const i of ids) if (dep[i] == null) dep[i] = 0;
-  }
-  const ring = id => grp(G[id]) === 'armas' ? dep[id] + 1 : dep[id]; // no centro as armas começam um anel fora do núcleo
-  const count = (ids, fn) => { const c = []; for (const i of ids) c[fn(i)] = (c[fn(i)] || 0) + 1; return c; };
-  const cm = count(by.marcial, ring), ca = count(by.armas, ring), K = Math.max(cm.length, ca.length), rc = [0];
-  for (let k = 1; k < K; k++) rc[k] = Math.max(rc[k - 1] + GAP, Math.max(cm[k] || 0, ca[k] || 0) * SP / HALF);
-  const Rc = rc[K - 1], sec = ORDER.filter(el => by[el]), D = Math.max(...sec.flatMap(el => by[el].map(i => dep[i]))) + 1, rs = [];
-  for (let d = 0; d < D; d++) rs[d] = Math.max(d ? rs[d - 1] + GAP : Rc + GAP * 1.5, Math.max(...sec.map(el => count(by[el], i => dep[i])[d] || 0)) * SP / WEDGE);
-  const place = (ids, r, lo, hi, mid) => { // um anel de um grupo: ângulo ideal = média dos pais; o varrimento respeita o espaço mínimo entre esferas
-    const gap = SP / r, want = id => ang0[id] ?? mid;
-    const L = ids.map(id => [id, want(id)]).sort((p, q) => p[1] - q[1] || parseInt(p[0].slice(1)) - parseInt(q[0].slice(1))), pos = [];
-    L.forEach(([, w], i) => pos[i] = Math.max(Math.min(Math.max(w, lo), hi), i ? pos[i - 1] + gap : lo));
-    for (let i = L.length - 1; i >= 0; i--) pos[i] = Math.min(pos[i], i < L.length - 1 ? pos[i + 1] - gap : hi);
-    L.forEach(([id], i) => { ang[id] = pos[i]; rad[id] = r; });
     // nós soltos do setor (ligados ao resto só por casas do Marcial, quando a grade lotou): não podem virar profundidade 0, que infla o 1º anel de todos os setores.
     // Entram pela casa de grade mais próxima de um nó já ligado, e a profundidade continua de nó em nó pelas ligações deles.
     const gd = (p, q) => Math.max(Math.abs(G[p].gx - G[q].gx), Math.abs(G[p].gy - G[q].gy));
@@ -186,8 +172,60 @@ function ringLayout(G) {
       const [s0, p0] = seed; dep[s0] = dep[p0] + 1; par[s0] = p0; (kids[p0] ||= []).push(s0);
       const qq = [s0]; for (let n = 0; n < qq.length; n++) for (const j of G[qq[n]].ln || []) if (set.has(j) && dep[j] == null) { dep[j] = dep[qq[n]] + 1; par[j] = qq[n]; (kids[qq[n]] ||= []).push(j); qq.push(j); }
     }
+    for (const i of ids) if (dep[i] == null) dep[i] = 0;
+  }
+  // camada de cada nó (1–10): a do próprio nó; sem camada, a do pai (ou 1)
+  const cam = id => { for (let i = id; i; i = par[i]) if (G[i].cam != null) return Math.min(10, Math.max(1, G[i].cam)); return 1; };
+  // Faixas por camada: cada camada é uma faixa concêntrica (a 1 por dentro, a 10 por fora), igual para todos os grupos de um mesmo anel,
+  // então a mesma distância do centro é o mesmo nível de poder. Dentro da faixa os nós ficam numa grade polar de colunas (ângulo) × linhas (raio),
+  // compacta, com as linhas ímpares deslocadas meia coluna (colmeia) para as ligações não passarem por cima de outra esfera.
+  const ROW = 92, BAND = 150, band = {}; // band[g][c] = { r, cols, rows }
+  const bands = (gs, wedge, r0) => { let r = r0;
+    for (let c = 1; c <= 10; c++) { let rows = 0;
+      for (const g of gs) { const n = (by[g] || []).filter(i => i !== 'g0' && cam(i) === c).length, cols = Math.max(1, Math.floor(wedge * r / SP));
+        (band[g] ||= {})[c] = { r, cols, n }; rows = Math.max(rows, Math.ceil(n / cols)); }
+      if (rows) r += (rows - 1) * ROW + BAND; }
+    return r; };
+  const sec = ORDER.filter(el => by[el]), Rc = bands(['marcial', 'armas'], HALF, 220); bands(sec, WEDGE, Rc + GAP * 2);
+  const place = (ids, g, lo, hi) => { // uma faixa de um grupo: ordem pelo ângulo do leque; o varrimento põe cada nó na casa livre mais perto do seu ângulo
+    const { r, cols } = band[g][cam(ids[0])], rows = Math.ceil(ids.length / cols), tot = cols * rows, w = (hi - lo) / cols;
+    const L = ids.map(id => [id, ang0[id] ?? (lo + hi) / 2]).sort((p, q) => p[1] - q[1] || dep[p[0]] - dep[q[0]] || parseInt(p[0].slice(1)) - parseInt(q[0].slice(1))), pos = [];
+    L.forEach(([, a], i) => pos[i] = Math.max(Math.min(Math.round((a - lo) / (hi - lo) * tot - .5), tot - 1), i ? pos[i - 1] + 1 : 0));
+    for (let i = L.length - 1; i >= 0; i--) pos[i] = Math.min(pos[i], i < L.length - 1 ? pos[i + 1] - 1 : tot - 1);
+    const col = []; L.forEach(([id], i) => (col[Math.floor(pos[i] / rows)] ||= []).push(id));
+    // na coluna, quem liga à camada de baixo fica por dentro e quem liga à de cima fica por fora (a ligação não atravessa a faixa); empate: quem vem antes no ramo, por dentro
+    const pull = id => { const c = cam(id); let v = 0; for (const j of G[id].ln || []) if (G[j] && grp(G[j]) === g) v += Math.sign(cam(j) - c); return v; };
+    const slot = (k, j) => [lo + (k + .5 + (j % 2 ? .5 : 0) - (rows > 1 ? .25 : 0)) * w, r + j * ROW], cells = [];
+    for (let k = 0; k < cols; k++) for (let j = 0; j < rows; j++) cells.push({ k, at: slot(k, j), id: null });
+    col.forEach((l, k) => l && l.sort((p, q) => pull(p) - pull(q) || dep[p] - dep[q]).forEach((id, j) => {
+      [ang[id], rad[id]] = slot(k, j); cells[k * rows + j].id = id; }));
+    slots.push(cells);
   };
-  const run = (ids, radius, lo, hi, mid, fn) => { const b = []; ids.forEach(i => (b[fn(i)] ||= []).push(i)); b.forEach((l, k) => l && place(l, radius(k), lo, hi, mid)); };
+  // acabamento: trocas locais dentro de cada faixa (inclusive para casas vazias, até 3 colunas de distância) enquanto encurtam as ligações.
+  // Ligação curta e reta = menos linhas passando por cima de outra esfera.
+  const slots = [], xy = id => [rad[id] * Math.cos(ang[id]), rad[id] * Math.sin(ang[id])], CB = 120, grid = new Map(), ck = (x, y) => Math.floor(x / CB) + ',' + Math.floor(y / CB);
+  const index = (id, on) => { const k = ck(...xy(id)); let s = grid.get(k); if (!s) grid.set(k, s = new Set()); on ? s.add(id) : s.delete(id); };
+  const hits = (x, y, u, w, a, b) => { // esferas (fora as duas pontas) a menos de 30 da linha (x,y)–(u,w)
+    const L2 = (u - x) ** 2 + (w - y) ** 2, n = Math.ceil(Math.sqrt(L2) / CB) + 1, seen = new Set(); let c = 0;
+    for (let t = 0; t <= n; t++) { const px = x + (u - x) * t / n, py = y + (w - y) * t / n, gx = Math.floor(px / CB), gy = Math.floor(py / CB);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const o of grid.get((gx + dx) + ',' + (gy + dy)) || []) {
+        if (o === a || o === b || seen.has(o)) continue; seen.add(o); const [ox, oy] = xy(o), s = ((ox - x) * (u - x) + (oy - y) * (w - y)) / L2;
+        if (s > 0 && s < 1 && Math.hypot(ox - x - s * (u - x), oy - y - s * (w - y)) < 30) c++; } }
+    return c; };
+  const hc = {}, cost = (id, a, r, pen = true) => { const x = r * Math.cos(a), y = r * Math.sin(a); let v = 0;
+    for (const j of G[id].ln || []) if (rad[j] != null) { const [u, w] = xy(j); const d2 = (x - u) ** 2 + (y - w) ** 2; v += d2 + (pen && d2 < 2e5 ? 4e4 * hits(x, y, u, w, id, j) : 0); } return v; };
+  const polish = () => { for (const id of Object.keys(rad)) index(id, true);
+    for (let pass = 0; pass < 2; pass++) { let moved = 0;
+    for (const cells of slots) for (const A of cells) for (const B of cells) {
+      if (A === B || Math.abs(A.k - B.k) > 3 || (!A.id && !B.id)) continue;
+      const here = C => C.id ? (hc[C.id] ??= cost(C.id, ...C.at)) : 0, before = here(A) + here(B);
+      const swap = () => { for (const C of [A, B]) if (C.id) index(C.id, false); [A.id, B.id] = [B.id, A.id]; for (const C of [A, B]) if (C.id) { [ang[C.id], rad[C.id]] = C.at; index(C.id, true); } };
+      swap(); // só o comprimento já piora: nem precisa contar esferas no caminho
+      if ((A.id ? cost(A.id, ...A.at, false) : 0) + (B.id ? cost(B.id, ...B.at, false) : 0) >= before - 1 || (A.id ? cost(A.id, ...A.at) : 0) + (B.id ? cost(B.id, ...B.at) : 0) >= before - 1) { swap(); continue; }
+      moved++; for (const C of [A, B]) if (C.id) { delete hc[C.id]; for (const j of G[C.id].ln || []) delete hc[j]; }
+    }
+    if (!moved) break; } };
+  const run = (ids, g, lo, hi) => { const b = []; ids.forEach(i => (b[cam(i)] ||= []).push(i)); b.forEach(l => l && place(l, g, lo, hi)); };
   const m = .05, wt = {}, weigh = id => wt[id] ??= 1 + (kids[id] || []).reduce((a, k) => a + weigh(k), 0);
   // leque da árvore: cada nó recebe uma fatia do ângulo do pai proporcional ao tamanho do seu ramo, então os ramos se espalham pela fatia sem se cruzar
   const fan = (list, lo, hi) => { const tot = list.reduce((a, k) => a + weigh(k), 0); let x = lo;
@@ -196,9 +234,10 @@ function ringLayout(G) {
   ORDER.forEach((el, i) => span[el] = [i * SEC - WEDGE / 2, i * SEC + WEDGE / 2]);
   for (const g of Object.keys(by)) { const [lo, hi] = span[g], roots = g === 'marcial' ? kids.g0 || [] : rootsOf[g]; fan(roots, lo, hi); }
   rad.g0 = 0; ang.g0 = Math.PI;
-  run((by.marcial || []).filter(i => i !== 'g0'), k => rc[k], Math.PI / 2 + m, Math.PI * 1.5 - m, Math.PI, ring);
-  run(by.armas || [], k => rc[k], -Math.PI / 2 + m, Math.PI / 2 - m, 0, ring);
-  sec.forEach(el => { const c = ORDER.indexOf(el) * SEC; run(by[el], d => rs[d], c - WEDGE / 2, c + WEDGE / 2, c, i => dep[i]); });
+  run((by.marcial || []).filter(i => i !== 'g0'), 'marcial', Math.PI / 2 + m, Math.PI * 1.5 - m);
+  run(by.armas || [], 'armas', -Math.PI / 2 + m, Math.PI / 2 - m);
+  sec.forEach(el => { const c = ORDER.indexOf(el) * SEC; run(by[el], el, c - WEDGE / 2, c + WEDGE / 2); });
+  polish();
   for (const [id, s] of Object.entries(G)) { s.wx = Math.round(rad[id] * Math.cos(ang[id])); s.wy = Math.round(rad[id] * Math.sin(ang[id])); }
 }
 // unidades de mundo por casa da grade (a esfera tem raio 24; sobra espaço para o nome em duas linhas)

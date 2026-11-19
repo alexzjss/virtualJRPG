@@ -175,7 +175,7 @@ const hiddenRaw = c => {
   const mine = c.role === 'table' ? heroes : heroes.filter(ch => ch.owner === c.name);
   return Object.keys(S.skills).filter(id => { const s = S.skills[id]; return s.gx != null && !owned.has(id) && !mine.some(ch => reachable(ch, s, id)); });
 };
-const silhouette = s => ({ name: '???', d: '', kind: s.kind === 'passive' ? 'passive' : s.kind === 'form' ? 'form' : 'dmg', attr: '', el: s.el, power: 0, cost: 0, res: s.res, gx: s.gx, gy: s.gy, wx: s.wx, wy: s.wy, ln: s.ln, br: s.br, root: s.root, xp: s.xp, secret: 1 });
+const silhouette = s => ({ name: '???', d: '', kind: s.kind === 'passive' ? 'passive' : s.kind === 'form' ? 'form' : 'dmg', attr: '', el: s.el, power: 0, cost: 0, res: s.res, gx: s.gx, gy: s.gy, wx: s.wx, wy: s.wy, ln: s.ln, br: s.br, root: s.root, xp: s.xp, cam: s.cam, secret: 1 });
 let secCache = { v: -1, m: new Map() };
 const defsFor = (c, d) => { // versão das definições com os nós secretos trocados pela silhueta; cacheada por conjunto de nós escondidos
   const hid = hiddenSkills(c);

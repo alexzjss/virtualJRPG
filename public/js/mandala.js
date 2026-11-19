@@ -25,7 +25,7 @@
 
   // ---------- desenho ----------
   const cam = M.cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
-  let disp = 'system-ui,sans-serif', cx0, pv = null, ac, rot = 0, hg = null, rings = [], core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
+  let disp = 'system-ui,sans-serif', cx0, pv = null, ac, rot = 0, hg = null, rings = [],  tiersS = { sep: [], mid: [] }, tiersC = { sep: [], mid: [] }, core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
   const hexA = (h, a) => { const v = parseInt((h || '#ffffff').slice(1), 16); return `rgba(${v >> 16},${v >> 8 & 255},${v & 255},${a})`; };
   const col = el => (typeof ELC !== 'undefined' && ELC[el === 'armas' ? 'fis' : el]) || '#ffffff';
   const grp = s => s.br?.startsWith('armas') ? 'armas' : s.el; // a Árvore de Armas é um bloco à parte (el 'fis', sem ligação com o Marcial): ganha o próprio selo
@@ -54,7 +54,12 @@
   function build() { // posições, ligações e selos dos setores; refeito quando as definições ou a lista visível mudam
     P = place(o.skills); if (rot) { const c = Math.cos(rot), n = Math.sin(rot); for (const [id, [x, y]] of P) P.set(id, [x * c - y * n, x * n + y * c]); } E = edges(o.skills, new Set(o.ids));
     const cen = {}; for (const id of o.ids) { const s = o.skills[id], p = P.get(id), c = cen[grp(s)] ||= { x: 0, y: 0, n: 0, ids: [] }; c.x += p[0]; c.y += p[1]; c.n++; c.ids.push(id); }
-    bound = 400; rings = [...new Set(o.ids.map(id => Math.round(Math.hypot(...P.get(id)) / 4) * 4))].filter(r => r > 0).sort((a, b) => a - b); const sr = o.ids.filter(id => o.skills[id].el !== 'fis').map(id => Math.hypot(...P.get(id))); core = sr.length ? Math.min(...sr) - 60 : 0; seals = Object.entries(cen).map(([el, c]) => { const x = c.x / c.n, y = c.y / c.n; let r = 0; for (const id of c.ids) { const p = P.get(id); r += Math.hypot(p[0] - x, p[1] - y); bound = Math.max(bound, Math.abs(p[0]), Math.abs(p[1])); } return { el, x, y, r: Math.max(180, r / c.n * 1.3) }; });
+    bound = 400; rings = [...new Set(o.ids.map(id => Math.round(Math.hypot(...P.get(id)) / 4) * 4))].filter(r => r > 0).sort((a, b) => a - b);
+    // faixas das camadas (1–10): cada camada ocupa uma faixa concêntrica; guarda a divisória entre faixas e o meio de cada uma (onde vai o número)
+    const bandsOf = ids => { const b = []; for (const id of ids) { const c = o.skills[id].cam, r = Math.hypot(...P.get(id)); if (!c || r < 1) continue; const x = b[c] ||= [r, r]; x[0] = Math.min(x[0], r); x[1] = Math.max(x[1], r); }
+      const cs = b.map((x, c) => x && c).filter(Boolean); return { sep: cs.slice(1).map((c, i) => (b[cs[i]][1] + b[c][0]) / 2), mid: cs.map(c => [c, (b[c][0] + b[c][1]) / 2]) }; };
+    tiersS = bandsOf(o.ids.filter(id => o.skills[id].el !== 'fis')); tiersC = bandsOf(o.ids.filter(id => o.skills[id].el === 'fis'));
+    const sr = o.ids.filter(id => o.skills[id].el !== 'fis').map(id => Math.hypot(...P.get(id))); core = sr.length ? Math.min(...sr) - 60 : 0; seals = Object.entries(cen).map(([el, c]) => { const x = c.x / c.n, y = c.y / c.n; let r = 0; for (const id of c.ids) { const p = P.get(id); r += Math.hypot(p[0] - x, p[1] - y); bound = Math.max(bound, Math.abs(p[0]), Math.abs(p[1])); } return { el, x, y, r: Math.max(180, r / c.n * 1.3) }; });
     stars = []; for (let i = 0; i < 900; i++) stars.push([(Math.random() * 2 - 1) * bound * 1.25, (Math.random() * 2 - 1) * bound * 1.25, Math.random() * 1.5 + .3, Math.random() * TAU]);
     motes = seals.filter(s => s.el !== 'fis').flatMap(s => Array.from({ length: 14 }, () => [s, Math.random() * TAU, Math.random() * s.r, Math.random() * TAU]));
   }
@@ -74,18 +79,20 @@
     // guias do sphere grid: um anel por nível, a divisória Marcial | Armas no centro e as 11 fatias dos setores em volta
     { const [ox, oy] = w2s(0, 0), n = SECN, z = cam.z, rb = (Math.max(...rings, 0) + 70) * z, cr = Math.max(0, core) * z;
       cx.lineWidth = 1; cx.strokeStyle = 'rgba(170,160,230,.08)'; // núcleo: anéis cinza; fora dele cada fatia tem a cor e o padrão do seu patrono
-      for (const r of rings) { if (r * z < 6 || r * z > cr) continue; cx.beginPath(); cx.arc(ox, oy, r * z, 0, TAU); cx.stroke(); }
+      for (const r of tiersC.sep) { if (r * z < 6 || r * z > cr) continue; cx.beginPath(); cx.arc(ox, oy, r * z, 0, TAU); cx.stroke(); } // divisórias entre as camadas do núcleo
       ORDER.forEach((el, i) => { const c = col(el), a0 = (i - .5) * TAU / n + rot, a1 = (i + .5) * TAU / n + rot, gr = cx.createRadialGradient(ox, oy, cr, ox, oy, rb);
         gr.addColorStop(0, hexA(c, o.mineEls?.has(el) ? .16 : .09)); gr.addColorStop(1, hexA(c, .015)); cx.fillStyle = gr; cx.beginPath(); cx.arc(ox, oy, rb, a0, a1); cx.arc(ox, oy, cr, a1, a0, true); cx.closePath(); cx.fill();
         cx.strokeStyle = hexA(c, far ? .1 : .2); cx.setLineDash(DASH[i].map(v => v * Math.max(.6, z * 2.2)));
-        for (const r of rings) { if (r * z <= cr + 2) continue; cx.beginPath(); cx.arc(ox, oy, r * z, a0, a1); cx.stroke(); } cx.setLineDash([]); }); 
+        for (const r of tiersS.sep) { if (r * z <= cr + 2) continue; cx.beginPath(); cx.arc(ox, oy, r * z, a0, a1); cx.stroke(); } cx.setLineDash([]); }); 
       cx.strokeStyle = 'rgba(170,160,230,.3)'; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(ox, oy, cr, 0, TAU); cx.stroke();
       const vx = Math.cos(rot + Math.PI / 2) * cr, vy = Math.sin(rot + Math.PI / 2) * cr; cx.beginPath(); cx.moveTo(ox - vx, oy - vy); cx.lineTo(ox + vx, oy + vy);
       for (let i = 0; i < n; i++) { const a = (i + .5) * TAU / n + rot; cx.moveTo(ox + Math.cos(a) * cr, oy + Math.sin(a) * cr); cx.lineTo(ox + Math.cos(a) * rb, oy + Math.sin(a) * rb); } cx.stroke();
-      // runas: losango onde cada divisória cruza o núcleo e a cada 5º anel; número do nível ao longo da primeira divisória
-      const a = TAU / n / 2 + rot, tiers = rings.filter(r => r * z > cr + 2); cx.fillStyle = 'rgba(200,190,255,.55)';
-      for (let i = 0; i < n; i++) { const bb = (i + .5) * TAU / n + rot; poly(ox + Math.cos(bb) * cr, oy + Math.sin(bb) * cr, 6, 4); cx.fill(); tiers.forEach((r, k) => { if ((k + 1) % 5 === 0 && z > .12) { poly(ox + Math.cos(bb) * r * z, oy + Math.sin(bb) * r * z, 4, 4); cx.fill(); } }); }
-      if (z > .12) { cx.font = `600 ${Math.round(Math.min(13, 8 + 6 * z))}px ${disp}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; tiers.forEach((r, k) => { if (z > .35 || (k + 1) % 5 === 0) { const x = ox + Math.cos(a) * r * z, y = oy + Math.sin(a) * r * z; cx.fillStyle = 'rgba(10,8,20,.8)'; cx.beginPath(); cx.arc(x, y, 8, 0, TAU); cx.fill(); cx.fillStyle = 'rgba(210,200,255,.75)'; cx.fillText(k + 1, x, y + .5); } }); }
+      // runas: losango onde cada divisória de setor cruza o núcleo e as divisórias de camada; número da camada no meio de cada faixa, ao longo das divisórias
+      cx.fillStyle = 'rgba(200,190,255,.55)';
+      for (let i = 0; i < n; i++) { const bb = (i + .5) * TAU / n + rot; poly(ox + Math.cos(bb) * cr, oy + Math.sin(bb) * cr, 6, 4); cx.fill(); if (z > .12) for (const r of tiersS.sep) { poly(ox + Math.cos(bb) * r * z, oy + Math.sin(bb) * r * z, 4, 4); cx.fill(); } }
+      if (z > .04) { const fs = Math.round(Math.min(14, 9 + 8 * z)), rr = Math.max(8, fs * .75); cx.font = `700 ${fs}px ${disp}`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+        for (let i = 0; i < n; i++) { if (z < .12 && i) break; const bb = (i + .5) * TAU / n + rot; for (const [c, r] of tiersS.mid) { const x = ox + Math.cos(bb) * r * z, y = oy + Math.sin(bb) * r * z; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
+          cx.fillStyle = 'rgba(10,8,20,.85)'; cx.beginPath(); cx.arc(x, y, rr, 0, TAU); cx.fill(); cx.strokeStyle = 'rgba(210,200,255,.35)'; cx.lineWidth = 1; cx.stroke(); cx.fillStyle = 'rgba(225,215,255,.9)'; cx.fillText(c, x, y + .5); } } }
       if (z < .5) { cx.fillStyle = 'rgba(200,190,255,.5)'; cx.font = `600 13px ${disp}`; cx.textAlign = 'center'; cx.fillText('Marcial', ox + Math.cos(Math.PI + rot) * cr * .5, oy + Math.sin(Math.PI + rot) * cr * .5 + 44); cx.fillText('Armas', ox + Math.cos(rot) * cr * .5, oy + Math.sin(rot) * cr * .5 + 44); } }
     // fundo de cada setor: halo na cor do patrono, partículas lentas e o kanji grande (selo quando afastado)
     for (const s of seals) { const [x, y] = w2s(s.x, s.y), r = s.r * cam.z * 1.3, c = col(s.el), mine = s.el === 'fis' || s.el === 'armas' || o.mineEls?.has(s.el);
