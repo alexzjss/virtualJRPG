@@ -95,5 +95,11 @@
     return 0; };
   const sigOf = s => { if (!s || !(s.cam >= 8) || s.limit || s.dom) return { kind: 'none' }; const fam = g.ANIM_PROFILES?.familyOf?.(s) || 'projectile';
     return { kind: 'line', key: `${temaOf(s)}-${famGroup(fam)}`, intensity: (Math.min(10, s.cam) - 7) / 3 }; };
-  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle, ultTimeline, famGroup, temaOf, sigOf };
+  // ----- chefes: preset de entrada e de golpe escolhido pelo mestre (ch.bossFx) ou pelo elemento -----
+  const BOSS_PRESETS = ['ascensao', 'eclipse', 'tempestade', 'mare', 'erupcao', 'julgamento', 'enxame', 'fenda'];
+  const BOSS_EL = { kagutsuchi: 'erupcao', susanoo: 'mare', indra: 'tempestade', tsukuyomi: 'eclipse', amaterasu: 'julgamento', hiruko: 'enxame', oculto: 'fenda' };
+  const okP = x => BOSS_PRESETS.includes(x) ? x : null;
+  const sanBossFx = v => !v || typeof v !== 'object' || Array.isArray(v) ? null : { in: okP(v.in), hit: okP(v.hit), col: /^#[0-9a-f]{6}$/i.test(v.col || '') ? v.col : '' };
+  const bossScene = (ch = {}, which = 'in') => { const b = sanBossFx(ch.bossFx); return { preset: (b && b[which === 'hit' ? 'hit' : 'in']) || BOSS_EL[ch.el] || 'ascensao', col: b?.col || '' }; };
+  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE, numberStyle, ultTimeline, famGroup, temaOf, sigOf, BOSS_PRESETS, sanBossFx, bossScene };
 })(globalThis);

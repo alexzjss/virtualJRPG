@@ -64,6 +64,7 @@ const H = {
     else if (NUM[f]) { ch[f] = int(m.v); if (f === 'hp' && ch.hp > 0) { delete ch.dead; delete ch.dying; } }
     else if (f === 'name') { ch.name = String(m.v).slice(0, 30) || '?'; if (ch.enemy && S.bestiary[ch.id] === ch) ch.tpl = ch.name; }
     else if (f === 'boss' && g && ch.enemy) ch.boss = !!m.v;
+    else if (f === 'bossFx' && g && ch.enemy) { const P = ['ascensao', 'eclipse', 'tempestade', 'mare', 'erupcao', 'julgamento', 'enxame', 'fenda'], v = m.v, ok = x => P.includes(x) ? x : null; ch.bossFx = v && typeof v === 'object' && !Array.isArray(v) ? { in: ok(v.in), hit: ok(v.hit), col: /^#[0-9a-f]{6}$/i.test(v.col || '') ? v.col : '' } : null; } // cenas de chefe (luz-cenas): mesma regra de LUZP.sanBossFx
     else if (f === 'color' && /^#[0-9a-f]{6}$/i.test(m.v)) ch.color = m.v;
     else if (f === 'img') ch.img = okUrl(m.v) ? m.v : '';
     else if (f === 'imgF' || f === 'imgP' || (f === 'imgB' && !ch.enemy)) ch[f] = okUrl(m.v) ? m.v : ''; // imagens do palco de batalha: frente, retrato e costas (inimigo não tem costas)

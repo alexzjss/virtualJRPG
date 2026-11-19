@@ -112,6 +112,7 @@ function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do
   if (bf) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 450); } seal('bf', 'BLACK FLASH!'); posFx('invert'); }
   else if (grade) seal(grade.fx.cg, (RULES.CMD.GRADE_NAME[grade.fx.cg] || '') + '!');
   if (ctr) setTimeout(() => seal('ctr', 'CONTRA!'), 250);
+  if (luzOn() && typeof LUZCENAS !== 'undefined') { const c = bf ? 'bf' : chq ? 'chq' : ctr ? 'ctr' : grade?.fx.cg === 'perf' ? 'perf' : ''; if (c) setTimeout(() => LUZCENAS.cmd(c, { tid: (bf || chq || ctr || grade).fx.id }), c === 'ctr' ? 250 : 0); } // comandos especiais no mundo
   if (chq) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 400); } seal('chq', 'CHOQUE!'); }
 }
 // cada quem-age é uma cena (o contra-ataque ganha a sua, com a câmera virando para o ombro de quem defende)
@@ -213,7 +214,8 @@ function intro() { // abertura: os dois lados entram e a faixa "Batalha!" corta 
   const fs = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.enemy).map(c => esc(c.name));
   const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0), boss = inB.find(c => c.enemy && c.boss);
   if (stage3d() && typeof PVIDA !== 'undefined') PVIDA.enter(inB.filter(c => !c.enemy).map(c => c.id), inB.filter(c => c.enemy).map(c => c.id));
-  if (boss) setTimeout(() => fxAdd('bossband', `${stage3d() ? `<i class="th-por">${portrait(boss)}</i>` : ''}<div><small>Chefe</small><b>${esc(boss.name)}</b></div>`, 1600), 900);
+  if (boss && luzOn() && typeof LUZCENAS !== 'undefined') setTimeout(() => LUZCENAS.boss(LUZP.bossScene({ ...boss, el: mainEl(boss) }, 'in').preset, 'in', boss), 900); // entrada do chefe por preset
+  else if (boss) setTimeout(() => fxAdd('bossband', `${stage3d() ? `<i class="th-por">${portrait(boss)}</i>` : ''}<div><small>Chefe</small><b>${esc(boss.name)}</b></div>`, 1600), 900);
   fxAdd('intro', `<i class="in-l"></i><i class="in-r"></i><div><b>Batalha!</b><small>${fs.slice(0, 4).join(' · ')}${fs.length > 4 ? ` e mais ${fs.length - 4}` : ''}</small></div>`, 1700); sfxc('start');
   if (typeof ANIMFX !== 'undefined') setTimeout(() => Object.values(S.chars).filter(c => c.id in S.battle.ticks && c.hp > 0).forEach((c, i) => {
     const p = (c.skills || []).map(SK).find(s => s?.kind === 'passive'); if (p) setTimeout(() => ANIMFX.play({ actorId: c.id, targetIds: [c.id], skill: { ...p, anim: 'form' }, fx: { a: c.id, id: c.id, s: p.name, el: p.el, passive: 1 } }), i * 80);

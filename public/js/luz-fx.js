@@ -157,7 +157,8 @@
     const P = e.profile, M = { ...LP.material(P.el) }; if (P.palette?.[1] && P.el === 'fis') M.rim = P.palette[2] || M.rim;
     const ph = LP.phases(P.family, e.dur), fam = DRAW[P.family], B = LP.budget(g.ANIMFX?.level?.() || 'medium'), sh = LP.share(B.particles, e.n || 1, P.hits || 1), nImp = clamp(Math.min(sh.perHit / 6, 24) * q(), 4, 24) | 0;
     e.k = 0; let hit = false;
-    const SG = e.sig === 'line' && e.skill ? LP.sigOf(e.skill) : null; if (SG?.kind === 'line') e.sigI = SG.intensity; const sigFn = SG?.kind === 'line' ? g.LUZCENAS?.line?.(SG.key, e) : null; // assinatura das camadas 8–10
+    const SG = e.sig === 'line' && e.skill ? LP.sigOf(e.skill) : null; if (SG?.kind === 'line') e.sigI = SG.intensity; let sigFn = SG?.kind === 'line' ? g.LUZCENAS?.line?.(SG.key, e) : null; // assinatura das camadas 8–10
+    const A = g.S?.chars?.[e.aid]; if (A?.enemy && A.boss && e.skill && g.LUZCENAS?.boss && e.i === 0) { const top = Math.max(0, ...(A.skills || []).map(k => (typeof SK === 'function' ? SK(k) : g.S.skills?.[k])?.power || 0)); if (top > 0 && (e.skill.power || 0) >= top) sigFn = g.LUZCENAS.boss(LP.bossScene({ ...A, el: typeof mainEl === 'function' ? mainEl(A) : A.el }, 'hit').preset, 'hit', A); } // golpe forte do chefe
     if (reduced()) return L.onFrame(now => { const t = now - e.start; if (t > e.dur) return false; if (t >= 0) { const b = e.to(); glow(b, 90 * e.sb(), M.rim, 1 - t / e.dur); } return true; });
     return L.onFrame(now => { const t = now - e.start; if (t < 0) return true; if (t > e.dur + 1400) return false; e.now = t;
       if (t <= e.dur) fam(e, M, t, ph, P);

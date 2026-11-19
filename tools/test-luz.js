@@ -72,3 +72,16 @@ test('LUZP: assinaturas das camadas 8–10 por tema × grupo de família', () =>
   assert.deepEqual(L.sigOf({ ...s10, limit: true }), { kind: 'none' }); assert.deepEqual(L.sigOf({ ...s10, dom: true }), { kind: 'none' });
   assert.deepEqual(L.sigOf(null), { kind: 'none' });
 });
+
+test('LUZP: presets de chefe saneados e cena padrão pelo elemento', () => {
+  assert.deepEqual(L.BOSS_PRESETS, ['ascensao', 'eclipse', 'tempestade', 'mare', 'erupcao', 'julgamento', 'enxame', 'fenda']);
+  assert.deepEqual(L.sanBossFx({ in: 'eclipse', hit: 'xyz', col: 'vermelho' }), { in: 'eclipse', hit: null, col: '' });
+  assert.deepEqual(L.sanBossFx({ in: 'fenda', hit: 'mare', col: '#FF0000', lixo: 1 }), { in: 'fenda', hit: 'mare', col: '#FF0000' });
+  for (const v of [null, 'eclipse', 3, []]) assert.equal(L.sanBossFx(v), null, JSON.stringify(v));
+  for (const [el, p] of [['kagutsuchi', 'erupcao'], ['susanoo', 'mare'], ['indra', 'tempestade'], ['tsukuyomi', 'eclipse'], ['amaterasu', 'julgamento'], ['hiruko', 'enxame'], ['oculto', 'fenda'], ['fis', 'ascensao'], ['atlas', 'ascensao']]) assert.equal(L.bossScene({ el }, 'in').preset, p, el);
+  assert.equal(L.bossScene({ el: 'fis', bossFx: { in: 'eclipse', hit: null, col: '' } }, 'hit').preset, 'ascensao');
+  assert.equal(L.bossScene({ el: 'fis', bossFx: { in: 'eclipse', hit: null, col: '#ff0000' } }, 'in').preset, 'eclipse');
+  assert.equal(L.bossScene({ el: 'fis', bossFx: { in: 'eclipse', hit: null, col: '#ff0000' } }, 'in').col, '#ff0000');
+  assert.equal(L.bossScene({ el: 'fis', bossFx: { in: 'bogus' } }, 'in').preset, 'ascensao', 'preset inválido salvo cai no elemento');
+  assert.equal(L.bossScene({ el: 'kagutsuchi' }, 'in').col, '', 'sem cor: quem chama usa a cor do elemento');
+});

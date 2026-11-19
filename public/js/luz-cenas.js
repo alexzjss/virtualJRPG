@@ -82,5 +82,61 @@
   };
   const lineScene = (key, e) => { const [tm, grp] = String(key).split('-'), mf = MOTIF[tm], pl = PLACE[grp]; if (!mf || !pl) return null; const I = cl(e.sigI ?? 1);
     return (ee, M, t, ph, P) => { const L = g.LUZ; if (!L) return; mf(pl(ee, ph), L, ee, M, t, P, I); }; };
-  g.LUZCENAS = { ult, line: lineScene, MOTIF, PLACE };
+  // ----- chefes: 8 presets; 'in' toca sozinho na entrada (~2,5 s, no próprio chefe), 'hit' corre por cima do golpe forte (no alvo) -----
+  const geoOf = id => { const L = g.LUZ, r = L?.geo?.rect(id); return { at: L.geo.target(r), foot: L.geo.foot(r), s: L.geo.scale(r) }; };
+  const bolt = (L, a, b, s, col, al, seed) => { let p0 = a; for (let i = 1; i <= 8; i++) { const p1 = lerp(a, b, i / 8), o = i < 8 ? (rnd(seed + i) - .5) * 60 * s : 0, n = { x: p1.x + o, y: p1.y }; L.line(p0, n, 9 * s, col, al * .7); L.line(p0, n, 3 * s, '#fff', al); p0 = n; } };
+  // X: { at, foot, s }; u: 0..1 do trecho; t: ms desde o início; col: cor do chefe; once: marca de disparo único
+  const BOSS = {
+    ascensao: (L, X, t, u, col, once) => { const w = (40 + 120 * eo(u)) * X.s, top = { x: X.foot.x, y: X.foot.y - 900 * X.s }, f = u > .85 ? (1 - u) / .15 : 1;
+      L.line(X.foot, top, w * 1.8, col, .35 * f); L.line(X.foot, top, w, col, .8 * f); L.line(X.foot, top, w * .35, '#fff', f); L.sprite({ x: X.foot.x, y: X.foot.y, size: w * 4, flat: .3, color: col, alpha: .6 * f, tex: 'shock', layer: 0 });
+      if (Math.random() < .8) L.emit({ x: X.foot.x + (Math.random() - .5) * w * 2, y: X.foot.y, vy: -500 * X.s, drag: .4, life: 800, size: 14 * X.s, size1: 3, tex: 'star4', color: Math.random() < .5 ? '#fff' : col });
+      once('a', u > .1, () => g.LUZ.pos?.fire('bloom', { strength: 1 })); },
+    eclipse: (L, X, t, u, col, once) => { const c = { x: X.at.x, y: X.at.y - 260 * X.s }, R = 120 * X.s * eo(Math.min(1, u * 2)), f = u > .85 ? (1 - u) / .15 : 1;
+      L.sprite({ x: c.x, y: c.y, size: R * 2.6, color: col, alpha: .55 * f, tex: 'glow', layer: 0 }); L.sprite({ x: c.x, y: c.y, size: R * 1.45, rot: t / 900, color: '#fff', alpha: .8 * f, tex: 'ringThin', layer: 0 });
+      L.sprite({ x: c.x, y: c.y, size: R * 1.5, color: '#07020c', alpha: .95 * f, add: false, tex: 'glow' }); L.sprite({ x: c.x, y: c.y, size: R * 1.1, color: '#000', alpha: f, add: false, tex: 'core' });
+      for (let i = 0; i < 10; i++) { const an = i / 10 * TAU + t / 2400, p = { x: c.x + Math.cos(an) * R * .62, y: c.y + Math.sin(an) * R * .62 }; L.line(p, { x: c.x + Math.cos(an) * R * (1 + .3 * Math.sin(t / 200 + i)), y: c.y + Math.sin(an) * R * (1 + .3 * Math.sin(t / 200 + i)) }, 6 * X.s, col, .7 * f); } },
+    tempestade: (L, X, t, u, col, once) => { const sky = X.at.y - 380 * X.s, f = u > .85 ? (1 - u) / .15 : 1;
+      for (let i = 0; i < 7; i++) L.sprite({ x: X.at.x + (i - 3) * 70 * X.s + Math.sin(t / 700 + i) * 10, y: sky + Math.sin(i * 2.3) * 20 * X.s, size: 170 * X.s, color: '#1c2030', alpha: .75 * f * cl(u * 4), add: false, tex: 'smoke', layer: 0 });
+      const k = Math.floor(t / 230); if (u > .2 && u < .9 && t % 230 < 90) bolt(L, { x: X.at.x + (rnd(k) - .5) * 260 * X.s, y: sky }, X.foot, X.s, col, 1, k * 13);
+      once('b', u > .2, () => g.LUZ.pos?.fire('shock', { x: X.foot.x, y: X.foot.y, strength: .8 })); },
+    mare: (L, X, t, u, col, once) => { const dir = 1, x0 = X.at.x - 520 * X.s * dir, x = x0 + eo(u) * 620 * X.s * dir, h = 260 * X.s * Math.sin(Math.min(1, u * 1.3) * Math.PI) + 40 * X.s, f = u > .85 ? (1 - u) / .15 : 1;
+      L.sprite({ x, y: X.foot.y - h * .5, size: h * 1.6, sx: .9, sy: 1, rot: -.6 * dir, color: col, alpha: .8 * f, tex: 'crescent' }); L.sprite({ x, y: X.foot.y - h * .5, size: h * 1.4, sx: .9, sy: .8, rot: -.6 * dir, color: '#e6fbff', alpha: .9 * f, tex: 'crescent' });
+      if (Math.random() < .9) L.emit({ x: x + (Math.random() - .5) * 60 * X.s, y: X.foot.y - h, vx: (Math.random() - .3) * 200 * dir, vy: -120 - Math.random() * 120, grav: 600, life: 700, size: 12 * X.s, size1: 22 * X.s, tex: 'bubble', color: col });
+      once('c', u > .7, () => { L.emit({ x: X.at.x, y: X.foot.y, life: 600, size: 80 * X.s, size1: 320 * X.s, flat: .3, tex: 'shock', color: '#e6fbff' }); g.LUZ.pos?.fire('shock', { x: X.at.x, y: X.foot.y }); }); },
+    erupcao: (L, X, t, u, col, once) => { const f = u > .85 ? (1 - u) / .15 : 1, k = cl(u / .45);
+      for (let i = 0; i < 7; i++) { const an = i / 7 * TAU + .3, e2 = { x: X.foot.x + Math.cos(an) * 230 * X.s * eo(k), y: X.foot.y + Math.sin(an) * 60 * X.s * eo(k) }; L.line(X.foot, e2, 8 * X.s, col, .9 * f, true, 0); L.line(X.foot, e2, 3 * X.s, '#fff3c4', f, true, 0); }
+      if (u > .45) { if (Math.random() < .95) L.emit({ x: X.foot.x + (Math.random() - .5) * 120 * X.s, y: X.foot.y, vx: (Math.random() - .5) * 160, vy: -500 - Math.random() * 400, grav: 700, drag: .3, life: 900, size: 30 * X.s, size1: 6, tex: 'flame', color: Math.random() < .5 ? col : '#fff3c4' });
+        once('d', true, () => { L.emit({ x: X.foot.x, y: X.foot.y - 60 * X.s, life: 500, size: 120 * X.s, size1: 420 * X.s, tex: 'glow', color: col }); g.LUZ.pos?.fire('shock', { x: X.foot.x, y: X.foot.y, strength: 1 }); }); } },
+    julgamento: (L, X, t, u, col, once) => { const n = 7, f = u > .88 ? (1 - u) / .12 : 1;
+      for (let i = 0; i < n; i++) { const d = i * .07, v = cl((u - d) / .35), an = i / n * TAU, gx = X.foot.x + Math.cos(an) * 170 * X.s, gy = X.foot.y + Math.sin(an) * 45 * X.s, y = gy - (1 - eo(v)) * 700 * X.s - 80 * X.s; if (v <= 0) continue;
+        L.sprite({ x: gx, y, size: 150 * X.s, sx: .22, sy: 1, color: col, alpha: .8 * f, tex: 'shard' }); L.sprite({ x: gx, y, size: 140 * X.s, sx: .1, sy: 1, color: '#fff', alpha: f, tex: 'shard' });
+        once('j' + i, v >= 1, () => L.emit({ x: gx, y: gy, life: 380, size: 30 * X.s, size1: 150 * X.s, flat: .3, tex: 'shock', color: '#fff' })); } },
+    enxame: (L, X, t, u, col, once) => { const f = u > .85 ? (1 - u) / .15 : 1; if (u < .8 && Math.random() < .95) for (let i = 0; i < 3; i++) { const an = Math.random() * TAU, r = 380 * X.s, p = { x: X.at.x + Math.cos(an) * r, y: X.at.y + Math.sin(an) * r * .6 };
+        L.emit({ x: p.x, y: p.y, vx: -Math.cos(an) * r * 1.6 - Math.sin(an) * 140, vy: -Math.sin(an) * r * 1.1 + Math.cos(an) * 90, drag: 1.4, life: 700, size: 10 * X.s, size1: 4, tex: i ? 'spark' : 'bubble', color: i % 2 ? col : '#f2ffd0' }); }
+      L.sprite({ x: X.at.x, y: X.at.y, size: 260 * X.s * eo(u), color: col, alpha: .35 * f, tex: 'glow' });
+      once('e', u > .8, () => L.emit({ x: X.at.x, y: X.at.y, life: 420, size: 60 * X.s, size1: 300 * X.s, tex: 'ring', color: col })); },
+    fenda: (L, X, t, u, col, once) => { const c = { x: X.at.x, y: X.at.y - 140 * X.s }, H = 300 * X.s, op = eo(cl(u / .35)) * (u > .85 ? (1 - u) / .15 : 1), f = u > .85 ? (1 - u) / .15 : 1;
+      let pl = { x: c.x, y: c.y - H }, pr = pl; for (let i = 1; i <= 10; i++) { const y = c.y - H + i * H / 5, wv = Math.sin(i / 10 * Math.PI) * 60 * X.s * op, jx = (rnd(i * 7) - .5) * 30 * X.s, nl = { x: c.x - wv + jx, y }, nr = { x: c.x + wv + jx, y }; L.line(pl, nl, 6 * X.s, col, f); L.line(pr, nr, 6 * X.s, col, f); if (wv > 2) L.sprite({ x: (nl.x + nr.x) / 2, y: y - H / 10, size: wv * 2.6, sx: 1, sy: 1.4, color: '#0a0010', alpha: .9 * f, add: false, tex: 'glow' }); pl = nl; pr = nr; }
+      L.sprite({ x: c.x, y: c.y, size: 200 * X.s * op, sx: .5, sy: 1.6, color: '#12001c', alpha: .9 * f, add: false, tex: 'glow' });
+      for (let i = 0; i < 3; i++) L.sprite({ x: c.x + (i - 1) * 16 * X.s, y: c.y + (i - 1) * 70 * X.s, size: 38 * X.s * op, color: '#ff2bd6', alpha: f * (.6 + .4 * Math.sin(t / 150 + i)), tex: 'eye' }); }
+  };
+  const runBoss = (preset, col, X, ms) => { const L = g.LUZ; if (!L?.active?.() || reduced()) return Promise.resolve(); const fn = BOSS[preset] || BOSS.ascensao, t0 = g.CENA ? g.CENA.now() : performance.now(), fired = new Set(), once = (k, c, f) => { if (c && !fired.has(k)) { fired.add(k); f(); } };
+    return new Promise(res => L.onFrame(now => { const t = now - t0; if (t > ms) { res(); return false; } fn(L, X(), t, t / ms, col, once); return true; })); };
+  // entrada: no próprio chefe, sozinha; golpe: devolve o desenho por quadro para LUZFX.run, ancorado no alvo, do disparo até depois do impacto
+  const boss = (preset, which, ch, e) => { const col = LP.bossScene({ ...ch, el: elOf(ch, {}) }, which).col || (typeof ELC !== 'undefined' && ELC[elOf(ch, {})]) || '#ffffff';
+    if (which !== 'hit') return runBoss(preset, col, () => geoOf(ch.id), 2500);
+    const fn = BOSS[preset] || BOSS.ascensao, fired = new Set(), once = (k, c, f) => { if (c && !fired.has(k)) { fired.add(k); f(); } };
+    return (ee, M, t, ph) => { const L = g.LUZ, a = ph.fire[0], b = ph.impact[0] + 900; if (t < a || t > b) return; fn(L, { at: ee.to(), foot: ee.footB(), s: ee.sb() }, t - a, (t - a) / (b - a), col, once); }; };
+  // comandos especiais (QTE): Black Flash, Choque, Contra, Perfeito — no alvo do golpe
+  const CMD = {
+    bf: (L, X) => { g.LUZ.pos?.fire('shock', { x: X.at.x, y: X.at.y, strength: 1 });
+      for (let i = 0; i < 28; i++) { const an = i / 28 * TAU + Math.random() * .3, v = 300 + Math.random() * 500; L.emit({ x: X.at.x, y: X.at.y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, drag: 4, life: 500, size: 30 * X.s, size1: 6, rot: an, sx: 2.6, sy: .6, tex: 'spark', color: '#e4002b' }); L.emit({ x: X.at.x, y: X.at.y, vx: Math.cos(an) * v * .9, vy: Math.sin(an) * v * .9, drag: 4, life: 460, size: 22 * X.s, size1: 4, rot: an, sx: 2.6, sy: .5, tex: 'spark', add: false, color: '#0a0003' }); } },
+    chq: (L, X) => { for (const sd of [-1, 1]) L.emit({ x: X.at.x + sd * 260 * X.s, y: X.at.y, vx: -sd * 260 * X.s / .28, life: 280, size: 140 * X.s, size1: 160 * X.s, sx: .35, sy: 1, tex: 'ring', color: '#ffcf6e' });
+      L.emit({ x: X.at.x, y: X.at.y, life: 420, size: 40 * X.s, size1: 320 * X.s, tex: 'star8', color: '#fff', delay: 270 }); setTimeout(() => g.LUZ.pos?.fire('shock', { x: X.at.x, y: X.at.y, strength: .9 }), 270); },
+    ctr: (L, X) => { g.LUZ.pos?.fire('speed', { x: X.at.x, y: X.at.y, strength: .9 }); L.emit({ x: X.at.x, y: X.at.y, life: 260, size: 240 * X.s, size1: 300 * X.s, sx: 1.8, sy: .12, rot: -.35, tex: 'beam', color: '#fff' }); L.emit({ x: X.at.x, y: X.at.y, life: 320, size: 240 * X.s, size1: 320 * X.s, sx: 1.8, sy: .3, rot: -.35, tex: 'beam', color: '#5fb8ff' }); },
+    perf: (L, X) => { L.emit({ x: X.at.x, y: X.at.y, life: 380, size: 340 * X.s, size1: 60 * X.s, tex: 'ring', color: '#ffd24a' }); L.emit({ x: X.at.x, y: X.at.y, life: 360, size: 300 * X.s, size1: 40 * X.s, tex: 'ringThin', color: '#fff' });
+      L.emit({ x: X.at.x, y: X.at.y, life: 460, size: 30 * X.s, size1: 260 * X.s, tex: 'star4', spin: 2, color: '#ffd24a', delay: 340 }); setTimeout(() => g.LUZ.pos?.fire('bloom', { strength: 1 }), 340); }
+  };
+  const cmd = (kind, e = {}) => { const L = g.LUZ; if (!L?.active?.() || reduced() || !CMD[kind]) return; CMD[kind](L, e.at ? e : geoOf(e.tid)); L.kick(); };
+  g.LUZCENAS = { ult, line: lineScene, MOTIF, PLACE, boss, cmd, BOSS, CMD };
 })(globalThis);

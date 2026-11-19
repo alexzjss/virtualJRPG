@@ -15,6 +15,7 @@ app.addEventListener('change', e => {
       .then(u => d.up === 'bg' ? setBg(u) : d.up === 'bbg' ? send({ t: 'map', f: 'bbg', v: u }) : /^bbL:/.test(d.up) ? send({ t: 'map', f: 'bbL', v: ({ ...(S.scenes[S.scene]?.bbL || {}), [d.up.slice(4)]: u }) }) : d.up === 'hand' ? (hand.img = u, render()) : send({ t: 'set', id: d.id, f: /^img[FBP]$/.test(d.up) ? d.up : 'img', v: u })).catch(() => toast('Falha no envio da imagem.', 'no', 'Aceita PNG, JPG, WEBP ou GIF de até 5 MB.'));
   } else if (d.ed) send({ t: 'edSet', coll: d.ed, id: d.id, f: d.f, v });
   else if (d.ini) send({ t: 'ini', k: 'set', id: d.ini, v });
+  else if (d.bfx) { const b = { in: null, hit: null, col: '', ...(S.chars[d.id]?.bossFx || {}) }; b[d.bfx] = v || (d.bfx === 'col' ? '' : null); send({ t: 'set', id: d.id, f: 'bossFx', v: b }); } // cenas de chefe
   else if (d.f) send({ t: 'set', id: d.id, f: d.f, v });
   else if (d.map === 'bg') setBg(v);
   else if (/^bbL:/.test(d.map)) send({ t: 'map', f: 'bbL', v: ({ ...(S.scenes[S.scene]?.bbL || {}), [d.map.slice(4)]: v }) }); // camadas do parallax
