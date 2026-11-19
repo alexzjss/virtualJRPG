@@ -1844,3 +1844,38 @@ body .p3d:not([data-biome=custom]) .envface.stage::before,body .p3d:not([data-bi
 .ot.now .otn{color:#0a0a0a}.ot.now::before{color:#0a0a0a;font-weight:700}.ot.now::after{background:#0a0a0a}
 .ot.hl{background:#262626}
 .hud-order::before{display:none}
+/* cartão do grupo: barra dupla HP|Aura em espelho, olho da sanidade, faixa LIMIT e alertas (Tales/Xenoblade, Bloodborne, FF7) */
+.hud-party .pm .in{padding:40px 14px 12px 18px}
+.hud-party .dbar{position:relative;display:flex;height:16px;margin:6px 2px 0;transform:skewX(-18deg);background:#000;border:2px solid #fff;box-shadow:3px 3px 0 #000}
+.hud-party .dbar::after{content:"";position:absolute;left:calc(50% - 2px);top:-6px;bottom:-6px;width:4px;background:#fff;transform:skewX(-14deg);z-index:3}
+.hud-party .dh,.hud-party .da{position:relative;flex:1;overflow:hidden;background:#2a0710}
+.hud-party .da{background:#06202e}
+.hud-party .dh{transform:scaleX(-1)} /* o HP enche do centro para a esquerda */
+.hud-party .dh>i,.hud-party .da>i{position:relative;z-index:1;display:block;height:100%;transition:width .6s}
+.hud-party .dh>i:not(.trail){background:linear-gradient(#ff5a74,#e4002b 60%,#a3001e)}
+.hud-party .da>i:not(.trail){background:linear-gradient(#bff4ff,#3cc8f0 60%,#1488b8)}
+.hud-party .dh>.trail,.hud-party .da>.trail{z-index:0}
+.hud-party .dh .shbar{position:absolute;top:0;bottom:0;z-index:2;background:repeating-linear-gradient(90deg,#e8f0ffdd 0 5px,#9fb4d8dd 5px 7px);box-shadow:inset 0 0 0 1px #fff}
+.hud-party .lmt{display:flex;align-items:center;gap:6px;margin:7px 0 0;transform:skewX(-14deg);position:relative}
+.hud-party .lmt b{font:400 15px/1 var(--disp);letter-spacing:1px;color:#000;background:var(--gold);padding:2px 6px}
+.hud-party .lmt .lsg{flex:1;display:flex;gap:2px}
+.hud-party .lmt .lsg i{flex:1;height:10px;background:#3a2c00;border:1px solid #ffc93c55}
+.hud-party .lmt .lsg i.f{background:linear-gradient(#fff2b0,var(--gold));border-color:#fff8}
+.hud-party .lmt em{font:700 13px var(--cond);font-style:normal;color:var(--gold);min-width:44px;text-align:right}
+.hud-party .olho{position:absolute;left:0;top:74px;width:70px;height:40px;z-index:4;filter:drop-shadow(2px 3px 0 #000);transform:rotate(-7deg)}
+.hud-party .olho .pal{fill:#0a0a0a}
+.hud-party .olho .vei path{fill:none;stroke:#d0103a;stroke-width:1.4;opacity:0;transition:opacity .4s}
+.hud-party .pm.now .olho{top:62px}
+/* alertas */
+.hud-party .pm.hplow .ink{background:#ff2a4a}
+.hud-party .pm.hplow .p5n .h b,.hud-party .pm.hplow .dh>i:not(.trail){animation:hplow .7s infinite alternate}
+@keyframes hplow{to{color:#ff5a74;filter:brightness(1.7)}}
+.hud-party .pm.au0 .da>i{background:#555}.hud-party .pm.au0 .p5n .a b{color:#777;text-shadow:none}
+.hud-party .pm.sanlow .olho .vei path{opacity:1}
+.hud-party .pm.sanlow .olho{animation:olhot .18s infinite}
+@keyframes olhot{50%{transform:rotate(-7deg) translate(1px,-1px)}}
+.hud-party .pm.lmax .ink{background:var(--gold);box-shadow:0 0 18px var(--gold)}
+.hud-party .pm.lmax .lmt b{animation:hlgh .5s infinite alternate}
+.hud-party .pm.lmax .lmt::after{content:"";position:absolute;left:58px;right:44px;bottom:6px;height:22px;pointer-events:none;background:radial-gradient(10px 18px at 15% 100%,#ffb020,transparent 70%),radial-gradient(9px 22px at 40% 100%,#ff6a00,transparent 70%),radial-gradient(11px 16px at 65% 100%,#ffd24a,transparent 70%),radial-gradient(8px 20px at 88% 100%,#ff7a00,transparent 70%);animation:chama .35s infinite alternate;transform-origin:50% 100%}
+@keyframes chama{to{transform:scaleY(1.3) translateX(2px);opacity:.75}}
+@media(prefers-reduced-motion:reduce){.hud-party .pm.hplow .p5n .h b,.hud-party .pm.hplow .dh>i,.hud-party .pm.sanlow .olho,.hud-party .pm.lmax .lmt::after,.hud-party .pm.lmax .lmt b{animation:none}}

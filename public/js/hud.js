@@ -81,15 +81,20 @@ const HUD = (() => {
     if (performance.now() - bandT > 1600) return ''; const f = S.chars[C.foe], alvos = (C.tgs || []).map(id => S.chars[id]?.name).filter(Boolean);
     return `<div class="band" role="status" style="--c:${esc(f?.color || '#e4002b')}"><b>${esc(f?.name || 'Inimigo')} · ${esc(C.nm || 'Ataque')}</b>${alvos.length ? `<small>ALVO: ${esc(alvos.join(', '))}</small>` : ''}</div>`; };
   const grupo = (inB, cur) => `<div class="hud-party" aria-label="Grupo">${inB.filter(c => !c.enemy).map(c => {
-    const hp = pct(c.hp, c.hpMax), au = Math.round(10 * Math.max(0, c.aura) / (c.auraMax || 1)), form = c.st.form && c.form && SK(c.form);
-    return `<div class="pm ${c === cur ? 'now' : ''} ${c.id === tgt || S.battle.cmd?.tgs?.includes(c.id) ? 'pmtg' : ''} ${S.battle.cmd?.tgs?.includes(c.id) ? 'dtg' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" style="--c:${esc(c.color)}" title="${esc(c.name)}">
-      <i class="ink"></i><div class="por">${photo(c, 'p')}</div>
-      <div class="hlim ${c.limit >= 100 ? 'full' : ''}" title="Limite ${c.limit}%"><i style="height:${pct(c.limit, 100)}%"></i></div>
+    const hp = pct(c.hp, c.hpMax), ap = pct(Math.max(0, c.aura), c.auraMax), sp = pct(Math.max(0, c.san), c.sanMax), lm = pct(c.limit, 100), form = c.st.form && c.form && SK(c.form);
+    const warn = `${c.hp > 0 && hp < 25 ? 'hplow' : ''} ${c.aura <= 0 ? 'au0' : ''} ${sp < 25 ? 'sanlow' : ''} ${c.limit >= 100 ? 'lmax' : ''}`;
+    return `<div class="pm ${c === cur ? 'now' : ''} ${c.id === tgt || S.battle.cmd?.tgs?.includes(c.id) ? 'pmtg' : ''} ${S.battle.cmd?.tgs?.includes(c.id) ? 'dtg' : ''} ${c.hp > 0 ? '' : 'ko'} ${warn}" data-tgt="${c.id}" style="--c:${esc(c.color)}" title="${esc(c.name)}">
+      <i class="ink"></i><div class="por">${photo(c, 'p')}</div>${olho(c.id, sp)}
       <div class="pst">${c.hp > 0 ? stIcons(c) : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}${c.st.defUp ? '<span>Defendendo</span>' : ''}${form ? `<span>Forma: ${esc(form.name)}</span>` : ''}</div>
-      <div class="in"><b class="pnm">${esc(c.name)}</b><div class="p5n" aria-hidden="true"><span class="h"><small>HP</small><b>${c.hp}</b></span><span class="a"><small>AU</small><b>${c.aura}</b></span></div><div class="hpn2"><b>${c.hp}</b><small>/${c.hpMax}</small><em>HP</em></div>
-        <div class="hpbar"><i data-bid="${c.id}:hp" data-p="${hp}" style="width:${hp}%"></i>${shBar(c)}</div>
-        <div class="au" title="Aura ${c.aura}/${c.auraMax}"><span class="dia2"><b>${c.aura}</b></span><span class="segs">${Array.from({ length: 10 }, (_, i) => `<i class="${i < au ? 'f' : ''}"></i>`).join('')}</span></div>
-        <div class="sanr" title="Sanidade ${c.san}/${c.sanMax}"><small>SAN ${c.san}</small><div class="sanl"><i style="width:${pct(c.san, c.sanMax)}%"></i></div></div></div></div>`; }).join('')}</div>`;
+      <div class="in"><b class="pnm">${esc(c.name)}</b><div class="p5n" aria-hidden="true"><span class="h"><small>HP</small><b>${c.hp}</b></span><span class="a"><small>AU</small><b>${c.aura}</b></span></div>
+        <div class="dbar" title="HP ${c.hp}/${c.hpMax} · Aura ${c.aura}/${c.auraMax}${c.shield > 0 ? ' · Escudo ' + c.shield : ''}"><div class="dh"><i data-bid="${c.id}:hp" data-p="${hp}" style="width:${hp}%"></i>${shBar(c)}</div><div class="da"><i data-bid="${c.id}:aura" data-p="${ap}" style="width:${ap}%"></i></div></div>
+        <div class="lmt" title="Limite ${c.limit}%"><b>LIMIT</b><span class="lsg">${Array.from({ length: 10 }, (_, i) => `<i class="${i < Math.floor(lm / 10) ? 'f' : ''}"></i>`).join('')}</span><em>${c.limit >= 100 ? 'PRONTO' : lm + '%'}</em></div></div></div>`; }).join('')}</div>`;
+  // sanidade em olho: a íris enche com a sanidade e as pálpebras fecham conforme ela cai; veias abaixo de 25% (classe sanlow no cartão)
+  const olho = (id, s) => { const k = Math.max(0, Math.min(100, s)) / 100, cl = .85 * (1 - k) * 18, f = 22 * k, A = 'M3 18Q32-5 61 18Q32 41 3 18Z';
+    return `<svg class="olho" viewBox="0 0 64 36" aria-label="Sanidade ${s}%" role="img"><defs><clipPath id="oe-${id}"><path d="${A}"/></clipPath><clipPath id="oi-${id}"><circle cx="32" cy="18" r="11"/></clipPath></defs>
+      <path d="${A}" fill="#f2eefa"/><g clip-path="url(#oe-${id})"><g class="vei"><path d="M4 18q8-3 13 1M6 23q7 1 11-3M60 17q-8-3-13 1M58 23q-7 1-11-3"/></g>
+      <circle cx="32" cy="18" r="11" fill="#24123a"/><rect clip-path="url(#oi-${id})" x="21" y="${(29 - f).toFixed(1)}" width="22" height="${f.toFixed(1)}" fill="#a66bff"/><circle cx="32" cy="18" r="4.2" fill="#000"/><circle cx="35" cy="14.5" r="1.8" fill="#fff"/>
+      <rect class="pal" x="0" y="${(cl - 36).toFixed(1)}" width="64" height="36"/><rect class="pal" x="0" y="${(36 - cl).toFixed(1)}" width="64" height="36"/></g><path d="${A}" fill="none" stroke="#fff" stroke-width="2.6"/></svg>`; };
   // fileira de comandos de turno, logo acima do grupo (canto inferior direito); gmO: o mestre agindo pelo ator do leque dele
   const cmds = (a, cur, inB, gmO = false) => {
     if (!a) return '';
