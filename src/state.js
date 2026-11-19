@@ -54,7 +54,7 @@ pointers();
     const byName = Object.fromEntries(Object.entries(built).map(([k, s]) => [s.name, k])), old = S.skills; let lost = 0;
     for (const ch of [...Object.values(S.chars), ...Object.values(S.bestiary || {})]) {
       const keep = [];
-      for (const k of ch.skills || []) { const nk = byName[old[k]?.name] || byName[SUBST(old[k]?.name)]; if (nk) keep.push(nk); else { lost++; if (!ch.enemy) ch.xp = (ch.xp || 0) + (old[k]?.xp || 0); } }
+      for (const k of ch.skills || []) { const nk = byName[old[k]?.name] || byName[SUBST(old[k]?.name)]; if (nk && !keep.includes(nk)) keep.push(nk); else if (nk) { if (!ch.enemy) ch.xp = (ch.xp || 0) + (old[k]?.xp || 0); } else { lost++; if (!ch.enemy) ch.xp = (ch.xp || 0) + (old[k]?.xp || 0); } }
       ch.skills = [...new Set(keep)];
     }
     S.log.push({ n: S.seq = (S.seq || 0) + 1, who: 'Sistema', text: `Árvore de habilidades atualizada. Skills aprendidas foram mantidas pelo nome${lost ? `; ${lost} que deixaram de existir devolveram o XP.` : '.'}`, kind: 'ok' });

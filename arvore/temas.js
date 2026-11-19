@@ -6,7 +6,10 @@
 // Roda antes de arvore/camadas.js: renomeia (RENOMES), troca o status estrangeiro pelo equivalente do setor e depois valida.
 
 // palavras de nome que pertencem a cada dono (cor não é tema: rubro/escarlate ficam livres)
-export const DONO = {
+// o \b do JavaScript não enxerga letra acentuada (água, maré, trovão): as bordas viram classes Unicode e o \w vira "qualquer letra"
+const U = re => { const s = re.source.split('\\w').join('\\p{L}'), b = '\\b'; return new RegExp('(?<![\\p{L}\\p{N}])' + s.slice(b.length, -b.length) + '(?![\\p{L}\\p{N}])', 'iu'); };
+const mapa = o => Object.fromEntries(Object.entries(o).map(([k, re]) => [k, U(re)]));
+export const DONO = mapa({
   kagutsuchi: /\b(fogo|fogos|chama|chamas|brasa|brasas|fumaça|ígne[oa]|incendi\w*|queim\w*|fornalha|labared\w*|magma|lava|cinzas?|ardente|ardida|fervura|ferve|escaldante|vapor|centelha|fagulha\w*)\b/i,
   susanoo: /\b(água|aquátic\w*|mar|maré|marés|chuva|torrente|dilúvio|gelo|gelad\w*|congel\w*|gélid\w*|neve|nevasca|tsunami|tempestade|tempestades)\b/i,
   atlas: /\b(terra|pedra|pedras|rocha|rochas|gravidade|sísmic\w*|terremoto|montanha|tectônic\w*|areia)\b/i,
@@ -16,7 +19,7 @@ export const DONO = {
   tsukuyomi: /\b(lua|lunar|trevas|sombra|sombras|ilusão|ilusões|ilusóri\w*|pesadelo|pesadelos|escuridão|eclipse)\b/i,
   shukketsu: /\b(sangue|sanguíne\w*|hemorrág\w*|vampir\w*)\b/i,
   hiruko: /\b(doença|doent\w*|veneno|envenen\w*|tóxic\w*|toxina|radioativ\w*|radiação|mutaç\w*|mutante|ácid[oa]|corros\w*|praga|peste|isótopo\w*|atômic\w*)\b/i,
-};
+});
 // palavras que mais de um dono usa: "tempestade" é tormenta (água, raio ou vento); gelo também é do Fuhaku
 const PARTILHA = { indra: ['susanoo:tempestade'], fuhaku: ['susanoo:tempestade', 'susanoo:gelo'] };
 const GELO = /^(gelo|gelad\w*|congel\w*|gélid\w*|neve|nevasca)$/i;
@@ -27,7 +30,7 @@ export const IDIOMA = new Set([
   'Fio Terra', 'Raio Solar', 'Mais Rápido Que a Luz', 'Chuva de Raios', 'Chuva de Detritos', 'Chuva de Luz', 'Chuva de Pétalas Brancas', 'Luz que Consome o Veneno', 'Eclipse Inverso',
   'Chuva de Lampejos', 'Gelo na Espinha', 'Sangue Frio', 'Maré Vermelha', 'Chuva Rubra', 'Tempestade de Sangue', 'Mar de Sangue', 'Ritual: Maré Escarlate Eterna', 'Chuva Carmesim',
   'Sangue Inerte', 'Mutação: Sangue Ácido', 'Cérebro Queimado', 'Chuva de Esferas', 'Rocha Contra Rocha', 'Jan-Ken: Pedra!', 'Chuva de Armas', 'Chuva de Meteoros', 'Canhão de Aura Gélido',
-  'Chuva de Lascas', 'Chuva de Lâminas', 'Chuva de Flechas', 'Chuva do Fim', 'Ritmo no Sangue', 'Forma Carmesim: Fornalha', 'Sangue Mutante', 'Faro de Tempestade',
+  'Chuva de Lascas', 'Chuva de Lâminas', 'Chuva de Flechas', 'Chuva do Fim', 'Ritmo no Sangue', 'Forma Carmesim: Fornalha', 'Sangue Mutante', 'Faro de Tempestade', 'Sangue na Água',
 ]);
 // [nome novo, descrição nova (opcional)]: a migração dá a quem tinha o nome antigo a técnica com o nome novo
 export const RENOMES = {
@@ -80,7 +83,7 @@ export const RENOMES = {
   'Faísca Canalizada': ['Vontade Canalizada', 'O foco concentra a vontade num ponto que fere.'], 'Tempestade de Elos': ['Turbilhão de Elos'], 'Marca de Fogo': ['Marca do Chicote', 'Um estalo certeiro que deixa um risco vermelho no alvo.'],
   'Fumaça de Fuga': ['Pó de Fuga', 'Uma bolinha estoura no chão e o corpo some no pó.'], 'Passo de Sombra': ['Passo Mudo'], 'Kunai Envenenado': ['Kunai Serrilhado', 'A ponta serrilhada abre a carne.'],
   'Malabares em Chamas': ['Malabares de Lâminas', 'Lâminas voando por cima da cabeça de todos.'], 'Trovão de Tambores': ['Estrondo de Tambores'],
-  'Cantiga de Ninar': ['Cantiga Entorpecente'], 'Canção de Ninar Vil': ['Canção Entorpecente'],
+  'Cantiga de Ninar': ['Cantiga Entorpecente'], 'Reflexo na Água': ['Reflexo Lunar'], 'Canção de Ninar Vil': ['Canção Entorpecente'],
 };
 // descrições que falavam do elemento de outro dono (o nome fica)
 export const DESCRICOES = {
@@ -92,7 +95,12 @@ export const DESCRICOES = {
   'Presente do Caos': 'Energia: o caos escapa da pele em fios que escolhem sozinhos.', 'Página Marcada': 'Abre o grimório na página certa, e a página obedece.',
 };
 // na descrição, só as palavras que não têm uso comum viram regra (eletricidade e radiação)
-const DESC = { indra: /\b(elétric\w*|eletricidade|trovão|trovões|relâmpago\w*|faíscas?)\b/i, hiruko: /\b(radiação|radioativ\w*)\b/i };
+const DESC = mapa({ indra: /\b(elétric\w*|eletricidade|trovão|trovões|relâmpago\w*|faíscas?)\b/i, hiruko: /\b(radiação|radioativ\w*)\b/i });
+// duplicadas (mesmo setor, camada e mecânica): a de cá some e quem a tinha recebe a de lá
+export const FUNDIDAS = { 'Faro de Demônio': 'Concentração Total', 'Cinza Quente': 'Brasa Persistente', 'Água de Templo': 'Toque Solar', 'Gota Afiada': 'Sangria',
+  'Hemorragia': 'Corte Venoso', 'Contaminar': 'Isótopo Instável', 'Tesoura de Aço': 'Estocada' };
+// duplicadas que valem a pena manter, diferenciadas
+const AJUSTES = { 'Meteoro Telúrico': { fx: 'st down 1 50%', d: 'Arranca um pedaço do chão e arremessa: quem leva vai ao chão.' } };
 // combinações que já existiam sem marcar o Vínculo parceiro
 const COMBINA = { 'Raio Solar': 'amaterasu', 'Vento Incendiário': 'kagutsuchi' };
 
@@ -119,16 +127,18 @@ function limparFx(el, s, fx) {
 }
 
 export function temas(TREE) {
+  for (const t of Object.values(TREE)) for (const b of t.branches) for (let i = b.length - 1; i >= 0; i--) if (FUNDIDAS[b[i].n]) b.splice(i, 1);
   const todos = []; for (const [el, t] of Object.entries(TREE)) for (const b of t.branches) for (const s of b) todos.push([el, s, b]);
   const nomes = new Set(todos.map(([, s]) => s.n));
   for (const [velho, [novo]] of Object.entries(RENOMES)) { if (!nomes.has(velho)) throw new Error(`temas: "${velho}" não existe na árvore`); if (nomes.has(novo)) throw new Error(`temas: "${novo}" já existe`); }
-  const ren = n => RENOMES[n]?.[0] || n, renL = v => v && String(v).split('|').map(ren).join('|');
+  const ren = n => RENOMES[n]?.[0] || FUNDIDAS[n] || n, renL = v => v && String(v).split('|').map(ren).join('|');
   for (const [el, s, b] of todos) {
     const r = RENOMES[s.n]; if (r) { s.n = r[0]; if (r[1]) s.d = r[1]; }
     for (const k of ['pre', 'combo', 'duo', 'amp']) if (s[k]) s[k] = renL(s[k]);
     if (b.de) b.de = ren(b.de);
     if (COMBINA[s.n]) s.v2 = COMBINA[s.n];
     if (DESCRICOES[s.n]) s.d = DESCRICOES[s.n];
+    if (AJUSTES[s.n]) Object.assign(s, AJUSTES[s.n]);
     const casa = el === 'armas' ? 'armas' : el;
     if (s.fx) s.fx = limparFx(casa, s, s.fx); if (s.rx && !/\brs\b/.test(s.fx || '')) s.rx = limparFx(casa, s, s.rx);
     if (s.st && !pode(casa, s.st, s)) s.st = troca(casa, s.st);
