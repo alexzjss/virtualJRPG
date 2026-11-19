@@ -7,8 +7,9 @@ import { LEVA10K } from './leva10k.js';
 import { LEVA10S } from './leva10s.js';
 import { LEVA10A } from './leva10a.js';
 import { LEVA10I } from './leva10i.js';
+import { LEVA10F } from './leva10f.js';
 
-export const LEVA10 = { ...LEVA10K, ...LEVA10S, ...LEVA10A, ...LEVA10I };
+export const LEVA10 = { ...LEVA10K, ...LEVA10S, ...LEVA10A, ...LEVA10I, ...LEVA10F };
 
 // base → nós novos. Herdam do primeiro nó da linha o atributo, o tipo de aura (cat) e a arma exigida (req).
 export function completar(TREE) {
