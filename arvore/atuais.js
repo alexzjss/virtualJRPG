@@ -11,6 +11,8 @@ export const ATUAIS = new Set([
   'Evolução Forçada', 'Intuição', 'Shukoudan', 'Soco da Dualidade', 'Lâmina da Irmandade', 'Clareza',
   'Esquiva Doentia', 'Suplex', 'Inconsciência', 'Força Doentia', 'Teia de Aura', 'Ren: Intensificar',
   'Carregar', 'Punho Reforçado', 'Corpo Reforçado', 'Punho Meteoro',
+  // Shinkai, 18/11/2026 (depois do nivelamento): o ramo de movimento de Indra e os selos
+  'Esquiva de Indra', 'Passo Trovejante', 'Absorver Carga', 'Energizar', 'Cintilação', 'Manto da Tempestade', 'Ketsujutsu', 'Selo de Indra', 'Lâmina de Indra',
 ]);
 
 // Nivelamento de 18/11/2026: o kit atual dos personagens desce UM nível na curva da árvore, para ser o começo da progressão
@@ -71,6 +73,11 @@ const BAL = {
   'Soco da Dualidade': { xp: 35, p: 25, c: 8, rq: { FOR: 52 } },
   // ápice -> avançada
   'Canhão de Aura Gélido': { xp: 40, p: 17, c: 11, ct: 135, area: true, rq: { SAB: 52 }, nb: 2, fx: 'st frozen 1 25%; st wet 2' },
+  // Shinkai: entram pelo mesmo nivelamento. Os números finais vêm da camada (arvore/camadas.js, kit nas camadas 1–5); aqui só
+  // tiram o excesso das formas, que somavam como ápice (Manto, Ketsujutsu), para a escala da camada partir de um ponto sensato
+  'Esquiva de Indra': { xp: 10 }, 'Passo Trovejante': { xp: 15 }, 'Selo de Indra': { xp: 10 }, 'Lâmina de Indra': { xp: 25 },
+  'Absorver Carga': { xp: 20 }, 'Energizar': { xp: 25, fm: 'dur 3; atk 15; agi 12; hit 5' }, 'Cintilação': { xp: 25, fm: 'dur 2; agi 25; def 5' },
+  'Manto da Tempestade': { xp: 30, fm: 'dur 2; agi 25; def 10; ret 12', aw: null }, 'Ketsujutsu': { xp: 30, fm: 'dur 4; atkP 6; hit 12', aw: null },
   // domínios -> domínios menores: duram menos, pesam menos e não pedem o Despertar (a versão plena é a vizinha deles)
   'Mundo do Tsukuyomi': { xp: 80, c: 0, ct: 150, rq: { INT: 55 }, nb: 3, aw: null, dom: 'dur 3; ally hit 6; foe hit -10; tick fear' },
   'Dente-de-leão': { xp: 80, c: 0, ct: 150, rq: { DES: 55 }, nb: 3, aw: null, dom: 'dur 3; ally agi 12; ally hit 6; foe hit -6' },
