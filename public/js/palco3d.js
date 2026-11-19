@@ -66,6 +66,13 @@
     frente: { ry: 180, rx: -12, m: .84 }, // frontal, do lado dos inimigos: vê o rosto do grupo (Dragon Quest, Persona)
     baixa: { ry: -62, rx: 5, m: .82 }     // heroica, rente ao chão, olhando para cima (Persona 5, Xenoblade)
   };
+  // lado da coluna de comandos: o primeiro em que ela (com a lista aberta, largura wr) cabe sem tocar o recorte; sem nenhum, o de mais folga e encolhida (scale .6 a 1)
+  const pickSide = (rect, L, w, wr, gap) => {
+    if (!rect) return { side: 1, scale: 1 };
+    const R = L.width - rect.right - gap - 8, Lf = rect.left - gap - 8;
+    if (R >= wr) return { side: 1, scale: 1 }; if (Lf >= wr) return { side: -1, scale: 1 };
+    const side = R >= Lf ? 1 : -1; return { side, scale: Math.round(clamp(Math.max(R, Lf) / wr, .6, 1) * 100) / 100 };
+  };
   const ZMIN = 420, ZMAX = 1700; // zoom: distância extra mínima e máxima do alvo
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
@@ -86,12 +93,13 @@
     } else if (v.kind === 'table') { // ombro de quem age, olhando o centro de todos; recua até caber a mesa (quem fica atrás do ombro não conta)
       const pts = (v.pts && v.pts.length ? v.pts : [a]), C = pts.reduce((m, p) => ({ x: m.x + p.x / pts.length, z: m.z + p.z / pts.length }), { x: 0, z: 0 });
       let dx = C.x - a.x, dz = C.z - a.z; if (Math.hypot(dx, dz) < 60) { dx = 0; dz = v.foe ? 1 : -1; }
-      const ln = v.lane && v.lane.w > 0 && (v.w || 1440) >= 900 ? v.lane : null, SX = clamp(-200 - (ln ? ln.side * ln.w * .29 : 0), -(v.w || 1440) * .3, (v.w || 1440) * .3), ZF = 420, k = ((v.w || 1440) / 2 * .82) / PERSP, L = Math.hypot(dx, dz); // ombro: quem age fica à esquerda (SX) e o centro da mesa no meio da tela; a faixa da coluna de comandos empurra o ator para o lado oposto
+      const ln = v.lane && v.lane.w > 0 && (v.w || 1440) >= 900 ? v.lane : null, SX = -200, ZF = 420, k = ((v.w || 1440) / 2 * .82) / PERSP, L = Math.hypot(dx, dz); // ombro: quem age fica à esquerda (SX) e o centro da mesa no meio da tela; a faixa da coluna de comandos empurra o ator para o lado oposto
       const ry = Math.round((Math.atan2(dx, -dz) + Math.asin(clamp(SX / Math.max(L, 1), -.6, .6))) * 1800 / Math.PI) / 10, A = rotP(a, ry);
       const tx = SX - A.x, tz0 = ZF - A.z; let b = 0;
       for (const p of pts) { const q = rotP(p, ry); if (q.z > A.z + 300) continue; b = Math.max(b, q.z + tz0 - PERSP + Math.abs(q.x + tx) / k); if (p.h > 380) b = Math.max(b, p.h * PERSP / ((v.h || 860) * .5) - PERSP + q.z + tz0); } // figura alta: a cabeça projetada cabe na metade de cima do quadro (recua a câmera)
       b = clamp(Math.ceil(b / 10) * 10, 0, 1400);
       r = { tx, ty: Math.round(b * .08), tz: tz0 - b, ry };
+      if (ln) { const ka = PERSP / Math.max(160, PERSP - (A.z + r.tz)); r.tx = tx - ln.side * Math.min(ln.w * .55, (v.w || 1440) * .25) / ka; } // a faixa da coluna: o ator sai da frente dela, em pixels de tela (ka: escala do ator depois do recuo)
     } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x, ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 1.2), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
     else if (v.kind === 'orbit') { const ry = (v.ry0 || 0) + (v.deg || 0), A = rotP(a, ry); r = { tx: -A.x, ty: -60, tz: -A.z - 620 - (v.back || 0), ry }; } // arco cinematográfico em volta de quem age
     else if (v.kind === 'aim') r = { tx: -(a.x * .55 + t.x * .45) - 120, ty: 0, tz: -a.z + 380, ry: a.x < 0 ? -4 : 4 };
@@ -158,7 +166,7 @@
   const QCYCLE = ['auto', 'high', 'medium', 'low'], QNAME = { auto: 'Auto', high: 'Alta', medium: 'Média', low: 'Baixa' };
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
-  const P = { lane: { w: 0, side: 1 }, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { lane: { w: 0, side: 1 }, pickSide, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let floor = null, rl = null, rb = null, floorKey = '', root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', biomeClass = '', settle = 0, hs1 = 0, hs2 = 0;

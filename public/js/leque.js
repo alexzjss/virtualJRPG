@@ -59,17 +59,21 @@ const LEQUE = (() => {
   const GAP = 22, DEAD = 40; // DEAD: px que o herói anda antes da coluna ir atrás
   // step(snap): mede e posiciona; snap pula a suavização (aba em segundo plano, onde o requestAnimationFrame não roda)
   const step = (snap = false) => {
-    const lq = app.querySelector('.lq'), m = lq?.querySelector('.lqm'); if (!lq || !m || !cx) { fol.id = null; return false; }
+    const lq = app.querySelector('.lq'), m = lq?.querySelector('.lqm'); if (!lq || !m || !cx) { fol.id = null; PALCO3D.lane.w = 0; return false; }
     const r = PALCO3D.rectOf(cx.actor.id), L = lq.getBoundingClientRect(), mi = m.firstElementChild.getBoundingClientRect();
     if (!L.width) return true;
     // sem recorte na tela (câmera de longe, fora do quadro): fica no meio, um pouco à direita
     const rl = r && r.width ? r.left - L.left : L.width * .45, rr = r && r.width ? r.right - L.left : L.width * .45, rt = r && r.height ? r.top - L.top : L.height * .4, rh = r && r.height ? r.height : 0;
     // o lado escolhe pela largura com a lista aberta (reserva), para abrir Skills não trocar de lado
-    const w = mi.width, h = mi.height, hk = mi.width / (m.firstElementChild.offsetWidth || 1), wr = Math.max(w, 560 * hk), fitR = rr + GAP + wr <= L.width - 8, fitL = rl - GAP - wr >= 8;
-    const side = fitR ? 1 : fitL ? -1 : (L.width - rr > rl ? 1 : -1); // à direita do ombro quando cabe; senão à esquerda; senão onde houver mais espaço
+    // largura/altura SEM a escala de encolher (fol.s): o lado e a escala saem do recorte, sem realimentar a medida
+    const s0 = fol.s || 1, hk = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) || .64, w0 = mi.width / s0, wr = Math.max(w0, 560 * hk), gap = GAP + rh * .04; // o espaço entre coluna e corpo cresce com o recorte
+    const pk = PALCO3D.pickSide({ left: rl, right: rr }, { width: L.width }, w0, wr, gap), side = pk.side, s = pk.scale;
+    if (s !== fol.s) { fol.s = s; lq.style.setProperty('--hk', s < 1 ? (hk * s).toFixed(3) : ''); }
+    const w = w0 * s, h = mi.height / s0 * s;
+    { const ln = PALCO3D.lane, lw = Math.round(wr * s); if (ln.w !== lw || ln.side !== side) { ln.w = lw; ln.side = side; if (typeof render === 'function' && !state.busy) { state.busy = true; setTimeout(() => { state.busy = false; render(); }, 0); } } } // a câmera reserva a faixa: só re-enquadra quando muda
     if (fol.id !== cx.actor.id || side !== fol.side) { fol.id = cx.actor.id; fol.x = fol.tx = null; } fol.side = side;
     // fol.x guarda a borda voltada para o herói (esquerda à direita do ombro; direita no lado espelhado): abrir a lista muda a largura sem deslizar a coluna
-    const sx = side > 0 ? 0 : w, x = Math.max(8, Math.min(L.width - w - 8, side > 0 ? rr + GAP : rl - GAP - w)) + sx;
+    const sx = side > 0 ? 0 : w, x = Math.max(8, Math.min(L.width - w - 8, side > 0 ? rr + gap : rl - gap - w)) + sx;
     const y = Math.max(8, Math.min(L.height - h - 8, rt + rh * .22));
     const hold = ['skills', 'items', 'all'].includes(state.mode); // navegando numa lista: a coluna fica parada para o clique não errar
     // suave e com zona morta: a deriva da câmera parada e a tremida do impacto não mexem a coluna (fica fácil de clicar)
@@ -94,7 +98,7 @@ const LEQUE = (() => {
     if (!fol.raf) fol.raf = requestAnimationFrame(follow);
     queueMicrotask(() => step(performance.now() - fol.last > 250)); // logo depois do desenho entrar na página, sem esperar o próximo quadro
     if (!fol.tmo) fol.tmo = setTimeout(function reserva() { fol.tmo = 0; const idle = performance.now() - fol.last > 250; if (step(idle) !== false && idle) fol.tmo = setTimeout(reserva, 300); }, 300); // reserva enquanto o requestAnimationFrame está parado
-    return `<div class="lq ${fol.side < 0 ? 'l' : ''}" aria-label="Comandos de ${esc(cx.actor.name)}"><div class="lqa lqm" style="${pos(fol.x == null ? null : fol.l, fol.y)}"><div class="lqin"><div class="lqc">${main}</div>${sub ? `<div class="lqsub" style="--row:${row}">${sub}</div>` : ''}</div></div>`
+    return `<div class="lq ${fol.side < 0 ? 'l' : ''}" ${fol.s < 1 ? `style="--hk:${(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) * fol.s).toFixed(3)}"` : ''} aria-label="Comandos de ${esc(cx.actor.name)}"><div class="lqa lqm" style="${pos(fol.x == null ? null : fol.l, fol.y)}"><div class="lqin"><div class="lqc">${main}</div>${sub ? `<div class="lqsub" style="--row:${row}">${sub}</div>` : ''}</div></div>`
       + (turn ? `<div class="lqa lqt" style="${pos(fol.tx == null ? null : fol.tl, fol.ty)}"><div class="lqin">${turn}</div></div>` : '') + '</div>';
   };
 

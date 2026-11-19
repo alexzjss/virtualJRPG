@@ -1705,6 +1705,14 @@ test('palco 3D: zoom e mesa respeitam a altura real e a faixa da coluna', async 
   for (const v of [R, L, mk(1200, { w: 420, side: 1 })]) assert.ok(Number.isFinite(v.tx) && Number.isFinite(v.tz) && v.tz > -9000);
   const one = P.cameraFor({ kind: 'table', at: { x: 0, z: 0, h: 1200 }, pts: [{ x: 0, z: 0, h: 1200 }], w: 1440, h: 860 }); assert.ok(Number.isFinite(one.tz) && one.tz > -9000, 'um combatente gigante');
 });
+test('palco 3D: a coluna de comandos escolhe o lado que cabe e encolhe só se nenhum couber', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, L = { width: 1440 };
+  assert.deepEqual(P.pickSide({ left: 100, right: 300 }, L, 200, 420, 22), { side: 1, scale: 1 });
+  assert.deepEqual(P.pickSide({ left: 1100, right: 1300 }, L, 200, 420, 22), { side: -1, scale: 1 });
+  const big = P.pickSide({ left: 300, right: 1100 }, L, 200, 420, 22); assert.equal(big.side, 1); assert.ok(big.scale < 1 && big.scale >= .6, 'recorte enorme: encolhe, nunca abaixo de .6');
+  assert.deepEqual(P.pickSide(null, L, 200, 420, 22), { side: 1, scale: 1 });
+  const tiny = P.pickSide({ left: 0, right: 1400 }, { width: 1440 }, 200, 420, 22); assert.ok(tiny.scale === .6 && Number.isFinite(tiny.side));
+});
 test('palco 3D: chefe no centro ao fundo, lacaios abrindo o arco, ninguém colado', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, fr = P.frame({ a: 0, cx: 0, cy: 0, d: 8 }, 20, 10);
   const F = P.formation([{ id: 'h' }, { id: 'b', enemy: true, boss: true }, { id: 'm1', enemy: true }, { id: 'm2', enemy: true }, { id: 'm3', enemy: true }], fr);
