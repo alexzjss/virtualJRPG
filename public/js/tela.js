@@ -1,3 +1,7 @@
+// setApp: só troca o DOM quando o HTML gerado mudou (estados repetidos pelo túnel não redesenham nada); o nó guardado detecta quem trocou o #app por fora (login)
+let appHtml = '', appNode = null;
+const setApp = h => { const x = gridFull && S.chars[gridFull] ? `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>` : ''; h += x;
+  if (h === appHtml && appNode && appNode === app.firstElementChild && appNode.isConnected) return false; app.innerHTML = h; appHtml = h; appNode = app.firstElementChild; return true; };
 let gmWasB = null, gmFocus = null, lastHero = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
 function render() {
   const ae = document.activeElement;
@@ -54,7 +58,7 @@ function render() {
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
     dockFix();
     const body = { ...xWins(), ...(gui.sheet && ent(gui.sheet.slice(2)) ? { [gui.sheet]: gmSheet(ent(gui.sheet.slice(2))) } : {}), pedidos: gui.R === 'pedidos' && sideOpen('R') ? reqStrip() : '', sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
-    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, ((lq) => HUD.gm() + lq)(bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '')) : null; app.innerHTML = `${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '', mesa: gui.view === 'mesa' ? MESA.html() : '' })}${cropper()}${ctxMenu()}`;
+    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, ((lq) => HUD.gm() + lq)(bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '')) : null; setApp(`${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '', mesa: gui.view === 'mesa' ? MESA.html() : '' })}${cropper()}${ctxMenu()}`);
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], _hs = c && !asWho && c.id !== lastHero && (lastHero = c.id, send({ t: 'activeHero', id: c.id })), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) { pg = 'mesa'; if (innerWidth > 700) chatOpen = false; navOpen = false; } // a batalha começou: leva o jogador para a mesa (no PC o chat só abre por cima, quando pedido)
@@ -67,14 +71,13 @@ function render() {
     const pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
     if (chatOpen) chatSeen = S.seq;
     lastPg = pg + (c?.id || '');
-    app.innerHTML = `<header class="top ${bat3 ? 'bat3' : ''}"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
+    setApp(`<header class="top ${bat3 ? 'bat3' : ''}"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
       <nav class="tnav" aria-label="Páginas">${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}" ${pg === k ? 'aria-current="page"' : ''}>${ico(k)}<span>${k === 'mesa' && b ? 'Batalha' : l}</span></button>`)}<button class="tchat ${chatOpen ? 'on' : ''}" data-a="chatT" aria-pressed="${chatOpen}">${ico('chat')}<span>Chat</span>${unread ? `<i class="bdg">${unread > 9 ? '9+' : unread}</i>` : ''}</button></nav>
       <div class="me"><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? `<div class="pop"><button data-a="mute">${snd.mute ? 'Ligar som' : 'Desligar som'}</button><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>` : ''}</div></header>
       ${ctl ? `<div class="peek ctl">Você está <b>jogando por ${esc(asWho)}</b>: o que fizer aqui acontece na hora, sem passar pela fila de pedidos.</div>` : asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
-      <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg} ${bat3 ? 'bat3' : ''}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`;
+      <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg} ${bat3 ? 'bat3' : ''}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`);
     lastReq = (myReq() || [])[0] || null;
-  } else app.innerHTML = `<main>${chaseBar()}${b ? battle(false, innerWidth > 700 ? HUD.html({ table: true }) : '') : map() + party()}</main>`;
-  if (gridFull && S.chars[gridFull]) app.insertAdjacentHTML('beforeend', `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>`);
+  } else setApp(`<main>${chaseBar()}${b ? battle(false, innerWidth > 700 ? HUD.html({ table: true }) : '') : map() + party()}</main>`);
   { const maps = skMount ? app.querySelectorAll(`.skmap[data-cid="${skMount.key}"]`) : [], skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes; uma por vez (a última aberta)
     if (skm && skMount) { MANDALA.mount(skm, skMount); skMount.fresh.forEach(id => MANDALA.learned(id)); } }
   if (editFocus) { editFocus = false; const el = app.querySelector('.edin'); if (el) { el.focus(); el.select(); } }

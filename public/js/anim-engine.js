@@ -9,6 +9,7 @@
   const ctx = cvs.getContext('2d', { alpha: true, desynchronized: true });
   const ELS = g.ANIM_PROFILES.PALETTES;
   const defaults = { quality: localStorage.getItem('vj_anim_quality') || 'auto', speed: +(localStorage.getItem('vj_anim_speed') || 1), flashes: localStorage.getItem('vj_anim_flash') !== '0' };
+  let lastP = 0; const qEvt = () => { try { dispatchEvent(new Event('vj-quality')); } catch {} };
   let dpr = 1, W = 0, H = 0, raf = 0, last = 0, fps = 60, autoLow = false, effects = [], persist = [], seq = 0, mA = 1;
   const clockNow = () => typeof g.CENA !== 'undefined' ? g.CENA.now() : performance.now(); // tempo virtual: hitstop e câmera lenta valem para o canvas
   const later = ms => typeof g.CENA !== 'undefined' ? g.CENA.wait(ms) : new Promise(res => setTimeout(res, ms));
@@ -158,7 +159,9 @@
     }
   }
   function frame(now) {
-    raf = 0; resize(); if (last) { const inst = 1000 / Math.max(1, now - last); fps = fps * .94 + inst * .06; if (defaults.quality === 'auto') autoLow = fps < 43 ? true : fps > 56 ? false : autoLow; } last = now;
+    raf = 0;
+    if (!effects.length && !extras.length && now - lastP < 33) { raf = requestAnimationFrame(frame); return; } // só os anéis persistentes: 30 fps bastam
+    lastP = now; resize(); if (last) { const inst = 1000 / Math.max(1, now - last); fps = fps * .94 + inst * .06; if (defaults.quality === 'auto' && (effects.length || extras.length)) { const was = autoLow; autoLow = fps < 43 ? true : fps > 56 ? false : autoLow; if (was !== autoLow) qEvt(); } } last = now;
     const vt = clockNow(); ctx.clearRect(0, 0, W, H); drawPersistent(vt);
     effects = effects.filter(e => { drawOne(e, vt); return vt < e.start + e.profile.duration; });
     extras = extras.filter(x => { const k = clamp((vt - x.start) / x.dur); x.draw(k); return k < 1; });
@@ -183,11 +186,13 @@
       ribbon([{ x: x0 - len / 2, y }, { x: x0, y: y - 6 }, { x: x0 + len / 2, y: y + 3 }], 10 * (1 - k * .7) * sc, i % 2 ? color : INK, 1 - k, 0, sd + i); } }); }
   function sync() {
     const B = g.S?.battle; if (!B?.active) { persist = []; return; }
-    persist = Object.values(g.S.chars || {}).filter(c => c.id in B.ticks && c.hp > 0).map(c => ({ id: c.id, el: typeof g.mainEl === 'function' ? g.mainEl(c) : 'fis', shield: !!c.shield, form: !!c.form, states: Object.keys(c.st || {}) })); kick();
+    persist = Object.values(g.S.chars || {}).filter(c => c.id in B.ticks && c.hp > 0 && (c.form || Object.keys(c.st || {}).length)).map(c => ({ id: c.id, el: typeof g.mainEl === 'function' ? g.mainEl(c) : 'fis', shield: !!c.shield, form: !!c.form, states: Object.keys(c.st || {}) })); if (persist.length && qLevel() >= .5 && !reduced()) kick(); // só quem tem forma ou condição desenha algo
   }
   function flash(color = '#fff', ms = 100) { if (!defaults.flashes || reduced()) return; const e = document.createElement('i'); e.className = 'animfx-flash'; e.style.cssText = `--af:${color};--ad:${ms}ms`; document.body.append(e); setTimeout(() => e.remove(), ms + 80); }
-  const setQuality = v => { if (!['auto', 'low', 'medium', 'high'].includes(v)) return; defaults.quality = v; localStorage.setItem('vj_anim_quality', v); resize(); kick(); };
+  const setQuality = v => { if (!['auto', 'low', 'medium', 'high'].includes(v)) return; defaults.quality = v; try { localStorage.setItem('vj_anim_quality', v); } catch {} resize(); kick(); qEvt(); };
+  // nível efetivo para o palco 3D: low | medium | high (auto começa em médio e cai para baixo se o fps cair nos golpes)
+  const level = () => defaults.quality === 'auto' ? (autoLow ? 'low' : 'medium') : defaults.quality;
   const setSpeed = v => { defaults.speed = clamp(+v || 1, .5, 2); localStorage.setItem('vj_anim_speed', defaults.speed); };
   const setFlashes = v => { defaults.flashes = !!v; localStorage.setItem('vj_anim_flash', v ? '1' : '0'); };
-  g.ANIMFX = { sparks, ink, play, profile, sync, flash, setQuality, setSpeed, setFlashes, settings: defaults, familyOf, palette: ELS };
+  g.ANIMFX = { level, sparks, ink, play, profile, sync, flash, setQuality, setSpeed, setFlashes, settings: defaults, familyOf, palette: ELS };
 })();

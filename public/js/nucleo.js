@@ -54,6 +54,7 @@ const loginForm = msg => { // gm: só a chave; jogador: login e senha; mesa: con
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const send = o => ws.readyState === 1 && ws.send(JSON.stringify(o));
+let netRaf = 0; const netRender = () => { if (document.hidden) { cancelAnimationFrame(netRaf); netRaf = 0; return render(); } if (!netRaf) netRaf = requestAnimationFrame(() => { netRaf = 0; render(); }); };
 const mine = c => gm || (role === 'player' && c.owner === name);
 const eq = (c, slot) => slot === 'arma' && c.st?.disarm ? undefined : S.items[c.equip[slot]];
 const lvl = (c, k) => { const d = c.body[k] || 0; return d >= c.hpMax * .3 ? 2 : d >= c.hpMax * .15 ? 1 : 0; };
@@ -153,7 +154,8 @@ function connect() {
   ws.onmessage = e => {
     let m; try { m = JSON.parse(e.data); } catch { return; }
     if (m.t === 'defs') { DEFS = m.d; DEFV = m.v; return; }
-    if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; syncOfi(); if (gm && window.vjOpenAfterState) { const q = window.vjOpenAfterState, id = typeof q === 'string' ? q : S.bestiary?.[q.id] ? q.id : Object.keys(S.bestiary || {}).find(k => !q.before.includes(k)); if (id && S.bestiary?.[id]) { gOpen('f_' + id); window.vjOpenAfterState = ''; } } render(); }
+    // vários estados no mesmo instante (rajada pelo túnel) viram um desenho só, no próximo quadro; aba escondida desenha já (sem rAF)
+    if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; syncOfi(); if (gm && window.vjOpenAfterState) { const q = window.vjOpenAfterState, id = typeof q === 'string' ? q : S.bestiary?.[q.id] ? q.id : Object.keys(S.bestiary || {}).find(k => !q.before.includes(k)); if (id && S.bestiary?.[id]) { gOpen('f_' + id); window.vjOpenAfterState = ''; } } netRender(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }
     if (m.t === 'sfx') playSfx(m.k);
     if (m.t === 'note') { if (m.id && gm && wf.d) wf.id = m.id; /* arma salva na Forja: continua editando ela */ toast(m.text, m.kind, m.why); if (m.kind === 'no') navigator.vibrate?.(120); }
