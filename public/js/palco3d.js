@@ -379,7 +379,7 @@
   P.follow = (fromId, toIds = [], ms = 500) => { const F = lastF; if (!live() || reducedM() || !F?.get(fromId) || toIds.filter(id => id !== fromId && F.get(id)).length !== 1) return;
     camLock = shotOf(fromId, toIds, 1); holdEnd = Math.max(holdEnd, performance.now() + ms + 400); world.classList.add('fast'); world.style.setProperty('--lg', Math.max(260, ms) + 'ms'); camera(F); };
   // impacto no recorte: tremida curta (classe hurt por 450 ms)
-  P.shake = id => { const u = els.get(id); if (!u) return; u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };
+  P.shake = id => { const u = els.get(id); if (!u) return; if (g.LUZ?.corpo?.has(id)) g.LUZ.corpo.flash(id); u.el.classList.remove('hurt'); void u.el.offsetWidth; u.el.classList.add('hurt'); clearTimeout(u.hurtT); u.hurtT = setTimeout(() => u.el.classList.remove('hurt'), 450); };
   const reducedM = () => matchMedia('(prefers-reduced-motion: reduce)').matches, live = () => !!root && root.style.display !== 'none';
   P.quake = (amp, dir = 1) => { if (!shk || !amp || reducedM() || typeof PFX === 'undefined') return; shk.animate(PFX.shakeKeys(amp, dir), { duration: 320, easing: 'ease-out' }); }; // o mundo treme na direção do golpe
   let vigT = 0; P.vignette = ms => { if (!root) return; root.classList.add('vinheta'); clearTimeout(vigT); vigT = setTimeout(() => root.classList.remove('vinheta'), ms); };
@@ -387,6 +387,7 @@
   P.recoil = (id, fromId, pct, crit) => { const u = els.get(id), a = lastF?.get(fromId), b = lastF?.get(id); P.shake(id); if (!u || !b || reducedM() || typeof PFX === 'undefined') return;
     const v = PFX.recoilVec(a && fromId !== id ? a : b, b, pct, crit), st = u.el.style; u.el.classList.add('rc'); st.transition = 'none'; st.setProperty('--rx', v.dx); st.setProperty('--rz', v.dz); st.setProperty('--tilt', v.tilt + 'deg'); void u.el.offsetWidth; st.transition = '';
     clearTimeout(u.rcT); u.rcT = setTimeout(() => { st.setProperty('--rx', 0); st.setProperty('--rz', 0); st.setProperty('--tilt', '0deg'); setTimeout(() => u.el.classList.remove('rc'), 320); }, 140);
+    if (g.LUZ?.corpo?.has(id)) { const sa = rectOfU(fromId), sb = u.el.getBoundingClientRect(); g.LUZ.corpo.play(id, v.kneel ? 'hurt' : 'hit', { dir: sa ? Math.sign(sa.left + sa.width / 2 - sb.left - sb.width / 2) || 1 : 1 }); }
     if (v.kneel) { u.el.classList.add('kneel'); clearTimeout(u.knT); u.knT = setTimeout(() => u.el.classList.remove('kneel'), 400); } };
   const orbitTo = (at, deg, ms, back = 0) => new Promise(res => { if (!live() || !at || reducedM()) return res(); camLock = cameraFor({ kind: 'orbit', at, ry0: camRy, deg, back }); holdEnd = performance.now() + ms + 200;
     world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(lastF); setTimeout(() => { res(); unlock(400); }, ms); });
@@ -394,8 +395,9 @@
   P.orbitGroup = (ids, deg, ms) => { const ps = ids.map(id => lastF?.get(id)).filter(Boolean); return ps.length ? orbitTo({ x: ps.reduce((t, p) => t + p.x, 0) / ps.length, z: ps.reduce((t, p) => t + p.z, 0) / ps.length }, deg, ms, 400) : Promise.resolve(); };
   // luz do elemento: quem está perto do impacto se tinge, e um clarão pinta o chão
   P.light = (id, color) => { const c = lastF?.get(id); if (!c || !live() || typeof PFX === 'undefined') return;
-    for (const { id: j, k } of PFX.litUnits(lastF, c)) { const u = els.get(j); if (!u) continue; u.el.style.setProperty('--lit', color); u.el.style.setProperty('--litk', k); u.el.classList.add('lit'); clearTimeout(u.litT); u.litT = setTimeout(() => u.el.classList.remove('lit'), 500); }
+    for (const { id: j, k } of PFX.litUnits(lastF, c)) { const u = els.get(j); if (!u) continue; if (g.LUZ?.corpo?.has(j)) { g.LUZ.corpo.tint(j, color, k, 500); continue; } u.el.style.setProperty('--lit', color); u.el.style.setProperty('--litk', k); u.el.classList.add('lit'); clearTimeout(u.litT); u.litT = setTimeout(() => u.el.classList.remove('lit'), 500); }
     const f = el('i', 'flare', atw); f.style.cssText = `--lit:${color};transform:translate3d(${c.x}px,-2px,${c.z}px) translate(-50%,-50%) rotateX(90deg)`; setTimeout(() => f.remove(), 520); };
+  const rectOfU = id => els.get(id)?.el.getBoundingClientRect() || null;
   P.linger = ms => { lingerUntil = Math.max(lingerUntil, performance.now() + ms); };
   P.unitOf = id => els.get(id) || null;
   P.posOf = id => lastF?.get(id) || null;

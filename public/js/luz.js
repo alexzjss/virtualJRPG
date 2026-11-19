@@ -156,9 +156,12 @@
     nB[ly] = n; lst.length = 0; gl.bindBuffer(gl.ARRAY_BUFFER, bufB[ly]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, dataB[ly], 0, n * STRIDE); };
   const drawB = ly => { if (!nB[ly]) return; gl.bindVertexArray(vaoB[ly]); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, nB[ly]); };
   const bindProg = now => { gl.useProgram(prog); gl.uniform2f(uRes, L.W, L.H); gl.uniform1f(uNow, now / 1000); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(uTex, 0); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); };
-  L.bindSprites = bindProg; let lastNow = 0;
+  L.bindSprites = bindProg; let lastNow = 0, lastDrawT = 0;
   function frame(t) {
     raf = 0; if (!gl || lost) return;
+    // só os corpos parados na tela (sem efeito, sem partícula, câmera parada): 30 fps bastam
+    if (frameFns.size === 0 && clockNow() >= deathP && L.bodiesIdle?.() && t - lastDrawT < 33) { raf = requestAnimationFrame(frame); return; }
+    lastDrawT = t;
     if (!L.active()) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); return; }
     const now = clockNow(), dt = Math.min(64, now - (lastNow || now)); lastNow = now;
     if (lastT) { const inst = 1000 / Math.max(1, t - lastT); fps = fps * .94 + inst * .06; } lastT = t;
@@ -181,6 +184,7 @@
   }
   const kick = () => { if (!raf && gl && !lost) raf = requestAnimationFrame(frame); };
   L.kick = kick;
+  L.step = t => { cancelAnimationFrame(raf); raf = 0; frame(t ?? performance.now()); }; // um quadro na mão (inspeção com a aba em segundo plano)
   const qEvt = () => { if (gl && !lost) sizeParticles(); mark(); try { dispatchEvent(new Event('vj-quality')); } catch {} };
 
   // ----- geometria dos recortes (igual ao motor antigo: âncoras salvas em fxK, pé, núcleo, escala) -----
@@ -225,7 +229,7 @@
   // ----- fachada -----
   const F = { ...C, settings, palette: C.palette, familyOf: C.familyOf, profile: C.profile, play, sparks,
     level: () => L.active() ? level() : C.level(),
-    sync: () => { battleEdge(); if (!L.active()) C.sync(); },
+    sync: () => { battleEdge(); if (!L.active()) C.sync(); else kick(); },
     ink: (r, color, ms) => C.ink(r, color, ms), // tinta do KO: o motor novo troca por fagulhas (luz-fx)
     flash: (color, ms) => C.flash(color, ms),
     setQuality: v => { C.setQuality(v); if (gl && !lost) sizeParticles(); mark(); kick(); },

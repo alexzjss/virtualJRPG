@@ -15,3 +15,13 @@ test('LUZP: orçamento, motor, duração e promessas', () => {
   assert.equal(L.duration(P, { speed: 1, reduced: true, sig: 'ult' }), 400);
   assert.deepEqual(L.promiseTimes(P, 2500), { impact: Math.round(2500 * P.impact), done: 2500 });
 });
+
+test('LUZP: malha só com imagem utilizável; curvas voltam ao repouso; idle só no topo', () => {
+  assert.equal(L.meshable({ src: '/img/a.png', sameOrigin: true, loaded: true }), true);
+  for (const o of [{ src: '' }, { sameOrigin: false }, { loaded: false }]) assert.equal(L.meshable({ src: '/img/a.png', sameOrigin: true, loaded: true, ...o }), false);
+  for (const k of ['projectile', 'beam', 'slash', 'smash', 'pierce', 'dash', 'area', 'rain', 'ritual', 'summon', 'psychic', 'musical', 'heal', 'barrier', 'form', 'hit', 'dodge', 'parry', 'hurt', 'limit', 'vit', 'foge'])
+    for (const t of [0, 1]) assert.deepEqual(L.bodyCurve(k, t), { bend: 0, squash: 0, twist: 0, dx: 0, dy: 0, shake: 0 }, k + '@' + t);
+  assert.ok(Math.abs(L.bodyCurve('ko', 1).bend) >= 1.3);
+  assert.ok(L.bodyCurve('smash', .3).squash !== 0, 'smash tem antecipação');
+  assert.equal(L.idleSway(1.2, 1, .5), 0); assert.ok(Math.abs(L.idleSway(1.2, 1, 1)) <= 3); assert.equal(L.idleSway(1.2, 0, 1), 0);
+});
