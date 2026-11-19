@@ -13,6 +13,8 @@ export const ATUAIS = new Set([
   'Carregar', 'Punho Reforçado', 'Corpo Reforçado', 'Punho Meteoro',
   // Shinkai, 18/11/2026 (depois do nivelamento): o ramo de movimento de Indra e os selos
   'Esquiva de Indra', 'Passo Trovejante', 'Absorver Carga', 'Energizar', 'Cintilação', 'Manto da Tempestade', 'Ketsujutsu', 'Selo de Indra', 'Lâmina de Indra',
+  // Fichas da campanha: técnicas já aprendidas que faltavam no catálogo de âncoras.
+  'Canto do Relâmpago', 'Lança de Trovão', 'Faísca Dupla',
 ]);
 
 // Nivelamento de 18/11/2026: o kit atual dos personagens desce UM nível na curva da árvore, para ser o começo da progressão
@@ -78,6 +80,9 @@ const BAL = {
   'Esquiva de Indra': { xp: 10 }, 'Passo Trovejante': { xp: 15 }, 'Selo de Indra': { xp: 10 }, 'Lâmina de Indra': { xp: 25 },
   'Absorver Carga': { xp: 20 }, 'Energizar': { xp: 25, fm: 'dur 3; atk 15; agi 12; hit 5' }, 'Cintilação': { xp: 25, fm: 'dur 2; agi 25; def 5' },
   'Manto da Tempestade': { xp: 30, fm: 'dur 2; agi 25; def 10; ret 12', aw: null }, 'Ketsujutsu': { xp: 30, fm: 'dur 4; atkP 6; hit 12', aw: null },
+  'Canto do Relâmpago': { xp: 10, p: 8, c: 3, ct: 70 },
+  'Lança de Trovão': { xp: 10, p: 9, c: 3, ct: 75 },
+  'Faísca Dupla': { xp: 10, p: 8, c: 3, ct: 75 },
   // domínios -> domínios menores: duram menos, pesam menos e não pedem o Despertar (a versão plena é a vizinha deles)
   'Mundo do Tsukuyomi': { xp: 80, c: 0, ct: 150, rq: { INT: 55 }, nb: 3, aw: null, dom: 'dur 3; ally hit 6; foe hit -10; tick fear' },
   'Dente-de-leão': { xp: 80, c: 0, ct: 150, rq: { DES: 55 }, nb: 3, aw: null, dom: 'dur 3; ally agi 12; ally hit 6; foe hit -6' },

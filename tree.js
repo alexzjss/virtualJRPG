@@ -4,6 +4,7 @@ import { VINC } from './arvore/vinculos.js';
 import { AURA } from './arvore/aura.js';
 import { OCULTO } from './arvore/oculto.js';
 import { CARTAS } from './arvore/cartas.js';
+import { INDRA_PROGRESSO } from './arvore/indra_progresso.js';
 import { LEVA2A } from './arvore/leva2a.js';
 import { LEVA2B, DOENCA_MAIS } from './arvore/leva2b.js';
 import { LEVA2C } from './arvore/leva2c.js';
@@ -745,6 +746,7 @@ TREE.hiruko.branches.at(-1).push(...DOENCA_MAIS); // ramo da Doença completo
 // leva 2: dois ramos por setor (ofensivo e reações/reforços), com 3 Limites por setor
 for (const L of [LEVA2A, LEVA2B, LEVA2C, LEVA3, LEVA4, LEVA5, LEVA6, LEVA8, LEVA9]) for (const [el, br] of Object.entries(L)) TREE[el].branches.push(...br);
 posicionar(TREE); // arvore/posicao.js: técnicas já usadas pelos jogadores descem, as fortes sobem, e cada uma ganha uma vizinha
+{ const ramo = TREE.indra.branches.find(b => b.some(s => s.n === 'Faísca Dupla')); const i = ramo?.findIndex(s => s.n === 'Faísca Dupla'); if (i >= 0) ramo.splice(i + 1, 0, ...INDRA_PROGRESSO); }
 variar8(TREE); // arvore/leva8e.js: 4 variações de 45 técnicas, na linha de cada uma
 nivelar(TREE); // arvore/nivel.js: evoluções somadas na base e pisos de custo das técnicas fortes
 balancearAtuais(TREE); // arvore/atuais.js: o kit atual dos personagens desce um nível (depois dos pisos, para eles não subirem os números)
