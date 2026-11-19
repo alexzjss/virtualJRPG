@@ -456,14 +456,17 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   }
   const sure = s.fx?.some(f => f.t === 'sure');
   const pr = parryCheck(a, s, t, o, sure); if (pr === 'ok') return false; if (pr === 'bad') o = { ...o, mult: (o.mult || 1) * 1.5 };
-  let rea = pickRea(a, s, t, o, sure, true);
+  // Esquiva (janela, reação ou status) não anula: o golpe sempre acerta, sem crítico, e causa só ×esqMult do dano; o Aparar é quem anula
+  let dodged = false; const dodge = () => { dodged = true; o = { ...o, mult: (o.mult || 1) * RU.CMD.DEF.esqMult }; };
+  if (pr === 'esq') dodge();
+  let rea = dodged ? null : pickRea(a, s, t, o, sure, true);
   if (rea) {
-    if (Math.random() * 100 < rea.rea.v) { log(t.name, `reage com ${rea.name} e esquiva de ${s.name}!`, 'ok', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el } }); return false; }
-    log(t.name, `tenta ${rea.name}, mas não escapa.`, 'bad');
+    if (Math.random() * 100 < rea.rea.v) { dodge(); log(t.name, `reage com ${rea.name} e esquiva em parte de ${s.name}!`, 'ok'); }
+    else log(t.name, `tenta ${rea.name}, mas não escapa.`, 'bad');
   }
-  if (t.st.evade && !s.area && !sure && !o.counter) { delete t.st.evade; log(a.name, `${s.name} → ${t.name}: esquivou!`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } }); return false; }
+  if (!dodged && t.st.evade && !s.area && !sure && !o.counter) { delete t.st.evade; dodge(); log(t.name, `esquiva em parte de ${s.name}!`, 'ok'); }
   const chance = sure ? 95 : int(stat + R.hit - (t.st.root ? 0 : Math.floor(at(t, 'AGI') / 2)) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) - (a.st.blind ? 25 : 0) - (a.st.exaus ? 15 : 0) + (a.st.focus ? 15 : 0) + (a.st.stealth ? 25 : 0) + ma.hit + (climaOf()?.[1].hit || 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
-  if (r > chance) {
+  if (r > chance && !dodged) {
     if (r >= 96) addLimit(a, 20);
     log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } });
     trig(a, 'miss', t);
@@ -473,7 +476,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (!rea) rea = pickRea(a, s, t, o, sure, false); // bloqueio, absorção e revide só quando o golpe acerta
   a.bt ??= {}; if (!a.bt.prey && t.enemy !== a.enemy) a.bt.prey = t.id; // Voto da Presa: o primeiro inimigo ferido
   const wk = !!aim && t.weakPart === aim; // ponto fraco do chefe: dano dobrado
-  const crit = !!o.cx?.crit || r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down, bf = !mental && s.bf > 0 && !!o.cx?.bf; // Black Flash: só no Perfeito do Golpe no tempo
+  const crit = !dodged && (!!o.cx?.crit || r <= Math.max(1, Math.floor(chance / 10) * (a.st.stealth ? 2 : 1) + ma.crit)), mental = s.kind === 'mental', w = t.weak.includes(s.el), rs = t.resist.includes(s.el) || t.vinc.includes(s.el) || eq(t, 'acess')?.el === s.el, down = w && !t.st.down, bf = !mental && s.bf > 0 && !!o.cx?.bf; // Black Flash: só no Perfeito do Golpe no tempo
   if (!a.enemy && t.enemy && (w || t.resist.includes(s.el))) { const L = (S.lore ??= {})[t.tpl || t.name] ??= { w: [], r: [] }, k = w ? 'w' : 'r'; if (!L[k].includes(s.el)) L[k].push(s.el); } // o grupo descobre no acerto, para todo inimigo do mesmo tipo
   a.bt ??= {}; const wu = (s.basic || s.req || s.wpn) && a.up?.[a.equip?.arma], olho = !a.bt.olho && OF.hook(a, 'olho') && !mental0(s) ? OF.hook(a, 'olho') : 0;
   const mt = modsOf(t), pierce = Math.min(100, (s.fx?.find(f => f.t === 'pierce')?.p || 0) + (wu?.living && stageOf(wu.kills) >= 3 && s.basic ? 40 : 0) + olho), rx = reactOf(s, t);
@@ -500,6 +503,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (bf && a.hp > 0) { const v = Math.round(a.auraMax / 4); a.aura = Math.min(a.auraMax, a.aura + v); extra = ` BLACK FLASH! (+${v} Aura)` + extra; }
   if (rx) { rx.on.forEach(k => delete t.st[k]); if (t.hp > 0 && rx.a) applySt(t, rx.a[0], rx.a[1]); extra += ` [Reação: ${rx.n}]`; }
   if (blk) extra += ' [bloqueado]';
+  if (dodged) extra += ' [esquivou: metade do dano]';
   if (t.hp > 0 && !blk) { if (s.st) applySt(t, s.st); if (down) t.st.down = 1; }
   if (wu && t.hp > 0 && !mental && !blk) { // engastes e segundo elemento da liga
     for (const rn of wu.g || []) { const Ru = OF.RUNAS[rn]; if (Ru?.st && Math.random() * 100 < Ru.st[2]) { applySt(t, Ru.st[0], Ru.st[1]); extra += ` [${STN[Ru.st[0]]}: ${rn}]`; } if (Ru?.drain && a.hp > 0) a.hp = Math.min(a.hpMax, a.hp + Math.max(1, Math.round(d * Ru.drain / 100))); }
@@ -509,7 +513,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
   extra += hitFx(a, s, t, { d, stat, blk });
   if (!mental && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(d * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
-  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}) } });
+  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}), ...(dodged ? { esq: 1 } : {}) } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
   if (w) a.bt.wkNow = true;
   if (crit) trig(a, 'crit', t);
@@ -546,7 +550,7 @@ function finPlan(a, hits, tel, beat) {
 function defWindow(a, plan) { // abre a janela para o plano do inimigo, ou devolve null se ninguém pode se defender
   const s = plan.skill === 'atk' ? basicOf(a) : SK(plan.skill), D = RU.CMD.DEF;
   if (!s || !plan.tgs.length || !['dmg', 'mental'].includes(s.kind) || s.fx?.some(f => f.t === 'sure')) return null;
-  const tel = telOf(a, plan.skill), esq = tel || plan.skill === 'atk'; // Esquiva: golpe anunciado ou ataque básico; o resto (Choque, Perfeito, direção) segue só no anunciado
+  const tel = telOf(a, plan.skill), esq = tel; // Esquiva: só golpe anunciado (ataque básico só se apara); o resto (Choque, Perfeito, direção) também
   const ts = plan.tgs.map(id => S.chars[id]).filter(t => t && !t.enemy && t.hp > 0 && !skipping(t) && (esq || (parryable(a, s, t, {}, false) && canPar(t))));
   if (!ts.length) return null;
   const perf = tel && !!a.boss && Math.random() < .2, beat = Math.round(D.beat * (perf ? .8 : 1)), hits = s.hits || 1, { beats, fin } = finPlan(a, hits, tel, beat);
@@ -569,7 +573,7 @@ function chqResolve(a, plan, C) { // o cabo de guerra fechou: quem apertou mais 
     strike(hero, effSkill(hero, key), a, null, 0, { mult: 1.3 }); applySt(a, 'exposed', 2); endTurn(a.id, 100);
   } else { log(hero.name, `CHOQUE perdido: o golpe de ${a.name} passa por cima!`, 'bad', { fx: { id: hero.id, chq: 1 } }); C.xmult = 1.3; runPlan(a, plan); }
 }
-function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'bad' (golpe sai +50%) ou ''
+function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'esq' (esquiva: golpe reduzido), 'bad' (golpe sai +50%) ou ''
   const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
   if (inWin) {
     const v = C.p[t.id][o.beat], fx = { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 };
@@ -578,7 +582,9 @@ function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (g
       else log(t.name, `apara mais uma batida de ${s.name}!`, 'ok', { fx });
       applySt(a, 'exposed', 2); return 'ok'; // 2: o atacante gasta 1 no próprio fim de turno
     }
-    if (v === 'esq') { log(t.name, `ESQUIVA ${s.name} de ${a.name}!`, 'ok', { fx: { ...fx, par: undefined, esq: 1 } }); return 'ok'; }
+    if (v === 'esq') { // esquiva reduz o golpe e cansa: o próximo turno do herói atrasa (1× por janela)
+      const tired = !(C.tired ??= {})[t.id]; if (tired) { C.tired[t.id] = 1; bump(t.id, Math.round(delay(t) * RU.CMD.DEF.esqTired)); }
+      log(t.name, `ESQUIVA ${s.name} de ${a.name}: o golpe perde força!${tired ? ` ${t.name} perde o fôlego e o próximo turno atrasa.` : ''}`, 'ok'); return 'esq'; }
     if (v === 'cedo') { applySt(t, 'exposed', 1); if (!(C.esq ?? C.tel)) { log(t.name, `tenta aparar ${s.name} fora do tempo e fica exposto!`, 'bad'); return 'bad'; } log(t.name, `erra o tempo da esquiva e fica exposto!`, 'bad'); }
     return '';
   }

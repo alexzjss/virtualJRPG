@@ -307,7 +307,7 @@ test('técnica em dupla: exige o parceiro com a skill par, que paga e perde o pr
 test('provocar puxa o golpe; guarda-costas recebe no lugar; esquiva e contra-ataque', () => {
   let [a, e] = duel(); const b = mk(ana, {}); S.battle.ticks[b.id] = 500; use(a, 'Desafio', a); const hb = b.hp; fixR(.3, () => { turn(e); H.act(gm, { id: e.id, skill: 'atk', target: b.id }); }); assert.equal(b.hp, hb); assert.ok(a.hp < a.hpMax);
   [a, e] = duel(); const c = mk(ana, {}); S.battle.ticks[c.id] = 500; use(a, 'Guarda-Costas', c); const hc = c.hp; fixR(.3, () => { turn(e); H.act(gm, { id: e.id, skill: 'atk', target: c.id }); }); assert.equal(c.hp, hc);
-  [a, e] = duel(); use(a, 'Reflexo do Raio', a); const ha = a.hp; fixR(.3, () => { turn(e); H.act(gm, { id: e.id, skill: 'atk', target: a.id }); }); assert.equal(a.hp, ha); assert.equal(a.st.evade, undefined);
+  [a, e] = duel(); use(a, 'Reflexo do Raio', a); const ha = a.hp; fixR(.3, () => { turn(e); H.act(gm, { id: e.id, skill: 'atk', target: a.id }); }); assert.ok(a.hp < ha, 'esquiva não anula: o golpe acerta com metade do dano'); assert.equal(a.st.evade, undefined);
   [a, e] = duel(); use(a, 'Contragolpe de Pedra', a); const he = e.hp; fixR(.3, () => { turn(e); H.act(gm, { id: e.id, skill: 'atk', target: a.id }); }); assert.ok(e.hp < he); assert.ok(S.log.some(l => /contra-ataca/.test(l.text)));
 });
 test('gatilhos: escudo no início da batalha e Tenacidade segura um golpe fatal uma vez', () => {
@@ -1014,25 +1014,26 @@ test('defesa: cedo demais em Aparar fica Exposto e leva +50%; só uma vez por ro
   const { hs: [h] } = dfx(); H.ai(gm); openAt(1000); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['cedo']);
   const aura = h.aura; H.def(ana, { id: h.id }); assert.equal(h.aura, aura, '1× por rodada'); await waitCmd(); assert.ok(h.st.exposed > 0);
 });
-test('defesa: golpe anunciado — esquiva de graça, sem precisar de nó', async () => {
-  const { hs: [h], e } = dfx([]); e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; // técnica anunciada
-  fixR(0, () => H.ai(gm)); const C = S.battle.cmd; assert.ok(C && C.tel, 'janela com esquiva'); const hp = h.hp, aura = h.aura; openAt(450); H.def(ana, { id: h.id });
-  assert.deepEqual(C.p[h.id], ['esq']); await waitCmd(); assert.equal(h.hp, hp); assert.equal(h.aura, aura); assert.ok(!e.st.exposed);
+const pesado = () => { const r = dfx([]); r.e.skills = [sk('Golpe Pesado')]; r.e.telK = [...r.e.skills]; return r; }; // técnica anunciada
+test('defesa: golpe anunciado — esquiva sem nó e sem Aura, mas só reduz o golpe e atrasa o próximo turno', async () => {
+  let { hs: [h] } = pesado(); fixR(0, () => H.ai(gm)); let C = S.battle.cmd; const hp = h.hp; await waitCmd(); const full = hp - h.hp; assert.ok(full > 2, 'sem apertar: dano cheio');
+  const { hs: [g], e } = pesado(); fixR(0, () => H.ai(gm)); C = S.battle.cmd; assert.ok(C && C.tel, 'janela com esquiva'); const hp2 = g.hp, aura = g.aura, t0 = S.battle.ticks[g.id]; openAt(450); H.def(ana, { id: g.id });
+  assert.deepEqual(C.p[g.id], ['esq']); await waitCmd(); const cut = hp2 - g.hp; assert.ok(cut >= 1 && cut <= Math.ceil(full * RU.CMD.DEF.esqMult) + 1, `esquiva reduz: ${cut} de ${full}`);
+  assert.equal(g.aura, aura); assert.ok(!e.st.exposed); assert.ok(S.battle.ticks[g.id] > t0, 'esquiva cansa: o próximo turno atrasa'); assert.ok(S.log.some(l => /ESQUIVA/.test(l.text || '')));
 });
-test('defesa: ataque básico abre Esquiva para todos (Aparar só com nó e Aura); técnica não anunciada sem Aparar não abre janela', () => {
-  let { hs: [h], e } = dfx(); h.aura = 0; H.ai(gm); let C = S.battle.cmd; assert.ok(C && C.esq && !C.tel, 'básico: janela com esquiva, mas não é golpe anunciado');
-  assert.ok(C.z[h.id].esq > 0 && !C.z[h.id].canP, 'sem Aura não apara'); assert.ok(!C.chqOk?.length, 'básico não abre Choque');
+test('defesa: ataque básico não abre Esquiva (só Aparar, com nó e Aura); técnica não anunciada sem Aparar não abre janela', () => {
+  let { hs: [h], e } = dfx(); h.aura = 0; H.ai(gm); assert.ok(!S.battle.cmd, 'básico sem Aura: sem janela');
+  ({ hs: [h], e } = dfx()); H.ai(gm); let C = S.battle.cmd; assert.ok(C && !C.esq && !C.tel && C.z[h.id].esq === 0 && C.z[h.id].canP, 'básico com Aparar: só zona de Aparar'); assert.ok(!C.chqOk?.length, 'básico não abre Choque');
   ({ hs: [h], e } = dfx(['Aparar'])); h.aura = 0; e.skills = [sk('Golpe Pesado')]; e.telK = [...e.skills]; fixR(0, () => H.ai(gm)); openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['esq']); assert.equal(h.aura, 0);
   ({ hs: [h], e } = dfx([])); e.skills = [Object.keys(S.skills).find(k => { const x = S.skills[k]; return x.kind === 'dmg' && !x.tel && !x.area && !x.cmd && !x.limit && x.res === 'aura' && (x.cost || 0) < 20 && x.tg !== 'self'; })]; e.telK = []; e.aura = 99; H.actWin(gm, { id: e.id, skill: e.skills[0], target: h.id }); assert.ok(!S.battle.cmd, 'técnica não anunciada, sem nó de Aparar: sem janela');
 });
-test('defesa: esquivar o ataque básico anula o golpe; errar o tempo expõe sem +50%', () => {
-  let { hs: [h] } = dfx(); h.aura = 0; H.ai(gm); openAt(100); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['esq']); const hp = h.hp; waitCmd(); assert.equal(h.hp, hp, 'esquivou');
-  ({ hs: [h] } = dfx()); h.aura = 0; H.ai(gm); openAt(900); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['cedo']); waitCmd(); assert.ok(h.st.exposed > 0); assert.ok(!S.log.some(l => /fora do tempo/.test(l.text || '')), 'na janela de esquiva errar não é o +50% do Aparar');
+test('defesa: errar o tempo da esquiva expõe sem o +50% do Aparar', () => {
+  let { hs: [h] } = pesado(); fixR(0, () => H.ai(gm)); h.aura = 0; openAt(900); H.def(ana, { id: h.id }); assert.deepEqual(S.battle.cmd.p[h.id], ['cedo']); waitCmd(); assert.ok(h.st.exposed > 0); assert.ok(!S.log.some(l => /fora do tempo/.test(l.text || '')), 'na janela de esquiva errar não é o +50% do Aparar');
 });
 test('defesa: golpe escolhido à mão pelo mestre abre a janela como na IA; cura e técnica que não alcança herói agem na hora', () => {
-  let { hs: [h], e } = dfx([]); H.actWin(gm, { id: e.id, skill: 'atk', target: h.id }); const C = S.battle.cmd; assert.ok(C && C.foe === e.id && C.tgs.includes(h.id), 'janela aberta para o alvo');
+  let { hs: [h], e } = dfx(); H.actWin(gm, { id: e.id, skill: 'atk', target: h.id }); const C = S.battle.cmd; assert.ok(C && C.foe === e.id && C.tgs.includes(h.id), 'janela aberta para o alvo');
   H.actWin(gm, { id: e.id, skill: 'atk', target: h.id }); assert.equal(S.battle.cmd, C, 'outra ação não passa por cima da janela');
-  openAt(100); H.def(ana, { id: h.id }); const hp = h.hp; waitCmd(); assert.equal(h.hp, hp, 'esquivou do golpe manual'); assert.ok(!S.battle.cmd); assert.ok(S.log.some(l => /ESQUIVA/.test(l.text || '')), 'registro da esquiva');
+  openAt(100); H.def(ana, { id: h.id }); const hp = h.hp; waitCmd(); assert.equal(h.hp, hp, 'aparou o golpe manual'); assert.ok(!S.battle.cmd); assert.ok(S.log.some(l => /APARA/.test(l.text || '')), 'registro da aparada');
   ({ hs: [h], e } = dfx()); H.actWin(gm, { id: e.id, skill: 'atk', target: e.id }); assert.ok(!S.battle.cmd, 'em si mesmo: sem janela');
 });
 // ---- fintas na janela de defesa ----

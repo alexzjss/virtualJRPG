@@ -182,7 +182,7 @@ function strikeFx(acts, f0, a, o = {}) {
       if (p3 && f.par) { const ra = PALCO3D.rectOf(f.a || f0.a), rb = PALCO3D.rectOf(f.id); if (ra && rb && engine && ANIMFX.sparks) ANIMFX.sparks((ra.left + ra.right + rb.left + rb.right) / 4, (ra.top + ra.bottom + rb.top + rb.bottom) / 4 - 20, '#ffd36a');
         if (typeof CENA !== 'undefined') CENA.slow(.4, 350); PALCO3D.recoil(f.a || f0.a, f.id, .3, false); const au2 = unitEl(f.a || f0.a); if (au2) pulse(au2, 'stagger', 600); }
       if (p3 && f.esq && typeof PVIDA !== 'undefined') PVIDA.ghosts(f.id, dirOf(f0.a, f.id)); }
-    const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
+    const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? (f.esq ? 'Esquivou · ' : '') + '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
     const rp = o.replay ? ' replay' : '';
     if (f.crit && !f.miss) posFx('chroma', f.id);
     if (num) floatNum(el, num, (f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : '') + rp, i, f);

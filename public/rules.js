@@ -9,13 +9,13 @@
   // o que cada condição nova faz (as antigas já são conhecidas na mesa)
   const STD = { shield: 'absorve dano antes do HP', regen: 'recupera HP no início do turno', taunt: 'inimigos só conseguem mirar nele', guarded: 'um guarda-costas recebe os golpes no lugar', counter: 'revida golpes corpo a corpo com um ataque', reflect: 'devolve 30% do dano recebido',
     wet: 'conduz raio e vento (reações elementais)', oil: 'queima e explode com fogo e raio', broken: 'perdeu o turno, sofre +50% de dano e não age até se recompor',
-    disarm: 'sem arma: luta com os punhos e perde as técnicas da arma', evade: 'o próximo golpe erra', stealth: 'não pode ser alvo direto; o próximo ataque tem +25% e crítico dobrado', focus: '+15% de acerto e enxerga quem está Furtivo', exposed: 'armadura não conta', exaus: '−15% de acerto, −15% de dano e não pode se transformar', seal: 'explode quando acaba ou ao ser detonado',
+    disarm: 'sem arma: luta com os punhos e perde as técnicas da arma', evade: 'o próximo golpe causa só metade do dano', stealth: 'não pode ser alvo direto; o próximo ataque tem +25% e crítico dobrado', focus: '+15% de acerto e enxerga quem está Furtivo', exposed: 'armadura não conta', exaus: '−15% de acerto, −15% de dano e não pode se transformar', seal: 'explode quando acaba ou ao ser detonado',
     blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental', mark: 'Marca do Caçador desperta: +30% de dano, +20% de velocidade e +10% de crítico' };
   // cargas que se acumulam no próprio personagem durante a batalha (efeitos stack/burst): nome e bônus de dano por carga
   const STK = { doenca: ['Doença', 8], carga: ['Carga Elétrica', 6], brasa: ['Brasa', 6], mare: ['Maré', 6], rocha: ['Rocha', 6], vento: ['Vento', 6], luz: ['Luz', 6], sombra: ['Sombra', 6], sangue: ['Sangue', 6], mutacao: ['Mutação', 6], ressonancia: ['Ressonância', 6], impeto: ['Ímpeto', 6], pavor: ['Pavor', 6] };
   // reações: disparam sozinhas no turno do inimigo (1 por rodada, pagando o custo da técnica)
   const REA = { evade: 'esquiva', block: 'bloqueia', absorb: 'absorve', counter: 'revida' };
-  const reaText = s => { const r = s.rea; return `reação automática (1×/rodada, paga o custo): ${r.t === 'evade' ? `${r.v}% de esquivar do golpe` : r.t === 'block' ? `bloqueia ${r.v}% do dano` : r.t === 'absorb' ? `absorve ${r.v}% do dano como Aura` : `revida com poder ${r.v}`}`; };
+  const reaText = s => { const r = s.rea; return `reação automática (1×/rodada, paga o custo): ${r.t === 'evade' ? `${r.v}% de esquivar (o golpe causa só metade do dano)` : r.t === 'block' ? `bloqueia ${r.v}% do dano` : r.t === 'absorb' ? `absorve ${r.v}% do dano como Aura` : `revida com poder ${r.v}`}`; };
   const NEG = ['wet', 'oil', ...DOT, ...CTRL, 'curse', 'marked', 'down', 'silence', 'atkDn', 'defDn', 'agiDn', 'fear', 'fury', 'blind', 'root', 'exposed', 'exaus', 'dread', 'seal', 'disarm', 'brand'];
   const POS = ['atkUp', 'defUp', 'agiUp', 'regen', 'counter', 'reflect', 'evade', 'stealth', 'focus', 'endure', 'taunt', 'mark'];
   // Aflições (Sanidade zerada e teste de SAB falho) e Virtudes (crítico): valem até o descanso longo
@@ -284,7 +284,7 @@
     RUNE_T,
     KINDS: ['tempo', 'martelar', 'segurar', 'seq', 'ritmo', 'mira', 'runa', 'choque'],
     RUNES: ['circulo', 'triangulo', 'raio', 'espiral', 'estrela', 'onda'],
-    DEF: { beat: 1100, esq: 450, grace: 200, gap: 700 },
+    DEF: { beat: 1100, esq: 450, grace: 200, gap: 700, esqMult: .5, esqTired: .25 }, // Esquiva só reduz o golpe (×esqMult) e atrasa o próximo turno do herói em esqTired do atraso dele (1× por janela)
     // zona do aperto na janela de defesa; left = ms até o impacto (negativo = depois dele)
     gradeDef(left, par, esq, canParry) {
       if (left < -CMD.DEF.grace) return 'late';
