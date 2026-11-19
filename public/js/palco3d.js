@@ -57,11 +57,20 @@
     return { tx, ty, tz: lo, ry, rx };
   };
   const angNear = (a, ref) => { let d = ((a - ref) % 360 + 540) % 360 - 180; return ref + d; }; // o mesmo ângulo, o mais perto de ref (sem dar a volta)
+  // posições fixas de câmera, no estilo dos JRPGs: ry gira em volta da cena, rx inclina (negativo olha de cima), m é a folga do quadro
+  const PRESET = {
+    side: { ry: -96, rx: -12, m: .84 },   // lateral clássica (FF antigos): heróis à esquerda, inimigos à direita
+    aerial: { ry: 0, rx: -56, m: .84 },   // aérea tática (Tactics, Fire Emblem)
+    tres: { ry: -48, rx: -24, m: .84 },   // três-quartos alto (FFX, Tales)
+    diag: { ry: 48, rx: -20, m: .84 },    // diagonal oposta, por cima do outro ombro (FFVII, Xenoblade)
+    frente: { ry: 180, rx: -12, m: .84 }, // frontal, do lado dos inimigos: vê o rosto do grupo (Dragon Quest, Persona)
+    baixa: { ry: -62, rx: 5, m: .82 }     // heroica, rente ao chão, olhando para cima (Persona 5, Xenoblade)
+  };
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
-    if (v.kind === 'side' || v.kind === 'aerial' || v.kind === 'wide') { // vistas de fora: lateral (heróis à esquerda), aérea tática e plano aberto de área
-      const pts = v.pts && v.pts.length ? v.pts : [a], ry = v.kind === 'side' ? -96 : v.kind === 'aerial' ? 0 : (v.ry0 || 0), rx = v.kind === 'side' ? -12 : v.kind === 'aerial' ? -56 : -22;
-      r = fitCam({ pts, ry, rx, w: v.w, h: v.h, m: v.kind === 'wide' ? .78 : .84 });
+    if (PRESET[v.kind] || v.kind === 'wide') { // vistas de fora travadas (ver PRESET) e plano aberto de área
+      const pts = v.pts && v.pts.length ? v.pts : [a], p = PRESET[v.kind] || { ry: v.ry0 || 0, rx: -22, m: .78 };
+      r = fitCam({ pts, ry: p.ry, rx: p.rx, w: v.w, h: v.h, m: p.m });
     } else if (v.kind === 'two') { // plano a dois, visto de fora e de lado: a linha atacante→alvo fica deitada na tela, atacante à esquerda (ou o lado mais perto da câmera atual)
       const b = v.to || a, base = Math.atan2(b.z - a.z, b.x - a.x) * 180 / Math.PI, ref = v.ry0 || 0, c1 = angNear(base, ref), c2 = angNear(base + 180, ref);
       const ry = Math.abs(c1 - ref) <= 110 ? c1 : c2, pts = [a, b, ...(v.pts || [])];
@@ -139,7 +148,8 @@
   };
 
   // estado só deste navegador, lido por cameraFor via view(); mode: vista escolhida (ombro, lateral, aérea), pitch: inclinação manual
-  const MODES = ['ombro', 'side', 'aerial'], MODE_NAME = { ombro: 'Ombro', side: 'Lateral', aerial: 'Aérea' };
+  const MODES = ['ombro', 'side', 'tres', 'diag', 'frente', 'baixa', 'aerial'], MODE_NAME = { ombro: 'Ombro', side: 'Lateral', tres: 'Três-quartos', diag: 'Diagonal', frente: 'Frontal', baixa: 'Heroica', aerial: 'Aérea' };
+  const FREE = false; // câmera travada: só as posições fixas (V / botão); gire, incline e deslize à mão ligando FREE
   const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } }, lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const local = { aim: null, zoom: null, orbit: 0, px: 0, pz: 0, pitch: 0, mode: MODES.includes(lsGet('vj_cam_mode')) ? lsGet('vj_cam_mode') : 'ombro' };
   const PK = 4; // planos grandes (cenário, chão, névoa, grade) têm 1/PK do tamanho e são ampliados ×PK: menos memória de vídeo
@@ -156,7 +166,7 @@
   let rst = null, mbtn = null, qbtn = null;
   const resetLocal = () => { local.orbit = local.px = local.pz = local.pitch = 0; };
   const labels = () => { if (mbtn) mbtn.textContent = `🎥 ${MODE_NAME[local.mode]} · V`; if (qbtn && typeof ANIMFX !== 'undefined') { const s = ANIMFX.settings.quality; qbtn.textContent = `◐ ${QNAME[s] || s}${s === 'auto' ? ` (${QNAME[qNow()]})` : ''}`; } };
-  const cycleMode = () => { local.mode = MODES[(MODES.indexOf(local.mode) + 1) % MODES.length]; lsSet('vj_cam_mode', local.mode); resetLocal(); labels(); if (world) world.style.transition = ''; if (lastF && root) camera(lastF); if (typeof HUD !== 'undefined') setTimeout(HUD.place, 1150); };
+  const cycleMode = (d = 1) => { local.mode = MODES[(MODES.indexOf(local.mode) + d + MODES.length) % MODES.length]; lsSet('vj_cam_mode', local.mode); resetLocal(); labels(); if (world) world.style.transition = ''; if (lastF && root) camera(lastF); if (typeof HUD !== 'undefined') setTimeout(HUD.place, 1150); };
   const el =(tag, cls, p) => { const e = document.createElement(tag); if (cls) e.className = cls; (p || null)?.appendChild(e); return e; };
   const ensure = () => {
     if (root) return;
@@ -166,8 +176,8 @@
     rl = el('div', 'rangeln', atw); rb = el('div', 'rangelb', atw); rl.hidden = rb.hidden = true;
     // recentralizar: aparece quando o jogador girou, aproximou ou moveu a câmera
     const ui = el('div', 'p3d-ui', root);
-    mbtn = el('button', 'p3d-btn', ui); mbtn.type = 'button'; mbtn.title = 'Troca a vista da câmera: ombro do herói, lateral ou aérea (tecla V)';
-    mbtn.addEventListener('click', e => { e.stopPropagation(); cycleMode(); });
+    mbtn = el('button', 'p3d-btn', ui); mbtn.type = 'button'; mbtn.title = 'Troca a posição da câmera: ombro, lateral, três-quartos, diagonal, frontal, heroica ou aérea (tecla V; Shift+V volta)';
+    mbtn.addEventListener('click', e => { e.stopPropagation(); cycleMode(e.shiftKey ? -1 : 1); });
     qbtn = el('button', 'p3d-btn', ui); qbtn.type = 'button'; qbtn.title = 'Qualidade do palco: Auto ajusta sozinho; Baixa ajuda PCs fracos (menos efeitos de cenário)';
     qbtn.addEventListener('click', e => { e.stopPropagation(); if (typeof ANIMFX === 'undefined') return; const cur = ANIMFX.settings.quality, nx = QCYCLE[(QCYCLE.indexOf(cur) + 1) % QCYCLE.length]; ANIMFX.setQuality(nx); });
     rst = el('button', 'p3d-reset', ui); rst.type = 'button'; rst.textContent = '⌖ Recentralizar'; rst.title = 'Volta a câmera ao enquadre do turno (ou duplo clique no fundo)'; rst.hidden = true;
@@ -183,21 +193,21 @@
     // botão esquerdo (no fundo, fora de botões e recortes) ou direito: arrastar na horizontal gira, na vertical inclina; o esquerdo só vale depois de 6 px (clique simples continua clique)
     let drag = null; const inStage = e => { if (!root || root.style.display === 'none') return false; const r = root.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom && !e.target.closest?.('button,input,select,textarea,.result'); };
     const UIQ = 'a,label,[data-tgt],[data-lq],[data-a],[data-g],[role=button],.hud-mini,.chatcol,.lq,.hrq,.dlg-bg,.modal,header,.top,.qte3d,.cmdq,.skl,.ot,.ta,.stroke';
-    addEventListener('pointerdown', e => { if (camLock || !inStage(e) || (e.button !== 2 && e.button !== 0) || (e.button === 0 && e.target.closest?.(UIQ))) return; drag = { x: e.clientX, y: e.clientY, o: local.orbit, p: local.pitch, live: e.button === 2, b: e.button }; if (drag.live) { world.style.transition = 'none'; e.preventDefault(); } });
+    addEventListener('pointerdown', e => { if (!FREE || camLock || !inStage(e) || (e.button !== 2 && e.button !== 0) || (e.button === 0 && e.target.closest?.(UIQ))) return; drag = { x: e.clientX, y: e.clientY, o: local.orbit, p: local.pitch, live: e.button === 2, b: e.button }; if (drag.live) { world.style.transition = 'none'; e.preventDefault(); } });
     addEventListener('pointermove', e => { if (!drag) return; if (camLock) { drag = null; world.style.transition = ''; return; } const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (!drag.live) { if (Math.hypot(dx, dy) < 6) return; drag.live = true; world.style.transition = 'none'; }
       local.orbit = clamp(drag.o + dx * .3, -180, 180); local.pitch = clamp(drag.p - dy * .15, -70, 18); if (lastF) camera(lastF); });
     addEventListener('pointerup', e => { if (!drag) return; const moved = drag.live && drag.b === 0; drag = null; world.style.transition = ''; if (moved) { const kill = ev => { ev.stopPropagation(); ev.preventDefault(); }; addEventListener('click', kill, { capture: true, once: true }); setTimeout(() => removeEventListener('click', kill, true), 0); } /* o clique que fecha o arrasto não vira clique */ if (typeof HUD !== 'undefined') HUD.place(); });
-    addEventListener('contextmenu', e => { if (inStage(e)) e.preventDefault(); });
+    addEventListener('contextmenu', e => { if (FREE && inStage(e)) e.preventDefault(); });
     addEventListener('dblclick', e => { if (camLock || !inStage(e) || e.target.closest('[data-tgt]')) return; resetLocal(); if (lastF) camera(lastF); });
     // roda fora de um inimigo: aproxima/afasta a câmera; WASD/setas: desliza pela cena (setas não, com a mira aberta). Tudo some quando um comando entra em cena
-    addEventListener('wheel', e => { if (camLock || !inStage(e) || e.target.closest?.('.bb.foe:not(.ko)')) return; e.preventDefault(); local.pz = clamp(local.pz - e.deltaY * .5, -1400, 320); world.style.transition = 'transform .12s ease-out'; if (lastF) camera(lastF); }, { passive: false });
+    addEventListener('wheel', e => { if (!FREE || camLock || !inStage(e) || e.target.closest?.('.bb.foe:not(.ko)')) return; e.preventDefault(); local.pz = clamp(local.pz - e.deltaY * .5, -1400, 320); world.style.transition = 'transform .12s ease-out'; if (lastF) camera(lastF); }, { passive: false });
     // WASD/setas deslizam; Q/E giram em volta da cena; V troca a vista (ombro → lateral → aérea)
     const keys = new Set(), DIR = { w: [0, 1, 0], s: [0, -1, 0], a: [1, 0, 0], d: [-1, 0, 0], arrowup: [0, 1, 0], arrowdown: [0, -1, 0], arrowleft: [1, 0, 0], arrowright: [-1, 0, 0], q: [0, 0, -1], e: [0, 0, 1] }; let mvT = 0, mvLast = 0;
     const mv = now => { mvT = 0; if (camLock || !keys.size || !root || root.style.display === 'none') { keys.clear(); world.style.transition = ''; return; } const dt = Math.min(50, now - (mvLast || now)); mvLast = now; let x = 0, z = 0, o = 0; for (const k of keys) { x += DIR[k][0]; z += DIR[k][1]; o += DIR[k][2]; } local.px = clamp(local.px + x * dt * .7, -1100, 1100); local.pz = clamp(local.pz + z * dt * .7, -1400, 320); local.orbit = clamp(local.orbit + o * dt * .09, -180, 180); if (lastF) camera(lastF); mvT = requestAnimationFrame(mv); };
     const typing = e => e.target.closest?.('input,textarea,select,[contenteditable]');
-    addEventListener('keydown', e => { if (e.key.toLowerCase() !== 'v' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !root || root.style.display === 'none' || typing(e) || document.querySelector('.dlg-bg')) return; e.preventDefault(); cycleMode(); });
-    addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (!DIR[k] || camLock || e.ctrlKey || e.metaKey || e.altKey || !root || root.style.display === 'none' || e.target.closest?.('input,textarea,select,[contenteditable]')) return; if (k.startsWith('arrow') && (e.defaultPrevented || local.aim || document.querySelector('.lq,.hud-tgt.on,.skl'))) return; keys.add(k); world.style.transition = 'none'; if (!mvT) { mvLast = 0; mvT = requestAnimationFrame(mv); } });
+    addEventListener('keydown', e => { if (e.key.toLowerCase() !== 'v' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !root || root.style.display === 'none' || typing(e) || document.querySelector('.dlg-bg')) return; e.preventDefault(); cycleMode(e.shiftKey ? -1 : 1); });
+    addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (!FREE || !DIR[k] || camLock || e.ctrlKey || e.metaKey || e.altKey || !root || root.style.display === 'none' || e.target.closest?.('input,textarea,select,[contenteditable]')) return; if (k.startsWith('arrow') && (e.defaultPrevented || local.aim || document.querySelector('.lq,.hud-tgt.on,.skl'))) return; keys.add(k); world.style.transition = 'none'; if (!mvT) { mvLast = 0; mvT = requestAnimationFrame(mv); } });
     addEventListener('keyup', e => { keys.delete(e.key.toLowerCase()); if (!keys.size) world.style.transition = ''; });
     addEventListener('blur', () => keys.clear());
     root.addEventListener('wheel', e => { const u = e.target.closest?.('.bb.foe:not(.ko)'); if (!u || !host?.isConnected) return; e.preventDefault();

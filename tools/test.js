@@ -1663,6 +1663,12 @@ test('PFX: actsAround junta o golpe inteiro e para no resto do log', async () =>
   const L = [{ n: 1, text: 'oi' }, { n: 2, fx: { a: 'h', s: 'X', id: 'e' } }, { n: 3, fx: { a: 'h', s: 'X', id: 'f' } }, { n: 4, fx: { a: 'e', s: 'Y', id: 'h' } }, { n: 5, fx: { a: 'h', s: 'X', id: 'e' } }];
   assert.deepEqual(F.actsAround(L, 3).map(e => e.n), [2, 3]); assert.deepEqual(F.actsAround(L, 5).map(e => e.n), [5]); assert.deepEqual(F.actsAround(L, 1), []);
 });
+test('palco 3D: posições fixas de câmera enquadram todos e são distintas', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, pts = [{ x: -430, z: 0 }, { x: 330, z: 60 }, { x: 0, z: -1500 }, { x: 900, z: -1300 }], seen = new Set();
+  assert.deepEqual(P.MODES, ['ombro', 'side', 'tres', 'diag', 'frente', 'baixa', 'aerial']);
+  for (const k of P.MODES.slice(1)) { const v = P.cameraFor({ kind: k, pts, w: 1440, h: 860 }); assert.ok(Number.isFinite(v.tz) && v.tz > -9000, k + ' cabe no quadro'); seen.add(`${v.ry}/${v.rx}`); }
+  assert.equal(seen.size, 6);
+});
 test('palco 3D: órbita e contracampo do inimigo', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, at = { x: 200, z: -300 };
   const o = P.cameraFor({ kind: 'orbit', at, ry0: 10, deg: 45 }), A = P.rotP(at, 55);
