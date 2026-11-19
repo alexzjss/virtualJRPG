@@ -25,6 +25,7 @@ const LEQUE = (() => {
     const l = cands(); if (!l.length) return; const nat = l.filter(natural);
     if (!nat.some(o => o.id === tgt)) { const n = allySide() ? nat.find(o => o.id === cx.actor.id) || nat[0] : nat[0]; tgt = (n || l[0]).id; aim = null; }
   };
+  let tacOpen = false; // grupo Tática aberto (Tab)
   let armed = null; // alvo fora do lado natural já avisado: o segundo Enter (ou clique) confirma
   const offSide = () => { const t = S.chars[tgt]; return !!t && !natural(t); };
   const sideStep = () => { const l = cands(), t = S.chars[tgt]; if (!l.length) return; const o = l.find(x => x.enemy !== !!t?.enemy); if (o) { tgt = o.id; aim = null; render(); } }; // Tab: pula para o outro lado
@@ -104,7 +105,7 @@ const LEQUE = (() => {
   return {
     state,
     // limpa tudo (a ação saiu ou a vez mudou)
-    reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; },
+    reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; tacOpen = false; },
     off() { cx = null; },
     lift,
     // âncora da vista tática/linha de alcance (palco3d.js): só enquanto o leque está na mira
@@ -157,14 +158,17 @@ const LEQUE = (() => {
       const t = S.chars[tgt], s = skSel(), it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma'), mode = state.mode;
       const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : mode === 'skills' ? 6 : 2));
       const back1 = mode !== 'menu' ? stroke('back', 'Esc', 'Voltar', '', { cls: 'mini' }) : '';
-      const turn = typeof HUD !== 'undefined' && HUD.turn ? HUD.turn(c, inB) : ''; // Coragem vale também na mira
+      const tp = typeof HUD !== 'undefined' && HUD.turnSplit ? HUD.turnSplit(c, inB) : { def: '', tac: '' }; // Coragem vale também na mira
+      // Tática (estilo Persona 5): Defender fica na coluna; Concentrar, Coragem, Mirar parte e Passar ficam num grupo que abre com Tab. Fechado, o grupo continua na página (escondido) para os atalhos 5–8 e Q funcionarem
+      const tac = () => stroke('tac', 'Tab', 'Tática', tacOpen ? '▾' : '▸', { cls: 'mini tacb', on: tacOpen, title: 'Concentrar, Coragem, Mirar parte e Passar' })
+        + `<div class="lqtac ${tacOpen ? 'open' : ''}" role="group" aria-label="Tática" ${tacOpen ? '' : 'hidden'}>${mode !== 'aim' && canAim() ? stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', { cls: 'mini' }) : ''}${tp.tac}</div>`;
       let main = '', sub = '', row = 0;
       if (mode !== 'aim') {
         // coluna principal: Atacar, Skills, Itens (de cima para baixo); a lista aberta sai ao lado da pincelada escolhida
         const M = [['atk', 1, 'Atacar', esc(ARMAS.prof(wp).atkN || 'Ataque'), wpnLine(wp, c)], ['sk', 2, 'Skills', sks.length + wsks.length], ['it', 3, 'Itens', cons.length]];
         const onK = mode === 'menu' ? sel : mode === 'items' ? 2 : 1;
         main += M.map((m, k) => stroke(m[0], m[1], m[2], m[3], { on: onK === k, title: m[4], cls: mode !== 'menu' && onK !== k ? 'dim' : '' })).join('');
-        if (canAim() && mode === 'menu') main += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', { cls: 'mini' });
+        main += `<div class="lqdef">${tp.def}</div>` + tac();
         if (gmO && c.enemy && mode === 'menu') main += stroke('ai', 'I', 'IA decide', '', { a: 'ai', cls: 'mini' });
         main += back1;
       }
@@ -190,12 +194,12 @@ const LEQUE = (() => {
         if (canAim()) main += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', { on: aimOpen, cls: 'mini' });
         const allies = battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0);
         if (allies.length && !allySide() && cands().some(o => o.enemy)) main += stroke('pass', 'P', 'Fraqueza passa', esc(passTo ? S.chars[passTo]?.name || '' : 'ninguém'), { cls: 'mini', title: 'Se acertar uma fraqueza, passa a vez para este aliado' });
-        main += back1;
+        main += `<div class="lqdef">${tp.def}</div>` + tac() + back1;
         main += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b>${off ? `<small class="offside">⚠ ${off}${armed ? ': Enter de novo confirma' : ''}</small>` : ''}${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
         if (canAim() && aimOpen) { row = 1; sub = `<div class="lq-aim">${aimBox()}</div>`; }
       }
       cx.shown = true;
-      return wrap(main, sub, turn, row);
+      return wrap(main, sub, '', row);
     },
     // clique numa pincelada
     click(name, v) {
@@ -212,6 +216,7 @@ const LEQUE = (() => {
       if (name === 'item') { pick = { k: 'it', id: v }; return go('aim', 'items'); }
       if (name === 'aim') return state.mode === 'aim' ? (aimOpen = !aimOpen, aimOpen || (aim = null), render()) : toAim();
       if (name === 'pass') { const l = ['', ...battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0).map(o => o.id)]; passTo = l[(l.indexOf(passTo) + 1) % l.length]; return render(); }
+      if (name === 'tac') { tacOpen = !tacOpen; return render(); }
       if (name === 'go') return confirm();
       if (name === 'back') return back();
     },
@@ -255,6 +260,7 @@ const LEQUE = (() => {
         render(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return true;
       }
       if (k === 'Tab' && mode === 'aim') { sideStep(); return true; }
+      if (k === 'Tab' && mode !== 'all') { click('tac'); return true; } // Tab abre e fecha a Tática (na mira, Tab continua trocando de lado; a Tática abre pelo clique)
       if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'aim') {
         const l = cands(); if (!l.length) return true;
         const i = l.findIndex(o => o.id === tgt); tgt = l[(i + (k === 'ArrowLeft' ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id; aim = null; render(); return true;

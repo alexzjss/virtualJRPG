@@ -99,12 +99,13 @@ const HUD = (() => {
     const lq = typeof LEQUE !== 'undefined' && LEQUE.ctx(); if (lq?.shown && lq.actor === a) return ''; // na vez: os comandos de turno estão na coluna presa ao herói (leque.js)
     return `<div class="hud-cmd">${turn(a, inB)}${mode !== 'menu' ? hint('Esc', 'Voltar', 'data-lq="back"') : ''}</div>`; };
   // comandos de turno (Defender, Concentrar, Coragem, Ataque Total, Passar): a coluna do lado oposto do recorte usa esta lista
-  const turn = (a, inB) => { const brv = a.brv || 0, foes = inB.filter(x => x.enemy !== a.enemy && x.hp > 0), downAll = foes.length > 0 && foes.every(x => x.st.down || x.st.broken);
-    return hint(4, `Defender${brv > 0 ? ' · ' + a.brv : ''}`, `data-a="defend" data-id="${a.id}" title="Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)"`)
-      + hint(5, `Concentrar${a.ten ? ' ×' + [1, 1.5, 2, 3][a.ten] : ''}`, `data-a="focus" data-id="${a.id}" title="Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3"`)
+  // turnSplit: Defender à parte (fica na coluna principal do leque); o resto vai para a Tática
+  const turnSplit = (a, inB) => { const brv = a.brv || 0, foes = inB.filter(x => x.enemy !== a.enemy && x.hp > 0), downAll = foes.length > 0 && foes.every(x => x.st.down || x.st.broken);
+    return { def: hint(4, `Defender${brv > 0 ? ' · ' + a.brv : ''}`, `data-a="defend" data-id="${a.id}" title="Defende (−25% de dano) e guarda 1 ponto de Coragem (máx. 3)"`), tac: hint(5, `Concentrar${a.ten ? ' ×' + [1, 1.5, 2, 3][a.ten] : ''}`, `data-a="focus" data-id="${a.id}" title="Gasta o turno acumulando: o próximo golpe causa ×1,5 / ×2 / ×3"`)
       + hint(6, `Coragem ${brv}`, brv > -2 ? `data-a="braveT" data-id="${a.id}" aria-pressed="${braveOn}" title="Gasta 1 ponto de Coragem para agir de novo; sem pontos, fica devendo tempo"` : '', `${braveOn ? 'on' : ''} ${brv < 0 ? 'debt' : ''} ${brv > -2 ? '' : 'off'}`)
       + (downAll ? hint(8, 'Ataque Total', `data-a="allOut" data-id="${a.id}" title="Todo inimigo Derrubado ou Quebrado: o grupo inteiro ataca"`, 'allout') : '')
-      + hint(7, 'Passar', `data-a="next" data-id="${a.id}" title="Passa a vez gastando metade do tempo"`); };
+      + hint(7, 'Passar', `data-a="next" data-id="${a.id}" title="Passa a vez gastando metade do tempo"`) }; };
+  const turn = (a, inB) => { const t = turnSplit(a, inB); return t.def + t.tac; };
   // lista de alvos, só durante a mira: os candidatos do leque (da esquerda para a direita, como no palco); a mão marca o atual
   const alvos = () => { const L = LEQUE.aimList(); if (!L.length) return '';
     return `<div class="hud-tgts" role="listbox" aria-label="Alvos"><span class="key" aria-hidden="true">←</span>${L.map(c => { const on = c.id === tgt, p = pct(c.hp, c.hpMax);
@@ -134,7 +135,7 @@ const HUD = (() => {
     return `<div class="hud-top" aria-label="Alvo"><div class="hpbar"><i style="width:${hp}%"></i>${shBar(c).replace(/ data-bid="[^"]*"/, '')}</div><h4><span class="sh2" title="Quebra">◆${c.brk ? c.brk.cur : 0}</span>${esc(c.name)}</h4></div>`
       + `<div class="hud-sheet" data-sid="${id}" style="${ok ? `left:${pos.l}px;top:${pos.t}px` : 'opacity:0'}">${sheet(id, { full: zoom, preview: LEQUE.preview(c) })}</div>`; };
   return {
-    sheet, miniT, turn,
+    sheet, miniT, turn, turnSplit,
     // mestre: a mesma HUD do jogador (html com gm), com o ator vindo do leque dele e a fila de pedidos no canto inferior esquerdo
     gm() { return this.html({ gm: true }); },
     // coloca a ficha ao lado do recorte (à direita; à esquerda se não couber; presa entre top 110 e 560); a câmera leva ~1,1 s, então é chamada de novo depois
