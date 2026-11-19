@@ -1397,7 +1397,7 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 .pm .sanl{flex:1;height:4px;background:#1c1530}.pm .sanl i{display:block;height:100%;background:var(--san)}
 .pm .hlim{position:absolute;left:6px;top:56px;width:8px;height:84px;background:#000;border:1px solid #ffc93c66;z-index:2;display:flex;align-items:flex-end}.pm .hlim i{width:100%;background:var(--gold)}
 .pm .hlim.full{box-shadow:0 0 12px var(--gold);animation:hlgh .6s infinite alternate}
-.pm.tg .por{animation:pmtg .5s infinite alternate}@keyframes pmtg{to{filter:brightness(2) sepia(1) hue-rotate(-30deg)}}
+.pm.pmtg .por{animation:pmtg .5s infinite alternate}@keyframes pmtg{to{filter:brightness(2) sepia(1) hue-rotate(-30deg)}}
 .pm.ko{filter:grayscale(1) brightness(.6)}
 
 /* leque de pinceladas */

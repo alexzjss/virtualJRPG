@@ -82,7 +82,7 @@ const HUD = (() => {
     return `<div class="band" role="status" style="--c:${esc(f?.color || '#e4002b')}"><b>${esc(f?.name || 'Inimigo')} · ${esc(C.nm || 'Ataque')}</b>${alvos.length ? `<small>ALVO: ${esc(alvos.join(', '))}</small>` : ''}</div>`; };
   const grupo = (inB, cur) => `<div class="hud-party" aria-label="Grupo">${inB.filter(c => !c.enemy).map(c => {
     const hp = pct(c.hp, c.hpMax), au = Math.round(10 * Math.max(0, c.aura) / (c.auraMax || 1)), form = c.st.form && c.form && SK(c.form);
-    return `<div class="pm ${c === cur ? 'now' : ''} ${c.id === tgt || S.battle.cmd?.tgs?.includes(c.id) ? 'tg' : ''} ${S.battle.cmd?.tgs?.includes(c.id) ? 'dtg' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" style="--c:${esc(c.color)}" title="${esc(c.name)}">
+    return `<div class="pm ${c === cur ? 'now' : ''} ${c.id === tgt || S.battle.cmd?.tgs?.includes(c.id) ? 'pmtg' : ''} ${S.battle.cmd?.tgs?.includes(c.id) ? 'dtg' : ''} ${c.hp > 0 ? '' : 'ko'}" data-tgt="${c.id}" style="--c:${esc(c.color)}" title="${esc(c.name)}">
       <i class="ink"></i><div class="por">${photo(c, 'p')}</div>
       <div class="hlim ${c.limit >= 100 ? 'full' : ''}" title="Limite ${c.limit}%"><i style="height:${pct(c.limit, 100)}%"></i></div>
       <div class="pst">${c.hp > 0 ? stIcons(c) : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}${c.st.defUp ? '<span>Defendendo</span>' : ''}${form ? `<span>Forma: ${esc(form.name)}</span>` : ''}</div>
