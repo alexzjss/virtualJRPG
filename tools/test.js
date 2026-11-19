@@ -1808,3 +1808,15 @@ test('Leva 10: efeitos conv (converte condição) e solo (único inimigo de pé)
   assert.equal(parseFx('solo')[0].m, 1.5);
   assert.throws(() => parseFx('conv burn naoexiste'), /conversão desconhecida/);
 });
+
+test('chefes: bossFx só do mestre, só em inimigo, saneado', () => {
+  reset(); const e = mk(gm, { name: 'Dragão', enemy: true }), h = mk(gm, { name: 'Herói' });
+  handle(gm, { t: 'set', id: e.id, f: 'boss', v: true });
+  handle(gm, { t: 'set', id: e.id, f: 'bossFx', v: { in: 'eclipse', hit: 'xyz', col: 'vermelho' } });
+  assert.deepEqual(S.chars[e.id].bossFx, { in: 'eclipse', hit: null, col: '' });
+  handle(gm, { t: 'set', id: e.id, f: 'bossFx', v: { in: 'fenda', hit: 'mare', col: '#FF0000' } });
+  assert.deepEqual(S.chars[e.id].bossFx, { in: 'fenda', hit: 'mare', col: '#FF0000' });
+  handle(ana, { t: 'set', id: e.id, f: 'bossFx', v: { in: 'eclipse' } }); assert.equal(S.chars[e.id].bossFx.in, 'fenda', 'jogador não muda');
+  handle(gm, { t: 'set', id: h.id, f: 'bossFx', v: { in: 'eclipse' } }); assert.equal(S.chars[h.id].bossFx, undefined, 'herói não tem cena de chefe');
+  handle(gm, { t: 'set', id: e.id, f: 'bossFx', v: 'eclipse' }); assert.equal(S.chars[e.id].bossFx, null);
+});
