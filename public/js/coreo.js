@@ -183,6 +183,7 @@ function strikeFx(acts, f0, a, o = {}) {
     if (!engine) return void hits(220);
     const run = ANIMFX.play({ actorId: f0.a, targetIds: acts.map(e => e.fx.id), skill: sk, fx: f0 });
     run.impact.then(() => hits(0));
+    if (cam && !go && PALCO3D.follow) PALCO3D.follow(f0.a, [...new Set(acts.map(e => e.fx.id))], Math.round(run.profile.duration * run.profile.impact)); // à distância: a câmera viaja com o efeito até o alvo
     if (cam) run.done.then(() => PALCO3D.hold(acts.length * 90 + 650)); // os números nascem antes da câmera seguir para o próximo turno
   };
   const cam = stage3d() && !old && typeof PALCO3D !== 'undefined' && PALCO3D.focus;

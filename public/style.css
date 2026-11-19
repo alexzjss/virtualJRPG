@@ -753,6 +753,7 @@ button.wpn{border-bottom-color:var(--gold)}
 .fxl .float{translate:-50% -50%;font:400 clamp(26px,calc(var(--uw)*.34),84px)/1 var(--disp);color:#fff;-webkit-text-stroke:2px #000;text-shadow:4px 5px 0 var(--fx,var(--red));white-space:nowrap;animation:floatx 1.25s cubic-bezier(.2,.9,.3,1) forwards}
 .fxl .float.crit{font-size:clamp(34px,calc(var(--uw)*.5),120px);color:var(--gold)}.fxl .float.weak{color:#fff;text-shadow:4px 5px 0 var(--red)}
 .fxl .float.heal{color:var(--hp);text-shadow:4px 5px 0 #063}.fxl .float.miss{font-size:clamp(18px,calc(var(--uw)*.2),44px);color:var(--dim);text-shadow:none}
+.fxl .shield-hit{translate:-50% -50%;padding:.25em .55em;background:linear-gradient(90deg,#103354,#061522);border:2px solid #80dcff;color:#e2f8ff;font:800 clamp(14px,calc(var(--uw)*.12),30px)/1 Barlow,sans-serif;letter-spacing:.08em;text-shadow:0 2px #000;box-shadow:0 0 14px #50c8ff;animation:floatx 1s ease-out forwards}
 @keyframes floatx{0%{transform:translateY(30px) scale(.3) rotate(-10deg);opacity:0}14%{transform:translateY(-6px) scale(1.25) rotate(-6deg);opacity:1}28%{transform:scale(1) rotate(-6deg)}78%{opacity:1}100%{transform:translateY(-50px) rotate(-6deg);opacity:0}}
 .unit.mendfx .figw{animation:mendx .8s ease-out}@keyframes mendx{30%{filter:drop-shadow(0 0 2.4cqw var(--hp)) brightness(1.4)}}
 /* corte de tela: Crítico e Fraqueza */
@@ -1162,6 +1163,48 @@ details.mais>.row{margin:8px 10px}
 .bb-aurora .bbfx::after{background:repeating-linear-gradient(80deg,#7a5cff55 0 6cqw,#7a5cff11 10cqw,#7a5cff55 16cqw);animation:bbwave calc(19s*var(--fxs,1)) ease-in-out infinite reverse}
 .bb-aurora .bbfx b{background:repeating-linear-gradient(95deg,#4dd5ff44 0 4cqw,#4dd5ff00 8cqw,#4dd5ff44 12cqw);top:8%;animation:bbwave calc(25s*var(--fxs,1)) ease-in-out infinite}
 
+/* Biomas de batalha: cenários panorâmicos em CSS, sem downloads ou dependência de imagens externas. */
+.bb-floresta-dia,.bb-vila-dia,.bb-deserto-dia,.bb-castelo-dia,.bb-praia-dia{--ray:#fff3a733;--g1:#326ca9;--g2:#eaa96c;--g3:#171e18}
+.bb-floresta-entardecer,.bb-castelo-crepusculo,.bb-deserto-crepusculo,.bb-praia-por-do-sol{--ray:#ff8a4a44;--g1:#301b58;--g2:#dd685c;--g3:#17101c}
+.bb-floresta-noite,.bb-castelo-noite,.bb-vila-noite,.bb-praia-noite,.bb-cemiterio-luar,.bb-casa-luar{--ray:#779eff33;--g1:#070d2d;--g2:#182b52;--g3:#050811}
+.bb-casa-abandonada,.bb-cemiterio-neblina,.bb-navio-fantasma,.bb-limiar-oculto{--ray:#8c9b8a22;--g1:#111921;--g2:#354442;--g3:#080d10}
+.bb-vulcao-ativo,.bb-forja-kagutsuchi{--ray:#ff4b173b;--g1:#170705;--g2:#8a260b;--g3:#140502}
+.bb-caverna-cristal,.bb-colosso-atlas{--ray:#79dcff38;--g1:#091b2c;--g2:#155070;--g3:#07111a}
+.bb-pantano-bruxo,.bb-floresta-fuhaku,.bb-ruinas-jungla,.bb-ninho-hiruko{--ray:#5ce3942c;--g1:#06180f;--g2:#28543a;--g3:#07110b}
+.bb-tundra-aurora,.bb-montanha-susanoo{--ray:#a5f6ff38;--g1:#0b2342;--g2:#6289a5;--g3:#101e2d}
+.bb-templo-submerso,.bb-mar-shukketsu{--ray:#4be4e035;--g1:#03182a;--g2:#07566b;--g3:#041722}
+.bb-torre-mago,.bb-santuario-indra,.bb-jardim-amaterasu,.bb-palacio-tsukuyomi,.bb-aura-despertar{--ray:#dac0ff35;--g1:#140c30;--g2:#453773;--g3:#0a0818}
+.bb-planicie-aurora{--ray:#ffdf7233;--g1:#18304a;--g2:#d17870;--g3:#131526}
+.bb-floresta-dia .bbfx,.bb-floresta-entardecer .bbfx,.bb-floresta-noite .bbfx,.bb-floresta-fuhaku .bbfx,.bb-pantano-bruxo .bbfx,.bb-ruinas-jungla .bbfx,.bb-ninho-hiruko .bbfx{background:linear-gradient(180deg,#fff0 0 43%,#18362433 63%,#07120de8 100%),radial-gradient(ellipse at 50% 44%,#f2c97977,transparent 29%)}
+.bb-floresta-dia .bbfx::before,.bb-floresta-entardecer .bbfx::before,.bb-floresta-noite .bbfx::before,.bb-floresta-fuhaku .bbfx::before,.bb-pantano-bruxo .bbfx::before,.bb-ruinas-jungla .bbfx::before,.bb-ninho-hiruko .bbfx::before{inset:15% -2% 0;background:linear-gradient(90deg,transparent 0 7%,#13251b 7.5% 9%,transparent 9.5% 18%,#172c20 18.5% 21%,transparent 21.5% 33%,#0f2118 33.5% 35%,transparent 35.5% 64%,#10251a 64.5% 67%,transparent 67.5% 78%,#172d20 78.5% 81%,transparent 81.5% 92%,#102319 92.5% 94%,transparent 94.5%),radial-gradient(ellipse at 12% 36%,#365d3c 0 14%,transparent 15%),radial-gradient(ellipse at 27% 27%,#284d32 0 17%,transparent 18%),radial-gradient(ellipse at 80% 30%,#315b39 0 19%,transparent 20%);opacity:.9}
+.bb-floresta-dia .bbfx::after,.bb-floresta-entardecer .bbfx::after,.bb-floresta-noite .bbfx::after,.bb-floresta-fuhaku .bbfx::after{inset:10% 0 42%;background:radial-gradient(circle,#ffe99a 0 .18cqw,transparent .32cqw) 0 0/13cqw 17cqw;animation:bbpulse calc(7s*var(--fxs,1)) ease-in-out infinite alternate}
+.bb-castelo-dia .bbfx,.bb-castelo-crepusculo .bbfx,.bb-castelo-noite .bbfx,.bb-vila-dia .bbfx,.bb-vila-noite .bbfx,.bb-casa-abandonada .bbfx,.bb-casa-luar .bbfx,.bb-torre-mago .bbfx,.bb-navio-fantasma .bbfx{background:linear-gradient(180deg,#fff0 0 48%,#15151b 49% 57%,#090a0d 100%)}
+.bb-castelo-dia .bbfx::before,.bb-castelo-crepusculo .bbfx::before,.bb-castelo-noite .bbfx::before,.bb-vila-dia .bbfx::before,.bb-vila-noite .bbfx::before,.bb-casa-abandonada .bbfx::before,.bb-casa-luar .bbfx::before,.bb-torre-mago .bbfx::before,.bb-navio-fantasma .bbfx::before{inset:20% 0 34%;background:linear-gradient(90deg,transparent 0 4%,#17171e 4.5% 12%,transparent 12.5% 18%,#28242a 18.5% 28%,transparent 28.5% 34%,#1c1a21 34.5% 43%,transparent 43.5% 57%,#201d25 57.5% 67%,transparent 67.5% 73%,#2a252a 73.5% 85%,transparent 85.5% 90%,#17171e 90.5% 97%,transparent 97.5%),linear-gradient(135deg,transparent 48%,#08090c 49% 53%,transparent 54%) 0 0/15cqw 100%;}
+.bb-castelo-dia .bbfx::after,.bb-castelo-crepusculo .bbfx::after,.bb-castelo-noite .bbfx::after,.bb-vila-dia .bbfx::after,.bb-vila-noite .bbfx::after,.bb-casa-abandonada .bbfx::after,.bb-casa-luar .bbfx::after,.bb-torre-mago .bbfx::after,.bb-navio-fantasma .bbfx::after{inset:28% 0 38%;background:radial-gradient(ellipse,#ffd479 0 18%,transparent 45%) 0 0/14cqw 18cqw;opacity:.8;animation:bbpulse calc(5s*var(--fxs,1)) ease-in-out infinite alternate}
+.bb-castelo-dia .bbfx b,.bb-castelo-crepusculo .bbfx b,.bb-castelo-noite .bbfx b,.bb-vila-dia .bbfx b,.bb-vila-noite .bbfx b,.bb-casa-abandonada .bbfx b,.bb-casa-luar .bbfx b,.bb-torre-mago .bbfx b,.bb-navio-fantasma .bbfx b{inset:0;background:linear-gradient(0deg,#07080b 0 34%,transparent 55%);}
+.bb-praia-dia .bbfx,.bb-praia-por-do-sol .bbfx,.bb-praia-noite .bbfx,.bb-templo-submerso .bbfx,.bb-mar-shukketsu .bbfx{background:linear-gradient(180deg,#fff0 0 46%,#68bad144 47% 67%,#174d63 68% 77%,#dbc18d 78% 82%,#403a2e 100%)}
+.bb-praia-dia .bbfx::before,.bb-praia-por-do-sol .bbfx::before,.bb-praia-noite .bbfx::before,.bb-templo-submerso .bbfx::before,.bb-mar-shukketsu .bbfx::before{inset:45% -10% 17%;background:repeating-linear-gradient(176deg,transparent 0 4cqw,#d5fbff55 4.2cqw 4.8cqw,transparent 5.2cqw 10cqw);animation:bbdrift calc(36s*var(--fxs,1)) linear infinite}
+.bb-praia-dia .bbfx::after,.bb-praia-por-do-sol .bbfx::after,.bb-praia-noite .bbfx::after,.bb-templo-submerso .bbfx::after,.bb-mar-shukketsu .bbfx::after{inset:15% 0 46%;background:radial-gradient(ellipse at 72% 70%,#fff4ba 0 8%,transparent 9%);}
+.bb-cemiterio-neblina .bbfx,.bb-cemiterio-luar .bbfx{background:linear-gradient(180deg,#fff0 0 46%,#1a201f 47% 63%,#080b0b 100%)}
+.bb-cemiterio-neblina .bbfx::before,.bb-cemiterio-luar .bbfx::before{inset:37% 0 28%;background:linear-gradient(90deg,transparent 0 9%,#9b9a8666 9.5% 10%,transparent 10.5% 22%,#9b9a8666 22.5% 23%,transparent 23.5% 37%,#9b9a8666 37.5% 38%,transparent 38.5% 61%,#9b9a8666 61.5% 62%,transparent 62.5% 78%,#9b9a8666 78.5% 79%,transparent 79.5% 90%,#9b9a8666 90.5% 91%,transparent 91.5%),radial-gradient(ellipse,#a9b8ad44,transparent 70%) 0 0/32cqw 100%;}
+.bb-cemiterio-neblina .bbfx::after,.bb-cemiterio-luar .bbfx::after{inset:35% -30% 20%;background:radial-gradient(ellipse 22cqw 8cqw at 30% 70%,#c4d0c266,transparent),radial-gradient(ellipse 28cqw 10cqw at 76% 48%,#b8c6c244,transparent);animation:bbdrift calc(55s*var(--fxs,1)) linear infinite}
+.bb-deserto-dia .bbfx,.bb-deserto-crepusculo .bbfx,.bb-vulcao-ativo .bbfx,.bb-forja-kagutsuchi .bbfx{background:linear-gradient(180deg,#fff0 0 47%,#d2a15c44 48%,#4c2917 69%,#140a08 100%)}
+.bb-deserto-dia .bbfx::before,.bb-deserto-crepusculo .bbfx::before,.bb-vulcao-ativo .bbfx::before,.bb-forja-kagutsuchi .bbfx::before{inset:33% 0 30%;background:linear-gradient(165deg,transparent 0 29%,#7c492d 30% 46%,transparent 47%) 0 0/45cqw 100%,linear-gradient(195deg,transparent 0 32%,#9b5831 33% 51%,transparent 52%) 5cqw 0/53cqw 100%;}
+.bb-vulcao-ativo .bbfx::after,.bb-forja-kagutsuchi .bbfx::after{inset:46% 0 0;background:radial-gradient(ellipse at 50% 5%,#ffbc36aa,transparent 47%),repeating-linear-gradient(170deg,transparent 0 8cqw,#fa511f88 8.2cqw 8.8cqw,transparent 9.2cqw 15cqw);animation:bbpulse calc(2.8s*var(--fxs,1)) ease-in-out infinite alternate}
+.bb-caverna-cristal .bbfx,.bb-colosso-atlas .bbfx{background:linear-gradient(180deg,#07131d 0 36%,#13334b 56%,#07121d 100%)}
+.bb-caverna-cristal .bbfx::before,.bb-colosso-atlas .bbfx::before{inset:12% 0 10%;background:linear-gradient(110deg,transparent 0 11%,#70e6ff 11.5% 12%,transparent 12.5% 24%,#b8f4ff 24.5% 25%,transparent 25.5% 40%,#55bde2 40.5% 41%,transparent 41.5% 65%,#9aeeff 65.5% 66%,transparent 66.5% 83%,#55bde2 83.5% 84%,transparent 84.5%),linear-gradient(0deg,#050a11 0 22%,transparent 23%);filter:drop-shadow(0 0 1cqw #4be1ff);}
+.bb-caverna-cristal .bbfx::after,.bb-colosso-atlas .bbfx::after{inset:0;background:radial-gradient(circle,#c5fbff 0 .16cqw,transparent .34cqw) 0 0/10cqw 12cqw;animation:bbrise calc(18s*var(--fxs,1)) linear infinite}
+.bb-tundra-aurora .bbfx,.bb-montanha-susanoo .bbfx,.bb-planicie-aurora .bbfx{background:linear-gradient(180deg,#fff0 0 50%,#c7e8e544 51%,#55717e 68%,#dbe9e4 69% 73%,#172636 100%)}
+.bb-tundra-aurora .bbfx::before,.bb-montanha-susanoo .bbfx::before,.bb-planicie-aurora .bbfx::before{inset:27% 0 30%;background:linear-gradient(150deg,transparent 0 30%,#b8d1d3 30.5% 48%,transparent 48.5%) 0 0/44cqw 100%,linear-gradient(210deg,transparent 0 27%,#e3eff0 27.5% 48%,transparent 48.5%) 12cqw 0/47cqw 100%;}
+.bb-tundra-aurora .bbfx::after,.bb-montanha-susanoo .bbfx::after,.bb-planicie-aurora .bbfx::after{inset:6% 0 48%;background:repeating-linear-gradient(100deg,#61ffd755 0 6cqw,transparent 11cqw 20cqw,#b880ff44 27cqw 32cqw);mask:linear-gradient(180deg,transparent,#000 25%,transparent);animation:bbwave calc(20s*var(--fxs,1)) ease-in-out infinite}
+.bb-templo-submerso .bbfx b,.bb-mar-shukketsu .bbfx b{background:radial-gradient(circle,#d9ffcb66 0 .16cqw,transparent .3cqw) 0 0/14cqw 11cqw;animation:bbrise calc(16s*var(--fxs,1)) linear infinite}
+.bb-santuario-indra .bbfx::after{inset:12%;background:repeating-linear-gradient(108deg,transparent 0 17cqw,#fff2b533 17.2cqw 17.8cqw,transparent 18cqw 34cqw);animation:bbjit calc(2s*var(--fxs,1)) steps(3) infinite}
+.bb-jardim-amaterasu .bbfx,.bb-aura-despertar .bbfx{background:radial-gradient(ellipse at 50% 55%,#fff2ae66,transparent 36%),linear-gradient(180deg,#fff0 0 48%,#344526 65%,#151a14 100%)}
+.bb-jardim-amaterasu .bbfx::before,.bb-aura-despertar .bbfx::before{inset:45% 0 12%;background:radial-gradient(circle,#ffdf6b 0 .4cqw,transparent .8cqw) 0 0/9cqw 8cqw,radial-gradient(ellipse,#e96a9b99 0 22%,transparent 45%) 3cqw 4cqw/17cqw 14cqw;animation:bbrise calc(18s*var(--fxs,1)) linear infinite}
+.bb-palacio-tsukuyomi .bbfx::before{inset:20% 0 35%;background:linear-gradient(90deg,transparent 0 10%,#b5c8ef66 10.5% 11%,transparent 11.5% 25%,#a6b8df55 25.5% 26%,transparent 26.5% 74%,#a6b8df55 74.5% 75%,transparent 75.5% 89%,#b5c8ef66 89.5% 90%,transparent 90.5%);}
+.bb-planicie-aurora .bbfx b,.bb-montanha-susanoo .bbfx b{inset:52% 0 0;background:repeating-linear-gradient(0deg,#fff4 0 .12cqw,transparent .15cqw 4cqw);}
+.bb-vulcao-ativo .bbfx b,.bb-forja-kagutsuchi .bbfx b{background:radial-gradient(circle,#ffc45a 0 .16cqw,transparent .3cqw) 0 0/9cqw 8cqw,radial-gradient(circle,#ff5c22 0 .22cqw,transparent .4cqw) 4cqw 3cqw/16cqw 17cqw;animation:bbrise calc(9s*var(--fxs,1)) linear infinite}
+
 /* ---- clima sobreposto (qualquer fundo, inclusive imagem) ---- */
 .clima{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .clima::before,.clima::after{content:"";position:absolute;pointer-events:none;will-change:transform}
@@ -1208,8 +1251,11 @@ details.mais>.row{margin:8px 10px}
 .p3d .bbplane{position:absolute;left:-3600px;top:-2000px;width:7200px;height:2600px;transform:translateZ(-2600px);overflow:hidden;background:linear-gradient(180deg,#1a2238 0%,#3b3550 40%,#2a2a22 75%,#0e130f 100%) center/cover}
 .p3d .bbplane.img{background-size:cover;background-position:center;filter:saturate(1.05) brightness(.8)}
 body .p3d .bbplane.stage{display:block;min-height:0;height:2600px;background:#050506}
+.p3d .bbplane.env-left,.p3d .bbplane.env-right,.p3d .bbplane.env-front{left:-3000px;top:-2000px;width:6000px;height:2600px}
+body .p3d .bbplane.stage.env-ceiling{left:-3600px;top:-3000px;width:7200px;height:6000px;transform:translate3d(0,700px,0) rotateX(90deg);filter:brightness(.76) saturate(.82)}
+.p3d .bbplane.env-left{filter:brightness(.58) saturate(.82)}.p3d .bbplane.env-right{filter:brightness(.76) saturate(.9)}.p3d .bbplane.env-front{filter:brightness(.62) saturate(.82)}
 .p3d .ground{position:absolute;left:-3000px;top:-3000px;width:6000px;height:6000px;transform:rotateX(90deg);
- background:radial-gradient(closest-side,#3a3a2a 0%,#1b1d17 45%,transparent 75%),repeating-linear-gradient(0deg,#ffc93c0d 0 2px,transparent 2px 160px),repeating-linear-gradient(90deg,#ffc93c0d 0 2px,transparent 2px 160px)}
+ background:radial-gradient(closest-side,color-mix(in srgb,var(--g2,#3a3a2a) 70%,#fff) 0%,color-mix(in srgb,var(--g3,#1b1d17) 82%,#000) 48%,transparent 78%),repeating-linear-gradient(0deg,color-mix(in srgb,var(--ray,#ffc93c0d) 30%,transparent) 0 .5px,transparent .5px 40px),repeating-linear-gradient(90deg,color-mix(in srgb,var(--ray,#ffc93c0d) 30%,transparent) 0 .5px,transparent .5px 40px)}
 .p3d .floorgrid{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;background-image:linear-gradient(#fff1 1.5px,transparent 1.5px),linear-gradient(90deg,#fff1 1.5px,transparent 1.5px);box-shadow:inset 0 0 0 2px #fff1}
 .p3d .bb{transform-style:preserve-3d}.p3d .bb .ring{position:absolute;left:50%;bottom:0;width:210px;height:210px;margin:0 0 -105px -105px;border-radius:50%;border:5px solid var(--c,#fff);box-shadow:0 0 18px var(--c,#fff),inset 0 0 18px var(--c,#fff);opacity:.8;transform:rotateX(90deg);pointer-events:none}.p3d .bb.ko .ring{display:none}
 .p3d .rangeln{position:absolute;left:0;top:0;height:16px;margin-top:-8px;transform-origin:0 50%;background:repeating-linear-gradient(90deg,#ffd84a 0 36px,transparent 36px 60px);opacity:.85;pointer-events:none}
@@ -1548,3 +1594,66 @@ body[data-role=table] .stage3d>.fbar{font-size:1.5vw;gap:.8vw;left:2vw;top:1.2vw
 @keyframes p3end{0%{scale:1.4;opacity:0}15%{scale:1;opacity:1}85%{opacity:1}100%{opacity:0}}
 .fxl .rpltag{position:fixed;top:12px;left:50%;translate:-50% 0;padding:4px 14px;background:#000c;border:1px solid #ffc93c;color:#ffc93c;font:800 14px Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase;pointer-events:none}
 .log .rpl{margin-left:6px;padding:0 6px;min-height:0;font-size:11px;line-height:18px;vertical-align:middle}
+
+/* ===== palco 3D: desempenho, qualidade e câmera =====
+   Planos grandes têm 1/4 do tamanho e são ampliados ×4: o Chromium rasteriza camadas 3D no tamanho CSS delas, e uma camada que cruza a câmera
+   é rasterizada inteira. Em 6000–7200 px isso estourava a memória de vídeo de PCs fracos (o palco ficava preto nos golpes, com a HUD visível).
+   Filtros (brightness/saturate/blur/drop-shadow) sobre camadas 3D viram superfícies extras: trocados por véus e degradês. */
+.p3d .bbplane::before{content:none}
+.p3d .bbplane{left:-900px;top:-1025px;width:1800px;height:650px;transform:translateZ(-2600px) scale(4)}
+body .p3d .bbplane.stage{height:650px}
+.p3d .bbplane.env-left,.p3d .bbplane.env-right,.p3d .bbplane.env-front{left:-750px;top:-1025px;width:1500px;height:650px}
+body .p3d .bbplane.stage.env-ceiling{left:-900px;top:-750px;width:1800px;height:1500px;transform:translate3d(0,700px,0) rotateX(90deg) scale(4)}
+.p3d .bbplane.img,.p3d .bbplane.env-left,.p3d .bbplane.env-right,.p3d .bbplane.env-front,body .p3d .bbplane.stage.env-ceiling{filter:none}
+.p3d .bbplane.envface::after,.p3d .bbplane.img::after{content:"";position:absolute;inset:0;z-index:5;background:#000;opacity:var(--sh,.2);pointer-events:none}
+.p3d .bbplane.env-left{--sh:.42}.p3d .bbplane.env-right{--sh:.26}.p3d .bbplane.env-front{--sh:.38}.p3d .bbplane.env-ceiling{--sh:.3}.p3d .bbplane.env-back{--sh:0}.p3d .bbplane.env-back.img{--sh:.2}
+.p3d .ground{left:-750px;top:-750px;width:1500px;height:1500px;transform:rotateX(90deg) scale(4)}
+.p3d .fog{left:-750px;top:-400px;width:1500px;height:200px;transform:translateZ(-1900px) scale(4)}
+.p3d .drift{animation:none}
+.p3d .bb img{filter:none}
+.p3d .bb .shadow{filter:none;left:0;right:0;bottom:-22px;height:44px;background:radial-gradient(closest-side,#000c,#0000)}
+/* qualidade (data-q: low | medium | high; Auto = médio, cai para baixo se o fps cair nos golpes) */
+.p3d:not([data-q=high]) .envface:not(.env-back) .bbfx,.p3d:not([data-q=high]) .envface:not(.env-back) .bbfx::before,.p3d:not([data-q=high]) .envface:not(.env-back) .bbfx::after,.p3d:not([data-q=high]) .envface:not(.env-back) .bbfx *{animation-play-state:paused}
+.p3d[data-q=low] .bbfx,.p3d[data-q=low] .bbfx::before,.p3d[data-q=low] .bbfx::after,.p3d[data-q=low] .bbfx *{animation:none!important}
+.p3d[data-q=low] .pcl,.p3d[data-q=low] .fog,.p3d[data-q=low] .flare{display:none}
+.p3d[data-q=low] .bb .ring{box-shadow:none}
+/* câmera: curva de saída (rápida no começo, assenta devagar): trocar de alvo no meio não para e arranca de novo */
+.p3d .world{transition:transform 1.1s cubic-bezier(.22,.8,.26,1)}
+.p3d .world.fast{transition-timing-function:cubic-bezier(.3,.7,.25,1)}
+/* a figura inclina para a câmera nas vistas de cima (o anel e a sombra continuam no chão) */
+.p3d .bb .bbi{rotate:x calc(var(--brx,0deg) * -.85);transition:rotate 1.1s cubic-bezier(.22,.8,.26,1)}
+/* botões do palco: vista (V), qualidade e recentralizar */
+.p3d-ui{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5;display:flex;gap:6px;align-items:center;pointer-events:none}
+.p3d-ui .p3d-reset{position:static;transform:none}
+.p3d-btn{pointer-events:auto;min-height:0;padding:5px 12px;border:1px solid #fff3;border-bottom:2px solid var(--red,#e4002b);background:rgba(10,8,12,.78);color:#fff;font:600 12px var(--cond,system-ui);letter-spacing:.5px;text-transform:none;cursor:pointer;opacity:.75;transition:opacity .15s}
+.p3d-btn:hover{opacity:1;background:rgba(10,8,12,.92)}
+html.p3-golpe .p3d-ui{opacity:0;transition:opacity .2s}
+/* movimento: andar (balanço), antecipação, impacto e pulo de volta */
+.p3d .bb{transition:transform var(--mvd,.6s) cubic-bezier(.4,0,.2,1),filter .3s,opacity .25s}
+.p3d .bb.walk{transition-timing-function:linear}
+.p3d .bb.walk .bbi{animation:bbwalk .36s ease-in-out infinite}
+@keyframes bbwalk{0%,100%{translate:0 0}25%{translate:0 -3.5%}50%{translate:0 0}75%{translate:0 -3.5%}}
+.p3d .bb.walk img{animation:bbsway .72s ease-in-out infinite}
+@keyframes bbsway{0%,100%{rotate:-2.5deg}50%{rotate:2.5deg}}
+.p3d .bb.windup{transition:transform .13s ease-out;transform:translate3d(calc((var(--x,0) + var(--wx,0)) * 1px),0,calc((var(--z,0) + var(--wz,0)) * 1px)) translate(-50%,-100%) rotateY(calc(var(--bry,0deg) * -1))}
+.p3d .bb.windup .bbi{scale:1.05 .9;transition:scale .13s ease-out,rotate 1.1s}
+.p3d .bb.impact .bbi{animation:bbimpact .26s ease-out}
+@keyframes bbimpact{0%{scale:1.12 .9}45%{scale:.95 1.06}100%{scale:1}}
+.p3d .bb.hopb{transition:transform var(--mvd,.46s) cubic-bezier(.3,.6,.35,1)}
+.p3d .bb.hopb .bbi{animation:bbhop var(--mvd,.46s) ease-out}
+@keyframes bbhop{0%{translate:0 0}40%{translate:0 -14%}75%{translate:0 0;scale:1.04 .94}100%{scale:1}}
+@media(prefers-reduced-motion:reduce){.p3d .bb.walk .bbi,.p3d .bb.walk img,.p3d .bb.hopb .bbi,.p3d .bb.impact .bbi{animation:none}}
+@media(prefers-reduced-motion:reduce){.p3d .world,.p3d .bb,.p3d .bb .bbi{transition-duration:.01s}}
+/* filtro no .bb achata o recorte (anel e sombra deixam o chão, a figura não inclina) e cria uma superfície por recorte: os tons vão para a imagem */
+.p3d .bb.unit,.p3d .bb.ko,.p3d.selecting .bb:not(.pickable),.p3d.threat .bb.hero,.p3d .bb.hurt,.p3d .bb.hl{filter:none}
+.p3d:not([data-q=low]) .bb.unit:not(.cur) img{filter:brightness(.82) saturate(.92)}
+.p3d .bb.ko img{filter:grayscale(1) brightness(.45)}
+.p3d.selecting .bb:not(.pickable) img{filter:grayscale(.7) brightness(.55)}
+.p3d.threat .bb.hero img{filter:brightness(.4) saturate(.6)}
+.p3d .bb.hurt img{filter:brightness(1.6)}
+.p3d .bb.hl img{filter:drop-shadow(0 0 10px var(--gold)) brightness(1.15)}
+.p3d .bb .shadow{left:50%;right:auto;bottom:0;width:230px;height:230px;margin:0 0 -115px -115px;border-radius:50%;background:radial-gradient(closest-side,#000b 30%,#0000);transform:rotateX(90deg) scale(calc(1 - var(--lift,0) * .5))}
+.scene-prop{position:absolute;left:0;top:0;transform-style:preserve-3d;pointer-events:none}
+.scene-prop img{position:absolute;width:420px;height:490px;max-width:none;transform-origin:50% 100%}
+.p3d[data-biome$="-noite"] .scene-prop img{filter:brightness(.49) saturate(.7)}
+.p3d:is([data-biome$="-entardecer"],[data-biome$="-crepusculo"],[data-biome$="-por-do-sol"]) .scene-prop img{filter:sepia(.3) brightness(.85)}

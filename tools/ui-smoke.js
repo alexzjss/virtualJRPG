@@ -553,7 +553,7 @@ try {
       await bia.locator('.qte3d button.def').dispatchEvent('pointerdown');
       await until(() => (S.battle.cmd?.p[mikhail.id] || []).length > 0, 'o aperto no PC chega ao servidor como nota');
       check(await until(() => bia.evaluate(id => { const w = document.querySelector('.p3d .world'), F = PALCO3D.formation(Object.values(S.chars).filter(c => c.id in S.battle.ticks), PALCO3D.frameNow(Object.values(S.chars).filter(c => c.id in S.battle.ticks))), v = PALCO3D.cameraFor({ kind: 'hero', at: F.get(id) });
-        return w.style.transform.replace(/\s/g, '') === `translate3d(${v.tx}px,${v.ty}px,${v.tz}px)rotateY(${v.ry}deg)`; }, mikhail.id), 'câmera no ombro do alvo', 1500), 'na janela de defesa a câmera vai ao ombro da Mikhail');
+        return w.style.transform.replace(/\s/g, '') === `translate3d(${v.tx}px,${v.ty}px,${v.tz}px)rotateX(${v.rx || 0}deg)rotateY(${v.ry}deg)`; }, mikhail.id), 'câmera no ombro do alvo', 1500), 'na janela de defesa a câmera vai ao ombro da Mikhail');
       go({ t: 'cmdSkip' }); push(); await until(() => !S.battle.cmd, 'a janela fecha (PC)');
       await until(async () => !(await bia.locator('.qte3d').count()), 'o anel 3D some'); await bia.emulateMedia({ reducedMotion: 'no-preference' }); }
     // ataque: técnica com Golpe no tempo abre o minigame; pular manda a ação sem nota e o golpe sai normal

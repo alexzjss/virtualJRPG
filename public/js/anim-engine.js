@@ -165,13 +165,15 @@
     const vt = clockNow(); ctx.clearRect(0, 0, W, H); drawPersistent(vt);
     effects = effects.filter(e => { drawOne(e, vt); return vt < e.start + e.profile.duration; });
     extras = extras.filter(x => { const k = clamp((vt - x.start) / x.dur); x.draw(k); return k < 1; });
+    // a câmera do palco anda durante o efeito: origem e alvo são relidos a cada quadro (o projétil acompanha a tela)
+    for (const e of effects) { const ar = e.aid && rect(e.aid), tr = e.tid && rect(e.tid); if (ar) { e.from = point(e.aid, ar, e.profile.origin); e.footA = footPoint(ar); e.sa = scaleOf(ar); } if (tr) { e.to = targetPoint(tr); e.footB = footPoint(tr); e.sb = scaleOf(tr); } }
     if (effects.length || persist.length || extras.length) raf = requestAnimationFrame(frame);
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   function play({ actorId, targetIds = [], skill, fx = {}, delay = 0 } = {}) {
     const aid = actorId || fx.a, P = profile(skill || skillByName(fx.s), fx), ar = rect(aid), a = point(aid, ar, P.origin), ids = [...new Set(targetIds.filter(Boolean))], targets = ids.length ? ids : [fx.id].filter(Boolean), start = clockNow() + delay;
     try { if (typeof tone === 'function') { const f = NOTE[P.el] || 220, beam = P.family === 'beam' || P.family === 'ritual'; tone(f, Math.min(.5, P.duration / 1000), { type: beam ? 'sawtooth' : P.family === 'heal' ? 'sine' : 'triangle', to: beam ? f * 2 : P.family === 'projectile' ? f * 1.5 : 0, g: .035 + P.tier * .012 }); if (['smash', 'area', 'rain'].includes(P.family) && typeof thud === 'function') thud(.18, 180 + P.tier * 90, .16 + P.tier * .05, 'lowpass', P.duration * P.impact / 1000); } } catch {}
-    const list = (targets.length ? targets : ['']).map((id, i) => { const tr = rect(id), b = targetPoint(tr), p = { ...P, seed: P.seed + i * 997, duration: P.duration + i * 40 }; return { id: ++seq, start: start + i * 40, from: a, to: b, footA: footPoint(ar), footB: footPoint(tr), sa: scaleOf(ar), sb: scaleOf(tr), profile: p }; });
+    const list = (targets.length ? targets : ['']).map((id, i) => { const tr = rect(id), b = targetPoint(tr), p = { ...P, seed: P.seed + i * 997, duration: P.duration + i * 40 }; return { id: ++seq, aid, tid: id, start: start + i * 40, from: a, to: b, footA: footPoint(ar), footB: footPoint(tr), sa: scaleOf(ar), sb: scaleOf(tr), profile: p }; });
     effects.push(...list); kick();
     const impactMs = Math.round(P.duration * P.impact + delay), doneMs = Math.round(P.duration + delay);
     return { profile: P, impact: later(impactMs), done: later(doneMs) };
