@@ -74,7 +74,7 @@
     const side = R >= Lf ? 1 : -1; return { side, scale: Math.round(clamp(Math.max(R, Lf) / wr, .6, 1) * 100) / 100 };
   };
   const mood = sc => { const t = [sc?.mood, sc?.hora, /-(dia|tarde|noite)$/.exec(String(sc?.bbg || ''))?.[1]].find(v => v === 'dia' || v === 'tarde' || v === 'noite'); return t || 'dia'; }; // hora do dia da cena: campo mood/hora, ou o sufixo do cenário pronto (tema-hora)
-  const ZMIN = 420, ZMAX = 1700; // zoom: distância extra mínima e máxima do alvo
+  const ZMIN = 420, ZMAX = 2600; // zoom: distância extra mínima e máxima do alvo
   const cameraFor = v => {
     const a = v.at || { x: 0, z: 0 }, t = v.to || a; let r;
     if (PRESET[v.kind] || v.kind === 'wide') { // vistas de fora travadas (ver PRESET) e plano aberto de área
@@ -101,7 +101,7 @@
       b = clamp(Math.ceil(b / 10) * 10, 0, 1400);
       r = { tx, ty: Math.round(b * .08), tz: tz0 - b, ry };
       if (ln) { const ka = PERSP / Math.max(160, PERSP - (A.z + r.tz)); const W = v.w || 1440, mx = ln.side > 0 ? W / 2 + SX * ka - W * .3 : W * .7 - (W / 2 + SX * ka); r.tx = tx - ln.side * Math.max(0, Math.min(ln.w * .55, W * .25, mx)) / ka; } // a faixa da coluna: o ator sai da frente dela, em pixels de tela (ka: escala do ator depois do recuo)
-    } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x, ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 1.2), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
+    } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x, ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 2.8), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
     else if (v.kind === 'orbit') { const ry = (v.ry0 || 0) + (v.deg || 0), A = rotP(a, ry); r = { tx: -A.x, ty: -60, tz: -A.z - 620 - (v.back || 0), ry }; } // arco cinematográfico em volta de quem age
     else if (v.kind === 'aim') r = { tx: -(a.x * .55 + t.x * .45) - 120, ty: 0, tz: -a.z + 380, ry: a.x < 0 ? -4 : 4 };
     else if (v.kind === 'foe') r = { tx: -a.x * .3, ty: 0, tz: 180, ry: 0 };

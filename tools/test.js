@@ -1695,7 +1695,7 @@ test('palco 3D: zoom e mesa respeitam a altura real e a faixa da coluna', async 
   const z = h => P.cameraFor({ kind: 'zoom', to: to(h), ry: 0 });
   assert.equal(z(300).tz, P.cameraFor({ kind: 'zoom', to: { x: 0, z: -1500 }, ry: 0 }).tz, 'sem h usa o padrão');
   assert.ok(z(1200).tz < z(380).tz, 'chefe grande: câmera mais longe');
-  for (const h of [50, 380, 1200, 5000]) { const d = 1500 - z(h).tz; assert.ok(Number.isFinite(z(h).tz) && d >= 420 && d <= 1700, 'piso e teto do zoom'); }
+  for (const h of [50, 380, 1200, 5000]) { const d = 1500 - z(h).tz; assert.ok(Number.isFinite(z(h).tz) && d >= 420 && d <= 2600, 'piso e teto do zoom'); }
   const mk = (h, lane) => P.cameraFor({ kind: 'table', at: { x: -430, z: 0, h: 300 }, pts: [{ x: -430, z: 0, h: 300 }, { x: 0, z: -1500, h }], w: 1440, h: 860, ...(lane ? { lane } : {}) });
   assert.ok(mk(1200).tz < mk(380).tz, 'recua para caber a figura alta');
   assert.deepEqual(mk(380, { w: 0, side: 1 }), mk(380), 'faixa zero não muda nada');
