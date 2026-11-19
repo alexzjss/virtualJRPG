@@ -13,7 +13,7 @@ export const LEVA10S = {
     N('Chicote Encharcante', 'O chicote estala e deixa todos encharcados.', 'd10/8 a', 'st wet 2'),
     N('Chicote de Duas Pontas', 'Duas pontas de água, e a segunda cobra o que a primeira molhou.', 'd10/9 x2', 'vs wet 1.4; st wet 1'),
     N('Chicote Que Estala no Gelo', 'O chicote estala no gelo e derruba quem estiver congelado.', 'd18/10', 'vs frozen 1.6; st down 1'),
-    N('Chicote da Serpente do Mar', 'Uma serpente de água que salta de inimigo em inimigo.', 'd34/14', 'st wet 3; chain 2 .6'),
+    N('Chicote da Serpente do Mar', 'Uma serpente de água que cobra mais de quem já está molhado.', 'd30/14', 'st wet 3; vs wet 1.3'),
   ],
   'Maré Alta': [
     N('Maré Que Acumula', 'Cada onda deixa a água mais alta no campo.', 'd10/9 a', 'stack mare 5; st wet 1'),

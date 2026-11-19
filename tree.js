@@ -38,9 +38,10 @@ export const TREE = {
       { n: "Tiro Certeiro", req: "dist", k: "dmg", d: "Respirar fundo, mirar com calma e disparar sem pressa.", xp: 15, a: "DES", p: 10, c: 4, ct: 60 },
       { n: "Foco", k: "passive", d: "Um hábito de concentração que alarga a reserva de aura.", xp: 15, pas: "auraMax", p: 8 },
       { n: "Mente Firme", k: "passive", d: "A cabeça fria de quem já viu o pior e continua de pé.", xp: 15, pas: "sanMax", p: 10 },
+      { n: "Golpe Limite", k: "dmg", d: "Toda a dor sofrida convertida em um golpe devastador.", xp: 40, a: "FOR", p: 48, c: 0, limit: true, fx: "rage .5" },
       { n: "Grito de Guerra", k: "heal", d: "Um brado que faz o sangue ferver e acende o grupo.", xp: 20, a: "CAR", p: 0, c: 6, st: "atkUp", area: true },
       { n: "Passo Rápido", k: "heal", d: "Um incentivo curto, apressando o ritmo do aliado.", xp: 20, a: "AGI", p: 0, c: 4, st: "agiUp", ct: 50 },
-      { n: "Golpe Limite", k: "dmg", d: "Toda a dor sofrida convertida em um golpe devastador.", xp: 40, a: "FOR", p: 48, c: 0, limit: true, fx: "rage .5" },
+      { n: "Golpe Perfeito", k: "dmg", d: "Um golpe sem um gesto sobrando, no instante em que a guarda do inimigo se abre.", xp: 110, a: "FOR", p: 54, c: 18, fx: "pierce 60; st stun 1 40%" },
     ],
     [
       { n: "Treino de FOR", k: "passive", d: "Dias de treino constante afinam a força.", xp: 15, pas: "FOR", p: 5 },
@@ -51,6 +52,7 @@ export const TREE = {
       { n: "Treino de SAB", k: "passive", d: "Dias de treino constante afinam a sabedoria.", xp: 15, pas: "SAB", p: 5 },
       { n: "Treino de CAR", k: "passive", d: "Dias de treino constante afinam a carisma.", xp: 15, pas: "CAR", p: 5 },
       { n: "Treino de SOR", k: "passive", d: "Dias de treino constante afinam a sorte.", xp: 15, pas: "SOR", p: 5 },
+      { n: "Treino de Fôlego", k: "passive", d: "Respiração e corrida até o pulmão da aura ficar maior.", xp: 15, pas: "auraMax", p: 8 },
     ],
   ] },
   kagutsuchi: { branches: [

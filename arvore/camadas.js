@@ -226,6 +226,8 @@ function caber(bs, fixos) {
 }
 
 export const VAGAS = [];
+const FLAT = new Map(); // passivas do 1º ramo do Marcial: mantêm o bônus de sempre
+const TREINO = new Set(); // Treinos de atributo: o bônus sobe devagar com a camada, não pela curva de dano
 export const LINHAS = []; // linhas de variação que não chegam à camada 10 (a Leva 10 completa todas)
 const temaDe = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return ['ofensiva', 'controle', 'defesa', 'maestria', 'especial'][c.indexOf(Math.max(...c))]; };
 const vaga = (el, ramo, b, tema) => { if (b.length < CAM) VAGAS.push({ el, ramo, tem: b.length, faltam: Array.from({ length: CAM - b.length }, (_, k) => b.length + k + 1), tema: tema || temaDe(b) }); };
@@ -243,7 +245,7 @@ export function camadas(TREE, preencher) {
     espalharFortes([...comuns, ...novos], new Set(raiz ? [raiz[0]] : []));
     t.branches = [...t.branches.filter(b => !b.de), ...novos, ...linhas];
     preencher?.(el, t.branches.filter(b => !b.de && !fixos.has(b))); // casas livres (arvore/leva9.js)
-    for (const b of fixos) b.forEach(s => marca(s, 1, 0));
+    for (const b of fixos) b.forEach((s, i) => { marca(s, i + 1, 0); if (b === t.branches[1]) TREINO.add(s); else if (s.k === 'passive') FLAT.set(s, [s.p, s.xp]); }); // ramos iniciais do Marcial: a posição também é a camada
     t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; ordenar(b, b === raiz); b.forEach((s, i) => marca(s, i + 1, i)); vaga(el, bi, b); });
   }
   // Árvore de Armas: cada tipo tem 3 ramos (o 1º leva o nome do tipo); o excesso passa para o irmão mais curto; os primordiais só ordenam
@@ -269,6 +271,8 @@ export function camadas(TREE, preencher) {
     if (L0 + b.length < CAM) LINHAS.push({ el, ramo: bi, base: b.de, tem: b.length, faltam: CAM - L0 - b.length });
   }
   for (const [s, L, i] of plano) aplicar(s, L, i);
+  for (const [s, [p, xp]] of FLAT) { s.p = p; s.xp = xp; }
+  for (const s of TREINO) s.p = s.pas === 'hpMax' ? 10 + 2 * s.cam : s.pas === 'auraMax' ? 8 + s.cam : 5 + Math.floor((s.cam - 1) / 3);
   for (const [s] of plano) delete s._xp0;
   return VAGAS;
 }

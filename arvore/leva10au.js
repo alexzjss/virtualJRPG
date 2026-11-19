@@ -85,10 +85,10 @@ export const LEVA10AU = {
   ],
   'Ritual: Perceber o Outro Lado': [
     N('Ritual: Perceber Fundo', 'O ritual vai fundo, e o outro lado devolve o olhar.', 'u/5 s', 'st focus 3', { a: 'INT' }),
-    N('Ritual: Ver o Que Se Esconde', 'O que se esconde fica à mostra para o grupo todo.', 'u/8 a', 'st exposed 2', { a: 'INT' }),
+    N('Ritual: Ver o Que Se Esconde', 'O que se esconde fica à mostra para o grupo todo.', 'u/8 a', 'st exposed 2 foes', { a: 'INT' }),
     N('Ritual: Perceber o Medo', 'O ritual lê o medo do alvo e o marca.', 'm14/9', 'st fear 2; st marked 2'),
     N('Ritual: Abrir o Terceiro Olho', 'Um olho que não é de ninguém se abre na testa do ocultista.', 'u/10 s', 'st focus 3; gain aura 10', { a: 'INT' }),
-    N('Ritual: Ver Tudo', 'Nada fica escondido do ritual: nem o alvo, nem o que ele teme.', 'u/14 a', 'st exposed 3; st marked 3', { a: 'INT' }),
+    N('Ritual: Ver Tudo', 'Nada fica escondido do ritual: nem o alvo, nem o que ele teme.', 'u/14 a', 'st exposed 3 foes; st marked 3 foes', { a: 'INT' }),
   ],
   'Ritual: Decadência': [
     N('Ritual: Decadência Que Se Alastra', 'A decadência pula de um corpo para o outro.', 'd18/12 a', 'st defDn 2; st curse 2'),

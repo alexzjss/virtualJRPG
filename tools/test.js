@@ -1694,10 +1694,29 @@ test('camadas e temas: ramos de até 10, posição = camada, kit atual até a 5,
   const { TREE } = await import('../tree.js'), { CAM, forte } = await import('../arvore/camadas.js'), { ATUAIS } = await import('../arvore/atuais.js'), { validar } = await import('../arvore/temas.js');
   for (const [el, t] of Object.entries(TREE)) t.branches.forEach((b, bi) => {
     if (b.de) return; assert.ok(b.length <= CAM, `${el}-${bi}: ${b.length} nós`);
-    if (!(el === 'marcial' && bi < 2)) b.forEach((s, i) => assert.equal(s.cam, i + 1, `${s.n}: casa ${i + 1}, camada ${s.cam}`));
+    b.forEach((s, i) => assert.equal(s.cam, i + 1, `${s.n}: casa ${i + 1}, camada ${s.cam}`));
   });
   const all = Object.values(TREE).flatMap(t => t.branches.flat());
   for (const s of all.filter(s => ATUAIS.has(s.n))) assert.ok(s.cam <= 5, `${s.n} na camada ${s.cam}`);
   assert.ok(all.filter(s => forte(s)).filter(s => s.cam < 7).length <= 2, 'fortes abaixo da 7');
+  // Leva 10: toda linha de variação sobe uma camada por nó até a 10 (os que passam disso dividem a 10), cada nó pede o anterior
+  const cam = new Map(all.map(s => [s.n, s.cam]));
+  for (const [el, t] of Object.entries(TREE)) for (const b of t.branches) if (b.de) {
+    const L0 = cam.get(b.de), cams = b.map(s => s.cam);
+    assert.equal(Math.max(...cams), CAM, `${el}: linha de ${b.de} não chega à camada ${CAM}`);
+    assert.ok(Math.min(...cams) > L0, `${el}: linha de ${b.de} começa antes da base`);
+    b.forEach((s, i) => assert.equal(s.pre, i ? b[i - 1].n : b.de, `${s.n}: pré-requisito fora da corrente`));
+    for (let i = 1; i < b.length; i++) assert.ok(b[i].cam >= b[i - 1].cam, `${el}: ${b[i].n} fica antes de ${b[i - 1].n}`);
+  }
   assert.deepEqual(validar(TREE), []);
+});
+
+test('Leva 10: efeitos conv (converte condição) e solo (único inimigo de pé)', () => {
+  const { parseFx, fxText, fxSrc } = globalThis.RULES;
+  const [c, s] = parseFx('conv burn exposed; solo 1.6');
+  assert.deepEqual([c.t, c.k, c.k2, s.t, s.m], ['conv', 'burn', 'exposed', 'solo', 1.6]);
+  assert.match(fxText([c, s]), /converte.*em.*único inimigo/);
+  assert.equal(fxSrc([c, s]), 'conv burn exposed; solo 1.6');
+  assert.equal(parseFx('solo')[0].m, 1.5);
+  assert.throws(() => parseFx('conv burn naoexiste'), /conversão desconhecida/);
 });

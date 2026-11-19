@@ -15,7 +15,7 @@ export const LEVA10H = {
   'Suplex': [
     N('Suplex Que Contagia', 'O arremesso passa a doença para o alvo.', 'd12/7', 'st poison 2; stack doenca 5'),
     N('Suplex Que Racha', 'O arremesso racha o chão e a postura do alvo.', 'd16/9', 'brk 2; st down 1'),
-    N('Suplex em Cadeia', 'O alvo é jogado contra o próximo, e o próximo contra o outro.', 'd18/11', 'chain 2 .6; stack doenca 5'),
+    N('Suplex em Cadeia', 'O alvo é jogado contra o próximo, e o próximo contra o outro.', 'd18/11', 'chain 1 .5; stack doenca 5'),
     N('Suplex da Febre', 'Quanto mais doente o alvo, mais forte o arremesso.', 'd22/12', 'vs poison 1.5; st poison 3'),
     N('Suplex Terminal', 'O último arremesso, o da fase terminal da doença.', 'd40/16', 'st down 2; vs poison 1.6; stack doenca 5'),
   ],
@@ -46,7 +46,7 @@ export const LEVA10H = {
   ],
   'Isótopo Instável': [
     N('Isótopo Acumulado', 'Cada isótopo deixa uma carga no caçador.', 'd10/6', 'stack mutacao 5; st rad 2'),
-    N('Isótopos em Cadeia', 'Um isótopo desperta o vizinho, e o vizinho do vizinho.', 'd12/8', 'chain 2 .6; st rad 2'),
+    N('Isótopos em Cadeia', 'Um isótopo desperta o vizinho, e o vizinho do vizinho.', 'd12/8', 'chain 1 .5; st rad 2'),
     N('Isótopo Detonador', 'Toda a radiação acumulada estoura no alvo.', 'd16/10', 'det rad 6; st rad 2'),
     N('Isótopo Que Contamina', 'A radiação passa de um inimigo para todos os outros.', 'd16/12 a', 'spread rad; st rad 2'),
     N('Isótopo do Núcleo Instável', 'Um núcleo instável que não aguenta ser núcleo.', 'd40/18 a', 'st rad 3; vs rad 1.5'),

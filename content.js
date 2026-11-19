@@ -95,6 +95,10 @@ export function buildSkills(sk) {
   // núcleo Marcial (centro e o anel em volta): aberto a todos, sem exigir vizinho aprendido; dele se anda para o resto do tronco
   put(C, C, node(M[0][0], 'fis', { open: 1 }));
   around(C, C).forEach((p, i) => M[0][i + 1] && put(...p, node(M[0][i + 1], 'fis', { open: 1 }), [C, C]));
+  for (const o of M[0].slice(9)) { // a 10ª casa do ramo inicial: a livre mais perto do centro, encostada no núcleo
+    let at = null; for (let r = 2; r <= 6 && !at; r++) for (let x = C - r; x <= C + r && !at; x++) for (let y = C - r; y <= C + r && !at; y++) if (free(x, y)) { const v = around(x, y).find(p => used.get(p.join(',')) === 'fis'); if (v) at = [x, y, v]; }
+    if (at) put(at[0], at[1], node(o, 'fis', { open: 1 }), at[2]);
+  }
   const rays = M.slice(2).filter(b => !b.de); // M[1] são os treinos; as armas saíram para TREE.armas
   rays.forEach((br, i) => chain(i * 360 / rays.length + 360 / ORDER.length / 2, 2, br.map(o => node(o, 'fis')), fis));
   const train = M[1].map(o => node(o, 'fis'));

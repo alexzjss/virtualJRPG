@@ -32,7 +32,7 @@ export function completar(TREE) {
       const s = { ...o, xp: 50, ob: ref.ob };
       if (s.k !== 'passive') s.a = o.a || b.find(x => x.a)?.a || 'FOR';
       for (const k of ['cat', 'req']) if (ref[k] && s[k] == null) s[k] = ref[k];
-      if (ref.circ && !s.circ) { s.circ = Math.min(4, 1 + Math.floor((b.length + i) / 3)); s.pay = { san: s.circ + 1 }; }
+      if (ref.circ && !s.circ) { s.circ = Math.min(4, 1 + Math.floor((b.length + i) / 3)); s.pay = { san: s.circ + 1 }; s.cmd = 'runa'; s.rn = ['circulo', 'triangulo', 'estrela', 'espiral'][s.circ - 1]; }
       b.push(s);
     });
     feitos.add(base);
