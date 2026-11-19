@@ -13,18 +13,25 @@
   const SHD = [0.834, -0.552], SHK = 1.4; // sombra no chão: direção (x, z) e comprimento por unidade de altura
   const f1 = v => Math.round(v * 10) / 10, f4 = v => Math.round(v * 1e4) / 1e4;
   const rng = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-  const svgUrl = (w, h, body, pa = 'none') => `url('data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="${pa}">${body}</svg>`).replace(/'/g, '%27')}')`;
+  // recorte com contorno de silhueta: dilata o alfa e pinta de INK por trás (rasterizado uma vez, sem custo por quadro)
+  const olSvg = (w, h, body, r = Math.max(1.2, w / 90), pa = 'none') => !CEL ? svgUrl(w, h, body, pa) : svgUrl(w, h, `<defs><filter id="ol" x="-4%" y="-4%" width="108%" height="108%"><feMorphology in="SourceAlpha" operator="dilate" radius="${f1(r)}" result="d"/><feFlood flood-color="${INK}"/><feComposite in2="d" operator="in" result="o"/><feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#ol)">${body}</g>`, pa);
+  function svgUrl(w, h, body, pa = 'none') { return `url('data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="${pa}">${body}</svg>`).replace(/'/g, '%27')}')`; }
   // ----- horário: toda cor gerada passa por grade() ao montar (custo zero na luta). "!#hex" marca cor que não grada (céu, lava, cristal) -----
   const HORAS = ['dia', 'tarde', 'noite'];
+  let CEL = false; // estilo cel shading (padrão ao montar; "simples" volta ao antigo)
+  const INK = '#1c3038'; // contorno: azul-petróleo escuro, não preto
+  const mixHex = (a, b, k) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - k) + parseInt(b.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
   const horaDe = id => { const p = String(id || '').split('-'); return p.length === 2 && HORAS.includes(p[1]) ? p[1] : 'dia'; };
   function grade(hex, hora) {
-    if (hora !== 'tarde' && hora !== 'noite') return hex;
+    const ds = CEL ? .9 : 1; // cel: tira 10% da saturação (menos berrante), em qualquer horário
+    if (hora !== 'tarde' && hora !== 'noite' && ds === 1) return hex;
     const v = hex.replace(/^#/, ''), short = v.length <= 4, s = short ? [...v.slice(0, 3)].map(ch => ch + ch).join('') : v.slice(0, 6);
     let c = [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16) / 255);
     const gray = () => .2126 * c[0] + .7152 * c[1] + .0722 * c[2], l = gray();
     const mix = (t, k) => { c = c.map((x, i) => x + (t[i] - x) * k); }, sat = k => { const y = gray(); c = c.map(x => y + (x - y) * k); };
+    sat(ds);
     if (hora === 'tarde') { mix([1, .6, .29], .24 * l + .06); mix([.54, .23, .48], .2 * (1 - l)); sat(1.1); } // luz dourada, sombra puxando para o magenta
-    else { sat(.7); mix([.16, .23, .54], .35); c = c.map(x => x * .42 + .04); } // noite azulada, com piso de luminância
+    else if (hora === 'noite') { sat(.7); mix([.16, .23, .54], .35); c = c.map(x => x * .42 + .04); } // noite azulada, com piso de luminância
     c = c.map(x => Math.max(0, Math.min(1, x)));
     return '#' + (short ? c.map(x => Math.round(x * 15).toString(16)).join('') + v.slice(3) : c.map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('') + v.slice(6));
   }
@@ -78,7 +85,7 @@
         if (o.face && dot(n, o.face) < 0) n = mul(n, -1);
         const rad = pts.reduce((s, p) => s + len(sub(p, c)), 0) / pts.length, k = 1 + (o.grow ?? 1.6) / (rad || 1);
         const P = pts.map(p => add(c, mul(sub(p, c), k))); // cresce um pouco por igual: sem frestas entre faces vizinhas
-        const col = o.color || tone(n, mat, o.ds), ex = o.ds ? ';backface-visibility:visible' : '';
+        const col = o.color || tone(n, mat, o.ds), ex = (o.ds ? ';backface-visibility:visible' : '') + (CEL && !o.color ? `;box-shadow:inset 0 0 0 2px ${INK}` : '');
         if (P.length === 4 && len(sub(add(P[0], P[2]), add(P[1], P[3]))) < 4) { // paralelogramo: elemento inteiro, sem recorte
           let u = sub(P[1], P[0]), v = sub(P[3], P[0]); if (!orient(u, v, n)) [u, v] = [v, u];
           return emit(P[0], u, v, n, o.bg ? `${o.bg},${col}` : col, ex);
@@ -104,7 +111,8 @@
         const b = [P(-w / 2, -d / 2, y0), P(w / 2, -d / 2, y0), P(w / 2, d / 2, y0), P(-w / 2, d / 2, y0)], t = b.map(p => [p[0], y0 - h, p[2]]), mid = [x, y0 - h / 2, z];
         for (let k = 0; k < 4; k++) B.poly([b[k], b[(k + 1) % 4], t[(k + 1) % 4], t[k]], mat, mid, { bg: o.bg });
         B.poly(t, o.top || mat, mid, { bg: o.topBg }); },
-      blob(x, y, z, r, pal) { cur.push(`<b class="tb" style="--x:${f1(x)};--y:${f1(y)};--z:${f1(z)};--k:${f4(r / 128)};--a:${pal[0]};--b:${pal[1]};--c:${pal[2]}"></b>`); },
+      blob(x, y, z, r, pal, o = {}) { if (CEL && !o.round) return B.card(x, z, r * 2.5, r * 2.33, blobSvg(pal, Math.abs(Math.round((x + z) / 97)) % 3), { sh: true, y: -(y + r * 1.083) });
+        cur.push(`<b class="tb" style="--x:${f1(x)};--y:${f1(y)};--z:${f1(z)};--k:${f4(r / 128)};--a:${pal[0]};--b:${pal[1]};--c:${pal[2]}"></b>`); },
       // recorte em pé que gira para a câmera. k: desenhado a 1/k e ampliado (menos memória); sh: espelha quando o sol troca de lado na tela
       card(x, z, w, h, bg, o = {}) { const k = o.k || 1, W = w / k, H = h / k;
         cur.push(`<s class="tc${o.sh ? ' sh' : ''}" style="left:${f1(-W / 2)}px;top:${f1(-H)}px;width:${f1(W)}px;height:${f1(H)}px;--x:${f1(x)};--y:${f1(-(o.y || 0))};--z:${f1(z)};--ck:${k}${o.flip ? ';--cf:-1' : ''};background-image:${bg}"></s>`); },
@@ -127,10 +135,10 @@
     return `<g>${c(7 * s, shade)}<rect x="${f1(cx - 66 * s)}" y="${f1(cy - 4 * s)}" width="${f1(132 * s)}" height="${f1(13 * s)}" rx="${f1(6 * s)}" fill="${shade}"/>${c(0, lite)}<rect x="${f1(cx - 62 * s)}" y="${f1(cy - 10 * s)}" width="${f1(124 * s)}" height="${f1(12 * s)}" rx="${f1(6 * s)}" fill="${lite}"/></g>`; };
   const ridge = (W, base, amp, R, col, step = 24) => { const ph = [R() * 6, R() * 6, R() * 6], fq = [.004 + R() * .003, .011 + R() * .006, .03 + R() * .01]; let d = `M0 650 L0 ${base}`;
     for (let x = 0; x <= W + step; x += step) d += ` L${x} ${f1(base - amp * (.55 * Math.sin(x * fq[0] + ph[0]) + .3 * Math.sin(x * fq[1] + ph[1]) + .15 * Math.sin(x * fq[2] + ph[2]) + .6))}`;
-    return `<path d="${d} L${W + step} 650 Z" fill="${col}"/>`; };
-  const bumps = (W, base, r0, r1, R, col, from = 0, to = W) => { let s = `<rect x="${from}" y="${base}" width="${to - from}" height="${650 - base}" fill="${col}"/>`;
-    for (let x = from - r1 * .3; x < to + r1 * .3; x += r0 * 1.1 + R() * r0) { const r = r0 + R() * (r1 - r0); s += `<circle cx="${f1(x)}" cy="${f1(base + r * .35)}" r="${f1(r)}" fill="${col}"/>`; }
-    return s; };
+    return `<path d="${d} L${W + step} 650 Z" fill="${col}"/>` + (CEL ? `<rect y="${f1(base - amp * .5)}" width="${W + step}" height="${f1(amp * .5 + 50)}" fill="url(#hz)"/>` : ''); }; // cel: névoa de distância na base
+  const bumps = (W, base, r0, r1, R, col, from = 0, to = W) => { const C = []; for (let x = from - r1 * .3; x < to + r1 * .3; x += r0 * 1.1 + R() * r0) C.push([x, r0 + R() * (r1 - r0)]);
+    const draw = (k, c) => `<rect x="${from}" y="${base}" width="${to - from}" height="${650 - base}" fill="${c}"/>` + C.map(([x, r]) => `<circle cx="${f1(x)}" cy="${f1(base + r * .35)}" r="${f1(r + k)}" fill="${c}"/>`).join('');
+    return (CEL ? draw(3, mixHex(col, INK, .55)) : '') + draw(0, col); }; // cel: contorno escuro na silhueta
   const skyDefs = (hora, tema) => { const k = (SKYT[tema] || SKY)[hora] || SKY.dia; return `<defs><linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="!${k[0]}"/><stop offset=".36" stop-color="!${k[1]}"/><stop offset=".62" stop-color="!${k[2]}"/><stop offset=".77" stop-color="!${k[3]}"/></linearGradient></defs>`; };
   // sol da manhã, sol baixo da tarde ou lua: sempre no mesmo lado (a luz do cenário não muda de direção)
   const astro = hora => hora === 'tarde' ? `<circle cx="425" cy="300" r="240" fill="!#ffb060" opacity=".22"/><circle cx="425" cy="300" r="130" fill="!#ffc070" opacity=".35"/><circle cx="425" cy="300" r="70" fill="!#ffe0a0"/>`
@@ -142,11 +150,14 @@
     const R = rng(seed), [W, wc] = FACE[face], night = hora === 'noite', smoke = tema === 'vulcao';
     if (tema === 'caverna') return cavHz(face, R, hora);
     if (face === 'env-ceiling') { const k = (CEILT[tema] || CEIL)[hora] || CEIL.dia; let s = `<defs><radialGradient id="z" cx=".2" cy=".7" r=".9"><stop offset="0" stop-color="!${k[0]}"/><stop offset="1" stop-color="!${k[1]}"/></radialGradient></defs><rect width="1800" height="1500" fill="url(#z)"/>` + (night ? stars(1800, 1500, 60, R) : '');
-      for (let i = 0; i < 7; i++) s += cloudSvg(150 + R() * 1500, 150 + R() * 1200, 1.6 + R() * 1.4, R, smoke ? '#6a5a6ad9' : '#ffffffd9', smoke ? '#4a3c4acc' : '#cfe2fbcc');
+      for (let i = 0; i < 7; i++) s += CEL ? celCloud(150 + R() * 1500, 150 + R() * 1200, 1.4 + R() * 1.2, R, smoke ? '#6a5a6a' : '#ffffff', smoke ? '#4a3c4a' : '#cfdcf5', smoke ? '#2a2030' : '#8aa2d0') : cloudSvg(150 + R() * 1500, 150 + R() * 1200, 1.6 + R() * 1.4, R, smoke ? '#6a5a6ad9' : '#ffffffd9', smoke ? '#4a3c4acc' : '#cfe2fbcc');
       return svgUrl(1800, 1500, s); }
     let s = skyDefs(hora, tema) + `<rect width="${W}" height="650" fill="url(#ceu)"/>` + (night ? stars(W, 380, 40, R) : '');
     if (face === 'env-left') s += astro(hora);
-    for (let i = 0, n = 2 + Math.floor(R() * 2); i < n; i++) s += smoke ? cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R, '#7a6470', '#4a3c4a') : cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R);
+    if (CEL) s += `<defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eaf6ff" stop-opacity="0"/><stop offset="1" stop-color="#eaf6ff" stop-opacity=".6"/></linearGradient></defs>`;
+    if (CEL && face === 'env-left' && !night) s += [[-.15, 34], [.1, 22], [.35, 30], [.62, 18]].map(([a, w]) => { const L = 900, x = 425 + Math.cos(.55 + a) * L, y = 120 + Math.sin(.55 + a) * L; return `<polygon points="425,120 ${f1(x - w)},${f1(y + w)} ${f1(x + w)},${f1(y - w)}" fill="#fff6c8" opacity=".13"/>`; }).join('');
+    if (CEL) for (let i = 0, n = 2 + Math.floor(R() * 2); i < n; i++) s += smoke ? celCloud(160 + R() * (W - 320), 150 + R() * 130, 1.1 + R() * .9, R, '#7a6470', '#4a3c4a', '#2a2030') : celCloud(160 + R() * (W - 320), 150 + R() * 130, 1.1 + R() * .9, R);
+    else for (let i = 0, n = 2 + Math.floor(R() * 2); i < n; i++) s += smoke ? cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R, '#7a6470', '#4a3c4a') : cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R);
     if (tema === 'neve') {
       s += ridge(W, 330, 170, R, '#f4f8ff', 16) + ridge(W, 345, 140, R, '#d8e0f8', 16) + ridge(W, 420, 80, R, '#b8c6ec') + ridge(W, 460, 36, R, '#9fb0e0') + bumps(W, 470, 12, 24, R, '#2f6a5a') + bumps(W, 488, 16, 30, R, '#24564a');
     } else if (tema === 'deserto') {
@@ -167,6 +178,8 @@
       s += ridge(W, 410, 60, R, '#b8e0a0') + ridge(W, 450, 36, R, '#9ad070');
       if (face === 'env-back') s += `<polygon points="1290,470 1302,360 1330,360 1342,470" fill="#f0e0c8"/><polygon points="1320,360 1330,360 1342,470 1326,470" fill="#cbb8a8"/><polygon points="1294,362 1316,336 1338,362" fill="#c85a3a"/><g transform="translate(1316 352)" stroke="#8a6a5a" stroke-width="3">${[20, 110, 200, 290].map(a => `<rect x="-6" y="-70" width="12" height="62" fill="#fff8ec" transform="rotate(${a})"/>`).join('')}</g>`;
       s += bumps(W, 470, 18, 32, R, '#7ac850') + bumps(W, 490, 24, 40, R, '#68b844');
+    } else if (tema === 'floresta' && CEL) {
+      s += ridge(W, 380, 95, R, '#a9c8ea') + haze(380, 60, W) + ridge(W, 430, 50, R, '#7aa8b0') + haze(430, 40, W) + bumpsO(W, 450, 16, 30, R, '#4c8a5c', '#2f5a4a') + bumpsO(W, 472, 22, 40, R, '#3a7650', '#1f4438') + bumpsO(W, 490, 26, 44, R, '#2c6044', INK);
     } else if (tema === 'floresta') {
       s += ridge(W, 395, 85, R, '#9ccbf0') + ridge(W, 440, 45, R, '#6fb4a8') + bumps(W, 452, 16, 30, R, '#4ca066') + bumps(W, 474, 22, 40, R, '#348550') + bumps(W, 492, 26, 44, R, '#24693f');
     } else if (tema === 'castelo') {
@@ -208,14 +221,14 @@
   }
 
   // ----- chão de cada tema (1 SVG) -----
-  const shadowOf = (x, z, h, r, k = 1) => { const ox = x + SHD[0] * h * SHK * .8, oz = z + SHD[1] * h * SHK * .8; return `<ellipse cx="${GX(ox)}" cy="${GZ(oz)}" rx="${GR(r * 1.25 * k)}" ry="${GR(r * .85 * k)}" fill="#1d4a7a" opacity=".28"/>`; };
+  const shadowOf = (x, z, h, r, k = 1) => { const ox = x + SHD[0] * h * SHK * .8, oz = z + SHD[1] * h * SHK * .8; return `<ellipse cx="${GX(ox)}" cy="${GZ(oz)}" rx="${GR(r * 1.25 * k)}" ry="${GR(r * .85 * k)}" fill="${CEL ? '#2a3a78' : '#1d4a7a'}" opacity="${CEL ? .36 : .28}"/>`; };
   const contact = (x, z, r) => `<ellipse cx="${GX(x + 10)}" cy="${GZ(z - 6)}" rx="${GR(r)}" ry="${GR(r * .8)}" fill="#14305a" opacity=".3"/>`;
 
   // ----- recortes em SVG (luz pintada à esquerda; o palco espelha quando o sol aparece à direita) -----
-  const memo = new Map(), once = (k, fn) => memo.get(k) || (memo.set(k, fn()), memo.get(k));
-  const trunkSvg = (m = M.tronco) => once('tr' + m, () => svgUrl(40, 200, `<polygon points="9,0 31,0 33,182 40,200 0,200 7,182" fill="${m[1]}"/><polygon points="9,0 16,0 14,200 0,200 7,182" fill="${m[0]}"/><polygon points="25,0 31,0 33,182 40,200 27,200" fill="${m[2]}"/>`));
+  const memo = new Map(), once = (k, fn) => { k += CEL ? '|c' : ''; return memo.get(k) || (memo.set(k, fn()), memo.get(k)); };
+  const trunkSvg = (m = M.tronco) => once('tr' + m, () => olSvg(40, 200, `<polygon points="9,0 31,0 33,182 40,200 0,200 7,182" fill="${m[1]}"/><polygon points="9,0 16,0 14,200 0,200 7,182" fill="${m[0]}"/><polygon points="25,0 31,0 33,182 40,200 27,200" fill="${m[2]}"/>`));
   const rockSvg = (R, top) => { const L = [3, 66], Ls = [12 + R() * 8, 26 + R() * 10], P = [40 + R() * 20, 3 + R() * 8], Rs = [80 + R() * 10, 20 + R() * 12], Rr = [97, 66], Mb = [54 + R() * 8, 66], C = [50 + R() * 8, 30 + R() * 8], pt = a => a.map(p => p.map(f1).join(',')).join(' ');
-    return svgUrl(100, 66, `<polygon points="${pt([L, Ls, P, C, Mb])}" fill="${M.pedra[0]}"/><polygon points="${pt([Mb, C, P, Rs, Rr])}" fill="${M.pedra[2]}"/><polygon points="${pt([P, Rs, C])}" fill="${M.pedra[1]}"/>${top ? `<polygon points="${pt([Ls, P, C])}" fill="${top}"/>` : ''}`); };
+    const m = M.pedra; return olSvg(100, 66, `<polygon points="${pt([L, Ls, P, C, Mb])}" fill="${m[0]}"/><polygon points="${pt([Mb, C, P, Rs, Rr])}" fill="${m[2]}"/><polygon points="${pt([P, Rs, C])}" fill="${m[1]}"/>${top ? `<polygon points="${pt([Ls, P, C])}" fill="${top}"/>` : ''}`, 1.6); };
   const palmSvg = R => { const T = [185 + R() * 40, 105], B0 = [118, 520], C = [100 + R() * 20, 300], pts = [];
     for (let i = 0; i <= 8; i++) { const t = i / 8, x = (1 - t) ** 2 * B0[0] + 2 * (1 - t) * t * C[0] + t * t * T[0], y = (1 - t) ** 2 * B0[1] + 2 * (1 - t) * t * C[1] + t * t * T[1]; pts.push([x, y, 15 - 6 * t]); }
     const side = (k, f) => pts.map(([x, y, w], i) => { const q = pts[Math.min(8, i + 1)], p = pts[Math.max(0, i - 1)], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1; return [x - dy / L * w * k, y + dx / L * w * k]; });
@@ -228,7 +241,7 @@
       return half(1, hang ? M.fronde[1] : M.fronde[0]) + half(-1, hang ? M.fronde[2] : M.fronde[1]); };
     s += tips.filter(t => t[1] > 20).map(leaf).join('') + tips.filter(t => t[1] <= 20).map(leaf).join('');
     s += [[-9, 16], [8, 18], [0, 27]].map(([dx, dy]) => `<circle cx="${f1(T[0] + dx)}" cy="${f1(T[1] + dy)}" r="10" fill="#8a5a32"/><circle cx="${f1(T[0] + dx - 3)}" cy="${f1(T[1] + dy - 3)}" r="4" fill="#c08a4a"/>`).join('');
-    return svgUrl(300, 520, s); };
+    return olSvg(300, 520, s, 3.4); };
   // torre redonda: corpo em três faixas de luz, cinta de mísulas, telhado cônico azul e bandeirola
   const towerSvg = () => once('torre', () => { const [h, m, s] = M.muro, [rh, rm, rs] = M.telhado, band = (y0, y1, x0, x1) => { const w = x1 - x0; return `<rect x="${x0}" y="${y0}" width="${w}" height="${y1 - y0}" fill="${m}"/><rect x="${x0}" y="${y0}" width="${w * .32}" height="${y1 - y0}" fill="${h}"/><rect x="${x0 + w * .74}" y="${y0}" width="${w * .26}" height="${y1 - y0}" fill="${s}"/>`; };
     let t = band(730, 1780, 80, 740) + Array.from({ length: 14 }, (_, i) => `<rect x="80" y="${770 + i * 72}" width="660" height="5" fill="#6a5a8a" opacity=".13"/>`).join('');
@@ -236,16 +249,59 @@
     t += `<polygon points="0,612 410,0 300,612" fill="${rh}"/><polygon points="300,612 410,0 590,612" fill="${rm}"/><polygon points="590,612 410,0 820,612" fill="${rs}"/><rect x="0" y="596" width="820" height="20" fill="${rs}"/>`;
     t += [930, 1290].map(y => `<path d="M370 ${y + 120}V${y + 30}Q370 ${y} 410 ${y}Q450 ${y} 450 ${y + 30}V${y + 120}Z" fill="#33407a"/><path d="M382 ${y + 120}V${y + 34}Q382 ${y + 12} 410 ${y + 12}Q438 ${y + 12} 438 ${y + 34}V${y + 120}Z" fill="#1f2a5a"/>`).join('');
     t += `<rect x="404" y="-1" width="8" height="10" fill="#7a4a3a"/>`;
-    return svgUrl(820, 1780, t, 'none'); });
+    return olSvg(820, 1780, t, 9); });
   const flagSvg = svgUrl(60, 30, `<path d="M0 0H60L44 15L60 30H0Z" fill="#ff3048"/>`);
   const fountainSvg = () => once('fonte', () => { const [h, m, s] = M.muro, [ah, am, as] = M.agua;
-    return svgUrl(640, 440, `<path d="M20 320V400Q320 450 620 400V320Z" fill="${m}"/><path d="M20 320V400Q90 424 200 432V330Z" fill="${h}"/><path d="M470 330V432Q560 424 620 400V320Z" fill="${s}"/><ellipse cx="320" cy="320" rx="300" ry="52" fill="${h}"/><ellipse cx="320" cy="322" rx="262" ry="40" fill="${am}"/><ellipse cx="300" cy="316" rx="150" ry="18" fill="${ah}" opacity=".7"/>`
+    return olSvg(640, 440, `<path d="M20 320V400Q320 450 620 400V320Z" fill="${m}"/><path d="M20 320V400Q90 424 200 432V330Z" fill="${h}"/><path d="M470 330V432Q560 424 620 400V320Z" fill="${s}"/><ellipse cx="320" cy="320" rx="300" ry="52" fill="${h}"/><ellipse cx="320" cy="322" rx="262" ry="40" fill="${am}"/><ellipse cx="300" cy="316" rx="150" ry="18" fill="${ah}" opacity=".7"/>`
       + `<rect x="290" y="130" width="60" height="192" fill="${m}"/><rect x="290" y="130" width="20" height="192" fill="${h}"/><rect x="334" y="130" width="16" height="192" fill="${s}"/><path d="M200 128Q320 190 440 128Z" fill="${s}"/><ellipse cx="320" cy="126" rx="122" ry="24" fill="${h}"/><ellipse cx="320" cy="127" rx="100" ry="16" fill="${am}"/>`
       + `<path d="M320 120Q320 40 300 30Q340 40 330 120Z" fill="${ah}"/><path d="M230 132Q190 200 176 312" stroke="${ah}" stroke-width="10" fill="none" opacity=".85"/><path d="M410 132Q450 200 464 312" stroke="${ah}" stroke-width="10" fill="none" opacity=".85"/><circle cx="318" cy="28" r="14" fill="#ffffff"/>`); });
-  const barrelSvg = () => once('barril', () => { const [h, m, s] = M.barril; return svgUrl(160, 180, `<path d="M14 24Q4 90 14 160Q80 186 146 160Q156 90 146 24Z" fill="${m}"/><path d="M14 24Q4 90 14 160Q34 168 52 172Q44 90 52 30Z" fill="${h}"/><path d="M112 30Q120 90 112 172Q130 168 146 160Q156 90 146 24Z" fill="${s}"/><path d="M8 62Q80 76 152 62M8 124Q80 138 152 124" stroke="#4a3a5a" stroke-width="7" fill="none"/><ellipse cx="80" cy="24" rx="66" ry="16" fill="${M.madeira[0]}"/><ellipse cx="80" cy="24" rx="52" ry="10" fill="${M.madeira[1]}"/>`); });
+  const barrelSvg = () => once('barril', () => { const [h, m, s] = M.barril; return olSvg(160, 180, `<path d="M14 24Q4 90 14 160Q80 186 146 160Q156 90 146 24Z" fill="${m}"/><path d="M14 24Q4 90 14 160Q34 168 52 172Q44 90 52 30Z" fill="${h}"/><path d="M112 30Q120 90 112 172Q130 168 146 160Q156 90 146 24Z" fill="${s}"/><path d="M8 62Q80 76 152 62M8 124Q80 138 152 124" stroke="#4a3a5a" stroke-width="7" fill="none"/><ellipse cx="80" cy="24" rx="66" ry="16" fill="${M.madeira[0]}"/><ellipse cx="80" cy="24" rx="52" ry="10" fill="${M.madeira[1]}"/>`); });
   const crenelSvg = n => once('cr' + n, () => svgUrl(n * 100, 100, Array.from({ length: n }, (_, i) => `<rect x="${i * 100}" y="0" width="56" height="100" fill="${M.muro[1]}"/><rect x="${i * 100}" y="0" width="56" height="14" fill="${M.muroTopo[0]}"/>`).join('')));
-  const tuftSvg = (c1, c2) => once('tu' + c1, () => svgUrl(100, 80, `<path d="M8 80 Q14 40 4 14 Q24 40 28 80Z M30 80 Q34 30 50 4 Q44 40 50 80Z" fill="${c2}"/><path d="M44 80 Q60 34 92 18 Q66 46 70 80Z M20 80 Q24 50 34 30 Q32 56 40 80Z" fill="${c1}"/>`));
+  const tuftSvg = (c1, c2) => once('tu' + c1, () => olSvg(100, 80, `<path d="M8 80 Q14 40 4 14 Q24 40 28 80Z M30 80 Q34 30 50 4 Q44 40 50 80Z" fill="${c2}"/><path d="M44 80 Q60 34 92 18 Q66 46 70 80Z M20 80 Q24 50 34 30 Q32 56 40 80Z" fill="${c1}"/>`));
   const tufts = (B, R, n, ok, c1, c2, prev) => { if (!n) return; const bg = tuftSvg(c1, c2); for (const [x, z] of scatter(R, n, 140, ok, [-2900, 2900], [-3000, 2500], prev)) { const s = .8 + R() * .8; B.card(x, z, 100 * s, 80 * s, bg); } };
+
+  // ===== estilo cel (DEMO atrás da chave vj_terr_estilo=cel; só o Bosque): contorno, 2 tons duros e rim light pintados na arte =====
+  const COPAS_CEL = [{ lt: '#8fcc4e', sh: '#2f6a4c', rim: '#c8f08a', ac: '#3e7e4e' }, { lt: '#7cbf54', sh: '#2a5f50', rim: '#bfeea0', ac: '#36704e' }, { lt: '#a2cf52', sh: '#3a7046', rim: '#dcf28e', ac: '#4a8048' }];
+  // contorno de folhagem: lóbulos que terminam em ponta (sem bolinha perfeita)
+  const crownD = (cx, cy, r, R, n, sq = .86) => { const a0 = R() * 6.283, P = [];
+    for (let i = 0; i < n; i++) { const a = a0 + i / n * 6.283, ro = r * (.92 + R() * .14), ri = r * (.74 + R() * .08), a2 = a + Math.PI / n;
+      P.push([cx + Math.cos(a) * ro, cy + Math.sin(a) * ro * sq], [cx + Math.cos(a2) * ri, cy + Math.sin(a2) * ri * sq]); }
+    const out = (q, k) => [cx + (q[0] - cx) * k, cy + (q[1] - cy) * k];
+    let d = `M${P.at(-1).map(f1).join(' ')}`;
+    for (let i = 0; i < P.length; i += 2) { const v0 = P[(i - 1 + P.length) % P.length], t = P[i], v1 = P[i + 1];
+      const c1 = out([(v0[0] + t[0]) / 2, (v0[1] + t[1]) / 2], 1.2), c2 = out([(t[0] + v1[0]) / 2, (t[1] + v1[1]) / 2], 1.1);
+      d += `Q${c1.map(f1).join(' ')} ${t.map(f1).join(' ')}Q${c2.map(f1).join(' ')} ${v1.map(f1).join(' ')}`; }
+    return d + 'Z'; };
+  let celId = 0;
+  // um tufo de copa em cel: base na sombra, faixa de rim light do lado oposto ao sol, área de luz com corte seco do lado do sol, contorno por fora
+  const crownCel = (cx, cy, r, R, pal, n = 8) => { const d = crownD(cx, cy, r, R, n), id = 'q' + (celId++).toString(36), k = r * .5;
+    let s = `<clipPath id="${id}"><path d="${d}"/></clipPath><path d="${d}" fill="${pal.sh}" stroke="${INK}" stroke-width="${f1(Math.max(5, r * .055))}" stroke-linejoin="round"/>`;
+    s += `<g clip-path="url(#${id})"><path d="${d}" fill="${pal.rim}"/><path d="${d}" fill="${pal.sh}" transform="translate(-${f1(r * .07)} -${f1(r * .03)})"/><path d="${crownD(cx - k * .8, cy - k, r * .95, R, n)}" fill="${pal.lt}"/>`;
+    for (let i = 0; i < 2; i++) { const a = .3 + R() * 1.2, dd = r * (.5 + R() * .2); s += `<path d="${crownD(cx + Math.cos(a) * dd * .7, cy + Math.sin(a) * dd * .5, r * (.22 + R() * .08), R, 6)}" fill="${pal.lt}"/>`; } // tufos de luz que escapam para a sombra
+    s += `<path d="${crownD(cx - r * .2, cy + r * .05, r * .2, R, 6)}" fill="${pal.ac}"/>`; // um bolsão de sombra dentro da luz
+    return s + '</g>'; };
+  // árvore inteira num recorte só (tronco + 3 a 4 tufos): pesa menos que tronco + 5 bolas
+  const celTreeSvg = (R, pal) => { celId = 0; const W = 400, H = 640, [tl, ts] = ['#b9845a', '#6a4a52'];
+    let s = `<path d="M178 640C186 520 182 420 196 300L214 300C218 420 214 520 226 640Z" fill="${ts}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/><path d="M178 640C186 520 182 420 196 300L203 300C196 420 198 520 196 640Z" fill="${tl}"/>`;
+    s += `<path d="M200 420Q150 380 120 330M206 380Q250 350 286 318" stroke="${INK}" stroke-width="16" fill="none" stroke-linecap="round"/><path d="M200 420Q150 380 120 330M206 380Q250 350 286 318" stroke="${ts}" stroke-width="9" fill="none" stroke-linecap="round"/>`;
+    for (const [x, y, r] of [[200, 175, 150], [118, 290, 108], [292, 278, 112], [205, 315, 118]]) s += crownCel(x + (R() - .5) * 20, y + (R() - .5) * 16, r * (.92 + R() * .16), R, pal);
+    return svgUrl(W, H, s); };
+  // tufo de copa no lugar de cada bolinha (paleta antiga luz/meio/sombra → luz, sombra, rim e acento)
+  const blobSvg = (pal, v) => once('bl' + pal.join() + v, () => { celId = 80; const R = rng(v * 7 + 3); return svgUrl(300, 280, crownCel(150, 150, 120, R, { lt: mixHex(pal[0], pal[1], .55), sh: mixHex(pal[2], INK, .12), rim: pal[0], ac: mixHex(pal[1], pal[2], .5) }, 8)); });
+  const celBushSvg = (R, pal) => { celId = 50; let s = ''; for (const [x, y, r] of [[150, 120, 92], [80, 150, 66], [222, 152, 70]]) s += crownCel(x, y, r * (.9 + R() * .2), R, pal, 9); return svgUrl(300, 220, s); };
+  // feixe de luz (só no high): trapézio inclinado em degradê, sem contorno
+  const beamSvg = once('feixe', () => svgUrl(160, 640, `<defs><linearGradient id="fx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c8" stop-opacity=".55"/><stop offset=".7" stop-color="#fff6c8" stop-opacity=".18"/><stop offset="1" stop-color="#fff6c8" stop-opacity="0"/></linearGradient></defs><polygon points="62,0 98,0 160,640 40,640" fill="url(#fx)"/>`));
+  // nuvem de cúmulo em cel: contorno suave, base na sombra e topo iluminado com corte seco
+  const celCloud = (cx, cy, s, R, lite = '#ffffff', shade = '#bccbec', ol = '#7f97c8') => { const pf = [];
+    for (let i = 0; i < 7; i++) { const t = (i - 3) / 3; pf.push([cx + t * 92 * s + (R() - .5) * 14 * s, cy - (1 - t * t) * 46 * s - R() * 14 * s, (24 + (1 - Math.abs(t)) * 26 + R() * 10) * s]); }
+    const c = (dx, dy, k, col) => pf.map(([x, y, r]) => `<circle cx="${f1(x + dx)}" cy="${f1(y + dy)}" r="${f1(r * k)}" fill="${col}"/>`).join('') + `<rect x="${f1(cx - 104 * s + dx)}" y="${f1(cy - 14 * s + dy)}" width="${f1(208 * s)}" height="${f1(22 * s * k)}" rx="${f1(10 * s)}" fill="${col}"/>`;
+    return c(0, 0, 1.06, ol) + c(0, 0, 1, shade) + c(-5 * s, -9 * s, .9, lite); };
+  const bumpsO = (W, base, r0, r1, R, col, ol) => { const C = []; for (let x = -r1 * .3; x < W + r1 * .3; x += r0 * 1.1 + R() * r0) C.push([x, r0 + R() * (r1 - r0)]);
+    const draw = (k, col) => `<rect x="0" y="${base}" width="${W}" height="${650 - base}" fill="${col}"/>` + C.map(([x, r]) => `<circle cx="${f1(x)}" cy="${f1(base + r * .35)}" r="${f1(r + k)}" fill="${col}"/>`).join('');
+    return draw(3, ol) + draw(0, col); };
+  const haze = (base, h, W) => `<rect y="${f1(base - h)}" width="${W}" height="${f1(h + 40)}" fill="url(#hz)"/>`;
+
+  const beams = (B, Q, spots) => { if (CEL && Q === 2) for (const [x, z] of spots) B.group([x, -900, z], 700, () => B.card(x, z, 520, 2100, beamSvg, { k: 4, y: -40 })); };
 
   // ----- BOSQUE DENSO -----
   function floresta(B, Q, R, gnd) {
@@ -254,15 +310,17 @@
     const trees = scatter(R, nT, 520, okT, [-3250, 3250], [-2750, 2750]);
     // trilha de terra que atravessa o bosque por baixo da luta
     let path = ''; for (let z = 3000; z >= -3000; z -= 150) { const x = Math.sin(z / 900) * 260 + Math.sin(z / 370) * 60; path += `<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(470 + Math.sin(z / 500) * 90)}" ry="${GR(220)}" fill="#d9ae6a"/>`; }
-    gnd.push(`<rect width="1800" height="1500" fill="#5fbd3c"/>`);
-    for (let i = 0; i < 26; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 90)}" ry="${f1(25 + R() * 50)}" fill="${R() < .5 ? '#7fd24a' : '#4ea838'}"/>`);
-    gnd.push(path.replace(/#d9ae6a/g, '#b98c52').replace(/rx="([\d.]+)"/g, (m, v) => `rx="${f1(+v + 8)}"`), path);
+    gnd.push(CEL ? `<defs><pattern id="gr" width="24" height="18" patternUnits="userSpaceOnUse"><path d="M3 15l2 -6 2 6M14 8l2 -6 2 6" stroke="#3a7a3e" stroke-width="1.2" fill="none" opacity=".55"/></pattern></defs><rect width="1800" height="1500" fill="#5aa84a"/>` : `<rect width="1800" height="1500" fill="#5fbd3c"/>`);
+    for (let i = 0; i < 26; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 90)}" ry="${f1(25 + R() * 50)}" fill="${CEL ? (R() < .5 ? '#6cb650' : '#4c9644') : R() < .5 ? '#7fd24a' : '#4ea838'}"/>`);
+    if (CEL) gnd.push(`<rect width="1800" height="1500" fill="url(#gr)"/>`);
+    gnd.push(path.replace(/#d9ae6a/g, CEL ? '#7a5a3e' : '#b98c52').replace(/rx="([\d.]+)"/g, (m, v) => `rx="${f1(+v + (CEL ? 5 : 8))}"`), CEL ? path.replace(/#d9ae6a/g, '#cfa46a') : path);
     for (let i = 0; i < 18; i++) { const x = (R() - .5) * 900, z = -3000 + R() * 6000; gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${f1(6 + R() * 10)}" ry="${f1(4 + R() * 6)}" fill="#c49352"/>`); }
     const flowers = ['#fff6a0', '#ffffff', '#ff9ec8', '#ffd24a'];
     for (let i = 0; i < 70; i++) { const x = (R() - .5) * 7000, z = (R() - .5) * 5800; if (Math.abs(x) < 700) continue; gnd.push(`<circle cx="${GX(x)}" cy="${GZ(z)}" r="${f1(2.5 + R() * 2)}" fill="${flowers[i % 4]}"/>`); }
     const shadows = [];
     for (const [x, z] of trees) {
       const s = .8 + R() * .55, h = (560 + R() * 240) * s, pal = COPAS[Math.floor(R() * 3)], top = -h - 40 * s, n = Q === 0 ? 3 : 4;
+      if (CEL) { const H = h * 1.32, W = H * 400 / 640; B.group([x, -H * .55, z], Math.max(W * .55, H * .5), () => B.card(x, z, W, H, celTreeSvg(R, COPAS_CEL[Math.floor(R() * 3)]), { k: 2, sh: true })); shadows.push(shadowOf(x, z, h, 300 * s), contact(x, z, 90 * s)); continue; }
       B.group([x, -h * .7, z], 330 * s, () => {
         B.card(x, z, 90 * s, h + 40 * s, trunkSvg(), { sh: true });
         B.blob(x, top, z, 235 * s, pal);
@@ -274,13 +332,15 @@
     // arbustos na borda da luta, pedras com musgo, toras e cogumelos
     const okB = (x, z) => !inArena(x, z, 40) && inArena(x, z, 1200);
     for (const [x, z] of scatter(R, nB, 280, okB, [-2600, 2600], [-3000, 1900], trees)) { const s = .7 + R() * .6, pal = COPAS[Math.floor(R() * 3)];
+      if (CEL) { B.group([x, -90 * s, z], 200 * s, () => B.card(x, z, 360 * s, 264 * s, celBushSvg(R, COPAS_CEL[Math.floor(R() * 3)]), { sh: true, y: -20 * s })); gnd.push(contact(x, z, 160 * s)); continue; }
       B.group([x, -80, z], 200 * s, () => { B.blob(x, -95 * s, z, 120 * s, pal); B.blob(x + 90 * s, -70 * s, z + 30 * s, 90 * s, pal); if (Q) B.blob(x - 80 * s, -65 * s, z - 20 * s, 85 * s, pal); });
       gnd.push(contact(x, z, 160 * s)); }
     for (const [x, z] of scatter(R, nR, 400, okB, [-2800, 2800], [-3000, 2200], trees)) { const r = 110 + R() * 90; B.group([x, -r * .5, z], r * 1.2, () => B.card(x, z, r * 2.2, r * 1.45, rockSvg(R, M.musgo[0]), { sh: true })); gnd.push(shadowOf(x, z, r * .4, r * 1.1), contact(x, z, r)); }
     for (let i = 0, n = [1, 2, 3][Q]; i < n; i++) { const [x, z] = scatter(R, 1, 600, okB, [-2600, 2600], [-2900, 2000], trees)[0] || [-1700, 300], a = R() * Math.PI, L = 260 + R() * 160, dx = Math.cos(a) * L / 2, dz = Math.sin(a) * L / 2;
       B.group([x, -40, z], L / 2 + 60, () => B.tube([x - dx, -44, z - dz], [x + dx, -44, z + dz], 44, Q ? 6 : 5, M.tronco, { cap0: '#e9c07c', cap1: '#f3d39a' })); gnd.push(contact(x, z, L * .55)); }
-    if (Q === 2) for (const [x, z] of scatter(R, 6, 160, okB, [-2400, 2400], [-3000, 1500], trees)) { const s = .7 + R() * .5; B.group([x, -40, z], 60, () => { B.tube([x, 0, z], [x, -38 * s, z], 10 * s, 4, ['#ffffff', '#efe6d8', '#a7a0c0']); B.blob(x, -44 * s, z, 30 * s, ['#ff8a8a', '#ff3b4e', '#a3204e']); }); }
+    if (Q === 2) for (const [x, z] of scatter(R, 6, 160, okB, [-2400, 2400], [-3000, 1500], trees)) { const s = .7 + R() * .5; B.group([x, -40, z], 60, () => { B.tube([x, 0, z], [x, -38 * s, z], 10 * s, 4, ['#ffffff', '#efe6d8', '#a7a0c0']); B.blob(x, -44 * s, z, 30 * s, ['#ff8a8a', '#ff3b4e', '#a3204e'], { round: true }); }); }
     tufts(B, R, nTuft, okB, '#8fe04a', '#4aa83a', trees);
+    beams(B, Q, [[-1900, -1700], [1750, -2300], [-2300, 900], [2100, 400]]);
   }
 
   // ----- PÁTIO ENTRE MURALHAS -----
@@ -312,9 +372,9 @@
     };
     wall([-X0, ZB], [X0, ZB], [0, -1]); wall([-X0, ZF], [X0, ZF], [0, 1]); wall([-X0, ZB], [-X0, ZF], [-1, 0]); wall([X0, ZB], [X0, ZF], [1, 0]);
     // portão no muro do fundo, estandartes vermelhos
-    const gate = svgUrl(100, 100, `<path d="M0 100V40Q0 0 50 0Q100 0 100 40V100Z" fill="#8a8ab0"/><path d="M8 100V42Q8 9 50 9Q92 9 92 42V100Z" fill="#7a4a34"/>` + [24, 42, 58, 76].map(x => `<rect x="${x - 2}" y="12" width="4" height="88" fill="#5a3426"/>`).join('') + `<rect x="8" y="46" width="84" height="5" fill="#4a4a6a"/><rect x="8" y="74" width="84" height="5" fill="#4a4a6a"/><circle cx="62" cy="62" r="3" fill="#f2c24a"/>`);
+    const gate = olSvg(100, 100, `<path d="M0 100V40Q0 0 50 0Q100 0 100 40V100Z" fill="#8a8ab0"/><path d="M8 100V42Q8 9 50 9Q92 9 92 42V100Z" fill="#7a4a34"/>` + [24, 42, 58, 76].map(x => `<rect x="${x - 2}" y="12" width="4" height="88" fill="#5a3426"/>`).join('') + `<rect x="8" y="46" width="84" height="5" fill="#4a4a6a"/><rect x="8" y="74" width="84" height="5" fill="#4a4a6a"/><circle cx="62" cy="62" r="3" fill="#f2c24a"/>`);
     B.group([0, -260, ZB + 10], 340, () => B.poly([[-270, 0, ZB + 4], [270, 0, ZB + 4], [270, -520, ZB + 4], [-270, -520, ZB + 4]], M.muro, null, { face: [0, 0, 1], color: '#0000', bg: gate }));
-    const banner = svgUrl(60, 140, `<path d="M0 0H60V140L30 116L0 140Z" fill="#c8102e"/><path d="M0 0H60V10H0Z" fill="#f2c24a"/><path d="M5 10H55V128L30 108L5 128Z" fill="none" stroke="#f2c24a" stroke-width="3"/><circle cx="30" cy="50" r="13" fill="#f2c24a"/><path d="M30 28L34 42L48 42L37 50L41 64L30 56L19 64L23 50L12 42L26 42Z" fill="#c8102e"/>`);
+    const banner = olSvg(60, 140, `<path d="M0 0H60V140L30 116L0 140Z" fill="#c8102e"/><path d="M0 0H60V10H0Z" fill="#f2c24a"/><path d="M5 10H55V128L30 108L5 128Z" fill="none" stroke="#f2c24a" stroke-width="3"/><circle cx="30" cy="50" r="13" fill="#f2c24a"/><path d="M30 28L34 42L48 42L37 50L41 64L30 56L19 64L23 50L12 42L26 42Z" fill="#c8102e"/>`);
     const bannerAt = (x, z, nx, nz) => { const w = 150, h = 360, px = -nz, pz = nx, o = 4, y0 = -H + 30; B.group([x, -H + 200, z], 220, () => B.poly([[x - px * w / 2 + nx * o, y0, z - pz * w / 2 + nz * o], [x + px * w / 2 + nx * o, y0, z + pz * w / 2 + nz * o], [x + px * w / 2 + nx * o, y0 + h, z + pz * w / 2 + nz * o], [x - px * w / 2 + nx * o, y0 + h, z - pz * w / 2 + nz * o]], M.muro, null, { face: [nx, 0, nz], color: '#0000', bg: banner })); };
     for (const x of [-620, 620, ...(Q ? [-1800, 1800] : [])]) bannerAt(x, ZB, 0, 1);
     if (Q) for (const z of [-1800, 400]) { bannerAt(-X0, z, 1, 0); bannerAt(X0, z, -1, 0); }
@@ -387,29 +447,29 @@
     for (const [t, w, b] of [[160, 100, 345], [80, 85, 250], [10, 60, 150]]) { const hh = b - t;
       s += pg([[100, t], [100 - w, b], [100 + w, b]], P[1]) + pg([[100, t], [100 - w, b], [100 - w * .35, b]], P[0]) + pg([[100, t], [100 + w * .45, b], [100 + w, b]], P[2]);
       if (snow) s += pg([[100, t], [100 - w * .34, t + hh * .34], [100 - w * .12, t + hh * .27], [100 + w * .06, t + hh * .36], [100 + w * .34, t + hh * .33]], '#ffffff') + `<path d="M${100 - w} ${b} q${f1(w * .25)} -16 ${f1(w * .5)} 0 t${f1(w * .5)} 0 t${f1(w * .5)} 0 t${f1(w * .5)} 0 v7 h${-2 * w}z" fill="#eef4ff"/>`; }
-    return svgUrl(200, 420, s); });
+    return olSvg(200, 420, s, 2.4); });
   // cristais: cor própria (não escurece à noite)
   const CRIST = [['#9ff8ff', '#3ad0f0', '#1a6ab0'], ['#ffb0f0', '#e050c8', '#7a2a9a'], ['#d8b8ff', '#9a6af0', '#4a2aa0']];
   const crystalSvg = (R, pal) => { let s = `<ellipse cx="60" cy="192" rx="60" ry="10" fill="!${pal[1]}" opacity=".4"/>`;
     for (const i of [0, 3, 1, 2]) { const cx = 60 + (i - 1.5) * 20 + (R() - .5) * 8, h = (70 + R() * 80) * (i === 1 || i === 2 ? 1.3 : 1), w = 11 + R() * 7, ln = (i - 1.5) * 12, top = [cx + ln, 196 - h], mid = [cx + ln * .4, 196];
       s += pg([[cx - w, 196], [cx - w + ln * .8, 196 - h * .8], top, mid], '!' + pal[0]) + pg([mid, top, [cx + w + ln * .8, 196 - h * .8], [cx + w, 196]], '!' + pal[1]) + pg([[cx + w * .2 + ln * .9, 196 - h * .8], top, [cx + w + ln * .8, 196 - h * .8]], '!' + pal[2]); }
-    return svgUrl(120, 200, s); };
+    return olSvg(120, 200, s, 1.6); };
   const pillarSvg = (R, m) => { const w0 = 40 + R() * 14, w1 = 10 + R() * 10, top = [60 + (R() - .5) * 14, 6], L = [60 - w0, 300], Rr = [60 + w0, 300];
-    return svgUrl(120, 300, pg([L, [60 - w1, 40], top, [60 + w1 * .2, 300]], m[0]) + pg([[60 + w1 * .2, 300], top, [60 + w1, 40], Rr], m[1]) + pg([[60 + w0 * .45, 300], [60 + w1 * .7, 60], [60 + w1, 40], Rr], m[2])); };
+    return olSvg(120, 300, pg([L, [60 - w1, 40], top, [60 + w1 * .2, 300]], m[0]) + pg([[60 + w1 * .2, 300], top, [60 + w1, 40], Rr], m[1]) + pg([[60 + w0 * .45, 300], [60 + w1 * .7, 60], [60 + w1, 40], Rr], m[2])); };
   const archSvg = () => once('arco', () => { const [h, m, s] = MN.marmore, ivy = ['#8ad84a', '#4aa83a', '#2a6a3a'];
     let t = `<path d="M20 360V150A130 130 0 0 1 280 150V360H220V160A70 70 0 0 0 80 160V360Z" fill="${m}"/><rect x="20" y="150" width="22" height="210" fill="${h}"/><rect x="220" y="160" width="20" height="200" fill="${h}"/><rect x="258" y="150" width="22" height="210" fill="${s}"/><rect x="60" y="160" width="20" height="200" fill="${s}"/>`;
     t += `<rect x="6" y="330" width="88" height="30" fill="${h}"/><rect x="206" y="330" width="88" height="30" fill="${m}"/><path d="M150 20l-10 20h20z" fill="${s}"/>`;
     t += [[40, 60, 34], [90, 30, 28], [150, 22, 30], [215, 40, 30], [262, 90, 24], [30, 130, 22], [268, 170, 18], [32, 210, 16]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${ivy[1]}"/><circle cx="${x - r * .3}" cy="${y - r * .3}" r="${r * .55}" fill="${ivy[0]}"/>`).join('');
     t += `<path d="M262 110q10 60 -2 120M36 150q-8 50 4 110" stroke="${ivy[2]}" stroke-width="5" fill="none"/>`;
-    return svgUrl(300, 360, t); });
+    return olSvg(300, 360, t, 3); });
   const twistSvg = R => { const [h, m, s] = ['#a89a7a', '#6a5a4a', '#3a3040'], b = 50 + R() * 30;
     let t = `<path d="M70 400C${70 + b} 320 ${30 - b * .4} 230 ${100} 120C130 80 120 40 ${150 + R() * 20} 10L162 20C140 60 150 100 122 140C${80 - b * .3} 220 ${110 + b} 300 112 400Z" fill="${m}"/><path d="M70 400C${70 + b} 320 ${30 - b * .4} 230 100 120L108 126C${50 - b * .3} 230 ${86 + b} 320 86 400Z" fill="${h}"/>`;
     t += `<path d="M104 200C70 180 40 186 14 160" stroke="${m}" stroke-width="12" fill="none" stroke-linecap="round"/><path d="M112 150C150 140 170 120 190 92" stroke="${s}" stroke-width="10" fill="none" stroke-linecap="round"/>`;
     t += `<path d="M14 160q-4 30 2 60M60 176q-2 26 4 48M190 92q4 30 -2 54" stroke="#6a8a4a" stroke-width="4" fill="none" opacity=".8"/>`;
-    return svgUrl(200, 400, t); };
+    return olSvg(200, 400, t, 2.6); };
   const fogSvg = once('nevoa', () => svgUrl(400, 120, `<defs><radialGradient id="nv"><stop offset="0" stop-color="#f4fff0" stop-opacity=".55"/><stop offset="1" stop-color="#f4fff0" stop-opacity="0"/></radialGradient></defs><ellipse cx="200" cy="70" rx="200" ry="50" fill="url(#nv)"/>`));
   const spikeSvg = R => { const [h, m, s] = MN.basalto, x1 = 40 + R() * 20, x2 = 90 + R() * 20;
-    return svgUrl(160, 220, pg([[4, 220], [x1, 20 + R() * 40], [70, 220]], h) + pg([[70, 220], [x1, 30], [x2, 4 + R() * 30], [156, 220]], m) + pg([[110, 220], [x2, 10], [156, 220]], s)
+    return olSvg(160, 220, pg([[4, 220], [x1, 20 + R() * 40], [70, 220]], h) + pg([[70, 220], [x1, 30], [x2, 4 + R() * 30], [156, 220]], m) + pg([[110, 220], [x2, 10], [156, 220]], s)
       + `<path d="M${f1(x1)} 80l8 40 -10 30 12 40" stroke="!#ff7a2a" stroke-width="4" fill="none"/><path d="M${f1(x2)} 60l-6 50 10 40" stroke="!#ffb040" stroke-width="3" fill="none"/>`); };
   const rockOf = (R, top, mat) => { const keep = M.pedra; M.pedra = mat; const u = rockSvg(R, top); M.pedra = keep; return u; };
   const posts = (B, R, pts, h, mat) => pts.forEach(([x, z]) => B.box(x, z, 34, 34, h * (.9 + R() * .2), mat));
@@ -463,6 +523,7 @@
     cr.forEach(([x, z], i) => { const pal = CRIST[i % 3], s = 1.2 + R() * 1.3, w = 120 * s, h = 200 * s;
       B.group([x, -h / 2, z], h * .6, () => B.card(x, z, w, h, crystalSvg(R, pal), { sh: true })); gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(w * 1.4)}" ry="${GR(w)}" fill="!${pal[1]}" opacity=".22"/>`); });
     for (const [x, z] of scatter(R, [2, 4, 6][Q], 300, (x, z) => okE(x, z) && inArena(x, z, 1300), [-2800, 2800], [-3000, 2200], [...cols, ...cr])) { const r = 90 + R() * 80; B.group([x, -r * .5, z], r * 1.2, () => B.card(x, z, r * 2.2, r * 1.45, rockOf(R, null, MN.cav), { sh: true })); gnd.push(contact(x, z, r)); }
+    beams(B, Q, [[-1300, -2600], [1300, -2600]]); // luz que desce da boca da caverna
   }
 
   // ----- RUÍNAS ANTIGAS -----
@@ -481,6 +542,7 @@
     for (const [x, z] of arches) { B.group([x, -300, z], 380, () => B.card(x, z, 600, 720, archSvg(), { k: 2, sh: true })); gnd.push(shadowOf(x, z, 500, 300), contact(x, z, 280)); }
     if (Q) B.group([-2100, -150, -2650], 520, () => { for (let k = 0; k < 4; k++) B.box(-2100, -2450 - k * 120, 900 - k * 120, 120, 70 * (k + 1), MN.marmore); });
     tufts(B, R, [0, 16, 26][Q], (x, z) => !inArena(x, z, 120), '#a6ea5a', '#4aa83a', cols);
+    beams(B, Q, [[-1800, -1300], [1700, -2200], [2000, 900]]);
   }
 
   // ----- PÂNTANO -----
@@ -498,6 +560,7 @@
     if (Q) for (const [x, z] of scatter(R, [0, 2, 3][Q], 600, okT, [-2600, 2600], [-2900, 2000], trees)) { const a = R() * 3, dx = Math.cos(a) * 180, dz = Math.sin(a) * 180; B.group([x, -40, z], 260, () => B.tube([x - dx, -38, z - dz], [x + dx, -38, z + dz], 38, 6, MN.lodo, { cap0: '#c8b27a', cap1: '#d6c08a' })); gnd.push(contact(x, z, 200)); }
     for (let i = 0, n = [2, 4, 6][Q]; i < n; i++) { const a = i / n * 6.3 + R() * .5, x = Math.cos(a) * 2500, z = Math.sin(a) * 2300 - 300; B.card(x, z, 1400, 260, fogSvg, { k: 2, y: -40 }); }
     tufts(B, R, [0, 16, 26][Q], (x, z) => !inArena(x, z, 150), '#a8c050', '#5a7a30', trees);
+    beams(B, Q, [[-1600, -2000], [1500, -1600]]);
   }
 
   // ----- VULCÃO -----
@@ -526,6 +589,7 @@
     const okT = (x, z) => !inArena(x, z, 300) && !(Math.abs(x) < 1500 && z < -2500) && !(Math.abs(x + 430) < 700 && z > 600 && z < 1700);
     const trees = scatter(R, [4, 6, 8][Q], 900, okT);
     for (const [x, z] of trees) { const s = .9 + R() * .5, h = (560 + R() * 200) * s, pal = COPAS[Math.floor(R() * 3)], top = -h - 40 * s;
+      if (CEL) { const H = h * 1.32, W = H * 400 / 640; B.group([x, -H * .55, z], Math.max(W * .55, H * .5), () => B.card(x, z, W, H, celTreeSvg(R, COPAS_CEL[Math.floor(R() * 3)]), { k: 2, sh: true })); gnd.push(shadowOf(x, z, h, 290 * s), contact(x, z, 90 * s)); continue; }
       B.group([x, -h * .7, z], 330 * s, () => { B.card(x, z, 90 * s, h + 40 * s, trunkSvg(), { sh: true }); B.blob(x, top, z, 230 * s, pal); for (let k = 0; k < (Q ? 3 : 2); k++) { const a = k * 2.1 + R() * .5; B.blob(x + Math.cos(a) * 170 * s, top + 90 * s, z + Math.sin(a) * 150 * s, 150 * s, pal); } });
       gnd.push(shadowOf(x, z, h, 290 * s), contact(x, z, 90 * s)); }
     // cerca de madeira num arco à esquerda e atrás (postes + duas tábuas de cada vão)
@@ -534,11 +598,12 @@
       for (let i = 0; i + 1 < fence.length; i++) { const [x0, z0] = fence[i], [x1, z1] = fence[i + 1]; for (const y of [55, 115]) B.poly([[x0, -y, z0], [x1, -y, z1], [x1, -y - 22, z1], [x0, -y - 22, z0]], M.madeira, null, { ds: true, face: [x0 + x1, 0, z0 + z1] }); } });
     for (const [x, z] of fence) gnd.push(contact(x, z, 30));
     tufts(B, R, [0, 14, 24][Q], (x, z) => !inArena(x, z, 150), '#b6f06a', '#5ab840', trees);
+    beams(B, Q, [[-2000, -1800], [1900, -1400], [-1700, 1300]]);
   }
 
   // ----- nuvens que andam, partículas e gaivotas -----
   // Poucas: cada camada animada obriga o navegador a reordenar todo o palco 3D a cada quadro.
-  const cloudCard = R => svgUrl(300, 130, cloudSvg(150, 92, 2, R, '#ffffff', '#bcd3f5'));
+  const cloudCard = R => svgUrl(300, 130, CEL ? celCloud(150, 100, 1.2, R) : cloudSvg(150, 92, 2, R, '#ffffff', '#bcd3f5'));
   function ceuVivo(B, Q, R, tema) {
     for (let i = 0, n = tema === 'caverna' ? 0 : [0, 3, 4][Q]; i < n; i++) { const a = (i / n) * 2 * Math.PI + R() * .6, r = 2700, x = Math.cos(a) * r * 1.1, z = Math.sin(a) * r * .95, k = 2.6 + R() * 1.6, ry = Math.atan2(-x, -z) * 180 / Math.PI;
       B.raw(`<s class="tcl" style="background-image:${cloudCard(R)};transform:translate3d(${f1(x)}px,${f1(-1450 - R() * 350)}px,${f1(z)}px) rotateY(${f1(ry + 180)}deg) scale(${f1(k)});animation-duration:${f1(70 + R() * 60)}s;animation-delay:-${f1(R() * 60)}s"></s>`); }
@@ -564,8 +629,11 @@
     neve: [neve, 41], deserto: [deserto, 53], caverna: [caverna, 67, FRC], ruinas: [ruinas, 71], pantano: [pantano, 83], vulcao: [vulcao, 97, FRV], campo: [campo, 103] };
   const TEMAS = Object.keys(BUILD);
   // monta o cenário sem tocar no DOM: html do terreno, horizonte de cada face e grupos (para sumir na frente da câmera), já no horário
-  function construir(tema, Q, hora = 'dia') {
+  function construir(tema, Q, hora = 'dia', estilo = 'cel') {
     const b = BUILD[tema]; if (!b) return null;
+    CEL = estilo !== 'simples'; try { return construir0(tema, Q, hora, b); } finally { CEL = false; }
+  }
+  function construir0(tema, Q, hora, b) {
     const R = rng(b[1]), B = Builder(), gnd = [], extra = [];
     b[0](B, Q, R, gnd, extra);
     ceuVivo(B, Q, rng(99), tema);
@@ -577,8 +645,9 @@
   function montar(parent, tema, q = 'medium', hora) {
     const Q = q === 'low' ? 0 : q === 'high' ? 2 : 1, host = parent.closest?.('[data-biome]');
     hora = HORAS.includes(hora) ? hora : horaDe(host?.dataset.biome);
-    const r = construir(tema, Q, hora); if (!r) return;
-    const terr = document.createElement('div'); terr.className = `terr t-${tema} h-${hora}`;
+    let estilo = 'cel'; try { estilo = localStorage.getItem('vj_terr_estilo') || 'cel'; } catch {} // "simples" volta ao estilo antigo
+    const r = construir(tema, Q, hora, estilo); if (!r) return;
+    const terr = document.createElement('div'); terr.className = `terr t-${tema} h-${hora}${estilo === 'cel' ? ' cel' : ''}`;
     terr.innerHTML = r.html;
     parent.appendChild(terr);
     host?.style.setProperty('--frest', r.frest);

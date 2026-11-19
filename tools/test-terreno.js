@@ -33,7 +33,8 @@ test('construir: todos os temas, qualidades e horários montam sem DOM', () => {
     if (Q === 0 && hora === 'dia') nHigh[tema + '0'] = r.n;
     for (const G of r.groups) assert.ok(!(Math.abs(G.c[0]) < 1050 && G.c[2] > -2700 && G.c[2] < 550), `${tema}: grupo no meio da luta em ${G.c}`);
   }
-  for (const tema of T.TEMAS) { assert.ok(nHigh[tema] <= nHigh.floresta * 1.25 + 40, `${tema} pesado: ${nHigh[tema]} vs ${nHigh.floresta}`); assert.ok(nHigh[tema + '0'] <= nHigh[tema] * .75 + 10, tema + ' low'); }
+  const ref = T.construir('floresta', 2, 'dia', 'simples').n; // teto: o Bosque antigo (o cel juntou as copas e ficou mais leve)
+  for (const tema of T.TEMAS) { assert.ok(nHigh[tema] <= ref * 1.25 + 40, `${tema} pesado: ${nHigh[tema]} vs ${ref}`); assert.ok(nHigh[tema + '0'] <= nHigh[tema] * .75 + 10, tema + ' low'); }
 });
 
 test('ids do fundo: 10 temas × 3 horários e migração', async () => {
@@ -42,4 +43,13 @@ test('ids do fundo: 10 temas × 3 horários e migração', async () => {
   const m = bbg => { const sc = { bbg }; migrateBackdrop(sc); return sc.bbg; };
   assert.equal(m('praia-noite'), 'praia-noite'); assert.equal(m('praia-por-do-sol'), 'praia-dia'); assert.equal(m('cemiterio-luar'), 'floresta-dia');
   assert.equal(m('https://x/a.png'), 'https://x/a.png'); assert.equal(m(''), '');
+});
+
+test('estilo cel é o padrão: sem bolinhas e com contorno; "simples" volta ao antigo', () => {
+  for (const tema of ['campo', 'castelo', 'pantano', 'neve']) { const h = T.construir(tema, 2, 'dia').html; assert.ok(!h.includes('class="tb"'), tema + ' ainda tem bolinha'); }
+  assert.ok(T.construir('praia', 2, 'dia').html.includes('feMorphology'), 'recortes sem contorno');
+  assert.ok(T.construir('floresta', 2, 'dia', 'simples').html.includes('class="tb"'));
+  assert.ok(/(#|%23)ffffff/i.test(T.construir('campo', 2, 'dia').html), 'dia em cel escureceu como noite'); // branco segue branco de dia
+  const nb = h => h.split('class="tb"').length - 1; // no Bosque só os cogumelos seguem redondos
+  assert.ok(nb(T.construir('floresta', 2, 'dia').html) * 3 < nb(T.construir('floresta', 2, 'dia', 'simples').html));
 });
