@@ -1690,6 +1690,21 @@ test('palco 3D: órbita e contracampo do inimigo', async () => {
   const foe = { x: 0, z: -2000 }, hero = { x: 0, z: 0 }, c = P.cameraFor({ kind: 'table', at: foe, pts: [foe, hero], w: 1440, foe: true });
   assert.equal(P.unitKind({}, c.ry), 'f');
 });
+test('palco 3D: zoom e mesa respeitam a altura real e a faixa da coluna', async () => {
+  await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, to = h => ({ x: 0, z: -1500, h });
+  const z = h => P.cameraFor({ kind: 'zoom', to: to(h), ry: 0 });
+  assert.equal(z(300).tz, P.cameraFor({ kind: 'zoom', to: { x: 0, z: -1500 }, ry: 0 }).tz, 'sem h usa o padrão');
+  assert.ok(z(1200).tz < z(380).tz, 'chefe grande: câmera mais longe');
+  for (const h of [50, 380, 1200, 5000]) { const d = 1500 - z(h).tz; assert.ok(Number.isFinite(z(h).tz) && d >= 420 && d <= 1700, 'piso e teto do zoom'); }
+  const mk = (h, lane) => P.cameraFor({ kind: 'table', at: { x: -430, z: 0, h: 300 }, pts: [{ x: -430, z: 0, h: 300 }, { x: 0, z: -1500, h }], w: 1440, h: 860, ...(lane ? { lane } : {}) });
+  assert.ok(mk(1200).tz < mk(380).tz, 'recua para caber a figura alta');
+  assert.deepEqual(mk(380, { w: 0, side: 1 }), mk(380), 'faixa zero não muda nada');
+  assert.deepEqual(P.cameraFor({ kind: 'table', at: { x: -430, z: 0 }, pts: [{ x: -430, z: 0 }, { x: 0, z: -1500 }], w: 700, lane: { w: 400, side: 1 } }), P.cameraFor({ kind: 'table', at: { x: -430, z: 0 }, pts: [{ x: -430, z: 0 }, { x: 0, z: -1500 }], w: 700 }), 'janela estreita ignora a faixa');
+  const R = mk(380, { w: 420, side: 1 }), L = mk(380, { w: 420, side: -1 }), N = mk(380);
+  assert.ok(R.tx !== N.tx && L.tx > R.tx, 'coluna à direita desloca o ator para a esquerda, à esquerda para a direita');
+  for (const v of [R, L, mk(1200, { w: 420, side: 1 })]) assert.ok(Number.isFinite(v.tx) && Number.isFinite(v.tz) && v.tz > -9000);
+  const one = P.cameraFor({ kind: 'table', at: { x: 0, z: 0, h: 1200 }, pts: [{ x: 0, z: 0, h: 1200 }], w: 1440, h: 860 }); assert.ok(Number.isFinite(one.tz) && one.tz > -9000, 'um combatente gigante');
+});
 test('palco 3D: chefe no centro ao fundo, lacaios abrindo o arco, ninguém colado', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, fr = P.frame({ a: 0, cx: 0, cy: 0, d: 8 }, 20, 10);
   const F = P.formation([{ id: 'h' }, { id: 'b', enemy: true, boss: true }, { id: 'm1', enemy: true }, { id: 'm2', enemy: true }, { id: 'm3', enemy: true }], fr);
