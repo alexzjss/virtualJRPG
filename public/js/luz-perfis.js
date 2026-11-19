@@ -69,5 +69,9 @@
     return { charge: [0, a], fire: [a, b], travel: [b, i], impact: [i, durMs] }; };
   // orçamento de partículas entre emissores (alvos) e golpes: todo impacto ganha ao menos impactFloor
   const share = (budget, emitters, hitsPerEmitter) => { const e = Math.max(1, emitters | 0), h = Math.max(1, hitsPerEmitter | 0); return { perHit: Math.floor(budget / (e * h)), impactFloor: Math.min(60, Math.floor(budget / e)) }; };
-  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL };
+  // ----- pós de tela: intensidade de cada pulso (0..1) t ms depois de disparar -----
+  const PULSE = { bloom: 220, shock: 450, invert: 34, chroma: 260, speed: 400 };
+  const pulse = (kind, t, strength = 1) => { const ms = PULSE[kind]; if (!ms || t < 0 || t > ms) return 0; const u = t / ms, k = kind === 'invert' ? 1 : kind === 'shock' ? Math.sin(Math.PI * Math.min(1, u * 1.15)) * (1 - u) + (1 - u) * .25 : 1 - u * u;
+    return Math.max(0, Math.min(1, k * clamp(strength, 0, 1))); };
+  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL, pulse, PULSE };
 })(globalThis);

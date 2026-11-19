@@ -98,6 +98,7 @@ function knockout(id) { // nocaute: corte em diagonal, o cartão cai e apaga
   sfxc('ko');
 }
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const posFx = (k, id, o = {}) => { const P = globalThis.LUZ?.pos; if (!P) return; const r = id && document.querySelector(`.p3d .bb[data-tgt="${CSS.escape(id)}"] > .bbi > img`)?.getBoundingClientRect(); P.fire(k, r?.width ? { x: r.left + r.width / 2, y: r.top + r.height * .45, ...o } : o); }; // pós de tela do motor luminoso (aberração, velocidade, choque, inversão)
 function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CHOQUE!, BLACK FLASH!
   fxl.querySelector('.seal')?.remove();
   if (kind !== 'bom' && kind !== 'erro') fxAdd('flash' + (kind === 'bf' ? ' dark' : ''), '', 260);
@@ -105,7 +106,7 @@ function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CH
 }
 function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do ataque, contra-ataque, Choque e Black Flash
   const grade = acts.find(e => e.fx.cg), bf = acts.find(e => e.fx.bf), ctr = acts.find(e => e.fx.ctr), chq = acts.find(e => e.fx.chq);
-  if (bf) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 450); } seal('bf', 'BLACK FLASH!'); }
+  if (bf) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 450); } seal('bf', 'BLACK FLASH!'); posFx('invert'); }
   else if (grade) seal(grade.fx.cg, (RULES.CMD.GRADE_NAME[grade.fx.cg] || '') + '!');
   if (ctr) setTimeout(() => seal('ctr', 'CONTRA!'), 250);
   if (chq) { if (stage && !calm()) { stage.classList.add('shake'); setTimeout(() => stage.classList.remove('shake'), 400); } seal('chq', 'CHOQUE!'); }
@@ -140,6 +141,7 @@ function strikeFx(acts, f0, a, o = {}) {
   if (au && !f0.dom) { au.style.setProperty('--fx', ELC[f0.el] || '#fff'); pulse(au, casts ? 'cast' : 'lunge'); }
   // no palco 3D a investida física leva a câmera e o recorte até o alvo; os golpes caem quando ela chega
   const go = stage3d() && !old && !casts && !f0.dom && t0 && typeof PALCO3D !== 'undefined' ? PALCO3D.lunge(f0.a, t0, typeof ANIM_PROFILES !== 'undefined' ? ANIM_PROFILES.familyOf(skByName(f0.s), f0) : '') : null;
+  if (go) posFx('speed', t0, { strength: .8 });
   const crit = acts.find(e => e.fx.crit), weak = acts.find(e => e.fx.w);
   if (crit && stage && !P3()) { stage.classList.add('shake'); if (!old) setTimeout(() => stage.classList.remove('shake'), 450); }
   comandoFx(acts, stage);
@@ -168,12 +170,13 @@ function strikeFx(acts, f0, a, o = {}) {
       if (p3 && f.esq && typeof PVIDA !== 'undefined') PVIDA.ghosts(f.id, dirOf(f0.a, f.id)); }
     const num = f.heal ? (f.a && f.heal === 1 ? 'Cura' : '+' + f.heal) : f.miss ? (f.par ? 'Aparou!' : f.esq ? 'Esquivou!' : 'Errou') : f.dmg ? '−' + f.dmg : ''; // golpe de apoio sem número não ganha legenda
     const rp = o.replay ? ' replay' : '';
+    if (f.crit && !f.miss) posFx('chroma', f.id);
     if (num) floatNum(el, num, (f.heal ? 'heal' : f.miss ? 'miss' : f.crit ? 'crit' : f.w ? 'weak' : '') + rp, i, f);
     if (G) setTimeout(() => floatNum(el, '= −' + G.total, 'total' + rp, i + 1, f), 200); // multi-hit: o total depois do último
     if (/QUEBROU!/.test(e.text)) setTimeout(() => shatter(el), 120);
     if (koNow) { setTimeout(() => knockout(f.id), 260);
       const sl = p3 && PFX.slowFor({ ko: true, lastFoe: !!S.chars[f.id]?.enemy && !foeLeft(f.id), reduced: calm() });
-      if (sl && typeof CENA !== 'undefined') { CENA.slow(sl.f, sl.ms); if (sl.zoom) { PALCO3D.focus(f.id, [], 300); PALCO3D.vignette(sl.ms); } } }
+      if (sl && typeof CENA !== 'undefined') { CENA.slow(sl.f, sl.ms); if (sl.zoom) { PALCO3D.focus(f.id, [], 300); PALCO3D.vignette(sl.ms); posFx('invert'); posFx('shock', f.id, { strength: 1 }); } } }
   };
   // golpes do mesmo grupo (multi-hit) caem a 140 ms um do outro; devolve quando o último cai
   const hits = d0 => { let k = 0, last = d0; for (const G of (typeof PFX !== 'undefined' ? PFX.groupHits(acts) : acts.map(e => ({ parts: [e], total: 0 }))))

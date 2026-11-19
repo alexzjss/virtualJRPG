@@ -34,3 +34,8 @@ test('LUZP: materiais, fases e partilha do orçamento', () => {
   const s = L.share(2500, 8, 5); assert.ok(s.perHit * 8 * 5 <= 2500); assert.equal(s.impactFloor, 60);
   assert.equal(L.share(2500, 100, 1).impactFloor, 25);
 });
+
+test('LUZP: pulsos de pós nascem e somem na janela', () => {
+  for (const [k, ms] of [['bloom', 220], ['shock', 450], ['invert', 34], ['chroma', 260], ['speed', 400]]) {
+    assert.ok(L.pulse(k, 0, 1) > 0, k); assert.equal(L.pulse(k, ms + 1, 1), 0, k); assert.equal(L.pulse(k, -1, 1), 0, k); assert.ok(L.pulse(k, ms / 2, .5) <= .5, k); }
+});

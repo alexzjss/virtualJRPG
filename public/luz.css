@@ -6,3 +6,5 @@ html.luz .animfx-canvas{display:none}
 html.luz .p3d .bb.malha img{opacity:0!important;rotate:0deg!important;filter:none!important;animation:none!important}
 html.luz .p3d .bb.malha .bbi{animation:none!important;scale:none!important;transform:none!important}
 html.luz .p3d .bb.malha .ghost{display:none}
+/* flash invertido do motor luminoso: inverte a tela inteira por um instante (mix-blend, sem filter em camada 3D) */
+.luz-invert{position:fixed;inset:0;z-index:60;background:#fff;mix-blend-mode:difference;pointer-events:none}

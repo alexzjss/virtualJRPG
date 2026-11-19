@@ -189,6 +189,7 @@
   }
   const kick = () => { if (!raf && !inFrame && gl && !lost) raf = requestAnimationFrame(frame); }; // dentro do quadro quem agenda é o fim do próprio quadro
   L.kick = kick;
+  L.fxBusy = () => frameFns.size > 0 || clockNow() < deathP; L.settings = settings; // luz-pos: só compõe enquanto há efeito no ar
   L.step = t => { cancelAnimationFrame(raf); raf = 0; frame(t ?? performance.now()); }; // um quadro na mão (inspeção com a aba em segundo plano)
   const qEvt = () => { if (gl && !lost) sizeParticles(); mark(); try { dispatchEvent(new Event('vj-quality')); } catch {} };
 
