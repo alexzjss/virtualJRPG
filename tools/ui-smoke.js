@@ -109,16 +109,17 @@ try {
       await anaD.locator('.hud-mini .mt').click(); check(await anaD.locator('.hud-mini.off').count() === 0, 'clicar de novo expande o minimapa');
       check(await mesa.evaluate(() => !document.querySelector('.hud-mini .mk.drag')), 'na tela da mesa nenhum ponto do minimapa arrasta'); }
     check(/SHINKAI/i.test(await txt(anaD, '.hud-order .ot.now .otn')) && await anaD.locator('.hud-order .ot .otn').count() >= 4, 'ordem estilo FFX: plaquetas com nome, a da vez no topo');
-    check(await anaD.evaluate(() => { const c = document.querySelector('.hud-br .hud-cmd'), p = document.querySelector('.hud-br .hud-party'); if (!c || !p) return false; const a = c.getBoundingClientRect(), b = p.getBoundingClientRect(); return a.bottom <= b.top + 2 && a.right > innerWidth * .6; }), 'comandos de turno no canto inferior direito, acima do grupo');
+    check(await until(() => anaD.evaluate(() => { const m = document.querySelector('.lq .lqm .lqc'), t = document.querySelector('.lq .lqt .lqin'), r = PALCO3D.rectOf(LEQUE.ctx()?.actor?.id); if (!m || !t || !r) return false; const a = m.getBoundingClientRect(), b = t.getBoundingClientRect(), near = x => Math.min(Math.abs(x.left - r.right), Math.abs(x.right - r.left)) < 50;
+      return near(a) && (near(b) || b.top >= a.bottom - 2) && !document.querySelector('.hud-br .hud-cmd'); }), 'coluna assentada no herói'), 'comandos presos ao herói: coluna no ombro e comandos de turno do outro lado');
     check(!(await vis(anaD, '.hud-tgts')), 'sem lista de alvos fora da mira');
     check(await anaD.locator('.cmd').count() === 0, 'o painel antigo não aparece no PC');
     check(!(await vis(anaD, '.top .tnav')) && await vis(anaD, '.hud-tr [data-a=navT]') && await vis(anaD, '.hud-tr [data-a=chatT]'), 'em batalha: sem barra de páginas, com ☰ e chat no HUD');
-    check(await vis(anaD, '.hud-cmd [data-a=defend]') && await vis(anaD, '.hud-cmd [data-a=braveT]') && await vis(anaD, '.hud-cmd [data-a=next]'), 'dicas de Defender, Coragem e Passar');
+    check(await vis(anaD, '.lqt [data-a=defend]') && await vis(anaD, '.lqt [data-a=braveT]') && await vis(anaD, '.lqt [data-a=next]'), 'Defender, Coragem e Passar na coluna de turno');
     await shot(anaD, 'palco3d');
     { const ids = shinkai.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'); shinkai.skPin = ids.slice(0, 1); shinkai.skUse = Object.fromEntries(ids.slice(1, 7).map((k, i) => [k, 9 - i])); push(); await sleep(300); } // fixada e mais usadas para as 6
     await anaD.keyboard.press('2'); await until(() => anaD.locator('.sk6').count(), 'tela das 6 skills');
     check(await anaD.locator('.sk6 .stroke[data-sk]').count() <= 6 && await anaD.locator('.stroke[data-lq="all"]').count() === 1, 'Skills abre as 6 e a pincelada Todas');
-    await anaD.keyboard.press('ArrowLeft'); await anaD.keyboard.press('ArrowRight'); await anaD.keyboard.press('Enter'); check(await until(async () => await anaD.locator('.lq-sum').count() === 1 && !(await anaD.locator('.sk6').count()), 'mira da skill'), 'Enter numa skill das 6 abre a mira');
+    await anaD.keyboard.press('ArrowDown'); await anaD.keyboard.press('ArrowUp'); await anaD.keyboard.press('Enter'); check(await until(async () => await anaD.locator('.lq-sum').count() === 1 && !(await anaD.locator('.sk6').count()), 'mira da skill'), 'Enter numa skill das 6 abre a mira');
     await anaD.keyboard.press('Escape'); await until(() => anaD.locator('.sk6').count(), 'volta às 6');
     await anaD.keyboard.press('t'); check(await until(async () => await anaD.locator('.skl').count() > 0, 'lista completa'), 'T abre a lista completa');
     await anaD.keyboard.press('Escape'); check(await until(async () => !(await anaD.locator('.skl').count()) && await anaD.locator('.sk6').count() > 0, 'Esc volta às 6'), 'Esc da lista volta às 6');
@@ -239,7 +240,7 @@ try {
     go({ t: 'ini', k: 'set', id: foe.id, v: 0 }); check(current() === foe.id || toTurn(foe.id), 'vez do inimigo'); await until(() => gmP.locator('[data-a="ai"].stroke').count(), 'leque do mestre na vez do inimigo');
     check(await nGm() === 0, 'barra antiga some no PC');
     check(await gmP.locator('[data-a="ai"].stroke').count() === 1, 'mestre tem IA decide no leque');
-    check(await vis(gmP, '.hud-br .hud-cmd [data-a=defend]') && await vis(gmP, '.hud-br .hud-cmd [data-a=next]') && await gmP.locator('.lq .stroke[data-lq=next]').count() === 0, 'mestre: Defender/Passar na fileira do canto, não no leque');
+    check(await vis(gmP, '.lqt [data-a=defend]') && await vis(gmP, '.lqt [data-a=next]') && await gmP.locator('.lq .stroke[data-lq=next]').count() === 0, 'mestre: Defender/Passar na coluna de turno, fora das pinceladas');
     check(await gmP.locator('.lq .stroke[data-lq=atk]').count() === 1 && await gmP.locator('.lq-gm-open').count() === 0, 'inimigo: Atacar no leque e sem botão recolhido');
     await gmP.keyboard.press('1'); check(await until(async () => await gmP.locator('.lq-sum').count() === 1, 'mira do mestre'), 'Atacar abre a mira');
     check(await vis(gmP, '.hud-br .hud-tgts .ta.on'), 'mestre: lista de alvos na mira');
@@ -344,9 +345,9 @@ try {
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
     check(toTurn(mikhail.id), 'vez da Mikhail para o Ataque Total'); const pg = bia; // a vez de quem tem tela aberta (o Thomas não tem)
-    await until(async () => await pg.locator('.hud-cmd [data-a=allOut]').count(), 'Ataque Total liberado com todos Derrubados');
+    await until(async () => await pg.locator('.lqt [data-a=allOut]').count(), 'Ataque Total liberado com todos Derrubados');
     const hp1 = bossCh.hp + minion.hp;
-    await pg.locator('.hud-cmd [data-a=allOut]').dispatchEvent('click'); // a dica pulsa sem parar: o clique vai direto nela
+    await pg.locator('.lqt [data-a=allOut]').dispatchEvent('click'); // a dica pulsa sem parar: o clique vai direto nela
     await until(() => /ATAQUE TOTAL|Ataque Total/i.test(battleLog()), 'registro do Ataque Total');
     await until(() => bossCh.hp + minion.hp < hp1, 'Ataque Total causou dano');
     await shot(pg, 'ataque-total');

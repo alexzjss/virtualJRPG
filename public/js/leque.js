@@ -1,7 +1,7 @@
-// ===== leque de comandos do jogador no PC: pinceladas à direita do herói da vez, no lugar do painel command() =====
+// ===== leque de comandos do jogador no PC: coluna de pinceladas presa ao ombro do herói da vez, no lugar do painel command() =====
 // Menu (1 Atacar, 2 Skills, 3 Itens, Q Mirar parte) → lista (skills ou itens) → mira (escolher o alvo no palco) → Enter age.
 // O estado da escolha continua nos globais do painel antigo (pick, tgt, aim, aimOpen, braveOn, passTo); aqui só vive o passo em que o leque está.
-// Posições em coordenadas de 1440×860 (a câmera sempre põe o herói no mesmo lugar); o CSS escala tudo pelo --hk.
+// A coluna segue o recorte na tela (follow) e escala pelo --hk; os comandos de turno (hud.js HUD.turn) ficam do lado oposto do recorte.
 const LEQUE = (() => {
   const state = { mode: 'menu', sel: 0 }; // mode: menu | skills (as 6 fixadas, tarefa 5) | all (lista inteira) | items | aim
   let from = 'menu', listFrom = 'menu', turnKey = '', cx = null, gmOpen = '', hovTgt = null, camId = null; // hovTgt: alvo escolhido pelo mouse; camId: âncora da linha de alcance na vista tática // from: de onde a mira veio (Esc volta para lá); listFrom: de onde a lista completa veio (as 6 ou o menu); cx: quem está no leque agora; gmOpen: vez em que o mestre abriu o leque de um herói com dono conectado
@@ -50,7 +50,53 @@ const LEQUE = (() => {
     if (state.mode === 'aim' && cands().some(o => o.id === n)) { tgt = n; aim = null; } setZoom(n); };
   const hint = n => { const b = app.querySelector(`.hk[data-a=${n}]`); if (b) b.click(); return !!b; }; // as dicas de baixo são botões: o clique passa pelo mesmo caminho do mouse
 
-  const stroke = (lq, key, label, small, x, y, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} style="left:${x}px;top:${y}px;${o.r != null ? `--r:${o.r}deg;` : ''}${o.fs ? `font-size:${o.fs}px` : ''}" ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
+  // pincelada da coluna: o atalho é uma marca discreta no canto (sem a faixa de dicas)
+  const stroke = (lq, key, label, small, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''} ${o.cls || ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
+
+  // ===== coluna presa ao herói: segue o recorte da vez (suave), espelha na borda e some durante a investida =====
+  // .lqm (comandos + lista aberta ao lado) fica no ombro; .lqt (comandos de turno) do lado oposto do recorte
+  const fol = { x: null, y: null, tx: null, ty: null, side: 1, raf: 0, tmo: 0, id: null, last: 0 };
+  const GAP = 22, DEAD = 40; // DEAD: px que o herói anda antes da coluna ir atrás
+  // step(snap): mede e posiciona; snap pula a suavização (aba em segundo plano, onde o requestAnimationFrame não roda)
+  const step = (snap = false) => {
+    const lq = app.querySelector('.lq'), m = lq?.querySelector('.lqm'); if (!lq || !m || !cx) { fol.id = null; return false; }
+    const r = PALCO3D.rectOf(cx.actor.id), L = lq.getBoundingClientRect(), mi = m.firstElementChild.getBoundingClientRect();
+    if (!L.width) return true;
+    // sem recorte na tela (câmera de longe, fora do quadro): fica no meio, um pouco à direita
+    const rl = r && r.width ? r.left - L.left : L.width * .45, rr = r && r.width ? r.right - L.left : L.width * .45, rt = r && r.height ? r.top - L.top : L.height * .4, rh = r && r.height ? r.height : 0;
+    // o lado escolhe pela largura com a lista aberta (reserva), para abrir Skills não trocar de lado
+    const w = mi.width, h = mi.height, hk = mi.width / (m.firstElementChild.offsetWidth || 1), wr = Math.max(w, 560 * hk), fitR = rr + GAP + wr <= L.width - 8, fitL = rl - GAP - wr >= 8;
+    const side = fitR ? 1 : fitL ? -1 : (L.width - rr > rl ? 1 : -1); // à direita do ombro quando cabe; senão à esquerda; senão onde houver mais espaço
+    if (fol.id !== cx.actor.id || side !== fol.side) { fol.id = cx.actor.id; fol.x = fol.tx = null; } fol.side = side;
+    // fol.x guarda a borda voltada para o herói (esquerda à direita do ombro; direita no lado espelhado): abrir a lista muda a largura sem deslizar a coluna
+    const sx = side > 0 ? 0 : w, x = Math.max(8, Math.min(L.width - w - 8, side > 0 ? rr + GAP : rl - GAP - w)) + sx;
+    const y = Math.max(8, Math.min(L.height - h - 8, rt + rh * .22));
+    const hold = ['skills', 'items', 'all'].includes(state.mode); // navegando numa lista: a coluna fica parada para o clique não errar
+    // suave e com zona morta: a deriva da câmera parada e a tremida do impacto não mexem a coluna (fica fácil de clicar)
+    const ease = (k, v) => { if (fol[k] == null) return v; if (hold) return fol[k]; const d = v - fol[k]; if (snap) return Math.abs(d) > DEAD ? v : fol[k]; if (Math.abs(d) < 3) return fol[k]; return fol.mv?.[k] || Math.abs(d) > DEAD ? fol[k] + d * .22 : fol[k]; }; // perto o bastante: para (a deriva não arrasta a coluna 1px por vez)
+    const nx = ease('x', x), ny = ease('y', y); fol.mv = { ...fol.mv, x: Math.abs(x - nx) >= 3, y: Math.abs(y - ny) >= 3 }; fol.x = nx; fol.y = ny;
+    lq.classList.toggle('l', fol.side < 0);
+    fol.l = fol.x - sx; m.style.transform = `translate(${Math.round(fol.l)}px,${Math.round(fol.y)}px)`; m.style.visibility = '';
+    const t = lq.querySelector('.lqt');
+    if (t) { const ti = t.firstElementChild.getBoundingClientRect(), tw = ti.width;
+      let tx = fol.side > 0 ? rl - GAP - tw : rr + GAP, ty = rt + rh * .3;
+      // herói colado na borda (câmera de ombro): sem espaço do outro lado, desce para baixo da coluna em vez de cobrir o recorte
+      if (fol.side > 0 ? tx < 8 : tx + tw > L.width - 8) { const ci = m.querySelector('.lqc').getBoundingClientRect(); tx = fol.side > 0 ? x : x - tw; ty = y + (ci.bottom - mi.top) + 12; }
+      const stx = side > 0 ? tw : 0; tx = Math.max(8, Math.min(L.width - tw - 8, tx)) + stx; ty = Math.max(8, Math.min(L.height - ti.height - 8, ty)); // também pela borda voltada ao herói
+      const ntx = ease('tx', tx), nty = ease('ty', ty); fol.mv = { ...fol.mv, tx: Math.abs(tx - ntx) >= 3, ty: Math.abs(ty - nty) >= 3 }; fol.tx = ntx; fol.ty = nty;
+      fol.tl = fol.tx - stx; t.style.transform = `translate(${Math.round(fol.tl)}px,${Math.round(fol.ty)}px)`; t.style.visibility = ''; }
+    return true;
+  };
+  // a câmera anda por ~1,1 s e a investida mexe o recorte: acompanha a cada quadro
+  const follow = () => { fol.raf = 0; fol.last = performance.now(); if (step()) fol.raf = requestAnimationFrame(follow); };
+  const pos = (a, b) => a == null ? 'visibility:hidden' : `transform:translate(${Math.round(a)}px,${Math.round(b)}px)`; // o desenho refaz o HTML: nasce onde estava
+  const wrap = (main, sub = '', turn = '', row = 0) => {
+    if (!fol.raf) fol.raf = requestAnimationFrame(follow);
+    queueMicrotask(() => step(performance.now() - fol.last > 250)); // logo depois do desenho entrar na página, sem esperar o próximo quadro
+    if (!fol.tmo) fol.tmo = setTimeout(function reserva() { fol.tmo = 0; const idle = performance.now() - fol.last > 250; if (step(idle) !== false && idle) fol.tmo = setTimeout(reserva, 300); }, 300); // reserva enquanto o requestAnimationFrame está parado
+    return `<div class="lq ${fol.side < 0 ? 'l' : ''}" aria-label="Comandos de ${esc(cx.actor.name)}"><div class="lqa lqm" style="${pos(fol.x == null ? null : fol.l, fol.y)}"><div class="lqin"><div class="lqc">${main}</div>${sub ? `<div class="lqsub" style="--row:${row}">${sub}</div>` : ''}</div></div>`
+      + (turn ? `<div class="lqa lqt" style="${pos(fol.tx == null ? null : fol.tl, fol.ty)}"><div class="lqin">${turn}</div></div>` : '') + '</div>';
+  };
 
   return {
     state,
@@ -99,43 +145,53 @@ const LEQUE = (() => {
       cx = { actor: c, cur, my, wait, gm: gmO, shown: false };
       const tk = `${cur?.id}:${S.battle.n}:${c.id}`; if (tk !== turnKey) { turnKey = tk; this.reset(); pick = { ...ATK }; aim = null; braveOn = false; gmOpen = ''; PALCO3D.local.zoom = null; if (gmO) { const f = battlers().find(o => o.enemy !== c.enemy && o.hp > 0); if (f) tgt = f.id; } }
       if (!my || wait || S.battle.cmd) return '';
-      if (gmO && donoOn(c) && gmOpen !== tk) return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox"><button type="button" class="lq-gm-open" data-lq="gmopen" title="${esc(c.owner)} está conectado: o leque fica recolhido até você pedir">Agir por ${esc(c.name)}</button></div></div>`;
+      if (gmO && donoOn(c) && gmOpen !== tk) return wrap(`<button type="button" class="lq-gm-open" data-lq="gmopen" title="${esc(c.owner)} está conectado: o leque fica recolhido até você pedir">Agir por ${esc(c.name)}</button>`);
       const inB = battlers();
       if (!inB.some(o => o.id === tgt) || (state.mode !== 'aim' && S.chars[tgt].enemy && S.chars[tgt].hp <= 0)) { const f = inB.find(o => o.enemy !== c.enemy && o.hp > 0); if (f) { tgt = f.id; aim = null; } } // na sua vez já vem mirado no primeiro inimigo de pé
       const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
       if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { ...ATK };
       const t = S.chars[tgt], s = skSel(), it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma'), mode = state.mode;
       const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : mode === 'skills' ? 6 : 2));
-      let h = '';
-      if (mode === 'menu') {
+      const back1 = mode !== 'menu' ? stroke('back', 'Esc', 'Voltar', '', { cls: 'mini' }) : '';
+      const turn = typeof HUD !== 'undefined' && HUD.turn ? HUD.turn(c, inB) : ''; // Coragem vale também na mira
+      let main = '', sub = '', row = 0;
+      if (mode !== 'aim') {
+        // coluna principal: Atacar, Skills, Itens (de cima para baixo); a lista aberta sai ao lado da pincelada escolhida
         const M = [['atk', 1, 'Atacar', esc(ARMAS.prof(wp).atkN || 'Ataque'), wpnLine(wp, c)], ['sk', 2, 'Skills', sks.length + wsks.length], ['it', 3, 'Itens', cons.length]];
-        h += [2, 1, 0].map((k, j) => stroke(M[k][0], M[k][1], M[k][2], M[k][3], 650 + j * 40, 340 + j * 78, { on: sel === k, title: M[k][4] })).join('');
-        if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24 });
-        if (gmO && c.enemy) h += stroke('ai', 'I', 'IA decide', '', 610, 262, { a: 'ai' }); // Passar e os outros comandos de turno estão na fileira do canto (hud.js)
-      } else if (mode === 'items') {
-        h += cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, 600 + j * 36, 400 + j * 76, { v: k, on: sel === j, fs: 24 })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
+        const onK = mode === 'menu' ? sel : mode === 'items' ? 2 : 1;
+        main += M.map((m, k) => stroke(m[0], m[1], m[2], m[3], { on: onK === k, title: m[4], cls: mode !== 'menu' && onK !== k ? 'dim' : '' })).join('');
+        if (canAim() && mode === 'menu') main += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', { cls: 'mini' });
+        if (gmO && c.enemy && mode === 'menu') main += stroke('ai', 'I', 'IA decide', '', { a: 'ai', cls: 'mini' });
+        main += back1;
+      }
+      if (mode === 'items') {
+        row = 2;
+        sub = cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, { v: k, on: sel === j })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
       } else if (mode === 'skills') {
+        row = 1;
         const S6 = six(c), AF = { w: '▲', r: '▼', '?': '?' }, dia = s2 => `<span class="cost"><span class="lqd"><b>${s2.limit ? '∞' : s2.cost}</b></span>${s2.limit ? '' : s2.res === 'san' ? 'SAN' : 'AU'}</span>`;
-        const one = (i, big) => { const id = S6[i], s2 = SK(id), off = blocked(c, s2, id) ? blockWhy(c, s2, id) : '', af = skAff(s2, t), a = af ? `<span class="af ${af === 'r' ? 'r' : af === '?' ? 'q' : ''}">${AF[af]}</span>` : '', e = `<span class="el" style="--e:${ELC[s2.el] || '#888'}"></span>`;
-          return `<div class="stroke ${big ? 'big' : ''} ${sel === i ? 'on' : ''} ${off ? 'blk' : ''}" role="button" data-lq="skp" data-sk="${esc(id)}" data-v="${esc(id)}" ${off ? `title="${esc(off)}"` : ''}>${big ? `${dia(s2)}<div class="sk6n">${c.skPin?.includes(id) ? '<span class="star">★</span>' : ''}${e}${esc(s2.name)} ${a}</div><div class="t">${esc(KIND[s2.kind] || s2.kind)} · ${esc(EL[s2.el] || s2.el)}${s2.power ? ` · Poder ${s2.power}` : ''}${af === 'w' ? ' · <span class="w">▲ alvo fraco</span>' : ''}</div><p>${esc(desc(s2))}</p>${off ? `<div class="why">Bloqueada: ${esc(off)}</div>` : ''}` : `${e}${esc(s2.name)} ${a}${dia(s2)}`}</div>`; };
-        h += `<div class="sk6">${[3, 4, 5].filter(i => i < S6.length).map((i, j) => `<div class="sk6p" style="left:${560 + j * 14}px;top:${330 + j * 66}px">${one(i, 0)}</div>`).join('')}${[0, 1, 2].filter(i => i < S6.length).map((i, j) => `<div class="sk6p" style="left:${920 + j * 14}px;top:${230 + j * 128}px">${one(i, 1)}</div>`).join('')}</div>`;
-        h += stroke('all', 'T', 'Todas as skills…', String(usables(c).length), 600, 505, { on: sel === 6, r: -6, fs: 20 });
+        // as 6 numa coluna só; a destacada abre com tipo, elemento e descrição
+        const one = i => { const id = S6[i], s2 = SK(id), big = sel === i, off = blocked(c, s2, id) ? blockWhy(c, s2, id) : '', af = skAff(s2, t), a = af ? `<span class="af ${af === 'r' ? 'r' : af === '?' ? 'q' : ''}">${AF[af]}</span>` : '', e = `<span class="el" style="--e:${ELC[s2.el] || '#888'}"></span>`;
+          return `<div class="stroke ${big ? 'big on' : ''} ${off ? 'blk' : ''}" role="button" data-lq="skp" data-sk="${esc(id)}" data-v="${esc(id)}" ${off ? `title="${esc(off)}"` : ''}><div class="sk6n">${c.skPin?.includes(id) ? '<span class="star">★</span>' : ''}${e}${esc(s2.name)} ${a}${dia(s2)}</div>${big ? `<div class="t">${esc(KIND[s2.kind] || s2.kind)} · ${esc(EL[s2.el] || s2.el)}${s2.power ? ` · Poder ${s2.power}` : ''}${af === 'w' ? ' · <span class="w">▲ alvo fraco</span>' : ''}</div><p>${esc(desc(s2))}</p>${off ? `<div class="why">Bloqueada: ${esc(off)}</div>` : ''}` : ''}</div>`; };
+        sub = `<div class="sk6">${S6.map((_, i) => one(i)).join('')}</div>` + stroke('all', 'T', 'Todas as skills…', String(usables(c).length), { on: sel === 6, cls: 'mini' });
       } else if (mode === 'all') {
-        h += `<div class="lq-all">${skPane(c, t, { bare: true })}</div>`;
+        row = 1;
+        sub = `<div class="lq-all">${skPane(c, t, { bare: true })}</div>`;
         const cur2 = pick.k === 'sk' && s, w = cur2 && blocked(c, s, pick.id) ? blockWhy(c, s, pick.id) : '';
-        if (cur2) h += `<div class="lq-sum"><b>${esc(s.name)}</b><small>${esc(desc(s))}</small>${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
+        if (cur2) sub += `<div class="lq-sum"><b>${esc(s.name)}</b><small>${esc(desc(s))}</small>${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
       } else if (mode === 'aim') {
         const label = it ? it.name : s ? s.name : ARMAS.prof(wp).atkN || 'Ataque', w = why(); if (armed !== tgt) armed = null;
         const off = offSide() && !w ? (t.enemy === c.enemy ? (t.id === c.id ? 'em si mesmo' : 'fogo amigo') : 'ajuda o inimigo') : '';
-        h += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b>${off ? `<small class="offside">⚠ ${off}${armed ? ': Enter de novo confirma' : ''}</small>` : ''}<small>${w ? `<span class="why">${esc(w)}</span> · ` : ''}← → escolhem o alvo · Tab troca de lado · clique de novo no alvo confirma · Esc volta</small></div>`;
-        h += stroke('go', '⏎', armed ? 'Confirmar mesmo assim' : esc(askL('act', 'Agir')), '', 430, 600, { on: !w, blk: !!w });
-        if (canAim()) h += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', 150, 350, { r: 4, fs: 24, on: aimOpen });
-        if (canAim() && aimOpen) h += `<div class="lq-aim">${aimBox()}</div>`;
+        main += stroke('go', '⏎', armed ? 'Confirmar mesmo assim' : esc(askL('act', 'Agir')), '', { on: !w, blk: !!w });
+        if (canAim()) main += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', { on: aimOpen, cls: 'mini' });
         const allies = battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0);
-        if (allies.length && !allySide() && cands().some(o => o.enemy)) h += stroke('pass', 'P', 'Fraqueza passa a vez', esc(passTo ? S.chars[passTo]?.name || '' : 'ninguém'), 150, 430, { r: 4, fs: 20 });
+        if (allies.length && !allySide() && cands().some(o => o.enemy)) main += stroke('pass', 'P', 'Fraqueza passa', esc(passTo ? S.chars[passTo]?.name || '' : 'ninguém'), { cls: 'mini', title: 'Se acertar uma fraqueza, passa a vez para este aliado' });
+        main += back1;
+        main += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b>${off ? `<small class="offside">⚠ ${off}${armed ? ': Enter de novo confirma' : ''}</small>` : ''}${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
+        if (canAim() && aimOpen) { row = 1; sub = `<div class="lq-aim">${aimBox()}</div>`; }
       }
       cx.shown = true;
-      return `<div class="lq" aria-label="Comandos de ${esc(c.name)}"><div class="lqbox mode-${mode}">${h}</div></div>`;
+      return wrap(main, sub, turn, row);
     },
     // clique numa pincelada
     click(name, v) {
@@ -186,18 +242,13 @@ const LEQUE = (() => {
       if (/^[tT]$/.test(k) && mode !== 'aim') { click('all'); return true; }
       if (/^[pP]$/.test(k) && mode === 'aim' && app.querySelector('[data-lq=pass]')) { click('pass'); return true; }
       if (k === 'ArrowUp' || k === 'ArrowDown') {
-        const d = k === 'ArrowUp' ? 1 : -1; // o leque sobe para os itens: ↑ vai para cima na tela
-        if (mode === 'menu') state.sel = (state.sel + d + 3) % 3;
+        const d = k === 'ArrowUp' ? 1 : -1; // ↑ sobe na coluna
+        if (mode === 'menu') state.sel = (state.sel - d + 3) % 3; // a coluna desce: ↓ vai para o próximo
         else if (mode === 'items') { const n = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons').length; if (!n) return true; state.sel = (state.sel - d + n) % n; }
-        else if (mode === 'skills') { const n = six(c).length; if (!n) return true; const col = (state.sel >= 3 && state.sel < 6 ? [3, 4, 5] : [0, 1, 2]).filter(i => i < n), i = col.indexOf(state.sel); // ↓ no fim da coluna chega à pincelada "Todas"
-          state.sel = state.sel === 6 ? (d > 0 ? col.at(-1) ?? 0 : 6) : d > 0 ? col[Math.max(0, i - 1)] : i < col.length - 1 ? col[i + 1] : 6; }
+        else if (mode === 'skills') { const n = six(c).length, L = [...Array(n).keys(), 6], i = Math.max(0, L.indexOf(state.sel)); state.sel = L[(i - d + L.length) % L.length]; } // as 6 e, no fim, "Todas"
         else if (mode === 'all') { const l = flat(); if (!l.length) return true; const i = l.findIndex(x => pick.k === 'sk' && x.id === pick.id); pick = { k: 'sk', id: l[(i + (d > 0 ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id }; }
         else return false;
         render(); app.querySelector('.skr.on')?.scrollIntoView({ block: 'nearest' }); return true;
-      }
-      if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'skills') {
-        const n = six(c).length, s0 = state.sel; if (s0 === 6 || !n) return true; const to = k === 'ArrowRight' ? (s0 >= 3 ? s0 - 3 : s0) : (s0 < 3 ? s0 + 3 : s0);
-        state.sel = to < n ? to : n > 3 ? n - 1 : s0; render(); return true; // sem a mesma linha na outra coluna: vai para o último dela
       }
       if (k === 'Tab' && mode === 'aim') { sideStep(); return true; }
       if ((k === 'ArrowLeft' || k === 'ArrowRight') && mode === 'aim') {

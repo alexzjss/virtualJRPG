@@ -161,7 +161,7 @@
   };
   const place = () => {
     if (!root || !host || !host.isConnected) return;
-    const r = host.getBoundingClientRect(); document.documentElement.style.setProperty('--hk', Math.max(.45, Math.min(r.width / 1440, r.height / 860, 1.6)).toFixed(3)); // escala do HUD e do leque (desenhados para 1440×860)
+    const r = host.getBoundingClientRect(); document.documentElement.style.setProperty('--hk', Math.max(.36, .75 * Math.min(r.width / 1440, r.height / 860, 1.6)).toFixed(3)); // escala do HUD e do leque (desenhados para 1440×860, mostrados a 75%)
     Object.assign(root.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
   };
   const mount = h => {
@@ -273,15 +273,16 @@
   };
   // investida: a câmera corre até o alvo (0,45 s) e o recorte de quem age avança até a frente dele; resolve no impacto e volta sozinho
   const LG_HOLD = 500; // pausa no alvo (o número nasce aqui); ida e volta duram lungeMs(distância)
+  let lungeN = 0;
   P.lunge = (fromId, toId, family) => new Promise(res => {
     const a = els.get(fromId), F = lastF, to = F?.get(toId), from = F?.get(fromId);
     if (!a || !to || !from || fromId === toId || !root || root.style.display === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return res();
     const z0 = +a.el.style.getPropertyValue('--z') || from.z, dz = Math.sign(z0 - to.z) || 1, dx = Math.sign(from.x - to.x) || -1;
     const tx = to.x + 140 * dx, tz = to.z + 260 * dz, ms = lungeMs(Math.hypot(tx - (+a.el.style.getPropertyValue('--x') || from.x), tz - z0));
     camLock = cameraFor(S.chars[toId]?.enemy ? { kind: 'zoom', to, ry: camRy } : S.chars[fromId]?.enemy ? { kind: 'table', at: from, pts: [from, to], w: root.clientWidth, foe: true } : { kind: 'table', at: to, pts: [...F.values()], w: root.clientWidth }); /* inimigo: contracampo, do ombro dele */ world.classList.add('fast'); world.style.setProperty('--lg', ms + 'ms'); camera(F);
-    holdEnd = performance.now() + 4000; local.orbit = local.px = local.pz = 0; a.lunging = true; a.el.classList.add('lunging'); a.el.style.setProperty('--lg', ms + 'ms'); { const A = typeof PFX !== 'undefined' ? PFX.lungeArc(family) : null; if (A) { a.el.style.setProperty('--arc-h', A.h); a.el.style.setProperty('--crouch', A.crouch); a.el.style.setProperty('--lg-ease', A.ease); a.el.classList.remove('arc'); void a.el.offsetWidth; a.el.classList.add('arc'); } } a.el.style.setProperty('--x', tx); a.el.style.setProperty('--z', tz);
+    holdEnd = performance.now() + 4000; local.orbit = local.px = local.pz = 0; a.lunging = true; a.el.classList.add('lunging'); lungeN++; document.documentElement.classList.add('p3-golpe'); a.el.style.setProperty('--lg', ms + 'ms'); { const A = typeof PFX !== 'undefined' ? PFX.lungeArc(family) : null; if (A) { a.el.style.setProperty('--arc-h', A.h); a.el.style.setProperty('--crouch', A.crouch); a.el.style.setProperty('--lg-ease', A.ease); a.el.classList.remove('arc'); void a.el.offsetWidth; a.el.classList.add('arc'); } } a.el.style.setProperty('--x', tx); a.el.style.setProperty('--z', tz);
     setTimeout(res, ms);
-    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging', 'arc'); a.pos = ''; unlock(ms); }, ms + LG_HOLD);
+    setTimeout(() => { a.lunging = false; a.el.classList.remove('lunging', 'arc'); a.pos = ''; unlock(ms); if (--lungeN <= 0) { lungeN = 0; document.documentElement.classList.remove('p3-golpe'); } }, ms + LG_HOLD); // p3-golpe: a coluna de comandos some durante a investida
   });
   // a câmera segura a cena do comando até P.hold expirar; só então volta ao enquadre do turno seguinte
   let holdEnd = 0, unT = 0;
