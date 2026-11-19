@@ -1728,3 +1728,6 @@ body .p3d:not([data-biome=custom]) .envface.stage::before,body .p3d:not([data-bi
 .tgu b{position:absolute;left:-30px;top:-12px;width:60px;height:24px;background-size:100% 100%;backface-visibility:visible;animation:tflap .7s ease-in-out infinite}@keyframes tflap{50%{scale:1 .35}}
 .p3d[data-q=low] .twa{animation:none}
 @media(prefers-reduced-motion:reduce){.twa,.tcl,.tpa,.tgu,.tgu b{animation:none!important}.tpa,.tgu{display:none}}
+
+/* escudo sobre a barra de HP */
+.hpbar,.bar.hp{position:relative}.shbar{position:absolute;top:0;bottom:0;display:block;background:linear-gradient(#e6fbff,#70d8ff);box-shadow:0 0 6px #70d8ffaa,inset 0 0 0 1px #fff8;transition:left .7s cubic-bezier(.2,.8,.2,1),width .7s cubic-bezier(.2,.8,.2,1);z-index:2;pointer-events:none}.p3d .mini .hp{position:relative}.p3d .mini .hp>b.shbar{z-index:2}

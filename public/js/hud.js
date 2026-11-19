@@ -87,7 +87,7 @@ const HUD = (() => {
       <div class="hlim ${c.limit >= 100 ? 'full' : ''}" title="Limite ${c.limit}%"><i style="height:${pct(c.limit, 100)}%"></i></div>
       <div class="pst">${c.hp > 0 ? stIcons(c) : `<i class="dead">${c.dead ? 'Morto' : 'Caído' + (c.dying ? ' · ' + c.dying : '')}</i>`}${c.st.defUp ? '<span>Defendendo</span>' : ''}${form ? `<span>Forma: ${esc(form.name)}</span>` : ''}</div>
       <div class="in"><b class="pnm">${esc(c.name)}</b><div class="hpn2"><b>${c.hp}</b><small>/${c.hpMax}</small><em>HP</em></div>
-        <div class="hpbar"><i data-bid="${c.id}:hp" data-p="${hp}" style="width:${hp}%"></i></div>
+        <div class="hpbar"><i data-bid="${c.id}:hp" data-p="${hp}" style="width:${hp}%"></i>${shBar(c)}</div>
         <div class="au" title="Aura ${c.aura}/${c.auraMax}"><span class="dia2"><b>${c.aura}</b></span><span class="segs">${Array.from({ length: 10 }, (_, i) => `<i class="${i < au ? 'f' : ''}"></i>`).join('')}</span></div>
         <div class="sanr" title="Sanidade ${c.san}/${c.sanMax}"><small>SAN ${c.san}</small><div class="sanl"><i style="width:${pct(c.san, c.sanMax)}%"></i></div></div></div></div>`; }).join('')}</div>`;
   // fileira de comandos de turno, logo acima do grupo (canto inferior direito); gmO: o mestre agindo pelo ator do leque dele
@@ -122,8 +122,8 @@ const HUD = (() => {
       return `<span class="${k}" title="${esc(nm + (k === 'w' ? ': fraqueza' : k === 'r' ? ': resiste' : k === 'q' ? ': não testado' : ''))}">${k === 'q' ? '?' : esc((typeof KANJI !== 'undefined' && KANJI[e]) || e.slice(0, 1).toUpperCase())}</span>`; }).join('');
     const st = c.hp > 0 ? stIcons(c) : '', golpes = (c.telK || []).map(k => SK(k)?.name).filter(Boolean);
     return `<div class="sheet ${full ? 'full' : ''}"><h5>${esc(c.name)}<small>${c.boss ? 'Chefe' : 'Inimigo'}</small></h5>
-      <div class="row"><span>HP ${gm ? `${c.hp}/${c.hpMax}` : pct(c.hp, c.hpMax) + '%'}</span><span class="esc">ESCUDO ${c.brk ? c.brk.cur : 0}</span></div>
-      <div class="hpbar"><i style="width:${pct(c.hp, c.hpMax)}%"></i></div>
+      <div class="row"><span>HP ${gm ? `${c.hp}/${c.hpMax}` : pct(c.hp, c.hpMax) + '%'}</span><span class="esc">QUEBRA ${c.brk ? c.brk.cur : 0}</span></div>
+      <div class="hpbar"><i style="width:${pct(c.hp, c.hpMax)}%"></i>${shBar(c).replace(/ data-bid="[^"]*"/, '')}</div>
       <div class="row">FRAQUEZAS <div class="wk">${wk}</div></div>${st ? `<div class="row">CONDIÇÕES <div class="cond">${st}</div></div>` : ''}
       ${full ? `<div class="more">${gm ? `<p>Golpes conhecidos: ${golpes.length ? esc(golpes.join(', ')) : 'nenhum'}.</p>` : ''}${c.brk ? '<p>Quebra: perde 2 turnos e sofre +50% de dano.</p>' : ''}</div>` : ''}${preview ? `<div class="pv">${esc(preview)}</div>` : ''}</div>`;
   };
@@ -131,7 +131,7 @@ const HUD = (() => {
   const alvoId = () => { const id = PALCO3D.local.zoom || LEQUE.aimTarget(), c = id && S.chars[id]; return c && c.enemy && c.hp > 0 && id in S.battle.ticks ? id : null; };
   let pos = { id: '', l: 0, t: 0 }; // última posição da ficha (o desenho refaz o HTML a cada estado: sem isso ela piscaria)
   const alvo = () => { const id = alvoId(); if (!id) return ''; const c = S.chars[id], zoom = !!PALCO3D.local.zoom, hp = pct(c.hp, c.hpMax), ok = pos.id === id;
-    return `<div class="hud-top" aria-label="Alvo"><div class="hpbar"><i style="width:${hp}%"></i></div><h4><span class="sh2" title="Escudo (Quebra)">◆${c.brk ? c.brk.cur : 0}</span>${esc(c.name)}</h4></div>`
+    return `<div class="hud-top" aria-label="Alvo"><div class="hpbar"><i style="width:${hp}%"></i>${shBar(c).replace(/ data-bid="[^"]*"/, '')}</div><h4><span class="sh2" title="Quebra">◆${c.brk ? c.brk.cur : 0}</span>${esc(c.name)}</h4></div>`
       + `<div class="hud-sheet" data-sid="${id}" style="${ok ? `left:${pos.l}px;top:${pos.t}px` : 'opacity:0'}">${sheet(id, { full: zoom, preview: LEQUE.preview(c) })}</div>`; };
   return {
     sheet, miniT, turn,

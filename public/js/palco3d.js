@@ -258,7 +258,7 @@
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e); el('i', 'ring', e);
     u.picktag = el('b', 'picktag', e); // na mira, identifica cada candidato sem depender do tamanho ou da imagem do recorte
     u.sts = el('div', 'sts', e); // âncora das condições (.sti): as marcas de condição nova e de efeito contínuo do coreo.js caem aqui
-    if (c.enemy) { u.miniEl = el('div', 'mini', e); u.sh = el('b', 'sh', u.miniEl); u.hpb = el('i', 'hp', u.miniEl); u.hpt = el('i', 'trail', u.hpb); u.hpi = el('i', '', u.hpb); }
+    if (c.enemy) { u.miniEl = el('div', 'mini', e); u.sh = el('b', 'sh', u.miniEl); u.hpb = el('i', 'hp', u.miniEl); u.hpt = el('i', 'trail', u.hpb); u.hpi = el('i', '', u.hpb); u.shb = el('b', 'shbar', u.hpb); }
     u.inner = el('div', 'bbi', e); u.img = el('img', '', u.inner); u.img.alt = ''; // o .bbi é quem anima (cast, hit, dodge, kofall): o .bb só posiciona
     u.img.draggable = false;
     u.img.addEventListener('error', () => { if (u.url && !u.fb) { u.bad.push(u.url); setImg(u); } }); // imagem quebrada: cai para a próxima reserva
@@ -283,6 +283,7 @@
   // mini barra: dano cai já e o rastro desce depois; cura sobe o rastro verde e a barra vem depois
   const trailBar = (u, w) => { const n = parseFloat(w), o = u.hpw ?? n, p = typeof PFX !== 'undefined' ? PFX.trailPlan(o, n) : null; u.hpw = n;
     if (!p) { u.hpi.style.width = u.hpt.style.width = w; return; } u.hpt.classList.toggle('heal', p.heal); u.hpi.style.transitionDelay = p.bar.delay + 'ms'; u.hpt.style.transitionDelay = p.trail.delay + 'ms'; u.hpi.style.width = u.hpt.style.width = w; };
+  const miniSh = (u, hp, sp) => { if (!u.shb || typeof PFX === 'undefined') return; const g2 = PFX.shieldSeg(hp, sp); u.shb.style.left = g2.l + '%'; u.shb.style.width = g2.w + '%'; };
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
     const fr = frameNow(inB), F = formation(inB, fr), V = new Map(); // V: onde cada um aparece agora (o inimigo da vez já avançou)
@@ -302,8 +303,8 @@
       setCls(u, 'pickable', pickable.has(c.id));
       u.el.classList.toggle('ko', c.hp <= 0); if (c.hp > 0) u.el.classList.remove('kofall'); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
       { const k = c.hp > 0 ? stIcons(c) : ''; if (u.stk !== k) { u.stk = k; u.sts.innerHTML = k; } } setCls(u, 'tgt', c.id === tgt); if (typeof PVIDA !== 'undefined') PVIDA.unit(u, c);
-      if (c.enemy) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', w = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))) + '%';
-        if (u.mini !== m + w) { u.mini = m + w; u.sh.textContent = m; u.sh.hidden = !m; trailBar(u, w); } }
+      if (c.enemy && !(typeof BARHOLD !== 'undefined' && BARHOLD.has(c.id))) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', hp = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))), sp = c.hp > 0 ? 100 * (c.shield || 0) / (c.hpMax || 1) : 0, w = hp + '%';
+        if (u.mini !== m + w + sp) { u.mini = m + w + sp; u.sh.textContent = m; u.sh.hidden = !m; trailBar(u, w); miniSh(u, hp, sp); } } // barra presa: o coreo a solta no impacto
     }
     lastF = F; lastFr = fr; chao(fr, F, cur); return V;
   };
@@ -409,6 +410,7 @@
     const f = el('i', 'flare', atw); f.style.cssText = `--lit:${color};transform:translate3d(${c.x}px,-2px,${c.z}px) translate(-50%,-50%) rotateX(90deg)`; setTimeout(() => f.remove(), 520); };
   const rectOfU = id => els.get(id)?.el.getBoundingClientRect() || null;
   P.linger = ms => { lingerUntil = Math.max(lingerUntil, performance.now() + ms); };
+  P.miniHp = (id, hp, sp) => { const u = els.get(id); if (!u?.hpi) return; u.mini = null; trailBar(u, hp + '%'); if (sp != null) miniSh(u, hp, sp); }; // o coreo desce a mini barra a cada batida
   P.unitOf = id => els.get(id) || null;
   P.posOf = id => lastF?.get(id) || null;
   P.rectOf = id => els.get(id)?.el.getBoundingClientRect() || null;

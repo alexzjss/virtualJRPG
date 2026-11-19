@@ -8,6 +8,22 @@ const lastPct = new Map(), DICE_MS = 950, NUM_MS = 460;
 let cine = null, wasActive = null;
 const koHold = new Map(), hpPrev = new Map(), stPrev = new Map(), fxMarks = []; // marcas reaplicadas a cada redesenho até expirarem
 let threatUntil = 0, enterUntil = 0, busyUntil = 0;
+// barras presas até o impacto: quem leva golpe nesta leva só vê HP e escudo descerem quando o golpe chega na tela (em degraus no multi-hit)
+const held = new Map(), shPrev = new Map(); // id → { hp: [de, para], sh: [de, para], n, got, sum, dmg, t }
+const willHit = id => !!S.battle?.active && seen != null && S.log.some(e => e.n > seen && e.fx?.a && e.fx.id === id && (e.fx.dmg || e.fx.miss));
+const BARHOLD = { has: id => held.has(id) || willHit(id) }; // o palco 3D consulta antes de mexer na mini barra
+function paintHold(id, h, frac) {
+  const hp = PFX.stepPct(h.hp[0], h.hp[1], frac), sp = PFX.stepPct(h.sh[0], h.sh[1], frac), g2 = PFX.shieldSeg(hp, sp);
+  document.querySelectorAll(`[data-bid="${id}:hp"]`).forEach(el => { el.style.transitionDelay = '0ms'; el.style.width = hp + '%'; const t = el.parentElement?.querySelector(':scope > .trail'); if (t) { t.classList.remove('heal'); t.style.transitionDelay = '450ms'; t.style.width = hp + '%'; } });
+  document.querySelectorAll(`[data-bid="${id}:sh"]`).forEach(el => { el.style.transitionDelay = '0ms'; el.style.left = g2.l + '%'; el.style.width = g2.w + '%'; });
+  if (typeof PALCO3D !== 'undefined' && PALCO3D.miniHp) PALCO3D.miniHp(id, hp, sp);
+}
+function releaseBars(id, f, all) { // f: a batida que chegou; all: trava de segurança (nenhum impacto veio)
+  const h = held.get(id); if (!h) return;
+  if (!all) { h.got++; h.dmg += f?.dmg || 0; }
+  h.frac = all || h.got >= h.n ? 1 : h.sum ? h.dmg / h.sum : h.got / h.n; paintHold(id, h, h.frac);
+  if (h.frac >= 1) { clearTimeout(h.t); held.delete(id); }
+}
 const dropPct = new Map(), lastEl = new Map(); // quanto do HP cada alvo perdeu neste lote (peso do golpe) e o elemento do último dano (cor da tinta do KO)
 const P3 = () => !!stage3d() && !app.querySelector('.stage') && typeof PALCO3D !== 'undefined' && typeof PFX !== 'undefined';
 const skByName = n => Object.values(S.skills || {}).find(s => s.name === n);
@@ -167,6 +183,7 @@ function strikeFx(acts, f0, a, o = {}) {
   const foeLeft = id => Object.values(S.chars).some(c => c.enemy && c.id !== id && c.id in S.battle.ticks && c.hp > 0);
   const hit1 = (e, i, j, n, G) => {
     const f = e.fx, el = unitEl(f.id);
+    if (!o.replay) releaseBars(f.id, f);
     hitSfx(f);
     if (!el) return;
     el.style.setProperty('--fx', ELC[f.el] || '#fff');
@@ -261,8 +278,16 @@ function fxState() { // reaplica o que um redesenho apagaria: KO adiado, palco a
 function fx() {
   const news = seen == null ? [] : S.log.filter(e => e.n > seen), B = S.battle, cur = B.active ? S.chars[timeline(1)[0]] : null;
   const rolls = news.filter(e => e.rr), acts = news.filter(e => e.fx).slice(-8), quick = B.active, wait = acts.some(e => e.d) ? (quick ? NUM_MS : DICE_MS) : 0;
-  app.querySelectorAll('[data-bid]').forEach(el => { // a barra escoa do valor anterior até o novo, depois do dado
-    const k = el.dataset.bid, p = el.dataset.p, old = lastPct.get(k);
+  if (B.active && seen != null && typeof PFX !== 'undefined') for (const e of acts) { const f = e.fx, c = S.chars[f.id]; if (!f.a || !(f.dmg || f.miss) || !c) continue;
+    const hm = c.hpMax || 1, now = [100 * Math.max(0, c.hp) / hm, 100 * (c.hp > 0 ? c.shield || 0 : 0) / hm]; let h = held.get(f.id);
+    if (!h) { h = { hp: [100 * Math.max(0, hpPrev.get(f.id) ?? c.hp) / hm, now[0]], sh: [100 * (shPrev.get(f.id) ?? c.shield ?? 0) / hm, now[1]], n: 0, got: 0, sum: 0, dmg: 0, frac: 0 }; held.set(f.id, h); }
+    else { h.hp = [PFX.stepPct(h.hp[0], h.hp[1], h.frac), now[0]]; h.sh = [PFX.stepPct(h.sh[0], h.sh[1], h.frac), now[1]]; h.n -= h.got; h.sum -= h.dmg; h.got = h.dmg = h.frac = 0; } // nova leva antes do impacto: continua de onde a barra está
+    h.n++; h.sum += f.dmg || 0; clearTimeout(h.t); h.t = setTimeout(() => releaseBars(f.id, null, true), wait + 6000); }
+  document.querySelectorAll('[data-bid]').forEach(el => { // a barra escoa do valor anterior até o novo, depois do dado
+    const k = el.dataset.bid, p = el.dataset.p, old = lastPct.get(k), hk = held.get(k.split(':')[0]);
+    if (hk && /:(hp|sh)$/.test(k)) { lastPct.set(k, p); const id = k.split(':')[0], hp = PFX.stepPct(hk.hp[0], hk.hp[1], hk.frac), g2 = PFX.shieldSeg(hp, PFX.stepPct(hk.sh[0], hk.sh[1], hk.frac)); el.style.transition = 'none';
+      if (k.endsWith(':hp')) { el.style.width = hp + '%'; const t = el.parentElement?.querySelector(':scope > .trail'); if (t) { t.style.transition = 'none'; t.style.width = hp + '%'; t.offsetWidth; t.style.transition = ''; } } else { el.style.left = g2.l + '%'; el.style.width = g2.w + '%'; }
+      el.offsetWidth; el.style.transition = ''; return; } // presa: espera o impacto (releaseBars)
     if (old != null && old !== p) { el.style.transition = 'none'; el.style.width = old + '%'; el.offsetWidth; el.style.transition = ''; const d0 = wait + (acts.some(e => e.fx.lim || e.fx.dom) ? 1100 : 0), T = typeof PFX !== 'undefined' ? PFX.trailPlan(+old, +p) : null;
       el.style.transitionDelay = (d0 + (T ? T.bar.delay : 0)) + 'ms'; el.style.width = p + '%';
       if (T && el.parentElement) { const par = el.parentElement; let t = par.querySelector(':scope > .trail'); if (!t) { t = document.createElement('i'); t.className = 'trail'; par.insertBefore(t, el); if (getComputedStyle(par).position === 'static') par.style.position = 'relative'; }
@@ -270,8 +295,8 @@ function fx() {
     lastPct.set(k, p);
   });
   // quem caiu nesta leva só "cai" quando o golpe chega
-  if (B.active) for (const c of Object.values(S.chars)) { if (!(c.id in B.ticks) && !c.dead) continue; const was = hpPrev.get(c.id); if (was > 0 && c.hp <= 0 && seen != null) koHold.set(c.id, performance.now() + wait + 2600); if (was != null && seen != null && c.hp < was) dropPct.set(c.id, (was - c.hp) / (c.hpMax || 1)); hpPrev.set(c.id, c.hp); }
-  else hpPrev.clear();
+  if (B.active) for (const c of Object.values(S.chars)) { if (!(c.id in B.ticks) && !c.dead) continue; const was = hpPrev.get(c.id); if (was > 0 && c.hp <= 0 && seen != null) koHold.set(c.id, performance.now() + wait + 2600); if (was != null && seen != null && c.hp < was) dropPct.set(c.id, (was - c.hp) / (c.hpMax || 1)); hpPrev.set(c.id, c.hp); shPrev.set(c.id, c.hp > 0 ? c.shield || 0 : 0); }
+  else { hpPrev.clear(); shPrev.clear(); }
   // condições novas entram com um pulo; dano contínuo e regeneração fazem o ícone pulsar
   for (const c of Object.values(S.chars)) { const ks = Object.keys(c.st || {}), was = stPrev.get(c.id); if (was && seen != null) ks.filter(k => !was.includes(k)).forEach(k => mark(`.unit[data-tgt="${c.id}"] .sti[data-st="${k}"],.pm[data-tgt="${c.id}"] .sti[data-st="${k}"]`, 'new', 700)); stPrev.set(c.id, ks); }
   news.filter(e => e.fx && !e.fx.a).forEach(e => mark(`.unit[data-tgt="${e.fx.id}"] .sti,.pm[data-tgt="${e.fx.id}"] .sti`, 'tick', 800));

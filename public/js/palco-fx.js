@@ -53,5 +53,8 @@
     const same = e => e?.fx && e.fx.a === b.a && e.fx.s === b.s; let lo = i, hi = i;
     while (same(log[lo - 1]) && Math.abs(log[lo - 1].n - log[lo].n) <= 1) lo--; while (same(log[hi + 1]) && Math.abs(log[hi + 1].n - log[hi].n) <= 1) hi++;
     return log.slice(lo, hi + 1); };
-  g.PFX = { hitstopMs, shakeAmp, shakeKeys, slowFor, groupHits, segments, numberPath, numberSeed, trailPlan, recoilVec, lungeArc, layerPlanes, particleCount, particlesFor, litUnits, poseOf, auraOf, buffsOf, buffDiff, shieldCracks, actsAround };
+  // trecho do escudo sobre a barra de HP (em %): começa onde o HP acaba; se passar do fim, encosta à direita
+  const shieldSeg = (hp, sh) => { const w = Math.max(0, Math.min(100, Math.round(sh))); return { l: Math.max(0, Math.min(Math.round(hp), 100 - w)), w }; };
+  const stepPct = (old, nw, frac) => Math.round(old + (nw - old) * Math.max(0, Math.min(1, frac))); // barra no meio de um golpe de várias batidas
+  g.PFX = { shieldSeg, stepPct, hitstopMs, shakeAmp, shakeKeys, slowFor, groupHits, segments, numberPath, numberSeed, trailPlan, recoilVec, lungeArc, layerPlanes, particleCount, particlesFor, litUnits, poseOf, auraOf, buffsOf, buffDiff, shieldCracks, actsAround };
 })(globalThis);

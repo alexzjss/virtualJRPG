@@ -1,7 +1,10 @@
 function timeline(n = 8) { return (S.battle.order || []).filter(id => S.chars[id]).slice(0, n); } // fila calculada pelo servidor
+// escudo: trecho azul sobre a barra de HP, proporcional ao HP máximo; sempre presente com HP > 0 (largura 0 sem escudo) para descer no impacto
+function shBar(c) { if (c.hp <= 0) return ''; const hp = 100 * c.hp / (c.hpMax || 1), sp = 100 * (c.shield || 0) / (c.hpMax || 1), g = typeof PFX !== 'undefined' ? PFX.shieldSeg(hp, sp) : { l: hp, w: 0 };
+  return `<b class="shbar" data-bid="${c.id}:sh" data-p="${g.w}" style="left:${g.l}%;width:${g.w}%"${c.shield > 0 ? ` title="Escudo ${c.shield}"` : ''}></b>`; }
 function bar(k, c, hideNum) {
   const max = k === 'limit' ? 100 : c[k + 'Max'], pct = Math.round(Math.max(0, Math.min(100, 100 * c[k] / (max || 1))));
-  return `<div class="bar ${k}"><i data-bid="${c.id}:${k}" data-p="${pct}" style="width:${pct}%"></i><span>${L[k]}${hideNum ? '' : ` ${c[k]}/${max}`}</span></div>`;
+  return `<div class="bar ${k}"><i data-bid="${c.id}:${k}" data-p="${pct}" style="width:${pct}%"></i>${k === 'hp' ? shBar(c) : ''}<span>${L[k]}${hideNum ? '' : ` ${c[k]}/${max}`}</span></div>`;
 }
 
 // ===== palco de batalha =====

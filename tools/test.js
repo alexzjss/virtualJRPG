@@ -1663,6 +1663,8 @@ test('PFX: poses, auras, buffs e escudo', async () => {
   assert.deepEqual(F.buffsOf({ atkUp: 1, agiDn: 2 }), [{ k: 'atk', dir: 1, col: '#ff493d' }, { k: 'agi', dir: -1, col: '#45e6b3' }]);
   assert.deepEqual(F.buffDiff({ atkUp: 1 }, { atkUp: 1, defDn: 1 }), [{ k: 'def', dir: -1, col: '#e39b46' }]);
   assert.deepEqual(F.shieldCracks(0, 30), { on: false, cracks: 0 }); assert.deepEqual(F.shieldCracks(30, 30), { on: true, cracks: 0 });
+  assert.deepEqual(F.shieldSeg(60, 20), { l: 60, w: 20 }); assert.deepEqual(F.shieldSeg(90, 30), { l: 70, w: 30 }); assert.deepEqual(F.shieldSeg(50, 0), { l: 50, w: 0 }); assert.deepEqual(F.shieldSeg(10, 150), { l: 0, w: 100 });
+  assert.equal(F.stepPct(80, 20, .5), 50); assert.equal(F.stepPct(80, 20, 1), 20); assert.equal(F.stepPct(80, 20, 0), 80);
   assert.deepEqual(F.shieldCracks(15, 30), { on: true, cracks: 1 }); assert.deepEqual(F.shieldCracks(5, 30), { on: true, cracks: 2 });
 });
 test('PFX: segmentos por quem age (o contra vira cena própria)', async () => {
