@@ -32,6 +32,8 @@
   const HEX = /(!|%21)?(#|%23)([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/g;
   const gradeAll = (str, hora) => str.replace(HEX, (m, keep, h, v) => h + (keep ? v : grade('#' + v, hora).slice(1)));
   const SKY = { dia: ['#1a5fe0', '#3994f4', '#86ccff', '#e2f7ff'], tarde: ['#3a2a7a', '#c0508a', '#ff9a5a', '#ffd89a'], noite: ['#060a26', '#121e4a', '#24366e', '#3a4a80'] };
+  const SKYT = { vulcao: { dia: ['#4a1a3a', '#9a3a4a', '#e8704a', '#ffb070'], tarde: ['#2a0a2a', '#7a1a3a', '#d84a3a', '#ff9a50'], noite: ['#0e0614', '#2a0a1e', '#5a1a28', '#8a2a20'] } }; // céu próprio do tema
+  const CEILT = { vulcao: { dia: ['#9a3a4a', '#4a1a3a'], tarde: ['#7a1a3a', '#2a0a2a'], noite: ['#2a0a1e', '#0e0614'] } };
   const CEIL = { dia: ['#4aa2f6', '#1a5fe0'], tarde: ['#8a4a9a', '#3a2a7a'], noite: ['#16224e', '#060a26'] };
   const FREST = { dia: '#2a7be8', tarde: '#9a4a8a', noite: '#0e1840' }; // fundo atrás das frestas entre céu e paredes
   const stars = (W, H, n, R) => Array.from({ length: n }, () => `<circle cx="${f1(R() * W)}" cy="${f1(R() * H)}" r="${f1(.8 + R() * 1.8)}" fill="!#ffffff" opacity="${f1(.4 + R() * .6)}"/>`).join('');
@@ -129,7 +131,7 @@
   const bumps = (W, base, r0, r1, R, col, from = 0, to = W) => { let s = `<rect x="${from}" y="${base}" width="${to - from}" height="${650 - base}" fill="${col}"/>`;
     for (let x = from - r1 * .3; x < to + r1 * .3; x += r0 * 1.1 + R() * r0) { const r = r0 + R() * (r1 - r0); s += `<circle cx="${f1(x)}" cy="${f1(base + r * .35)}" r="${f1(r)}" fill="${col}"/>`; }
     return s; };
-  const skyDefs = hora => { const k = SKY[hora] || SKY.dia; return `<defs><linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="!${k[0]}"/><stop offset=".36" stop-color="!${k[1]}"/><stop offset=".62" stop-color="!${k[2]}"/><stop offset=".77" stop-color="!${k[3]}"/></linearGradient></defs>`; };
+  const skyDefs = (hora, tema) => { const k = (SKYT[tema] || SKY)[hora] || SKY.dia; return `<defs><linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="!${k[0]}"/><stop offset=".36" stop-color="!${k[1]}"/><stop offset=".62" stop-color="!${k[2]}"/><stop offset=".77" stop-color="!${k[3]}"/></linearGradient></defs>`; };
   // sol da manhã, sol baixo da tarde ou lua: sempre no mesmo lado (a luz do cenário não muda de direção)
   const astro = hora => hora === 'tarde' ? `<circle cx="425" cy="300" r="240" fill="!#ffb060" opacity=".22"/><circle cx="425" cy="300" r="130" fill="!#ffc070" opacity=".35"/><circle cx="425" cy="300" r="70" fill="!#ffe0a0"/>`
     : hora === 'noite' ? `<circle cx="425" cy="140" r="180" fill="!#c8d6ff" opacity=".1"/><circle cx="425" cy="140" r="52" fill="!#eef2ff"/><circle cx="410" cy="128" r="9" fill="!#d6deff"/><circle cx="440" cy="156" r="6" fill="!#d6deff"/>`
@@ -137,14 +139,35 @@
   // horizonte de cada parede: céu, sol (na esquerda), nuvens paradas e camadas de silhueta que clareiam com a distância
   const FACE = { 'env-back': [1800, lx => [(lx - 900) * 4, -3000]], 'env-left': [1500, lx => [-3600, -(lx - 750) * 4]], 'env-right': [1500, lx => [3600, (lx - 750) * 4]], 'env-front': [1800, lx => [(lx - 900) * 4, 3000]], 'env-ceiling': [1800] };
   function horizonte(tema, face, seed, hora = 'dia') {
-    const R = rng(seed), [W, wc] = FACE[face], night = hora === 'noite';
-    if (face === 'env-ceiling') { const k = CEIL[hora] || CEIL.dia; let s = `<defs><radialGradient id="z" cx=".2" cy=".7" r=".9"><stop offset="0" stop-color="!${k[0]}"/><stop offset="1" stop-color="!${k[1]}"/></radialGradient></defs><rect width="1800" height="1500" fill="url(#z)"/>` + (night ? stars(1800, 1500, 60, R) : '');
-      for (let i = 0; i < 7; i++) s += cloudSvg(150 + R() * 1500, 150 + R() * 1200, 1.6 + R() * 1.4, R, '#ffffffd9', '#cfe2fbcc');
+    const R = rng(seed), [W, wc] = FACE[face], night = hora === 'noite', smoke = tema === 'vulcao';
+    if (tema === 'caverna') return cavHz(face, R, hora);
+    if (face === 'env-ceiling') { const k = (CEILT[tema] || CEIL)[hora] || CEIL.dia; let s = `<defs><radialGradient id="z" cx=".2" cy=".7" r=".9"><stop offset="0" stop-color="!${k[0]}"/><stop offset="1" stop-color="!${k[1]}"/></radialGradient></defs><rect width="1800" height="1500" fill="url(#z)"/>` + (night ? stars(1800, 1500, 60, R) : '');
+      for (let i = 0; i < 7; i++) s += cloudSvg(150 + R() * 1500, 150 + R() * 1200, 1.6 + R() * 1.4, R, smoke ? '#6a5a6ad9' : '#ffffffd9', smoke ? '#4a3c4acc' : '#cfe2fbcc');
       return svgUrl(1800, 1500, s); }
-    let s = skyDefs(hora) + `<rect width="${W}" height="650" fill="url(#ceu)"/>` + (night ? stars(W, 380, 40, R) : '');
+    let s = skyDefs(hora, tema) + `<rect width="${W}" height="650" fill="url(#ceu)"/>` + (night ? stars(W, 380, 40, R) : '');
     if (face === 'env-left') s += astro(hora);
-    for (let i = 0, n = 2 + Math.floor(R() * 2); i < n; i++) s += cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R);
-    if (tema === 'floresta') {
+    for (let i = 0, n = 2 + Math.floor(R() * 2); i < n; i++) s += smoke ? cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R, '#7a6470', '#4a3c4a') : cloudSvg(120 + R() * (W - 240), 120 + R() * 170, 1 + R() * .9, R);
+    if (tema === 'neve') {
+      s += ridge(W, 330, 170, R, '#f4f8ff', 16) + ridge(W, 345, 140, R, '#d8e0f8', 16) + ridge(W, 420, 80, R, '#b8c6ec') + ridge(W, 460, 36, R, '#9fb0e0') + bumps(W, 470, 12, 24, R, '#2f6a5a') + bumps(W, 488, 16, 30, R, '#24564a');
+    } else if (tema === 'deserto') {
+      s += ridge(W, 400, 60, R, '#eab4a4') + ridge(W, 450, 34, R, '#f2c27a') + ridge(W, 482, 18, R, '#f6cf86');
+      if (face === 'env-back') s += pg([[1050, 470], [1210, 280], [1370, 470]], '#e0a868') + pg([[1210, 280], [1370, 470], [1260, 470]], '#b8805a') + pg([[560, 476], [640, 380], [720, 476]], '#e6b47a');
+    } else if (tema === 'ruinas') {
+      s += ridge(W, 395, 80, R, '#a6cdf2') + ridge(W, 445, 40, R, '#7fbfa8');
+      for (let i = 0, n = 3 + Math.floor(R() * 3); i < n; i++) { const x = 100 + R() * (W - 200), h = 40 + R() * 90; s += `<rect x="${f1(x)}" y="${f1(470 - h)}" width="16" height="${f1(h)}" fill="#b8c8d8"/><rect x="${f1(x - 4)}" y="${f1(470 - h)}" width="24" height="6" fill="#c8d6e2"/>`; }
+      s += bumps(W, 466, 16, 30, R, '#4ca066') + bumps(W, 486, 22, 38, R, '#348550');
+    } else if (tema === 'pantano') {
+      s += ridge(W, 420, 50, R, '#8ab0a0') + bumps(W, 452, 18, 34, R, '#4a6a4a');
+      for (let i = 0; i < 5; i++) { const x = f1(80 + R() * (W - 160)); s += `<path d="M${x} 470V${f1(390 - R() * 40)}l-24 -30M${x} 420l20 -24" stroke="#3a4a3a" stroke-width="7" fill="none"/>`; }
+      s += bumps(W, 478, 22, 40, R, '#3a5a3a') + `<rect y="440" width="${W}" height="60" fill="#e8f4e0" opacity=".28"/>`;
+    } else if (tema === 'vulcao') {
+      s += ridge(W, 420, 70, R, '#5a3a4a') + ridge(W, 470, 34, R, '#3a2a3a');
+      if (face === 'env-back') s += pg([[560, 500], [830, 160], [970, 160], [1240, 500]], '#2a1e2a') + pg([[900, 160], [970, 160], [1240, 500], [1000, 500]], '#1a121e') + `<ellipse cx="900" cy="162" rx="70" ry="14" fill="!#ff7a2a"/><ellipse cx="900" cy="150" rx="150" ry="60" fill="!#ff5a1a" opacity=".22"/><path d="M880 166q-30 120 -110 330M920 166q20 140 80 330" stroke="!#ff5a1a" stroke-width="10" fill="none"/><path d="M880 166q-30 120 -110 330" stroke="!#ffc040" stroke-width="3" fill="none"/>` + cloudSvg(900, 110, 1.8, R, '#6a5a6a', '#4a3c4a');
+    } else if (tema === 'campo') {
+      s += ridge(W, 410, 60, R, '#b8e0a0') + ridge(W, 450, 36, R, '#9ad070');
+      if (face === 'env-back') s += `<polygon points="1290,470 1302,360 1330,360 1342,470" fill="#f0e0c8"/><polygon points="1320,360 1330,360 1342,470 1326,470" fill="#cbb8a8"/><polygon points="1294,362 1316,336 1338,362" fill="#c85a3a"/><g transform="translate(1316 352)" stroke="#8a6a5a" stroke-width="3">${[20, 110, 200, 290].map(a => `<rect x="-6" y="-70" width="12" height="62" fill="#fff8ec" transform="rotate(${a})"/>`).join('')}</g>`;
+      s += bumps(W, 470, 18, 32, R, '#7ac850') + bumps(W, 490, 24, 40, R, '#68b844');
+    } else if (tema === 'floresta') {
       s += ridge(W, 395, 85, R, '#9ccbf0') + ridge(W, 440, 45, R, '#6fb4a8') + bumps(W, 452, 16, 30, R, '#4ca066') + bumps(W, 474, 22, 40, R, '#348550') + bumps(W, 492, 26, 44, R, '#24693f');
     } else if (tema === 'castelo') {
       s += ridge(W, 385, 110, R, '#a6cdf2') + ridge(W, 450, 40, R, '#7fbfa8') + bumps(W, 478, 14, 26, R, '#5aa86a');
@@ -164,7 +187,23 @@
         for (let i = 0; i < (x1 - x0) / 420; i++) { const ix = x0 + 60 + R() * Math.max(10, x1 - x0 - 120), iw = 40 + R() * 90; s += `<ellipse cx="${f1(ix)}" cy="470" rx="${f1(iw)}" ry="${f1(14 + R() * 16)}" fill="#5aa88a"/><rect x="${f1(ix - iw)}" y="470" width="${f1(iw * 2)}" height="6" fill="#1f84dc"/>`; }
         if (x1 - x0 > 500) { const bx = x0 + 200 + R() * (x1 - x0 - 400); s += `<polygon points="${f1(bx)},466 ${f1(bx + 36)},466 ${f1(bx + 30)},474 ${f1(bx + 6)},474" fill="#8a4a3a"/><polygon points="${f1(bx + 16)},466 ${f1(bx + 16)},428 ${f1(bx + 34)},462" fill="#fff"/>`; } }
     }
-    if (tema !== 'praia') s += `<rect y="${tema === 'castelo' ? 492 : 498}" width="${W}" height="160" fill="${tema === 'castelo' ? '#b9d58a' : '#3f9a3a'}"/>`;
+    const gl = { floresta: [498, '#3f9a3a'], castelo: [492, '#b9d58a'], neve: [496, '#e2ecff'], deserto: [494, '#f6cf86'], ruinas: [496, '#6ab848'], pantano: [496, '#5a7a34'], vulcao: [494, '#3a2e3a'], campo: [498, '#7ac850'] }[tema];
+    if (gl) s += `<rect y="${gl[0]}" width="${W}" height="160" fill="${gl[1]}"/>`;
+    return svgUrl(W, 650, s);
+  }
+
+  // caverna: paredes de rocha com estalactites e cristais; no fundo, a boca de luz mostra o céu do horário
+  function cavHz(face, R, hora) {
+    if (face === 'env-ceiling') { let s = `<rect width="1800" height="1500" fill="#1e1834"/>`;
+      for (let i = 0; i < 40; i++) s += `<circle cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" r="${f1(20 + R() * 60)}" fill="${R() < .5 ? '#2a2244' : '#161028'}"/>`;
+      for (let i = 0; i < 26; i++) s += `<circle cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" r="${f1(3 + R() * 4)}" fill="!${CRIST[i % 3][0]}" opacity=".85"/>`;
+      return svgUrl(1800, 1500, s); }
+    const W = FACE[face][0], k = SKY[hora] || SKY.dia;
+    let s = `<defs><linearGradient id="rk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161028"/><stop offset=".6" stop-color="#2a2244"/><stop offset="1" stop-color="#3a3058"/></linearGradient><linearGradient id="bo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="!${k[1]}"/><stop offset="1" stop-color="!${k[3]}"/></linearGradient></defs><rect width="${W}" height="650" fill="url(#rk)"/>`;
+    if (face === 'env-back') s += `<polygon points="760,140 1040,140 1300,650 500,650" fill="!${k[3]}" opacity=".12"/><ellipse cx="900" cy="330" rx="230" ry="190" fill="url(#bo)"/>`;
+    s += ridge(W, 520, 50, R, '#4a3e64') + ridge(W, 560, 30, R, '#5a4c74');
+    for (let x = 0; x < W; x += 40 + R() * 60) { const w = 30 + R() * 50, h = 50 + R() * 190, c = R() < .5 ? '#2a2244' : '#3a3058'; s += pg([[x, 0], [x + w, 0], [x + w * .5, h]], c) + pg([[x, 0], [x + w * .22, 0], [x + w * .5, h]], '#4a3e64'); }
+    for (let i = 0; i < 6; i++) { const x = 60 + R() * (W - 120), y = 540 + R() * 40, c = CRIST[i % 3]; s += pg([[x - 10, y], [x - 4, y - 40 - R() * 30], [x + 6, y]], '!' + c[0]) + pg([[x + 2, y], [x + 12, y - 30 - R() * 20], [x + 18, y]], '!' + c[1]) + `<ellipse cx="${f1(x + 4)}" cy="${f1(y)}" rx="34" ry="8" fill="!${c[1]}" opacity=".3"/>`; }
     return svgUrl(W, 650, s);
   }
 
@@ -338,17 +377,179 @@
     tufts(B, R, [0, 14, 28][Q], (x, z) => x < -1600 && !inArena(x, z, 200), '#b6e85a', '#6cbc44', spots);
   }
 
+  // ----- recortes dos temas novos (luz pintada à esquerda, como os demais) -----
+  const MN = {
+    pinho: ['#5ac87a', '#2f9a6a', '#1f5a5a'], arenito: ['#ffd8a0', '#e0a868', '#a86a5a'], marmore: ['#fbf4e6', '#d8ccb8', '#9a90b0'],
+    cav: ['#8a7ab0', '#54467a', '#2a2244'], basalto: ['#7a6a7a', '#43364a', '#1e1626'], lodo: ['#a8b060', '#6a7a3a', '#3a4a34'],
+  };
+  const pt = a => a.map(p => p.map(f1).join(',')).join(' '), pg = (a, col) => `<polygon points="${pt(a)}" fill="${col}"/>`;
+  const pineSvg = snow => once('pin' + snow, () => { const P = MN.pinho; let s = `<rect x="88" y="330" width="24" height="90" fill="${M.tronco[1]}"/><rect x="88" y="330" width="9" height="90" fill="${M.tronco[0]}"/>`;
+    for (const [t, w, b] of [[160, 100, 345], [80, 85, 250], [10, 60, 150]]) { const hh = b - t;
+      s += pg([[100, t], [100 - w, b], [100 + w, b]], P[1]) + pg([[100, t], [100 - w, b], [100 - w * .35, b]], P[0]) + pg([[100, t], [100 + w * .45, b], [100 + w, b]], P[2]);
+      if (snow) s += pg([[100, t], [100 - w * .34, t + hh * .34], [100 - w * .12, t + hh * .27], [100 + w * .06, t + hh * .36], [100 + w * .34, t + hh * .33]], '#ffffff') + `<path d="M${100 - w} ${b} q${f1(w * .25)} -16 ${f1(w * .5)} 0 t${f1(w * .5)} 0 t${f1(w * .5)} 0 t${f1(w * .5)} 0 v7 h${-2 * w}z" fill="#eef4ff"/>`; }
+    return svgUrl(200, 420, s); });
+  // cristais: cor própria (não escurece à noite)
+  const CRIST = [['#9ff8ff', '#3ad0f0', '#1a6ab0'], ['#ffb0f0', '#e050c8', '#7a2a9a'], ['#d8b8ff', '#9a6af0', '#4a2aa0']];
+  const crystalSvg = (R, pal) => { let s = `<ellipse cx="60" cy="192" rx="60" ry="10" fill="!${pal[1]}" opacity=".4"/>`;
+    for (const i of [0, 3, 1, 2]) { const cx = 60 + (i - 1.5) * 20 + (R() - .5) * 8, h = (70 + R() * 80) * (i === 1 || i === 2 ? 1.3 : 1), w = 11 + R() * 7, ln = (i - 1.5) * 12, top = [cx + ln, 196 - h], mid = [cx + ln * .4, 196];
+      s += pg([[cx - w, 196], [cx - w + ln * .8, 196 - h * .8], top, mid], '!' + pal[0]) + pg([mid, top, [cx + w + ln * .8, 196 - h * .8], [cx + w, 196]], '!' + pal[1]) + pg([[cx + w * .2 + ln * .9, 196 - h * .8], top, [cx + w + ln * .8, 196 - h * .8]], '!' + pal[2]); }
+    return svgUrl(120, 200, s); };
+  const pillarSvg = (R, m) => { const w0 = 40 + R() * 14, w1 = 10 + R() * 10, top = [60 + (R() - .5) * 14, 6], L = [60 - w0, 300], Rr = [60 + w0, 300];
+    return svgUrl(120, 300, pg([L, [60 - w1, 40], top, [60 + w1 * .2, 300]], m[0]) + pg([[60 + w1 * .2, 300], top, [60 + w1, 40], Rr], m[1]) + pg([[60 + w0 * .45, 300], [60 + w1 * .7, 60], [60 + w1, 40], Rr], m[2])); };
+  const archSvg = () => once('arco', () => { const [h, m, s] = MN.marmore, ivy = ['#8ad84a', '#4aa83a', '#2a6a3a'];
+    let t = `<path d="M20 360V150A130 130 0 0 1 280 150V360H220V160A70 70 0 0 0 80 160V360Z" fill="${m}"/><rect x="20" y="150" width="22" height="210" fill="${h}"/><rect x="220" y="160" width="20" height="200" fill="${h}"/><rect x="258" y="150" width="22" height="210" fill="${s}"/><rect x="60" y="160" width="20" height="200" fill="${s}"/>`;
+    t += `<rect x="6" y="330" width="88" height="30" fill="${h}"/><rect x="206" y="330" width="88" height="30" fill="${m}"/><path d="M150 20l-10 20h20z" fill="${s}"/>`;
+    t += [[40, 60, 34], [90, 30, 28], [150, 22, 30], [215, 40, 30], [262, 90, 24], [30, 130, 22], [268, 170, 18], [32, 210, 16]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${ivy[1]}"/><circle cx="${x - r * .3}" cy="${y - r * .3}" r="${r * .55}" fill="${ivy[0]}"/>`).join('');
+    t += `<path d="M262 110q10 60 -2 120M36 150q-8 50 4 110" stroke="${ivy[2]}" stroke-width="5" fill="none"/>`;
+    return svgUrl(300, 360, t); });
+  const twistSvg = R => { const [h, m, s] = ['#a89a7a', '#6a5a4a', '#3a3040'], b = 50 + R() * 30;
+    let t = `<path d="M70 400C${70 + b} 320 ${30 - b * .4} 230 ${100} 120C130 80 120 40 ${150 + R() * 20} 10L162 20C140 60 150 100 122 140C${80 - b * .3} 220 ${110 + b} 300 112 400Z" fill="${m}"/><path d="M70 400C${70 + b} 320 ${30 - b * .4} 230 100 120L108 126C${50 - b * .3} 230 ${86 + b} 320 86 400Z" fill="${h}"/>`;
+    t += `<path d="M104 200C70 180 40 186 14 160" stroke="${m}" stroke-width="12" fill="none" stroke-linecap="round"/><path d="M112 150C150 140 170 120 190 92" stroke="${s}" stroke-width="10" fill="none" stroke-linecap="round"/>`;
+    t += `<path d="M14 160q-4 30 2 60M60 176q-2 26 4 48M190 92q4 30 -2 54" stroke="#6a8a4a" stroke-width="4" fill="none" opacity=".8"/>`;
+    return svgUrl(200, 400, t); };
+  const fogSvg = once('nevoa', () => svgUrl(400, 120, `<defs><radialGradient id="nv"><stop offset="0" stop-color="#f4fff0" stop-opacity=".55"/><stop offset="1" stop-color="#f4fff0" stop-opacity="0"/></radialGradient></defs><ellipse cx="200" cy="70" rx="200" ry="50" fill="url(#nv)"/>`));
+  const spikeSvg = R => { const [h, m, s] = MN.basalto, x1 = 40 + R() * 20, x2 = 90 + R() * 20;
+    return svgUrl(160, 220, pg([[4, 220], [x1, 20 + R() * 40], [70, 220]], h) + pg([[70, 220], [x1, 30], [x2, 4 + R() * 30], [156, 220]], m) + pg([[110, 220], [x2, 10], [156, 220]], s)
+      + `<path d="M${f1(x1)} 80l8 40 -10 30 12 40" stroke="!#ff7a2a" stroke-width="4" fill="none"/><path d="M${f1(x2)} 60l-6 50 10 40" stroke="!#ffb040" stroke-width="3" fill="none"/>`); };
+  const rockOf = (R, top, mat) => { const keep = M.pedra; M.pedra = mat; const u = rockSvg(R, top); M.pedra = keep; return u; };
+  const posts = (B, R, pts, h, mat) => pts.forEach(([x, z]) => B.box(x, z, 34, 34, h * (.9 + R() * .2), mat));
+
+  // ----- MONTANHA NEVADA -----
+  function neve(B, Q, R, gnd) {
+    const okT = (x, z) => !inArena(x, z, 240) && !(Math.abs(x) < 1500 && z < -2500) && !(Math.abs(x + 430) < 700 && z > 600 && z < 1700);
+    const trees = scatter(R, [10, 18, 22][Q], 470, okT);
+    gnd.push(`<rect width="1800" height="1500" fill="#e8f0ff"/>`);
+    for (let i = 0; i < 30; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 110)}" ry="${f1(25 + R() * 50)}" fill="${R() < .5 ? '#ffffff' : '#d4def6'}"/>`);
+    let path = ''; for (let z = 3000; z >= -3000; z -= 150) { const x = Math.sin(z / 800) * 220 + Math.sin(z / 330) * 50; path += `<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(430 + Math.sin(z / 520) * 80)}" ry="${GR(210)}" fill="#c6d2ee"/>`; }
+    gnd.push(path); for (let i = 0; i < 40; i++) { const z = -2900 + i * 145, x = Math.sin(z / 800) * 220 + (i % 2 ? 40 : -40); gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="3.5" ry="5" fill="#a8b6da"/>`); }
+    { const x = -2300, z = -1100; gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(560)}" ry="${GR(380)}" fill="#bfe6ff"/><ellipse cx="${GX(x - 80)}" cy="${GZ(z - 60)}" rx="${GR(300)}" ry="${GR(90)}" fill="#e8f8ff"/>`); }
+    const shadows = [];
+    for (const [x, z] of trees) { const s = .8 + R() * .6, h = (640 + R() * 220) * s, w = h * 200 / 420;
+      B.group([x, -h * .5, z], Math.max(w, h) * .55, () => B.card(x, z, w, h, pineSvg(1), { sh: true })); shadows.push(shadowOf(x, z, h * .8, w * .55), contact(x, z, 70 * s)); }
+    gnd.push(...shadows);
+    const okB = (x, z) => !inArena(x, z, 40) && inArena(x, z, 1200);
+    for (const [x, z] of scatter(R, [4, 8, 10][Q], 300, okB, [-2600, 2600], [-3000, 1900], trees)) { const s = .7 + R() * .6, pal = ['#ffffff', '#e2eaff', '#a9b6e0'];
+      B.group([x, -70, z], 190 * s, () => { B.blob(x, -80 * s, z, 120 * s, pal); B.blob(x + 90 * s, -55 * s, z + 30 * s, 85 * s, pal); }); gnd.push(contact(x, z, 150 * s)); }
+    for (const [x, z] of scatter(R, [2, 4, 5][Q], 400, okB, [-2800, 2800], [-3000, 2200], trees)) { const r = 110 + R() * 90; B.group([x, -r * .5, z], r * 1.2, () => B.card(x, z, r * 2.2, r * 1.45, rockSvg(R, '#ffffff'), { sh: true })); gnd.push(shadowOf(x, z, r * .4, r * 1.1), contact(x, z, r)); }
+  }
+
+  // ----- DESERTO COM OÁSIS -----
+  function deserto(B, Q, R, gnd) {
+    gnd.push(`<rect width="1800" height="1500" fill="#f6cf86"/>`);
+    for (let i = 0; i < 22; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(90 + R() * 160)}" ry="${f1(30 + R() * 50)}" fill="${R() < .5 ? '#ecb86c' : '#fbe0a4'}"/>`);
+    for (let i = 0; i < 9; i++) { const y = f1(80 + i * 160 + R() * 40); gnd.push(`<path d="M0 ${y}Q450 ${f1(y - 30)} 900 ${y}T1800 ${y}" stroke="#e8b268" stroke-width="3" fill="none" opacity=".6"/>`); }
+    const ox = -2250, oz = -900; // o oásis, do lado do sol
+    gnd.push(`<ellipse cx="${GX(ox)}" cy="${GZ(oz)}" rx="${GR(900)}" ry="${GR(700)}" fill="#86cf4a"/><ellipse cx="${GX(ox)}" cy="${GZ(oz)}" rx="${GR(640)}" ry="${GR(460)}" fill="#f0d090"/><ellipse cx="${GX(ox)}" cy="${GZ(oz)}" rx="${GR(560)}" ry="${GR(390)}" fill="#2cc0ea"/><ellipse cx="${GX(ox + 60)}" cy="${GZ(oz + 40)}" rx="${GR(380)}" ry="${GR(240)}" fill="#5ae6d8"/><ellipse cx="${GX(ox - 120)}" cy="${GZ(oz - 80)}" rx="${GR(180)}" ry="${GR(50)}" fill="#bff8ff"/>`);
+    const palms = [palmSvg(R), palmSvg(R)], spots = [[ox - 650, oz - 420], [ox + 560, oz - 380], [ox - 500, oz + 520], [ox + 620, oz + 430], [ox - 820, oz + 60]].slice(0, [2, 4, 5][Q]);
+    spots.forEach(([x, z], i) => { const k = 1.7 + R() * .5, w = 300 * k, h = 520 * k; B.group([x, -h * .55, z], h * .55, () => B.card(x, z, w, h, palms[i % 2], { k: 2, sh: true })); gnd.push(shadowOf(x + 120, z, h * .9, 200), contact(x, z, 70)); });
+    tufts(B, R, [0, 8, 14][Q], (x, z) => Math.hypot(x - ox, (z - oz) * 1.3) < 900 && Math.hypot(x - ox, (z - oz) * 1.3) > 640, '#b6e85a', '#6cbc44', spots);
+    // ruínas de arenito: colunas e um portal ao fundo à direita
+    const cols = [[1900, -2500, 620], [2500, -2350, 420], [2300, -1700, 260], [2800, -900, 520], [1700, 1900, 340], [2500, 1300, 200]].slice(0, [3, 5, 6][Q]);
+    for (const [x, z, h] of cols) { B.group([x, -h / 2, z], Math.max(h / 2, 120) + 40, () => B.tube([x, 0, z], [x, -h, z], 70, Q ? 6 : 5, MN.arenito, { cap1: MN.arenito[0] })); gnd.push(shadowOf(x, z, h, 110), contact(x, z, 80)); }
+    if (Q) B.group([2650, -380, -2500], 420, () => { B.box(2350, -2500, 120, 120, 640, MN.arenito); B.box(2950, -2500, 120, 120, 640, MN.arenito); B.box(2650, -2500, 760, 140, 110, MN.arenito, { y: 640 }); });
+    const okR = (x, z) => !inArena(x, z, 200) && Math.hypot(x - ox, z - oz) > 1000;
+    for (const [x, z] of scatter(R, [2, 4, 6][Q], 420, okR, [-3000, 3000], [-3000, 2500], cols)) { const r = 100 + R() * 110; B.group([x, -r * .5, z], r * 1.2, () => B.card(x, z, r * 2.2, r * 1.45, rockOf(R, null, MN.arenito), { sh: true })); gnd.push(shadowOf(x, z, r * .4, r * 1.1), contact(x, z, r)); }
+  }
+
+  // ----- CAVERNA DE CRISTAIS -----
+  function caverna(B, Q, R, gnd) {
+    gnd.push(`<rect width="1800" height="1500" fill="#4a3e64"/>`);
+    for (let i = 0; i < 28; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 120)}" ry="${f1(25 + R() * 60)}" fill="${R() < .5 ? '#3a3054' : '#5a4c74'}"/>`);
+    for (let i = 0; i < 5; i++) { const x = (R() < .5 ? -1 : 1) * (1500 + R() * 1500), z = -2800 + R() * 5200; gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(260 + R() * 200)}" ry="${GR(160 + R() * 100)}" fill="!#7af0ff" opacity=".35"/><ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(220 + R() * 160)}" ry="${GR(130 + R() * 80)}" fill="#2a4a7a"/>`); }
+    const okE = (x, z) => !inArena(x, z, 150);
+    const cols = scatter(R, [4, 7, 9][Q], 600, okE);
+    for (const [x, z] of cols) { const s = .9 + R() * .7, w = 240 * s, h = 760 * s; B.group([x, -h / 2, z], h / 2, () => B.card(x, z, w, h, pillarSvg(R, MN.cav), { sh: true })); gnd.push(contact(x, z, w * .5)); }
+    const cr = scatter(R, [5, 9, 12][Q], 300, (x, z) => okE(x, z) && inArena(x, z, 1500), [-3000, 3000], [-3000, 2500], cols);
+    cr.forEach(([x, z], i) => { const pal = CRIST[i % 3], s = 1.2 + R() * 1.3, w = 120 * s, h = 200 * s;
+      B.group([x, -h / 2, z], h * .6, () => B.card(x, z, w, h, crystalSvg(R, pal), { sh: true })); gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(w * 1.4)}" ry="${GR(w)}" fill="!${pal[1]}" opacity=".22"/>`); });
+    for (const [x, z] of scatter(R, [2, 4, 6][Q], 300, (x, z) => okE(x, z) && inArena(x, z, 1300), [-2800, 2800], [-3000, 2200], [...cols, ...cr])) { const r = 90 + R() * 80; B.group([x, -r * .5, z], r * 1.2, () => B.card(x, z, r * 2.2, r * 1.45, rockOf(R, null, MN.cav), { sh: true })); gnd.push(contact(x, z, r)); }
+  }
+
+  // ----- RUÍNAS ANTIGAS -----
+  function ruinas(B, Q, R, gnd) {
+    gnd.push(`<rect width="1800" height="1500" fill="#78c850"/>`);
+    for (let i = 0; i < 26; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 90)}" ry="${f1(25 + R() * 50)}" fill="${R() < .5 ? '#8ed65a' : '#62b044'}"/>`);
+    for (let z = -2900; z < 2900; z += 120) for (let k = -3; k <= 3; k++) { if (R() < .3) continue; const x = k * 130 + (R() - .5) * 30; gnd.push(`<rect x="${f1(GX(x) - 14)}" y="${f1(GZ(z) - 12)}" width="${f1(26 + R() * 6)}" height="${f1(22 + R() * 4)}" rx="3" fill="${R() < .5 ? '#e8dcc4' : '#d6c8ae'}"/>`); }
+    const okC = (x, z) => !inArena(x, z, 200) && !(Math.abs(x + 430) < 700 && z > 600 && z < 1700);
+    const cols = scatter(R, [6, 10, 13][Q], 480, okC);
+    for (const [x, z] of cols) { const h = R() < .35 ? 700 + R() * 80 : 200 + R() * 400;
+      B.group([x, -h / 2, z], Math.max(h / 2, 110) + 40, () => { B.tube([x, 0, z], [x, -h, z], 64, Q ? 8 : 6, MN.marmore, { cap1: '#f4ecdc' }); B.box(x, z, 170, 170, 50, MN.marmore); if (h > 650) B.box(x, z, 170, 170, 46, MN.marmore, { y: h }); });
+      gnd.push(shadowOf(x, z, h, 100), contact(x, z, 90)); }
+    for (let i = 0, n = [1, 2, 3][Q]; i < n; i++) { const [x, z] = scatter(R, 1, 500, okC, [-2600, 2600], [-2900, 2200], cols)[0] || [-1800, 900], a = R() * Math.PI, dx = Math.cos(a) * 110, dz = Math.sin(a) * 110;
+      B.group([x, -60, z], 200, () => B.tube([x - dx, -62, z - dz], [x + dx, -62, z + dz], 62, 6, MN.marmore, { cap0: '#f4ecdc', cap1: '#efe4d0' })); gnd.push(contact(x, z, 160)); }
+    const arches = [[-2500, -2200, .5], [2600, -1500, -.6], [2400, 1700, .9]].slice(0, [1, 2, 3][Q]);
+    for (const [x, z] of arches) { B.group([x, -300, z], 380, () => B.card(x, z, 600, 720, archSvg(), { k: 2, sh: true })); gnd.push(shadowOf(x, z, 500, 300), contact(x, z, 280)); }
+    if (Q) B.group([-2100, -150, -2650], 520, () => { for (let k = 0; k < 4; k++) B.box(-2100, -2450 - k * 120, 900 - k * 120, 120, 70 * (k + 1), MN.marmore); });
+    tufts(B, R, [0, 16, 26][Q], (x, z) => !inArena(x, z, 120), '#a6ea5a', '#4aa83a', cols);
+  }
+
+  // ----- PÂNTANO -----
+  function pantano(B, Q, R, gnd) {
+    gnd.push(`<rect width="1800" height="1500" fill="#6a8a3a"/>`);
+    for (let i = 0; i < 26; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 100)}" ry="${f1(25 + R() * 60)}" fill="${R() < .5 ? '#7a9a44' : '#566e30'}"/>`);
+    const pools = [[-2200, -1500, 700], [2100, -2100, 600], [-1900, 1500, 520], [2400, 700, 560], [0, -2850, 520], [-2900, -200, 380]];
+    for (const [x, z, r] of pools) { gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(r * 1.1)}" ry="${GR(r * .8)}" fill="#4a6a3a"/><ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(r)}" ry="${GR(r * .7)}" fill="#2a4a42"/><ellipse cx="${GX(x - r * .2)}" cy="${GZ(z - r * .15)}" rx="${GR(r * .5)}" ry="${GR(r * .12)}" fill="#4a7a6a" opacity=".7"/>`);
+      for (let k = 0; k < 6; k++) { const a = R() * 6.3, d = R() * r * .8, lx = GX(x + Math.cos(a) * d), lz = GZ(z + Math.sin(a) * d * .7), lr = f1(5 + R() * 6); gnd.push(`<circle cx="${lx}" cy="${lz}" r="${lr}" fill="#5ab040"/><path d="M${lx} ${lz}l${lr} -2 0 4z" fill="#2a4a42"/>${k % 3 ? '' : `<circle cx="${f1(lx + 2)}" cy="${f1(lz - 2)}" r="2.4" fill="#ffb0d8"/>`}`); } }
+    const okT = (x, z) => !inArena(x, z, 240) && !(Math.abs(x + 430) < 700 && z > 600 && z < 1700) && !pools.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r * .8);
+    const trees = scatter(R, [6, 11, 14][Q], 520, okT), pal = ['#9ab84a', '#5a7a34', '#2a4a3a'];
+    for (const [x, z] of trees) { const s = .9 + R() * .5, h = 760 * s, w = 380 * s, fl = R() < .5;
+      B.group([x, -h * .6, z], h * .55, () => { B.card(x, z, w, h, twistSvg(R), { sh: true, flip: fl }); B.blob(x + (fl ? -1 : 1) * 60 * s, -h * .96, z, 150 * s, pal); if (Q) B.blob(x + (fl ? 1 : -1) * 150 * s, -h * .62, z + 20, 95 * s, pal); });
+      gnd.push(shadowOf(x, z, h * .7, 220 * s), contact(x, z, 80 * s)); }
+    if (Q) for (const [x, z] of scatter(R, [0, 2, 3][Q], 600, okT, [-2600, 2600], [-2900, 2000], trees)) { const a = R() * 3, dx = Math.cos(a) * 180, dz = Math.sin(a) * 180; B.group([x, -40, z], 260, () => B.tube([x - dx, -38, z - dz], [x + dx, -38, z + dz], 38, 6, MN.lodo, { cap0: '#c8b27a', cap1: '#d6c08a' })); gnd.push(contact(x, z, 200)); }
+    for (let i = 0, n = [2, 4, 6][Q]; i < n; i++) { const a = i / n * 6.3 + R() * .5, x = Math.cos(a) * 2500, z = Math.sin(a) * 2300 - 300; B.card(x, z, 1400, 260, fogSvg, { k: 2, y: -40 }); }
+    tufts(B, R, [0, 16, 26][Q], (x, z) => !inArena(x, z, 150), '#a8c050', '#5a7a30', trees);
+  }
+
+  // ----- VULCÃO -----
+  function vulcao(B, Q, R, gnd) {
+    gnd.push(`<rect width="1800" height="1500" fill="#3a2e3a"/>`);
+    for (let i = 0; i < 26; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(40 + R() * 110)}" ry="${f1(25 + R() * 60)}" fill="${R() < .5 ? '#4a3c48' : '#2a2030'}"/>`);
+    // rios de lava que contornam a luta (cor própria: brilha igual à noite)
+    const river = (x0, k, ph) => { let a = '', b = '', c = ''; for (let z = 3000; z >= -3000; z -= 120) { const x = x0 + Math.sin(z / k + ph) * 320, w = 150 + Math.sin(z / 400 + ph) * 40;
+      a += `<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(w * 1.8)}" ry="${GR(110)}" fill="!#ff5a1a" opacity=".22"/>`; b += `<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(w)}" ry="${GR(80)}" fill="!#ff6a1a"/>`; c += `<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(w * .45)}" ry="${GR(50)}" fill="!#ffc040"/>`; } return a + b + c; };
+    gnd.push(river(-2050, 700, 0), river(2250, 900, 2));
+    { const x = 1900, z = -2300; gnd.push(`<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(700)}" ry="${GR(420)}" fill="!#ff5a1a" opacity=".3"/><ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(520)}" ry="${GR(300)}" fill="!#ff7a20"/><ellipse cx="${GX(x - 60)}" cy="${GZ(z - 30)}" rx="${GR(300)}" ry="${GR(140)}" fill="!#ffe080"/>`); }
+    const okS = (x, z) => !inArena(x, z, 200);
+    const sp = scatter(R, [6, 10, 13][Q], 450, okS);
+    for (const [x, z] of sp) { const s = 1.2 + R() * 1.6, w = 160 * s, h = 220 * s; B.group([x, -h / 2, z], h * .6, () => B.card(x, z, w, h, spikeSvg(R), { sh: true })); gnd.push(shadowOf(x, z, h * .6, w * .5), contact(x, z, w * .4)); }
+    for (const [x, z] of scatter(R, [2, 4, 6][Q], 380, (x, z) => okS(x, z) && inArena(x, z, 1300), [-2800, 2800], [-3000, 2200], sp)) { const r = 100 + R() * 90; B.group([x, -r * .5, z], r * 1.2, () => B.card(x, z, r * 2.2, r * 1.45, rockOf(R, null, MN.basalto), { sh: true })); gnd.push(shadowOf(x, z, r * .4, r * 1.1), contact(x, z, r)); }
+  }
+
+  // ----- CAMPO FLORIDO -----
+  function campo(B, Q, R, gnd) {
+    gnd.push(`<rect width="1800" height="1500" fill="#8ad850"/>`);
+    for (let i = 0; i < 24; i++) gnd.push(`<ellipse cx="${f1(R() * 1800)}" cy="${f1(R() * 1500)}" rx="${f1(60 + R() * 120)}" ry="${f1(30 + R() * 60)}" fill="${R() < .5 ? '#a6e86a' : '#74c444'}"/>`);
+    let path = ''; for (let z = 3000; z >= -3000; z -= 150) { const x = Math.sin(z / 1000) * 300; path += `<ellipse cx="${GX(x)}" cy="${GZ(z)}" rx="${GR(380)}" ry="${GR(200)}" fill="#e0c088"/>`; } gnd.push(path);
+    const fl = ['#ffe04a', '#ffffff', '#ff8ac0', '#b08aff', '#ff6a5a'];
+    for (let i = 0; i < 22; i++) { const x = (R() < .5 ? -1 : 1) * (1300 + R() * 2200), z = -2900 + R() * 5600, c = fl[i % 5], r = 120 + R() * 220;
+      for (let k = 0; k < 24; k++) { const a = R() * 6.3, d = Math.sqrt(R()) * r; gnd.push(`<circle cx="${GX(x + Math.cos(a) * d)}" cy="${GZ(z + Math.sin(a) * d)}" r="${f1(2.6 + R() * 2.4)}" fill="${c}"/>`); } }
+    const okT = (x, z) => !inArena(x, z, 300) && !(Math.abs(x) < 1500 && z < -2500) && !(Math.abs(x + 430) < 700 && z > 600 && z < 1700);
+    const trees = scatter(R, [4, 6, 8][Q], 900, okT);
+    for (const [x, z] of trees) { const s = .9 + R() * .5, h = (560 + R() * 200) * s, pal = COPAS[Math.floor(R() * 3)], top = -h - 40 * s;
+      B.group([x, -h * .7, z], 330 * s, () => { B.card(x, z, 90 * s, h + 40 * s, trunkSvg(), { sh: true }); B.blob(x, top, z, 230 * s, pal); for (let k = 0; k < (Q ? 3 : 2); k++) { const a = k * 2.1 + R() * .5; B.blob(x + Math.cos(a) * 170 * s, top + 90 * s, z + Math.sin(a) * 150 * s, 150 * s, pal); } });
+      gnd.push(shadowOf(x, z, h, 290 * s), contact(x, z, 90 * s)); }
+    // cerca de madeira num arco à esquerda e atrás (postes + duas tábuas de cada vão)
+    const fence = []; for (let a = 2.3; a < 4.4; a += [.34, .22, .17][Q]) fence.push([Math.cos(a) * 2900, Math.sin(a) * 2500 - 200]);
+    B.group([-2500, -80, -900], 1600, () => { posts(B, R, fence, 150, M.madeira);
+      for (let i = 0; i + 1 < fence.length; i++) { const [x0, z0] = fence[i], [x1, z1] = fence[i + 1]; for (const y of [55, 115]) B.poly([[x0, -y, z0], [x1, -y, z1], [x1, -y - 22, z1], [x0, -y - 22, z0]], M.madeira, null, { ds: true, face: [x0 + x1, 0, z0 + z1] }); } });
+    for (const [x, z] of fence) gnd.push(contact(x, z, 30));
+    tufts(B, R, [0, 14, 24][Q], (x, z) => !inArena(x, z, 150), '#b6f06a', '#5ab840', trees);
+  }
+
   // ----- nuvens que andam, partículas e gaivotas -----
   // Poucas: cada camada animada obriga o navegador a reordenar todo o palco 3D a cada quadro.
   const cloudCard = R => svgUrl(300, 130, cloudSvg(150, 92, 2, R, '#ffffff', '#bcd3f5'));
   function ceuVivo(B, Q, R, tema) {
-    for (let i = 0, n = [0, 3, 4][Q]; i < n; i++) { const a = (i / n) * 2 * Math.PI + R() * .6, r = 2700, x = Math.cos(a) * r * 1.1, z = Math.sin(a) * r * .95, k = 2.6 + R() * 1.6, ry = Math.atan2(-x, -z) * 180 / Math.PI;
+    for (let i = 0, n = tema === 'caverna' ? 0 : [0, 3, 4][Q]; i < n; i++) { const a = (i / n) * 2 * Math.PI + R() * .6, r = 2700, x = Math.cos(a) * r * 1.1, z = Math.sin(a) * r * .95, k = 2.6 + R() * 1.6, ry = Math.atan2(-x, -z) * 180 / Math.PI;
       B.raw(`<s class="tcl" style="background-image:${cloudCard(R)};transform:translate3d(${f1(x)}px,${f1(-1450 - R() * 350)}px,${f1(z)}px) rotateY(${f1(ry + 180)}deg) scale(${f1(k)});animation-duration:${f1(70 + R() * 60)}s;animation-delay:-${f1(R() * 60)}s"></s>`); }
-    const kinds = { floresta: [['folha', [0, 8, 9][Q]], ['luz', [0, 6, 7][Q]]], castelo: [['poeira', [0, 10, 12][Q]], ['folha', [0, 3, 4][Q]]], praia: [['brilho', [0, 8, 10][Q]]] }[tema] || [];
+    const kinds = { floresta: [['folha', [0, 8, 9][Q]], ['luz', [0, 6, 7][Q]]], castelo: [['poeira', [0, 10, 12][Q]], ['folha', [0, 3, 4][Q]]], praia: [['brilho', [0, 8, 10][Q]]],
+      neve: [['neve', [0, 10, 14][Q]]], deserto: [['poeira', [0, 8, 10][Q]]], caverna: [['brilho', [0, 8, 10][Q]]], ruinas: [['poeira', [0, 6, 8][Q]], ['folha', [0, 3, 4][Q]]],
+      pantano: [['bolha', [0, 8, 10][Q]]], vulcao: [['brasa', [0, 10, 14][Q]]], campo: [['petala', [0, 9, 12][Q]]] }[tema] || [];
     for (const [kind, n] of kinds) for (let i = 0; i < n; i++) {
-      const x = (R() - .5) * 4400, z = -3000 + R() * 4600, y = kind === 'folha' ? -900 - R() * 400 : kind === 'brilho' ? -30 - R() * 80 : -120 - R() * 520;
-      const bx = kind === 'brilho' ? shore(z) + (R() - .3) * 300 : x, hue = kind === 'folha' ? ['#9be04a', '#e8d84a', '#6cc846'][i % 3] : '';
-      B.raw(`<i class="tpa tp-${kind}" style="transform:translate3d(${f1(bx)}px,${f1(y)}px,${f1(z)}px) rotateY(calc(var(--bry,0deg) * -1)) rotateX(calc(var(--brx,0deg) * -1));animation-duration:${f1(kind === 'folha' ? 9 + R() * 7 : 3 + R() * 4)}s;animation-delay:-${f1(R() * 12)}s${hue ? ';background:' + hue : ''}"></i>`);
+      const fall = kind === 'folha' || kind === 'neve' || kind === 'petala', low = kind === 'brasa' || kind === 'bolha';
+      const x = (R() - .5) * 4400, z = -3000 + R() * 4600, y = fall ? -900 - R() * 400 : low ? -10 - R() * 40 : kind === 'brilho' && tema === 'praia' ? -30 - R() * 80 : -120 - R() * 520;
+      const bx = kind === 'brilho' && tema === 'praia' ? shore(z) + (R() - .3) * 300 : x, hue = kind === 'folha' ? ['#9be04a', '#e8d84a', '#6cc846'][i % 3] : kind === 'petala' ? ['#ffb0d0', '#fff0f6', '#ffd0e0'][i % 3] : '';
+      B.raw(`<i class="tpa tp-${kind}" style="transform:translate3d(${f1(bx)}px,${f1(y)}px,${f1(z)}px) rotateY(calc(var(--bry,0deg) * -1)) rotateX(calc(var(--brx,0deg) * -1));animation-duration:${f1(fall ? 9 + R() * 7 : kind === 'brasa' ? 4 + R() * 3 : 3 + R() * 4)}s;animation-delay:-${f1(R() * 12)}s${hue ? ';background:' + hue : ''}"></i>`);
     }
     const gulls = tema === 'praia' ? [0, 2, 3][Q] : tema === 'castelo' ? [0, 1, 2][Q] : 0, gsv = svgUrl(40, 16, `<path d="M0 6Q10 0 20 10Q30 0 40 6Q30 4 20 14Q10 4 0 6Z" fill="#ffffff" stroke="#3a4a6a" stroke-width="1.2"/>`);
     for (let i = 0; i < gulls; i++) { const cx = tema === 'praia' ? 1800 + R() * 900 : (R() - .5) * 2000, cz = -1200 - R() * 1400;
@@ -358,7 +559,9 @@
   // ----- montar -----
   let live = []; // grupos do cenário atual: { el, c, r }
   // cada tema: função que monta as peças, semente fixa e as frestas (null = usa a do céu do horário)
-  const BUILD = { floresta: [(B, Q, R, gnd) => floresta(B, Q, R, gnd), 11], castelo: [(B, Q, R, gnd) => castelo(B, Q, R, gnd), 23], praia: [praia, 37] };
+  const FRC = { dia: '#1e1834', tarde: '#1e1834', noite: '#1e1834' }, FRV = { dia: '#7a2a3a', tarde: '#5a1a30', noite: '#1e0a14' };
+  const BUILD = { floresta: [(B, Q, R, gnd) => floresta(B, Q, R, gnd), 11], castelo: [(B, Q, R, gnd) => castelo(B, Q, R, gnd), 23], praia: [praia, 37],
+    neve: [neve, 41], deserto: [deserto, 53], caverna: [caverna, 67, FRC], ruinas: [ruinas, 71], pantano: [pantano, 83], vulcao: [vulcao, 97, FRV], campo: [campo, 103] };
   const TEMAS = Object.keys(BUILD);
   // monta o cenário sem tocar no DOM: html do terreno, horizonte de cada face e grupos (para sumir na frente da câmera), já no horário
   function construir(tema, Q, hora = 'dia') {
@@ -367,8 +570,9 @@
     b[0](B, Q, R, gnd, extra);
     ceuVivo(B, Q, rng(99), tema);
     const raw = `<div class="tgnd" style="background-image:${svgUrl(1800, 1500, gnd.join(''))}"></div>${extra.join('')}` + B.html();
-    const faces = Object.fromEntries(Object.keys(FACE).map(f => [f, gradeAll(horizonte(tema, f, f.length * 7 + tema.length, hora), hora)]));
-    return { html: gradeAll(raw, hora), faces, groups: B.groups.map(G => ({ c: G.c, r: G.r })), n: (raw.match(/<(?:i class="tf|b class="tb|s class="tc)/g) || []).length, frest: (b[2] || FREST)[hora] || FREST.dia };
+    const gh = tema === 'caverna' ? 'dia' : hora; // a caverna não tem céu: o horário só aparece na boca de luz
+    const faces = Object.fromEntries(Object.keys(FACE).map(f => [f, gradeAll(horizonte(tema, f, f.length * 7 + tema.length, hora), gh)]));
+    return { html: gradeAll(raw, gh), faces, groups: B.groups.map(G => ({ c: G.c, r: G.r })), n: (raw.match(/<(?:i class="tf|b class="tb|s class="tc)/g) || []).length, frest: (b[2] || FREST)[hora] || FREST.dia };
   }
   function montar(parent, tema, q = 'medium', hora) {
     const Q = q === 'low' ? 0 : q === 'high' ? 2 : 1, host = parent.closest?.('[data-biome]');
@@ -413,6 +617,13 @@
       floresta: `<path d="M0 22Q16 14 32 20T64 18V36H0Z" fill="#9ccbf0"/><rect y="27" width="64" height="9" fill="#5fbd3c"/><path d="M26 36L30 28H36L40 36Z" fill="#d9ae6a"/>` + [[6, 22, 8], [17, 18, 9], [48, 19, 9], [58, 23, 7], [3, 29, 5], [61, 29, 5]].map(([x, y, r]) => `<rect x="${x - 1.5}" y="${y}" width="3" height="${30 - y}" fill="#8f5a34"/><circle cx="${x}" cy="${y}" r="${r}" fill="#4fb54a"/><circle cx="${x - r * .3}" cy="${y - r * .3}" r="${r * .55}" fill="#b2ea5a"/>`).join(''),
       castelo: `<rect y="27" width="64" height="9" fill="#eadfc4"/><rect x="0" y="17" width="64" height="11" fill="#e0d1b0"/>` + [4, 12, 20, 28, 36, 44, 52, 60].map(x => `<rect x="${x - 2}" y="14" width="4" height="3" fill="#e0d1b0"/>`).join('') + [[8, 9], [56, 9], [32, 4]].map(([x, y]) => `<rect x="${x - 4}" y="${y + 4}" width="8" height="${24 - y}" fill="#fbf1d8"/><path d="M${x - 5} ${y + 4}L${x} ${y - 4}L${x + 5} ${y + 4}Z" fill="#3566e0"/>`).join('') + `<path d="M28 28V22Q32 18 36 22V28Z" fill="#7a4a34"/><rect x="18" y="18" width="4" height="7" fill="#c8102e"/><rect x="42" y="18" width="4" height="7" fill="#c8102e"/>`,
       praia: `<rect y="20" width="64" height="16" fill="#1f84dc"/><path d="M0 36V26Q20 24 34 30T64 33V36Z" fill="#f8dfa2"/><path d="M30 29Q40 31 64 31" stroke="#fff" stroke-width="1.2" fill="none"/><path d="M10 30Q12 20 16 12" stroke="#c38750" stroke-width="2" fill="none"/><path d="M16 12l-8 3M16 12l8 2M16 12l-5 -5M16 12l6 -4M16 12l1 8" stroke="#52b83a" stroke-width="2.4" stroke-linecap="round"/>`,
+      neve: `<path d="M0 26L12 10L20 18L32 4L44 16L52 10L64 22V36H0Z" fill="#d8e0f8"/><path d="M12 10L16 15L10 16ZM32 4L37 11L28 10Z" fill="#fff"/><rect y="27" width="64" height="9" fill="#eaf2ff"/>` + [[6, 18], [18, 22], [50, 20], [60, 24]].map(([x, y]) => `<path d="M${x} ${y - 8}L${x - 5} ${y + 4}H${x + 5}Z" fill="#2f9a6a"/><path d="M${x} ${y - 8}L${x - 2} ${y - 4}H${x + 2}Z" fill="#fff"/>`).join(''),
+      deserto: `<path d="M0 28Q16 20 34 26T64 24V36H0Z" fill="#f2c27a"/><path d="M40 24L48 12L56 24Z" fill="#e0a868"/><rect y="30" width="64" height="6" fill="#f6cf86"/><ellipse cx="14" cy="31" rx="10" ry="3" fill="#2cc0ea"/><path d="M8 30Q9 22 12 16" stroke="#c38750" stroke-width="1.6" fill="none"/><path d="M12 16l-6 2M12 16l6 1M12 16l-3 -4M12 16l4 -3" stroke="#52b83a" stroke-width="2" stroke-linecap="round"/>`,
+      caverna: `<rect width="64" height="36" fill="#2a2244"/><ellipse cx="32" cy="14" rx="9" ry="8" fill="!${'#86ccff'}"/>` + [4, 14, 22, 40, 50, 58].map((x, i) => `<path d="M${x - 4} 0H${x + 4}L${x} ${8 + (i % 3) * 4}Z" fill="#3a3058"/>`).join('') + `<rect y="28" width="64" height="8" fill="#4a3e64"/><path d="M10 30L13 18L16 30ZM48 30L52 20L55 30Z" fill="!#3ad0f0"/><path d="M28 31L31 23L34 31Z" fill="!#e050c8"/>`,
+      ruinas: `<path d="M0 22Q16 16 32 21T64 19V36H0Z" fill="#a6cdf2"/><rect y="27" width="64" height="9" fill="#78c850"/>` + [[10, 12], [22, 18], [44, 10], [56, 20]].map(([x, y]) => `<rect x="${x - 2.5}" y="${y}" width="5" height="${28 - y}" fill="#f4ecdc"/><rect x="${x - 3.5}" y="${y}" width="7" height="2" fill="#d8ccb8"/>`).join('') + `<path d="M28 28V20A5 5 0 0 1 38 20V28H35V21A2 2 0 0 0 31 21V28Z" fill="#d8ccb8"/>`,
+      pantano: `<path d="M0 24Q20 20 36 24T64 22V36H0Z" fill="#8ab0a0"/><rect y="27" width="64" height="9" fill="#6a8a3a"/><ellipse cx="34" cy="31" rx="14" ry="3" fill="#2a4a42"/><path d="M12 30C14 24 8 20 12 12L14 13C11 20 17 24 15 30Z" fill="#6a5a4a"/><circle cx="12" cy="12" r="5" fill="#5a7a34"/><path d="M52 30C50 24 56 20 52 14L54 13C58 20 52 24 55 30Z" fill="#6a5a4a"/><circle cx="54" cy="13" r="4.5" fill="#5a7a34"/><rect y="22" width="64" height="5" fill="#e8f4e0" opacity=".35"/>`,
+      vulcao: `<path d="M18 28L29 8H35L46 28Z" fill="#2a1e2a"/><ellipse cx="32" cy="8" rx="3.4" ry="1" fill="!#ff7a2a"/><path d="M31 9Q29 18 24 28" stroke="!#ff5a1a" stroke-width="1.6" fill="none"/><circle cx="34" cy="4" r="3" fill="#6a5a6a"/><circle cx="38" cy="2" r="2.4" fill="#6a5a6a"/><rect y="28" width="64" height="8" fill="#3a2e3a"/><path d="M0 33Q16 30 30 34T64 32" stroke="!#ff6a1a" stroke-width="1.6" fill="none"/>`,
+      campo: `<path d="M0 24Q16 18 32 23T64 21V36H0Z" fill="#b8e0a0"/><rect y="27" width="64" height="9" fill="#8ad850"/><rect x="45" y="14" width="4" height="10" fill="#f0e0c8"/><path d="M47 15l-6 -5M47 15l6 -5M47 15l-6 5M47 15l6 5" stroke="#fff8ec" stroke-width="1.6"/>` + [[8, 31, '#ffe04a'], [14, 33, '#ff8ac0'], [22, 31, '#fff'], [52, 32, '#b08aff'], [58, 30, '#ffe04a'], [36, 33, '#ff8ac0']].map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="1.3" fill="${c}"/>`).join('') + `<rect x="10" y="17" width="2" height="11" fill="#8f5a34"/><circle cx="11" cy="16" r="5" fill="#4fb54a"/>`,
     };
     const st = document.createElement('style'); st.id = 'terr-thumbs';
     st.textContent = Object.entries(art).flatMap(([k, a]) => HORAS.map(h => `.bbthumb.bb-${k}-${h}{background:${gradeAll(svgUrl(64, 36, sky(h) + a, 'xMidYMid slice'), h)} center/cover}.bbthumb.bb-${k}-${h} .bbfx,.bbthumb.bb-${k}-${h}::before{display:none}`)).join('');

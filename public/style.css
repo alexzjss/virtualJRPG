@@ -1724,6 +1724,10 @@ body .p3d:not([data-biome=custom]) .envface.stage::before,body .p3d:not([data-bi
 @keyframes tfloat{from{translate:0 0;opacity:.15}to{translate:36px -110px;opacity:1}}
 .tp-brilho{width:22px;height:22px;background:#fff;clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);animation-name:tblink;animation-direction:alternate;animation-timing-function:ease-in-out}
 @keyframes tblink{from{opacity:.15}to{opacity:1}}
+.tp-neve{width:12px;height:12px;border-radius:50%;background:#fff;animation-name:tsnow}@keyframes tsnow{0%{translate:0 0;opacity:0}10%,88%{opacity:.95}100%{translate:-70px 1000px 40px;opacity:0}}
+.tp-petala{width:14px;height:9px;border-radius:0 100%;animation-name:tfall}
+.tp-brasa{width:12px;height:12px;border-radius:50%;background:radial-gradient(#fff4a0 0 22%,#ff7a20 44%,#ff3a0000 70%);animation-name:trise}@keyframes trise{0%{translate:0 0;opacity:0}15%{opacity:1}100%{translate:60px -900px -30px;opacity:0}}
+.tp-bolha{width:16px;height:16px;border-radius:50%;border:2px solid #d8f0c8aa;background:#ffffff22;animation-name:tbub}@keyframes tbub{0%{translate:0 0;scale:.4;opacity:0}30%{opacity:.9}100%{translate:8px -160px;scale:1;opacity:0}}
 .tgu{transform:translate3d(var(--gx),var(--gy),var(--gz));animation:tgull 22s linear infinite}@keyframes tgull{to{rotate:y 360deg}}
 .tgu b{position:absolute;left:-30px;top:-12px;width:60px;height:24px;background-size:100% 100%;backface-visibility:visible;animation:tflap .7s ease-in-out infinite}@keyframes tflap{50%{scale:1 .35}}
 .p3d[data-q=low] .twa{animation:none}
