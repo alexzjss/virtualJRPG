@@ -1692,7 +1692,8 @@ html.p3-golpe .p3d-ui{opacity:0;transition:opacity .2s}
 @media(prefers-reduced-motion:reduce){.p3d .bb.walk .bbi,.p3d .bb.walk img,.p3d .bb.hopb .bbi,.p3d .bb.impact .bbi{animation:none}}
 @media(prefers-reduced-motion:reduce){.p3d .world,.p3d .bb,.p3d .bb .bbi{transition-duration:.01s}}
 /* filtro no .bb achata o recorte (anel e sombra deixam o chão, a figura não inclina) e cria uma superfície por recorte: os tons vão para a imagem */
-.p3d .bb.unit,.p3d .bb.ko,.p3d.selecting .bb:not(.pickable),.p3d.threat .bb.hero,.p3d .bb.hurt,.p3d .bb.hl{filter:none}
+.p3d .bb.unit,.p3d .bb.ko,.p3d.selecting .bb:not(.pickable),.p3d.threat .bb.hero,.p3d .bb.hurt,.p3d .bb.hl,.p3d.selecting .bb.pickable:hover,.p3d.selecting .bb.pickable:focus-visible{filter:none}
+.p3d.selecting .bb.pickable:hover img,.p3d.selecting .bb.pickable:focus-visible img{filter:brightness(1.25) drop-shadow(0 0 16px var(--c,#fff))!important} /* o brilho do alvo sob o mouse fica na imagem: no .bb ele achatava a figura na mira aérea */
 .p3d:not([data-q=low]) .bb.unit:not(.cur) img{filter:brightness(.82) saturate(.92)}
 .p3d[data-biome$="-tarde"]:not([data-biome^=caverna]) .bb.unit img{filter:sepia(.2) saturate(1.12) hue-rotate(-8deg)} /* horário do cenário: figuras pegam o tom da luz (a caverna não tem céu) */
 .p3d[data-biome$="-tarde"]:not([data-biome^=caverna]):not([data-q=low]) .bb.unit:not(.cur) img{filter:brightness(.84) sepia(.2) saturate(1.05) hue-rotate(-8deg)}
