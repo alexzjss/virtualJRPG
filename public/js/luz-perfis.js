@@ -47,5 +47,27 @@
   };
   // repouso: só o terço de cima ondula com o vento (o pé fica fixo); ≤ 3 px
   const idleSway = (t, wind, row) => { if (row <= 2 / 3 || !wind) return 0; const k = (row - 2 / 3) * 3; return 3 * clamp(wind, 0, 1) * k * k * Math.sin(t * 1.6 + row * 2) + 0; };
-  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway };
+  // ----- materiais de luz por elemento: glifo do círculo, núcleo/borda, como as partículas se movem e o resíduo no chão -----
+  const MAT = {
+    kagutsuchi: { glyph: 'glyph-kagutsuchi', core: '#fff3c4', rim: '#ff5a1f', motion: 'rise', residue: 'embers', tex: 'flame' },
+    susanoo: { glyph: 'glyph-susanoo', core: '#e6fbff', rim: '#2a9dff', motion: 'bubble', residue: 'puddle', tex: 'bubble' },
+    indra: { glyph: 'glyph-indra', core: '#ffffff', rim: '#8a63ff', motion: 'arc', residue: 'sparks', tex: 'spark' },
+    fuhaku: { glyph: 'glyph-fuhaku', core: '#f0fffb', rim: '#47e0bb', motion: 'spiral', residue: 'frost', tex: 'feather' },
+    amaterasu: { glyph: 'glyph-amaterasu', core: '#ffffff', rim: '#ffc22e', motion: 'burst', residue: 'light', tex: 'star4' },
+    tsukuyomi: { glyph: 'glyph-tsukuyomi', core: '#efe0ff', rim: '#8f4dff', motion: 'drift', residue: 'mist', tex: 'crescent' },
+    shukketsu: { glyph: 'glyph-shukketsu', core: '#ffd0d8', rim: '#e8173f', motion: 'drip', residue: 'pool', tex: 'drop' },
+    atlas: { glyph: 'glyph-atlas', core: '#fff1c8', rim: '#d8a24a', motion: 'shard', residue: 'dust', tex: 'shard' },
+    hiruko: { glyph: 'glyph-hiruko', core: '#f2ffd0', rim: '#7fd61f', motion: 'acid', residue: 'puddle', tex: 'bubble' },
+    aura: { glyph: 'glyph-aura', core: '#ffffff', rim: '#2cc8ff', motion: 'hex', residue: 'light', tex: 'hex' },
+    oculto: { glyph: 'glyph-oculto', core: '#ffd6ff', rim: '#c22cff', motion: 'smoke', residue: 'mist', tex: 'eye' },
+    fis: { glyph: 'glyph-fis', core: '#ffffff', rim: '#ffd36a', motion: 'streak', residue: 'none', tex: 'spark' }
+  };
+  const material = el => ({ ...(MAT[el] || MAT.fis) });
+  // fases do golpe em ms: carga → disparo → trajeto → impacto; o impacto começa no mesmo instante que promiseTimes promete
+  const TRAVEL = new Set(['projectile', 'beam', 'pierce', 'dash', 'psychic', 'musical']);
+  const phases = (family, durMs) => { const fr = g.ANIM_PROFILES?.IMPACT?.[family] ?? .58, i = Math.round(durMs * fr), [c, f] = TRAVEL.has(family) ? [.3, .38] : [.6, .7], a = Math.round(i * c), b = Math.round(i * f);
+    return { charge: [0, a], fire: [a, b], travel: [b, i], impact: [i, durMs] }; };
+  // orçamento de partículas entre emissores (alvos) e golpes: todo impacto ganha ao menos impactFloor
+  const share = (budget, emitters, hitsPerEmitter) => { const e = Math.max(1, emitters | 0), h = Math.max(1, hitsPerEmitter | 0); return { perHit: Math.floor(budget / (e * h)), impactFloor: Math.min(60, Math.floor(budget / e)) }; };
+  g.LUZP = { budget, engineFor, duration, promiseTimes, clamp, meshable, bodyCurve, idleSway, material, phases, share, TRAVEL };
 })(globalThis);

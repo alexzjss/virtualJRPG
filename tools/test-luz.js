@@ -25,3 +25,12 @@ test('LUZP: malha só com imagem utilizável; curvas voltam ao repouso; idle só
   assert.ok(L.bodyCurve('smash', .3).squash !== 0, 'smash tem antecipação');
   assert.equal(L.idleSway(1.2, 1, .5), 0); assert.ok(Math.abs(L.idleSway(1.2, 1, 1)) <= 3); assert.equal(L.idleSway(1.2, 0, 1), 0);
 });
+
+test('LUZP: materiais, fases e partilha do orçamento', () => {
+  for (const el of Object.keys(AP.PALETTES)) { const m = L.material(el); assert.ok(m.glyph && m.motion && m.residue, el); }
+  assert.equal(L.material('kagutsuchi').motion, 'rise'); assert.equal(L.material('indra').motion, 'arc'); assert.deepEqual(L.material('???'), L.material('fis'));
+  for (const fam of AP.FAMILIES) { const ph = L.phases(fam, 2500); assert.equal(ph.impact[0], Math.round(2500 * AP.IMPACT[fam]), fam);
+    assert.equal(ph.charge[0], 0); assert.equal(ph.charge[1], ph.fire[0]); assert.equal(ph.fire[1], ph.travel[0]); assert.equal(ph.travel[1], ph.impact[0]); assert.equal(ph.impact[1], 2500, fam); }
+  const s = L.share(2500, 8, 5); assert.ok(s.perHit * 8 * 5 <= 2500); assert.equal(s.impactFloor, 60);
+  assert.equal(L.share(2500, 100, 1).impactFloor, 25);
+});

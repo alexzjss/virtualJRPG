@@ -97,13 +97,14 @@
     }
     vec2 s = vec2(a5.y, a5.z) * size, c = vec2(cos(rot), sin(rot)), o = vec2(q.x * s.x, q.y * s.y);
     o = vec2(o.x * c.x - o.y * c.y, o.x * c.y + o.y * c.x);
+    if (a5.w < .5 && a2.z > 0.) o.y *= a2.z; else if (a5.w > 1.5) o.y *= .3; // deitado no chão: achata depois de girar (sprite: flat; partícula: modo 2)
     vec2 w = p + o; gl_Position = vec4(w.x / uRes.x * 2. - 1., 1. - w.y / uRes.y * 2., 0., 1.);
     vUv = mix(a4.xy, a4.zw, q * .5 + .5); vCol = vec4(a3.rgb, alpha); vAdd = a5.x;
   }`;
   const FS = `#version 300 es
   precision mediump float;
   in vec2 vUv; in vec4 vCol; in float vAdd; uniform sampler2D uTex; out vec4 o;
-  void main(){ float m = texture(uTex, vUv).a * vCol.a; vec3 c = mix(vCol.rgb, vec3(1.), smoothstep(.75, 1., m) * vAdd * .6); o = vec4(c * m, m * (1. - vAdd)); }`;
+  void main(){ float m = texture(uTex, vUv).a * vCol.a; vec3 c = mix(vCol.rgb, vec3(1.), smoothstep(.85, 1., m) * vAdd * .35); o = vec4(c * m, m * (1. - vAdd)); }`;
   const STRIDE = 24; // floats por instância
   let prog, vaoP, bufP, tex, uRes, uNow, uTex;
   let capP = 0, dataP, headP = 0, dirtyA = Infinity, dirtyB = -1, deathP = 0; const capB = 2048, dataB = [new Float32Array(capB * STRIDE), new Float32Array(capB * STRIDE)], nB = [0, 0], layerB = [[], []], bufB = [], vaoB = [];
@@ -135,12 +136,12 @@
     D[o + 8] = rot; D[o + 9] = spin; D[o + 10] = grav; D[o + 11] = drag; D[o + 12] = c[0]; D[o + 13] = c[1]; D[o + 14] = c[2]; D[o + 15] = a;
     D[o + 16] = uv[0]; D[o + 17] = uv[1]; D[o + 18] = uv[2]; D[o + 19] = uv[3]; D[o + 20] = add ? 1 : 0; D[o + 21] = sx; D[o + 22] = sy; D[o + 23] = mode; };
   const UV0 = [0, 0, 0, 0];
-  // partícula: { x, y, vx, vy (px/s), life (ms), size, size1, rot, spin, grav (px/s²), drag, color, alpha, tex, add, sx, sy }
+  // partícula: { x, y, vx, vy (px/s), life (ms), size, size1, rot, spin, grav (px/s²), drag, color, alpha, tex, add, sx, sy, flat (deitada no chão), delay (ms) }
   L.emit = p => { if (!gl || lost || !capP) return; const now = clockNow() / 1000, life = (p.life || 600) / 1000, o = headP * STRIDE;
-    put(dataP, o, p.x, p.y, p.vx || 0, p.vy || 0, now + (p.delay || 0) / 1000, life, p.size || 12, p.size1 ?? (p.size || 12) * .3, p.rot || 0, p.spin || 0, p.grav || 0, p.drag || 0, p.color || '#fff', p.alpha ?? 1, L.atlas[p.tex || 'glow'] || UV0, p.add !== false, p.sx || 1, p.sy || 1, 1);
+    put(dataP, o, p.x, p.y, p.vx || 0, p.vy || 0, now + (p.delay || 0) / 1000, life, p.size || 12, p.size1 ?? (p.size || 12) * .3, p.rot || 0, p.spin || 0, p.grav || 0, p.drag || 0, p.color || '#fff', p.alpha ?? 1, L.atlas[p.tex || 'glow'] || UV0, p.add !== false, p.sx || 1, p.sy || 1, p.flat ? 2 : 1);
     dirtyA = Math.min(dirtyA, headP); dirtyB = Math.max(dirtyB, headP); headP = (headP + 1) % capP; if (headP === 0) { dirtyA = 0; dirtyB = capP - 1; }
     deathP = Math.max(deathP, (now + life + (p.delay || 0) / 1000) * 1000); kick(); };
-  // sprite do lote (só neste quadro): { x, y, size, sx, sy, rot, color, alpha, tex, add, layer: 0 atrás dos corpos | 1 na frente }
+  // sprite do lote (só neste quadro): { x, y, size, sx, sy, rot, flat (achata y depois de girar: chão), color, alpha, tex, add, layer: 0 atrás dos corpos | 1 na frente }
   L.sprite = s => { if (!gl || lost) return; const lst = layerB[s.layer === 0 ? 0 : 1]; if (lst.length < capB) lst.push(s); };
   // fita entre dois pontos (feixe, rastro): sprite 'beam' esticado
   L.line = (a, b, w, color, alpha = 1, add = true, layer = 1, tex = 'beam') => { const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy); if (len < .5) return; L.sprite({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, size: 1, sx: len / 2 + w * .3, sy: w, rot: Math.atan2(dy, dx), color, alpha, tex, add, layer }); };
@@ -152,13 +153,17 @@
   L.post = null; // luz-pos: { begin() → true se vai compor, end(now) }
   const resize = () => { const d = Math.min(devicePixelRatio || 1, 1.5), w = innerWidth, h = innerHeight; if (w === L.W && h === L.H && d === L.dpr) return; L.W = w; L.H = h; L.dpr = d; cvs.width = Math.round(w * d); cvs.height = Math.round(h * d); cvs.style.width = w + 'px'; cvs.style.height = h + 'px'; };
   const flush = ly => { const lst = layerB[ly]; nB[ly] = 0; if (!lst.length) return; let n = 0;
-    for (const s of lst) { const sz = s.size ?? 16; put(dataB[ly], n * STRIDE, s.x, s.y, 0, 0, 0, 0, sz, sz, s.rot || 0, 0, 0, 0, s.color || '#fff', s.alpha ?? 1, L.atlas[s.tex || 'glow'] || UV0, s.add !== false, s.sx || 1, s.sy || 1, 0); n++; }
+    for (const s of lst) { const sz = s.size ?? 16; put(dataB[ly], n * STRIDE, s.x, s.y, 0, 0, 0, 0, sz, sz, s.rot || 0, 0, s.flat || 0, 0, s.color || '#fff', s.alpha ?? 1, L.atlas[s.tex || 'glow'] || UV0, s.add !== false, s.sx || 1, s.sy || 1, 0); n++; }
     nB[ly] = n; lst.length = 0; gl.bindBuffer(gl.ARRAY_BUFFER, bufB[ly]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, dataB[ly], 0, n * STRIDE); };
   const drawB = ly => { if (!nB[ly]) return; gl.bindVertexArray(vaoB[ly]); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, nB[ly]); };
   const bindProg = now => { gl.useProgram(prog); gl.uniform2f(uRes, L.W, L.H); gl.uniform1f(uNow, now / 1000); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(uTex, 0); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); };
   L.bindSprites = bindProg; let lastNow = 0, lastDrawT = 0;
+  let inFrame = false;
   function frame(t) {
     raf = 0; if (!gl || lost) return;
+    inFrame = true; try { step(t); } finally { inFrame = false; }
+  }
+  function step(t) {
     // só os corpos parados na tela (sem efeito, sem partícula, câmera parada): 30 fps bastam
     if (frameFns.size === 0 && clockNow() >= deathP && L.bodiesIdle?.() && t - lastDrawT < 33) { raf = requestAnimationFrame(frame); return; }
     lastDrawT = t;
@@ -180,9 +185,9 @@
     if (live) { gl.bindVertexArray(vaoP); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, capP); }
     gl.bindVertexArray(null); nB[0] = nB[1] = 0;
     if (composing) busy = L.post.end(now) || busy;
-    if (busy) raf = requestAnimationFrame(frame); else { lastT = 0; lastNow = 0; }
+    if (busy || frameFns.size || clockNow() < deathP) raf = requestAnimationFrame(frame); else { lastT = 0; lastNow = 0; } // inclui o que foi registrado durante este quadro
   }
-  const kick = () => { if (!raf && gl && !lost) raf = requestAnimationFrame(frame); };
+  const kick = () => { if (!raf && !inFrame && gl && !lost) raf = requestAnimationFrame(frame); }; // dentro do quadro quem agenda é o fim do próprio quadro
   L.kick = kick;
   L.step = t => { cancelAnimationFrame(raf); raf = 0; frame(t ?? performance.now()); }; // um quadro na mão (inspeção com a aba em segundo plano)
   const qEvt = () => { if (gl && !lost) sizeParticles(); mark(); try { dispatchEvent(new Event('vj-quality')); } catch {} };

@@ -8,6 +8,8 @@
   };
   const ATTRS = { FOR: '#ff493d', CON: '#e39b46', AGI: '#45e6b3', DES: '#4fb6ff', INT: '#b46cff', SAB: '#ffe36c', CAR: '#ff72b6', SOR: '#ffffff' };
   const FAMILIES = ['projectile', 'beam', 'slash', 'smash', 'pierce', 'dash', 'area', 'rain', 'ritual', 'summon', 'psychic', 'musical', 'heal', 'barrier', 'form'];
+  // fração da duração em que o golpe acerta (o motor antigo e o luminoso usam a mesma)
+  const IMPACT = Object.fromEntries(FAMILIES.map(f => [f, f === 'rain' ? .62 : f === 'ritual' || f === 'summon' ? .7 : .58]));
   const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   const random = n => { n |= 0; n = Math.imul(n ^ n >>> 16, 0x21f0aaad); n = Math.imul(n ^ n >>> 15, 0x735a2d97); return ((n ^ n >>> 15) >>> 0) / 4294967296; };
   const has = (s, re) => re.test(`${s?.name || ''} ${s?.d || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
@@ -36,7 +38,7 @@
     const el = s.el || f.el || 'fis', base = PALETTES[el] || PALETTES.fis, accent = ATTRS[s.attr] || base[2], palette = [base[0], base[1], accent];
     const origin = ['dash', 'smash', 'slash', 'pierce'].includes(family) ? 'weapon' : ['rain', 'ritual', 'psychic'].includes(family) ? 'head' : family === 'form' ? 'core' : 'hand';
     const speed = Math.max(.5, Math.min(2, +options.speed || 1)), duration = options.reduced ? 260 : Math.round((620 + tier * 80 + random(seed) * 90) / speed);
-    return { name: s.name, family, el, attr: s.attr, seed, tier, palette, origin, duration, impact: family === 'rain' ? .62 : family === 'ritual' || family === 'summon' ? .7 : .58, area: !!s.area, hits: s.hits || 1, limit: !!s.limit, dom: !!s.dom };
+    return { name: s.name, family, el, attr: s.attr, seed, tier, palette, origin, duration, impact: IMPACT[family] ?? .58, area: !!s.area, hits: s.hits || 1, limit: !!s.limit, dom: !!s.dom };
   }
-  globalThis.ANIM_PROFILES = { PALETTES, ATTRS, FAMILIES, hash, random, familyOf, profile };
+  globalThis.ANIM_PROFILES = { PALETTES, ATTRS, FAMILIES, IMPACT, hash, random, familyOf, profile };
 })();
