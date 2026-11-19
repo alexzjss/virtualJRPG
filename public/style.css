@@ -1690,6 +1690,10 @@ html.p3-golpe .p3d-ui{opacity:0;transition:opacity .2s}
 /* filtro no .bb achata o recorte (anel e sombra deixam o chão, a figura não inclina) e cria uma superfície por recorte: os tons vão para a imagem */
 .p3d .bb.unit,.p3d .bb.ko,.p3d.selecting .bb:not(.pickable),.p3d.threat .bb.hero,.p3d .bb.hurt,.p3d .bb.hl{filter:none}
 .p3d:not([data-q=low]) .bb.unit:not(.cur) img{filter:brightness(.82) saturate(.92)}
+.p3d[data-biome$="-tarde"]:not([data-biome^=caverna]) .bb.unit img{filter:sepia(.2) saturate(1.12) hue-rotate(-8deg)} /* horário do cenário: figuras pegam o tom da luz (a caverna não tem céu) */
+.p3d[data-biome$="-tarde"]:not([data-biome^=caverna]):not([data-q=low]) .bb.unit:not(.cur) img{filter:brightness(.84) sepia(.2) saturate(1.05) hue-rotate(-8deg)}
+.p3d[data-biome$="-noite"]:not([data-biome^=caverna]) .bb.unit img{filter:brightness(.9) saturate(.82) hue-rotate(8deg)}
+.p3d[data-biome$="-noite"]:not([data-biome^=caverna]):not([data-q=low]) .bb.unit:not(.cur) img{filter:brightness(.7) saturate(.72) hue-rotate(10deg)}
 .p3d .bb.ko img{filter:grayscale(1) brightness(.45)}
 .p3d.selecting .bb:not(.pickable) img{filter:grayscale(.7) brightness(.55)}
 .p3d.threat .bb.hero img{filter:brightness(.4) saturate(.6)}
@@ -1700,6 +1704,7 @@ html.p3-golpe .p3d-ui{opacity:0;transition:opacity .2s}
 /* ===== cenários 3D (terreno3d.js): Bosque, Pátio do castelo e Praia ===== */
 .p3d:not([data-biome=custom]) .ground{display:none}
 .p3d:not([data-biome=custom]) .cam{background:#2a7be8} /* frestas entre céu e paredes ficam azuis, não pretas */
+.p3d:not([data-biome=custom]) .cam{background:var(--frest,#2a7be8)} /* a cor das frestas segue o céu do horário (terreno3d.js grava --frest) */
 .p3d:not([data-biome=custom]) .envface .bbfx{display:none}
 body .p3d:not([data-biome=custom]) .envface.stage{background:#3994f4 center/100% 100% no-repeat;filter:none}
 body .p3d:not([data-biome=custom]) .bbplane.env-front{left:-900px;width:1800px} /* fecha os cantos: a caixa vai de x -3600 a 3600 */
