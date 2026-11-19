@@ -16,6 +16,7 @@ import { posicionar } from './arvore/posicao.js';
 import { balancearAtuais } from './arvore/atuais.js';
 import { variar } from './arvore/variacoes.js';
 import { reorganizar } from './arvore/ordem.js';
+import { camadas } from './arvore/camadas.js';
 import { LEVA8 } from './arvore/leva8.js';
 import { variar8 } from './arvore/leva8e.js';
 import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
@@ -747,3 +748,4 @@ balancearAtuais(TREE); // arvore/atuais.js: o kit atual dos personagens desce um
 marcarComandos(TREE); // Leva 4: comandos de ação nos nós que já existiam
 variar(TREE); // arvore/variacoes.js: comandos nos disparos e golpes rápidos e 3 variações por família
 reorganizar(TREE); // arvore/ordem.js: funde ramos curtos e põe cada setor em colunas temáticas (básico perto do centro)
+camadas(TREE); // arvore/camadas.js: posição no ramo = camada (1–10) e a camada define o poder, por orçamento

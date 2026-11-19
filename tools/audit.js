@@ -2,6 +2,8 @@
 //   node tools/audit.js            relatório completo
 //   node tools/audit.js --quiet    só o resumo (e código de saída 1 se houver erro)
 import { TREE } from '../tree.js';
+import { CAM, DANO, forte } from '../arvore/camadas.js';
+import { ATUAIS } from '../arvore/atuais.js';
 
 const quiet = process.argv.includes('--quiet');
 const nodes = [];
@@ -24,24 +26,19 @@ for (const n of nodes) {
   if (['dmg', 'mental'].includes(n.k) && !(n.p > 0) || (n.k === 'heal' && !(n.p > 0) && !n.st && !fx(n))) add('aviso', 'campo', n, 'ataque ou cura sem poder');
 }
 
-// 3. curva de XP: ramos de 10 nós do Vínculo (exceto os de armas, que têm trilhas próprias)
-const CURVA = [10, 10, 15, 15, 20, 25, 30, 40, 45, 60];
+// 3. camadas (arvore/camadas.js): ramo de até 10 nós, kit atual nas camadas 1–5, conceitos fortes da 7 em diante
+for (const [el, t] of Object.entries(TREE)) t.branches.forEach((br, bi) => { if (!br.de && br.length > CAM) add('erro', 'camada', { id: `${el}-${bi}`, n: '(ramo)' }, `${br.length} nós (máximo ${CAM})`); });
 for (const n of nodes) {
-  if (n.el === 'marcial' || n.el === 'aura' || n.el === 'oculto') continue;
-  const br = TREE[n.el].branches[n.bi];
-  if (br.length !== 10 || br.some(o => o.req) || n.bi > 8) continue;
-  const esperado = CURVA[n.ni];
-  if (n.xp < esperado * .5 || n.xp > esperado * 2.5) add('aviso', 'curva de XP', n, `XP ${n.xp}, a curva pede cerca de ${esperado}`);
+  if (!(n.cam >= 1 && n.cam <= CAM)) { add('erro', 'camada', n, 'sem camada'); continue; }
+  if (ATUAIS.has(n.n) && n.cam > 5) add('erro', 'camada', n, `kit atual na camada ${n.cam} (máximo 5)`);
+  if (forte(n) && n.cam < 7) add('aviso', 'camada', n, `conceito forte na camada ${n.cam} (pede 7+)`);
 }
 
-// 4. poder por XP: ataque diretos muito fora do resto do mesmo custo de XP
-const dmg = nodes.filter(n => n.k === 'dmg' && n.p && !n.hits && !n.area && !n.chg);
-const razao = n => n.p / n.xp;
-const m = dmg.reduce((s, n) => s + razao(n), 0) / dmg.length, sd = Math.sqrt(dmg.reduce((s, n) => s + (razao(n) - m) ** 2, 0) / dmg.length);
-for (const n of dmg) {
-  const z = (razao(n) - m) / sd;
-  if (z > 2.5) add('aviso', 'forte demais', n, `poder ${n.p} por ${n.xp} XP (z=${z.toFixed(1)})`);
-  if (z < -2.5) add('aviso', 'fraco demais', n, `poder ${n.p} por ${n.xp} XP (z=${z.toFixed(1)})`);
+// 4. poder pela camada: dano equivalente (golpes × área) longe do dano-base da camada
+for (const n of nodes.filter(n => n.k === 'dmg' && n.p && !n.limit)) {
+  const eq = n.p * (n.hits || 1) * (n.area ? 1.4 : 1), D = DANO(n.cam), r = eq / D;
+  if (r > 1.35) add('aviso', 'forte demais', n, `dano equivalente ${Math.round(eq)} na camada ${n.cam} (base ${Math.round(D)})`);
+  if (r < .45) add('aviso', 'fraco demais', n, `dano equivalente ${Math.round(eq)} na camada ${n.cam} (base ${Math.round(D)})`);
 }
 
 // 5. o nome promete algo que o efeito não faz
