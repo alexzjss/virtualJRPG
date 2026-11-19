@@ -141,6 +141,12 @@
   // troca para o motor antigo: devolve as imagens ao DOM
   addEventListener('vj-quality', () => { if (!L.active()) document.querySelectorAll('.p3d .bb.malha').forEach(e => e.classList.remove('malha')); else L.kick(); });
   L.corpo = { play, tint, flash, ghosts, has, textures: texs };
+  // o palco-vida chama action/ghosts/pose para o corpo; com a malha ativa, quem mexe o corpo é ela
+  const V = g.PVIDA; if (V) {
+    if (V.action) { const a0 = V.action; V.action = (id, family, tier = 1, seed = 0) => has(id) ? play(id, family, { tier, seed }) : a0(id, family, tier, seed); }
+    if (V.ghosts) { const g0 = V.ghosts; V.ghosts = (id, dir = 1) => has(id) ? ghosts(id, dir) : g0(id, dir); }
+    if (V.pose) { const p0 = V.pose; V.pose = (ids, cls, step = 150) => { p0(ids, cls, step); ids.forEach((id, i) => setTimeout(() => play(id, cls), reduced() ? 0 : i * step)); }; }
+  }
   // o palco aparece/redesenha: acorda o loop
   new MutationObserver(() => L.kick()).observe(document.body, { childList: true });
 })(globalThis);
