@@ -189,9 +189,12 @@ const H = {
     if (Array.isArray(m.take) && m.take.length) inScene(id, () => H.moveTo(c, { ids: m.take, scene: id }));
   },
   sceneGo(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) S.focus = m.id; }, // muda só o foco do mestre: ninguém é levado junto
-  sceneDel(c, m = {}) { // só uma cena vazia e sem batalha (os heróis precisam ser movidos antes)
+  sceneDel(c, m = {}) { // exclui uma cena sem batalha; heróis são transferidos para outra cena
     const id = Object.hasOwn(S.scenes, m.id) ? m.id : S.focus;
-    if (c.role !== 'gm' || Object.keys(S.scenes).length < 2 || S.scenes[id].battle?.active || Object.values(S.chars).some(ch => !ch.enemy && ch.scene === id)) return;
+    const to = Object.hasOwn(S.scenes, m.to) && m.to !== id ? m.to : Object.keys(S.scenes).find(k => k !== id);
+    if (c.role !== 'gm' || !S.scenes[id] || !to || Object.keys(S.scenes).length < 2 || S.scenes[id].battle?.active) return;
+    const heroes = Object.values(S.chars).filter(ch => !ch.enemy && ch.scene === id).map(ch => ch.id);
+    if (heroes.length) inScene(id, () => H.moveTo(c, { ids: heroes, scene: to }));
     delete S.scenes[id];
     for (const [k, ch] of Object.entries(S.chars)) if (ch.enemy && ch.scene === id) delete S.chars[k]; // inimigos da cena apagada vão junto
     for (const sc of Object.values(S.scenes)) sc.exits = (sc.exits || []).filter(e => e.to !== id);
