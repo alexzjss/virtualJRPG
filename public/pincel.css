@@ -1,0 +1,48 @@
+/* ===== UI Pincelada: tinta preta, folha de ouro e serifa clássica (ideia do Clair Obscur, adaptada) =====
+   Tudo vale só com body.ui-pincel (chave S.ui do mestre). As peças .pc-* são novas e não colidem com a UI antiga. */
+body.ui-pincel{
+  --pc-disp:'Cormorant Garamond',serif; --pc-num:'Barlow Condensed','Barlow',sans-serif;
+  --pc-tx:#efe6d4; --pc-dim:#a99f8c; --pc-ouro:#c9a56a; --pc-tinta:#08090b; --pc-perigo:#d8455c; --pc-azul:#6fb6ff; --pc-verde:#8fe0b0;
+  --pc-traco:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 100' preserveAspectRatio='none'%3E%3Cfilter id='r' x='-5%25' y='-40%25' width='110%25' height='180%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018 .32' numOctaves='3' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='18'/%3E%3C/filter%3E%3Cg filter='url(%23r)'%3E%3Cpath d='M12 54C40 30 130 24 230 26C340 22 460 20 588 30L560 42L598 50L556 58C440 78 300 80 180 78C100 80 40 74 16 64Z'/%3E%3Cpath d='M70 24L430 13L428 19L80 30Z'/%3E%3Cpath d='M90 82L470 85L462 90L100 90Z'/%3E%3Cpath d='M300 18L560 22L556 25L310 23Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+/* ---------- pincelada ---------- */
+.pc-traco{position:absolute;height:64px;display:flex;align-items:center;gap:14px;padding:0 30px 0 34px;transform:rotate(var(--rot,0deg));transform-origin:0 50%;cursor:pointer;transition:filter .15s,translate .15s;color:var(--pc-tx);background:none;border:0;border-radius:0;box-shadow:none;min-height:0;font:inherit;text-transform:none;letter-spacing:normal}
+.pc-traco:hover,.pc-traco:active{background:none;color:var(--pc-tx)}
+.pc-traco b,.pc-traco small{text-transform:none;letter-spacing:normal}
+.pc-traco.esq{transform-origin:100% 50%;flex-direction:row-reverse;padding:0 34px 0 30px}
+.pc-tinta{position:absolute;inset:0;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat;opacity:.93;pointer-events:none}
+.pc-ouro{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(55deg,#c9a56acc 0 1.5px,transparent 1.5px 7px),repeating-linear-gradient(-55deg,#c9a56a88 0 1px,transparent 1px 9px),radial-gradient(ellipse at 90% 50%,#c9a56a66,transparent 60%);
+  -webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat,linear-gradient(90deg,transparent 64%,#000 86%);-webkit-mask-composite:source-in;mask:var(--pc-traco) 0 0/100% 100% no-repeat,linear-gradient(90deg,transparent 64%,#000 86%);mask-composite:intersect}
+.pc-traco.esq .pc-tinta,.pc-traco.esq .pc-ouro{transform:scaleX(-1)}
+.pc-traco b{position:relative;font:600 31px/1 var(--pc-disp);color:var(--pc-tx);text-shadow:0 2px 6px #000;white-space:nowrap}
+.pc-traco small{position:relative;font:italic 16px var(--pc-disp);color:var(--pc-ouro)}
+.pc-traco:hover,.pc-traco.sel,.pc-traco:focus-visible{filter:drop-shadow(0 0 10px #c9a56a55);translate:6px 0;outline:none}
+.pc-traco.esq:hover,.pc-traco.esq.sel,.pc-traco.esq:focus-visible{translate:-6px 0}
+.pc-traco.sel b{color:#fff6dc}
+.pc-traco.sel::after{content:"";position:absolute;left:34px;right:40%;bottom:12px;height:1.5px;background:linear-gradient(90deg,var(--pc-ouro),transparent)}
+.pc-traco.esq.sel::after{left:40%;right:34px;background:linear-gradient(270deg,var(--pc-ouro),transparent)}
+.pc-traco.apagado{opacity:.5;cursor:default}
+.pc-traco.menor{height:44px}.pc-traco.menor b{font-size:20px}.pc-traco.menor .pc-ouro{display:none}
+.pc-traco.fino{height:52px}.pc-traco.fino b{font-size:23px;flex:1}
+/* pintar: cada pincelada se pinta do ombro para fora em ~120 ms, em cascata (--i é a posição) */
+.pc-traco.pc-pinta .pc-tinta,.pc-traco.pc-pinta .pc-ouro{animation:pc-pinta .12s ease-out both;animation-delay:calc(var(--i,0) * 40ms)}
+.pc-traco.esq.pc-pinta .pc-tinta,.pc-traco.esq.pc-pinta .pc-ouro{animation-name:pc-pinta-esq}
+.pc-traco.pc-pinta>b,.pc-traco.pc-pinta>small,.pc-traco.pc-pinta>.pc-k,.pc-traco.pc-pinta>.pc-los{animation:pc-surge .14s ease-out both;animation-delay:calc(var(--i,0) * 40ms + 60ms)}
+@keyframes pc-pinta{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes pc-pinta-esq{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0 0 0 0)}}
+@keyframes pc-surge{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.pc-traco.pc-pinta *{animation:none!important}}
+/* ---------- tecla, losango, números ---------- */
+.pc-k{position:relative;flex:none;min-width:28px;height:28px;padding:0 6px;display:inline-grid;place-items:center;border-radius:14px;border:1.5px solid rgba(239,230,212,.65);font:600 13px var(--pc-num);color:var(--pc-tx);background:#0b0d10}
+.pc-k.grande{font-size:16px;height:34px;padding:0 14px;border-radius:17px}
+.pc-los{position:relative;flex:none;width:30px;height:30px;display:inline-grid;place-items:center}
+.pc-los::before{content:"";position:absolute;inset:4px;transform:rotate(45deg);border:1.5px solid var(--pc-ouro);background:#0d151f}
+.pc-los i{position:relative;font:600 14px var(--pc-num);font-style:normal;color:var(--pc-tx)}
+.pc-los.azul::before{background:#13406e;border-color:#9fd0ff;box-shadow:0 0 8px #3d8de088}
+.pc-los.ouro::before{background:#3a2c14}
+.pc-los.verde::before{background:#16402a;border-color:var(--pc-verde)}
+.pc-los.rubro::before{background:#4a1220;border-color:#ff8fa3}
+.pc-num{font-family:var(--pc-num);font-weight:600;letter-spacing:.02em}
+/* ---------- opção do mestre ---------- */
+.pc-chave{display:flex;align-items:center;gap:10px;margin:6px 0 2px}
+.pc-chave button.on{border-color:#c9a56a;color:#f3dfb4;box-shadow:0 0 0 1px #c9a56a55 inset}
