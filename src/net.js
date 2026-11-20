@@ -18,7 +18,7 @@ import { nodeOf } from './oficios.js';
 
 
 // ---------- http ----------
-const hooks = { api: null, store: () => ({ camps: [], backups: [] }), view: (c, v) => v, foeSeen: ch => !!scene().seen[ch.x + ',' + ch.y] }; // foeSeen: o mundo 3D troca pela visão atual do grupo // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
+const hooks = { api: null, store: () => ({ camps: [], backups: [] }), view: (c, v) => v, foeSeen: ch => !!scene().seen[ch.x + ',' + ch.y], interGate: () => null, interText: () => 'interagir' }; // foeSeen: o mundo 3D troca pela visão atual do grupo // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
 // abre o painel do mestre no navegador já com a chave (ela vai depois do #, que nunca sai do computador)
 const openGm = () => { const url = `http://localhost:${PORT}/gm#k=${encodeURIComponent(KEY)}`, [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   try { runCmd(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true }).on('error', () => {}).unref(); } catch {} };
@@ -237,21 +237,22 @@ function handle(c, m) {
 function handleIn(c, m, sid) {
   if (c.role === 'gm' && !NOUNDO.has(m.t)) undoPush(S.scene);
   const cat = c.role === 'player' && !c.ctl ? gateOf(m) : null;
-  if (cat && !S.auto[cat]) { // vira um pedido (um por jogador: o novo substitui o anterior)
+  if (cat && (cat === 'inter' || !S.auto[cat])) { // vira um pedido (um por jogador: o novo substitui o anterior); 'inter' já vem decidido (auto do objeto ou S.auto.inter)
     const ch = S.chars[m.id];
     if (!can(c, ch) || (cat === 'act' && !(S.battle.active && current() === ch.id))) return;
     for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
     S.reqs[rid()] = { by: c.name, ch: ch.id, cat, t: m.t, text: reqText(m), n: ++S.seq, sc: sid,
-      m: { node: m.node, rec: m.rec, rune: m.rune, el2: m.el2, sig: m.sig, nm: m.nm, part: m.part, part2: m.part2, id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
+      m: { node: m.node, rec: m.rec, rune: m.rune, el2: m.el2, sig: m.sig, nm: m.nm, part: m.part, part2: m.part2, id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave, obj: m.obj, opt: m.opt } };
     return push(false);
   }
   try { H[m.t](c, m); } catch (e) { console.error(e); } if (!QUIET.has(m.t)) push(c.role === 'gm');
 }
 // o que o jogador pede e o mestre precisa aprovar, por tipo (S.auto[tipo] = true dispensa a aprovação)
 const GATE = { roll: 'roll', act: 'act', learn: 'learn', use: 'item', equip: 'item', drop: 'item', buy: 'item', sell: 'item', forge: 'item', campAct: 'camp', ofiUse: 'roll', ofiLearn: 'learn', craft: 'item', reroll: 'roll', defend: 'act', focus: 'act', allOut: 'act' };
-const gateOf = m => m.t === 'use' && S.battle.active && m.id in S.battle.ticks ? 'act' : GATE[m.t];
+const gateOf = m => m.t === 'interact' ? hooks.interGate(m) : m.t === 'use' && S.battle.active && m.id in S.battle.ticks ? 'act' : GATE[m.t];
 const reqText = m => { // frase curta que o mestre lê na fila
   const ch = S.chars[m.id], i = S.items[m.item], tg = S.chars[m.target], sg = v => (v > 0 ? '+' : '') + v;
+  if (m.t === 'interact') return hooks.interText(m);
   if (m.t === 'roll') return `rolar ${m.attr}${int(m.mod, -100, 100) ? ' ' + sg(int(m.mod, -100, 100)) : ''}`;
   if (m.t === 'act') return `${m.skill === 'atk' ? 'Ataque' : SK(m.skill)?.name || '?'} → ${tg?.name || '?'}${PARTS.includes(m.aim) ? ` (mira: ${PL[m.aim]})` : ''}`;
   if (m.t === 'learn') return `aprender ${S.skills[m.skill]?.name || '?'} (${S.skills[m.skill]?.xp ?? '?'} XP)`;

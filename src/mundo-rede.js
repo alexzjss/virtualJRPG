@@ -53,7 +53,7 @@ function vision(sid) {
   const nova = remember(sid), sig = Object.values(S.chars).filter(ch => ch.scene === sid && (ch.enemy || ch.npc) && ch.pos && hooks.foeSeen(ch)).map(ch => ch.id).sort().join();
   if (nova || sig !== foesSeen.get(sid)) { foesSeen.set(sid, sig); later(); }
 }
-MH.vision = vision;
+MH.vision = vision; MH.visNow = visNow;
 MH.onCell.push(ch => vision(ch.scene));
 hooks.foeSeen = ch => { const sc = S.scenes[ch.scene]; return use3d(sc) ? cellSeen(visNow(ch.scene), ch) : !!sc?.seen?.[ch.x + ',' + ch.y]; };
 const visSent = new Map(); // cena → chave da última visão que foi no pos

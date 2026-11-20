@@ -77,7 +77,7 @@ fixMundo();
 // ----- movimento -----
 const C = globalThis.MCOL;
 const clock = { now: () => Date.now() }; // os testes trocam o relógio
-const MH = { markPos: () => {}, onCell: [], vision: () => {} }; // ganchos: rede (pos agregado), o que acontece ao trocar de casa (névoa, gatilhos…) e recalcular a visão (porta mudou)
+const MH = { markPos: () => {}, onCell: [], vision: () => {}, visNow: () => null }; // ganchos: rede (pos agregado), o que acontece ao trocar de casa (névoa, gatilhos…) e recalcular a visão (porta mudou)
 const r2 = v => Math.round(v * 100) / 100;
 const floorOf = (sc, fid) => sc?.world?.floors.find(f => f.id === fid);
 const sendTo = (c, o) => { if (c?.readyState === 1) c.send(JSON.stringify(o)); };
@@ -148,7 +148,7 @@ function cleanDialog(d) {
 }
 // só passam os campos de cada tipo (spec, seção 6), já no tipo certo
 const CFG = {
-  porta: c => ({ e: one(c.e, ['h', 'v']), estado: one(c.estado, ['fechada', 'aberta', 'trancada']), chave: str(c.chave), teste: teste(c.teste) }),
+  porta: c => ({ e: one(c.e, ['h', 'v']), estado: one(c.estado, ['fechada', 'aberta', 'trancada']), chave: str(c.chave), gasta: !!c.gasta, teste: teste(c.teste) }),
   barreira: c => ({ e: one(c.e, ['h', 'v']), estado: one(c.estado, ['fechada', 'aberta']), aparencia: one(c.aparencia, ['grade', 'magia', 'entulho']) }),
   bau: c => ({ itens: (Array.isArray(c.itens) ? c.itens : []).filter(isObj).slice(0, 20).map(i => ({ id: str(i.id), n: int(i.n, 1, 99, 1) })), ouro: int(c.ouro, 0, 1e6), modo: one(c.modo, ['uma', 'cada']), teste: teste(c.teste), aberto: c.aberto === true || undefined }),
   item: c => ({ item: str(c.item), qtd: int(c.qtd, 1, 99, 1) }),
@@ -240,6 +240,7 @@ Object.assign(H, {
       const p = old.objs?.[id]; if (!p || p.k !== o.k) continue;
       if (KEEP_ESTADO.has(o.k) && p.cfg?.estado !== undefined) o.cfg.estado = p.cfg.estado;
       if (o.k === 'bau' && p.cfg?.aberto) o.cfg.aberto = p.cfg.aberto;
+      if (o.k === 'bau' && p.cfg?.por) o.cfg.por = p.cfg.por;
       if (p.rev) o.rev = true;
     }
     for (const f of d.floors) { const o = old.floors.find(x => x.id === f.id); if (o && (o.w !== f.w || o.h !== f.h)) delete sc.seenW?.[f.id]; } // névoa do tamanho antigo não serve
@@ -252,4 +253,5 @@ Object.assign(H, {
 ['wDraft', 'wPub', 'wDiscard'].forEach(k => NOUNDO.add(k)); // o editor tem desfazer próprio
 ['wDraft', 'wDiscard'].forEach(k => QUIET.add(k)); // o rascunho não vai no push de todos
 
+import './mundo-obj.js'; // interagir com portas, baús, itens e placas (usa MH e unstuck só dentro dos handlers)
 export { MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };

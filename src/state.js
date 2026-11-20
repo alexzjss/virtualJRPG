@@ -93,7 +93,7 @@ for (const s of Object.values(S.skills)) { s.req ??= ''; s.back ??= ''; s.ex ??=
 for (const i of Object.values(S.items)) { i.wt ??= ''; i.el ??= ''; if (i.kit === undefined && kitOf(i.name)) i.kit = kitOf(i.name); } // kit: tag que cumpre o reqItem das técnicas (o que o mestre já editou fica)
 Object.assign(S, { encounters: {}, camp: { open: false, acts: {} }, seq: 0, users: {}, bestiary: {}, contracts: {}, ...S });
 S.ofiCfg ??= {}; OF.apply(S.ofiCfg); // catálogo de ofícios editado pelo mestre (só as diferenças), mesclado sobre public/oficios.js
-S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, pass: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
+S.reqs ??= {}; S.auto = { roll: false, act: false, learn: false, item: false, camp: false, pass: false, inter: false, ...S.auto }; // pedidos dos jogadores à espera do mestre e o que ele liberou sem aprovação
 if (S.accV !== 2) { S.users = {}; S.accV = 2; } // contas antigas (criadas no primeiro acesso) são apagadas: agora só o mestre cria contas
 for (const sc of Object.values(S.scenes)) { sc.shop ??= { open: false, stock: [] }; sc.ar ??= sc.cols / sc.rows; sc.crop ??= { x: 0, y: 0, w: 1, h: 1 }; sc.ox ??= 0; sc.oy ??= 0; sc.cam ??= null; sc.bbg ??= ''; migrateBackdrop(sc); sc.clima ??= ''; sc.gather ??= []; }
 if (S.shop) { S.scenes[S.focus].shop = S.shop; delete S.shop; } // a loja única antiga vira a loja da cena atual

@@ -292,3 +292,68 @@ test('fog do mestre liga e desliga bits de seenW no andar certo', () => {
   handle(g, { t: 'fogAll', v: false }); assert.equal(bit(sc.seenW.f1, 48, 1 * 8 + 1), 0);
   sc.fogOn = false;
 });
+
+// ----- interações (Task 5.1) -----
+const put = (sc, id, o) => { sc.world.objs[id] = { f: 'f0', rot: 0, vis: 'visivel', auto: null, ...o, cfg: { ...o.cfg } }; return sc.world.objs[id]; };
+const at = (ch, x, z) => handle(gm, { t: 'walkGm', id: ch.id, f: 'f0', x, z });
+const inter = (c, ch, obj, o = {}) => handle(c, { t: 'interact', id: ch.id, obj, ...o });
+const K = () => Object.keys(S.items).find(k => S.items[k].type !== 'arma') || Object.keys(S.items)[0];
+test('interact: longe demais ou atrás da parede é recusado', () => {
+  const sc = freshWorld(); muro(sc, 6); nevoa(sc); S.auto.inter = true;
+  const c = cli('Ana'), ch = hero('Ana', 2, 5), k = K(); at(ch, 2.5, 5.5); const n0 = ch.inv[k] || 0;
+  try {
+    put(sc, 'i1', { k: 'item', x: 4, y: 5, cfg: { item: k, qtd: 2 } }); inter(c, ch, 'i1'); assert.ok(sc.world.objs.i1, 'longe (2 casas)');
+    put(sc, 'i2', { k: 'item', x: 6, y: 5, cfg: { item: k, qtd: 1 } }); at(ch, 5.6, 5.5); inter(c, ch, 'i2'); assert.ok(sc.world.objs.i2, 'atrás da parede');
+    put(sc, 'i3', { k: 'item', x: 4, y: 4, vis: 'oculto', cfg: { item: k, qtd: 1 } }); inter(c, ch, 'i3'); assert.ok(sc.world.objs.i3, 'oculto sem rev');
+    put(sc, 'i4', { k: 'item', x: 5, y: 4, f: 'f9', cfg: { item: k, qtd: 1 } }); inter(c, ch, 'i4'); assert.ok(sc.world.objs.i4, 'outro andar');
+    assert.equal(ch.inv[k] || 0, n0);
+    inter(cli('Zed'), ch, 'i1'); at(ch, 3.6, 5.5); inter(cli('Zed'), ch, 'i1'); assert.ok(sc.world.objs.i1, 'herói alheio');
+    inter(c, ch, 'i1'); assert.equal(sc.world.objs.i1, undefined); assert.equal(ch.inv[k], n0 + 2, 'pegou e sumiu');
+    put(sc, 'p1', { k: 'placa', x: 3, y: 6, cfg: { texto: 'Cuidado com o lobo', imagem: '' } }); c.sent.length = 0; inter(c, ch, 'p1');
+    assert.deepEqual(c.sent.filter(m => m.t === 'placa').map(m => m.text), ['Cuidado com o lobo']);
+  } finally { S.auto.inter = false; sc.fogOn = false; }
+});
+test('porta trancada: chave abre e consome; teste falho não abre', () => {
+  const sc = freshWorld(); muro(sc, 6, 5); nevoa(sc); S.auto.inter = true; const rnd = Math.random;
+  const c = cli('Ana'), ch = hero('Ana', 5, 5), k = K(); at(ch, 5.5, 5.5); delete ch.inv[k];
+  const d = put(sc, 'd1', { k: 'porta', x: 6, y: 5, cfg: { e: 'v', estado: 'trancada', chave: k, gasta: true } });
+  try {
+    inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'trancada', 'sem a chave');
+    ch.inv[k] = 1; inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'aberta'); assert.equal(ch.inv[k] || 0, 0, 'gastou a chave');
+    assert.equal(bit(sc.seenW.f0, 240, 5 * 20 + 8), 1, 'abrir recalcula a visão');
+    inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'fechada'); inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'aberta');
+    d.cfg = { e: 'v', estado: 'trancada', teste: { atr: 'FOR', dif: 10 } };
+    Math.random = () => .999; const n = S.log.length; inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'trancada'); assert.ok(S.log.slice(n).some(e => e.rr?.l === 'FOR'), 'a rolagem vai para o log');
+    Math.random = () => 0; inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'aberta');
+    at(ch, 6.02, 5.5); // parado no vão da porta aberta
+    d.cfg.estado = 'aberta'; inter(c, ch, 'd1'); assert.equal(d.cfg.estado, 'fechada'); assert.ok(!globalThis.MCOL.blockedAt(sc.world.floors[0], sc.world.objs, ch.pos.x, ch.pos.z, false), 'fechar a porta em cima tira o herói');
+    const b = put(sc, 'r1', { k: 'barreira', x: 6, y: 4, cfg: { e: 'v', estado: 'fechada' } }); at(ch, 5.5, 4.5); inter(c, ch, 'r1'); assert.equal(b.cfg.estado, 'fechada', 'barreira não abre na mão');
+  } finally { Math.random = rnd; S.auto.inter = false; sc.fogOn = false; }
+});
+test('baú uma vez para o grupo e uma por herói', () => {
+  const sc = freshWorld(); nevoa(sc); S.auto.inter = true; const k = K();
+  const ca = cli('Ana'), cb = cli('Bia'), a = hero('Ana', 2, 5), b = hero('Bia', 2, 6); at(a, 2.5, 5.5); at(b, 2.5, 6.5);
+  const g0 = [a.gold, b.gold], i0 = a.inv[k] || 0;
+  try {
+    put(sc, 'b1', { k: 'bau', x: 3, y: 5, cfg: { modo: 'uma', ouro: 10, itens: [{ id: k, n: 2 }] } });
+    inter(ca, a, 'b1'); assert.equal(a.gold, g0[0] + 10); assert.equal(a.inv[k], i0 + 2); assert.equal(sc.world.objs.b1.cfg.aberto, true);
+    inter(cb, b, 'b1'); assert.equal(b.gold, g0[1], 'o grupo já abriu');
+    put(sc, 'b2', { k: 'bau', x: 3, y: 6, cfg: { modo: 'cada', ouro: 5 } });
+    inter(ca, a, 'b2'); inter(ca, a, 'b2'); inter(cb, b, 'b2');
+    assert.equal(a.gold, g0[0] + 15); assert.equal(b.gold, g0[1] + 5); assert.deepEqual(Object.keys(sc.world.objs.b2.cfg.por).sort(), [a.id, b.id].sort());
+  } finally { S.auto.inter = false; sc.fogOn = false; }
+});
+test('interact vira pedido com auto=false e passa com S.auto.inter', () => {
+  const sc = freshWorld(); nevoa(sc); S.auto.inter = false; const k = K();
+  const c = cli('Ana'), ch = hero('Ana', 2, 5); at(ch, 2.5, 5.5); const n0 = ch.inv[k] || 0;
+  try {
+    for (const id of Object.keys(S.reqs)) delete S.reqs[id];
+    put(sc, 'i1', { k: 'item', x: 3, y: 5, cfg: { item: k, qtd: 1 } }); inter(c, ch, 'i1');
+    const rq = Object.entries(S.reqs).find(([, r]) => r.t === 'interact'); assert.ok(rq, 'virou pedido'); assert.equal(rq[1].cat, 'inter'); assert.match(rq[1].text, /pegar/);
+    assert.ok(sc.world.objs.i1); handle(gm, { t: 'reqOk', id: rq[0] }); assert.equal(sc.world.objs.i1, undefined, 'o mestre aprovou'); assert.equal(ch.inv[k], n0 + 1);
+    S.auto.inter = true; put(sc, 'i2', { k: 'item', x: 3, y: 4, cfg: { item: k, qtd: 1 } }); inter(c, ch, 'i2'); assert.equal(sc.world.objs.i2, undefined, 'S.auto.inter libera');
+    put(sc, 'i3', { k: 'item', x: 2, y: 4, auto: false, cfg: { item: k, qtd: 1 } }); inter(c, ch, 'i3'); assert.ok(sc.world.objs.i3, 'auto=false sempre pede');
+    assert.ok(Object.values(S.reqs).some(r => r.m.obj === 'i3'));
+    put(sc, 'i4', { k: 'item', x: 1, y: 5, auto: true, cfg: { item: k, qtd: 1 } }); S.auto.inter = false; inter(c, ch, 'i4'); assert.equal(sc.world.objs.i4, undefined, 'auto=true nunca pede');
+  } finally { S.auto.inter = false; sc.fogOn = false; for (const id of Object.keys(S.reqs)) delete S.reqs[id]; }
+});

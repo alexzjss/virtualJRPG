@@ -79,7 +79,7 @@ function fichasWin() {
 }
 // faixa fixa de pedidos dos jogadores (Enter aprova o primeiro, Delete nega)
 const narrável = r => r.t === 'ofiUse' && globalThis.OFI.PER[String(r.m.node).split('.')[0]]?.nodes.find(n => n.id === r.m.node)?.act === 'checar'; // teste narrativo: o mestre pode escrever o que acontece
-const reqUi = {}, AUTOL = { roll: 'Rolagens', act: 'Combate', learn: 'Skills', item: 'Itens', camp: 'Acampamento' }; let lastReqN = 0;
+const reqUi = {}, AUTOL = { roll: 'Rolagens', act: 'Combate', learn: 'Skills', item: 'Itens', camp: 'Acampamento', inter: 'Interações' }; let lastReqN = 0;
 function reqStrip() {
   const rs = Object.entries(S.reqs).sort((a, b) => a[1].n - b[1].n);
   for (const k in reqUi) if (!S.reqs[k]) delete reqUi[k];
