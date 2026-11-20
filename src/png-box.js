@@ -92,7 +92,7 @@ export function opaqueBox(buf) {
 }
 
 function localPath(url) {
-  if (typeof url !== 'string' || !url.startsWith('/')) return null;
+  if (typeof url !== 'string' || !url.startsWith('/') || /[\x00-\x1f'"()<>\\]/.test(url)) return null;
   try {
     const name = decodeURIComponent(url.split(/[?#]/, 1)[0]);
     const parts = name.slice(1).split('/');
@@ -126,7 +126,9 @@ export function setImage(ch, field, url) {
 export function measureImages(ch) {
   if (ch.box && typeof ch.box === 'object' && !Array.isArray(ch.box)) {
     for (const field of IMAGE_FIELDS) {
-      if (!ch[field]) delete ch.box[field];
+      const b = ch.box[field];
+      if (!ch[field] || !b || ![b.x, b.y, b.w, b.h, b.W, b.H].every(Number.isInteger)
+        || b.x < 0 || b.y < 0 || b.w < 1 || b.h < 1 || b.x + b.w > b.W || b.y + b.h > b.H || b.W * b.H > 16e6) delete ch.box[field];
     }
     return;
   }

@@ -126,6 +126,8 @@ test('set: mede imagens, publica recortes inimigos e protege direção e escudo'
   assert.equal(boxOfUrl('https://example.org/pincel.png'), null);
   assert.equal(boxOfUrl('//example.org/pincel.png'), null);
   assert.equal(boxOfUrl('/uploads/%2e%2e/pincel.png'), null);
+  H.set(ana, { id: hero.id, f: 'imgF', v: "/uploads/pincel.png#')" });
+  assert.equal(hero.imgF, '');
 
   H.set(ana, { id: hero.id, f: 'imgL', v: true });
   H.set(bia, { id: hero.id, f: 'imgL', v: false });
