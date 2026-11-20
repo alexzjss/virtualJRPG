@@ -1,6 +1,7 @@
 import '../public/rules.js'; // regras compartilhadas com o navegador (globalThis.RULES)
 import '../public/oficios.js'; // catálogo de ofícios (perícias), também usado pelo navegador (globalThis.OFI)
 import '../public/armas.js'; // armas: modelos, perfil do ataque básico e criador (globalThis.ARMAS)
+import '../public/js/mundo-pecas.js'; // pisos e arestas do mundo 3D (globalThis.MPECAS)
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
