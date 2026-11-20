@@ -77,7 +77,7 @@ fixMundo();
 // ----- movimento -----
 const C = globalThis.MCOL;
 const clock = { now: () => Date.now() }; // os testes trocam o relógio
-const MH = { markPos: () => {}, onCell: [] }; // ganchos: rede (pos agregado) e o que acontece ao trocar de casa (névoa, gatilhos…)
+const MH = { markPos: () => {}, onCell: [], vision: () => {} }; // ganchos: rede (pos agregado), o que acontece ao trocar de casa (névoa, gatilhos…) e recalcular a visão (porta mudou)
 const r2 = v => Math.round(v * 100) / 100;
 const floorOf = (sc, fid) => sc?.world?.floors.find(f => f.id === fid);
 const sendTo = (c, o) => { if (c?.readyState === 1) c.send(JSON.stringify(o)); };

@@ -240,3 +240,42 @@ test('asView: o mestre recebe o world como o herói vê (sem oculto) e sem push'
   handle(cli('Ana'), { t: 'asView', id: h.id }); // jogador não pede isso
   delete sc.world.objs.oc; delete sc.world.objs.vi;
 });
+
+// ----- névoa e visão (Task 4.2) -----
+// muro vertical inteiro na coluna X do andar 0 (porta na linha py, se houver); o world fica "do 3D" (sem legacy) e com névoa zerada
+const muro = (sc, X, py = -1) => { const f = sc.world.floors[0], v = P.unpack(f.wallV, (f.w + 1) * f.h); for (let y = 0; y < f.h; y++) v[y * (f.w + 1) + X] = y === py ? 2 : 1; f.wallV = P.pack(v); sc.world.v++; };
+const nevoa = sc => { for (const o of Object.values(S.chars)) if (o.scene === S.focus) o.scene = null; sc.world.legacy = false; sc.fogOn = true; sc.seenW = {}; MW.fixMundo(); };
+const foe = (x, y) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, { enemy: true }); const e = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(e); e.scene = S.focus; handle(gm, { t: 'move', id: e.id, x, y }); return e; };
+test('névoa: andar revela e lembra; inimigo atrás da parede não chega ao jogador nem ao pos', async () => {
+  const sc = freshWorld(); muro(sc, 6); nevoa(sc);
+  const g = gmc(), c = cli('Ana'), ch = hero('Ana', 2, 5), e = foe(9, 5), off = [join(g), join(c)], n = sc.world.floors[0].w * sc.world.floors[0].h, i = (x, y) => y * 20 + x;
+  try {
+    T += 100; walk(c, ch, 3.2, 5.5); assert.equal(ch.x, 3);
+    assert.equal(bit(sc.seenW.f0, n, i(5, 5)), 1); assert.equal(bit(sc.seenW.f0, n, i(8, 5)), 0);
+    T += 100; walk(c, ch, 2.5, 5.5); assert.equal(bit(sc.seenW.f0, n, i(5, 5)), 1, 'a casa vista fica lembrada');
+    const vp = net.view(c); assert.ok(!vp.chars[e.id], 'inimigo atrás da parede não vai no state'); assert.ok(net.view(g).chars[e.id]);
+    assert.equal(bit(vp.vis.f0, n, i(4, 5)), 1); assert.equal(bit(vp.vis.f0, n, i(9, 5)), 0); assert.equal(net.view(g).vis, undefined);
+    c.sent.length = 0; g.sent.length = 0;
+    handle(gm, { t: 'walkGm', id: e.id, f: 'f0', x: 9.6, z: 5.5 }); await sleep(150);
+    assert.ok(!posMsgs(c).some(m => m.l.some(r => r[0] === e.id)), 'pos do inimigo escondido não vai ao jogador'); assert.ok(posMsgs(g).some(m => m.l.some(r => r[0] === e.id)));
+    const p0 = net.pushes(); handle(gm, { t: 'walkGm', id: e.id, f: 'f0', x: 4.5, z: 5.5 }); await sleep(0);
+    assert.ok(net.pushes() > p0, 'inimigo que entra na visão dispara push'); assert.ok(net.view(c).chars[e.id]);
+    const p1 = net.pushes(); T += 100; walk(c, ch, 2.9, 5.5); await sleep(0); assert.equal(net.pushes(), p1, 'andar sem casa nova não dá push');
+  } finally { off.forEach(f => f()); delete S.chars[e.id]; sc.fogOn = false; }
+});
+test('névoa: abrir porta revela a sala vista pela porta', async () => {
+  const sc = freshWorld(); muro(sc, 6, 5); nevoa(sc);
+  sc.world.objs.d1 = { k: 'porta', f: 'f0', x: 6, y: 5, rot: 0, vis: 'visivel', auto: null, cfg: { e: 'v', estado: 'fechada' } };
+  const c = cli('Ana'), ch = hero('Ana', 2, 5), off = [join(c)], n = 240;
+  try {
+    T += 100; walk(c, ch, 3.2, 5.5); assert.equal(bit(sc.seenW.f0, n, 5 * 20 + 8), 0);
+    sc.world.objs.d1.cfg.estado = 'aberta'; MW.MH.vision(S.focus); await sleep(0);
+    assert.equal(bit(sc.seenW.f0, n, 5 * 20 + 8), 1); assert.equal(bit(sc.seenW.f0, n, 2 * 20 + 9), 0, 'só o que se vê pela porta');
+    assert.equal(bit(net.view(c).vis.f0, n, 5 * 20 + 8), 1);
+  } finally { off.forEach(f => f()); sc.fogOn = false; }
+});
+test('névoa: com fogOn desligado tudo fica visível, como hoje', () => {
+  const sc = freshWorld(); muro(sc, 6); sc.world.legacy = false; sc.fogOn = false;
+  const c = cli('Ana'), ch = hero('Ana', 2, 5), e = foe(9, 5);
+  try { const v = net.view(c); assert.ok(v.chars[e.id]); assert.equal(v.vis, undefined); } finally { delete S.chars[e.id]; }
+});

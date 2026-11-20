@@ -44,6 +44,7 @@
   // ----- rede -----
   function onPos(m) {
     const s = st(), now = performance.now();
+    if (m.vis && s && m.sc === s.scene) s.vis = m.vis; // visão atual do grupo (base64 por andar), sem esperar o próximo state
     if (m.fix) {
       const [id, f, x, z] = m.fix; console.info('Mundo: posição corrigida pelo servidor', id, f, x, z);
       if (local?.id === id) Object.assign(local, { f, x, z });

@@ -130,3 +130,8 @@ test('visão: bits em base64 ida e volta e OU de duas visões', () => {
   const r = new Uint8Array(4097); for (let i = 0; i < r.length; i += 3) r[i] = 1;
   assert.deepEqual(V.fromB64(V.toB64(r), r.length), r); assert.ok(V.toB64(r).length < 800);
 });
+test('fx: visão atual em base64 (vinda do servidor) vale como o Set', async () => {
+  const { fogData } = await import('../public/js/mundo3d-fx.js');
+  const seen = new Uint8Array(1), vis = new Uint8Array(1); seen[0] = 0b0110; vis[0] = 0b0100;
+  assert.deepEqual([...fogData(4, 1, P.pack(seen), P.pack(vis))], [0, 128, 255, 0]);
+});

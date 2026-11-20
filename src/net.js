@@ -18,7 +18,7 @@ import { nodeOf } from './oficios.js';
 
 
 // ---------- http ----------
-const hooks = { api: null, store: () => ({ camps: [], backups: [] }), view: (c, v) => v }; // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
+const hooks = { api: null, store: () => ({ camps: [], backups: [] }), view: (c, v) => v, foeSeen: ch => !!scene().seen[ch.x + ',' + ch.y] }; // foeSeen: o mundo 3D troca pela visão atual do grupo // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
 // abre o painel do mestre no navegador já com a chave (ela vai depois do #, que nunca sai do computador)
 const openGm = () => { const url = `http://localhost:${PORT}/gm#k=${encodeURIComponent(KEY)}`, [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   try { runCmd(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true }).on('error', () => {}).unref(); } catch {} };
@@ -104,7 +104,7 @@ const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ..
 // fraquezas do inimigo para jogadores: Identificar revela tudo; o acerto revela só o elemento usado (S.lore, por tipo)
 const scrub = ch => { const k = 100 / (ch.hpMax || 1), L0 = S.lore?.[ch.tpl || ch.name], lr = { w: Array.isArray(L0?.w) ? L0.w : [], r: Array.isArray(L0?.r) ? L0.r : [] }; return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, imgF: ch.imgF, imgB: ch.imgB, imgP: ch.imgP, imgS: ch.imgS, imgK: ch.imgK, fxK: ch.fxK, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, brk: ch.brk, shield: Math.ceil((ch.shield || 0) * k), form: ch.form, hp: Math.ceil(ch.hp * k), hpMax: 100,
   body: Object.fromEntries(PARTS.map(p => [p, (ch.body[p] || 0) * k])), attrs: Object.fromEntries(ATTRS.map(a => [a, 0])), aura: 0, auraMax: 1, san: 1, sanMax: 1, limit: 0, xp: 0, gold: 0, skills: [], inv: {}, equip: {}, weak: ch.known >= 1 ? ch.weak : ch.weak.filter(e => lr.w?.includes(e)), resist: ch.known >= 2 ? ch.resist : ch.resist.filter(e => lr.r?.includes(e)), weakPart: ch.known >= 3 ? ch.weakPart : undefined, known: ch.known || 0, marks: {}, bon: {} }; };
-const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !scene().seen[ch.x + ',' + ch.y]));
+const hiddenFoe = ch => !(ch.id in S.battle.ticks) && (ch.x == null || ch.scene !== S.scene || (scene().fogOn && !hooks.foeSeen(ch)));
 // `cm`: os modificadores dos comandos de ataque de cada técnica com comando (janelas, golpes extras…), para a tela desenhar o minigame certo
 const cmOf = ch => Object.fromEntries((ch.skills || []).filter(k => S.skills[k]?.cmd).map(k => { const m = modsOf(ch, S.skills[k]); return [k, { cw: m.cw, cp: m.cp, mx: m.mx, cz: m.cz, ma: m.ma, rit: m.rit, rn: m.rn, bf: m.bf }]; }));
 // `dly`: o atraso real do herói (delay() com passivas, forma, Marca, Domínio…), para a prévia de onde ele volta na ordem

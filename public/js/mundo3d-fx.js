@@ -33,11 +33,12 @@ export function lightPoints(f) {
   for (let z = 0; z < f.h; z++) for (let X = 0; X <= f.w; X++) if (p.edgeV(f, X, z) === 1) brasa(X, z + .5, temaAt(X < f.w ? X : X - 1, z));
   return out;
 }
-// bits (base64, bit i = y*w+x) → Uint8Array por casa: 0 escuro, 128 lembrado, 255 visível. Sem visBits, o visto conta como visível.
+// bits (base64, bit i = y*w+x) → Uint8Array por casa: 0 escuro, 128 lembrado, 255 visível. Sem visão, o visto conta como visível.
+// A visão atual vem em base64 do mesmo jeito (servidor) ou como Set de 'x,y'.
 export function fogData(w, h, seenB64, visSet) {
-  const n = w * h, out = new Uint8Array(n), seen = P().unpack(seenB64 || '', Math.ceil(n / 8));
+  const n = w * h, out = new Uint8Array(n), seen = P().unpack(seenB64 || '', Math.ceil(n / 8)), vb = typeof visSet === 'string' ? P().unpack(visSet, Math.ceil(n / 8)) : null;
   for (let i = 0; i < n; i++) {
-    const s = seen[i >> 3] >> (i & 7) & 1, v = visSet ? visSet.has((i % w) + ',' + Math.floor(i / w)) : s;
+    const s = seen[i >> 3] >> (i & 7) & 1, v = vb ? vb[i >> 3] >> (i & 7) & 1 : visSet ? visSet.has((i % w) + ',' + Math.floor(i / w)) : s;
     out[i] = v ? 255 : s ? 128 : 0;
   }
   return out;
@@ -103,9 +104,9 @@ export class Fx {
   sync(S, f, w, ctx) {
     const sc = S?.scenes?.[S.scene]; this.weather(sc?.clima || '', this.q);
     const on = !!(f && sc?.fogOn && ctx?.role !== 'gm'); U.uFogOn.value = on ? 1 : 0; if (!on) return;
-    const vis = ctx?.vis?.[f.id] || S.vis?.[f.id], key = f.id + '|' + f.w + 'x' + f.h + '|' + (sc.seenW?.[f.id] || '') + '|' + (vis ? [...vis].join(';') : '');
+    const vis = ctx?.vis?.[f.id] || S.vis?.[f.id], key = f.id + '|' + f.w + 'x' + f.h + '|' + (sc.seenW?.[f.id] || '') + '|' + (typeof vis === 'string' ? vis : vis ? [...vis].join(';') : '');
     if (key === this.fogKey) return; this.fogKey = key;
-    const t = this.fogTex(f); this.setFog(t, sc.seenW?.[f.id], vis ? new Set(vis) : null); U.uFog.value = t; U.uFogWH.value.set(f.w, f.h);
+    const t = this.fogTex(f); this.setFog(t, sc.seenW?.[f.id], typeof vis === 'string' ? vis : vis ? new Set(vis) : null); U.uFog.value = t; U.uFogWH.value.set(f.w, f.h);
   }
   update(now, dt, cam, f, target, ctx) {
     const t = target || { x: (f?.w || 0) / 2, z: (f?.h || 0) / 2 }, d = this.dir || sunDir(this.pal);
