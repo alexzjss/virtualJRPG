@@ -21,6 +21,7 @@ test('uiSet: só o mestre troca a UI e todos veem, mesmo depois de desfazer', ()
   assert.equal(S.ui, '');
   H.uiSet(ana, { v: 'pincel' });
   assert.equal(S.ui, '');
+  const ids = Object.keys(S.chars);
   handle(gm, { t: 'addChar', enemy: true });
   handle(gm, { t: 'uiSet', v: 'pincel' });
   assert.equal(view(gm).ui, 'pincel');
@@ -28,7 +29,7 @@ test('uiSet: só o mestre troca a UI e todos veem, mesmo depois de desfazer', ()
   H.uiSet(gm, { v: 'xyz' });
   assert.equal(S.ui, 'pincel');
   handle(gm, { t: 'undo' });
-  assert.deepEqual(S.chars, {});
+  assert.deepEqual(Object.keys(S.chars), ids);
   assert.equal(S.ui, 'pincel');
   H.uiSet(gm, { v: '' });
   assert.equal(view(ana).ui, '');

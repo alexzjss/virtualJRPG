@@ -124,7 +124,7 @@ const sceneOfClient = c => {
   return !h ? S.focus : okSc(h.scene) ? h.scene : null;
 };
 // cena em que uma mensagem acontece: a do personagem dela; sem personagem, a do cliente
-const sceneOfMsg = (c, m) => { const ch = S.chars[m?.id]; if (ch && (c.role === 'gm' || can(c, ch) || ch.enemy)) return okSc(ch.scene) ? ch.scene : ch.enemy ? S.focus : null; return sceneOfClient(c); };
+const sceneOfMsg = (c, m) => { if (m?.t === 'ordMove') return sceneOfClient(c); const ch = S.chars[m?.id]; if (ch && (c.role === 'gm' || can(c, ch) || ch.enemy)) return okSc(ch.scene) ? ch.scene : ch.enemy ? S.focus : null; return sceneOfClient(c); };
 const OFF0 = 'Seu personagem está em outro lugar por enquanto. Aguarde o mestre chamar você de volta.';
 const viewIn = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...heroOut(ch), gmNote: ch.gmNote }])), users: undefined, accounts: Object.keys(S.users).sort(), online: onlineAccts(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
    { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),

@@ -45,9 +45,48 @@ const evolveCh = ch => { const up = Object.keys(ch.marks).filter(a => d100() > c
 const sanPen = ch => { const p = ch.san / (ch.sanMax || 1); return p <= 0 ? 30 : p <= .25 ? 20 : p <= .5 ? 10 : 0; };
 // CTB: quanto maior a AGI, menor o intervalo entre turnos
 // heróis caídos continuam na fila: o "turno" deles conta para a morte
-const nextOf = T => Object.keys(T).filter(k => { const ch = S.chars[k]; return ch && !ch.dead && (ch.hp > 0 || !ch.enemy); }).sort((a, b) => T[a] - T[b] || a.localeCompare(b))[0];
+const nextOf = T => {
+  const B = S.battle;
+  return Object.keys(T).filter(k => { const ch = S.chars[k]; return ch && !ch.dead && (ch.hp > 0 || !ch.enemy); }).sort((a, b) => {
+    if (T[a] !== T[b]) return T[a] - T[b];
+    const tie = B.ordTies?.[T[a]];
+    if (tie?.moved.some(id => B.ticks[id] === T[a])) {
+      const rank = id => { const i = tie.ids.indexOf(id); return i < 0 ? tie.ids.length : i; };
+      return rank(a) - rank(b) || a.localeCompare(b);
+    }
+    return a.localeCompare(b);
+  })[0];
+};
 const current = () => nextOf(S.battle.ticks);
-const order = () => { const T = { ...S.battle.ticks }, out = []; for (let i = 0; i < 8; i++) { const id = nextOf(T); if (!id) break; out.push(id); T[id] += delay(S.chars[id]); } return out; }; // próximos turnos previstos
+const turnPreview = T => {
+  const turns = [];
+  for (let i = 0; i < 8; i++) {
+    const id = nextOf(T);
+    if (!id) break;
+    turns.push({ id, tick: T[id] });
+    T[id] += delay(S.chars[id]);
+  }
+  return turns;
+};
+const order = () => turnPreview({ ...S.battle.ticks }).map(turn => turn.id);
+export function placeTurn(id, to) {
+  const B = S.battle, T = { ...B.ticks };
+  delete T[id];
+  const turns = turnPreview(T);
+  if (!turns.length) return;
+  const left = turns[to - 1]?.tick, right = turns[to]?.tick;
+  const tick = left === undefined ? right - 1 : right === undefined ? left + 1 : left + (right - left) / 2;
+  for (const [key, tie] of Object.entries(B.ordTies || {})) {
+    tie.moved = tie.moved.filter(k => k !== id && B.ticks[k] === Number(key));
+    if (!tie.moved.length) delete B.ordTies[key];
+  }
+  B.ticks[id] = tick;
+  if (tick === left || tick === right) { // ticks iguais precisam de desempate até quem foi movido gastar o turno
+    turns.splice(to, 0, { id, tick });
+    const ties = B.ordTies ??= {}, moved = ties[tick]?.moved ?? [];
+    ties[tick] = { moved: [...moved, id], ids: [...new Set(turns.filter(turn => turn.tick === tick).map(turn => turn.id))] };
+  }
+}
 const onMap = ch => ch.x != null && ch.scene === S.scene;
 // quem acabou de perder um turno fica 2 turnos imune a novo controle (evita ficar travado para sempre)
 const addLimit = (ch, v) => ch.limit = Math.min(100, ch.limit + v);

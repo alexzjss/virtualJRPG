@@ -6,7 +6,7 @@ import { ATTRS, BBG, CAMP, CLIMA, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, 
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
 import { kick, push, tell, tell0 } from './net.js';
-import { manualPlan, runPlan, derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun } from './rules.js';
+import { manualPlan, runPlan, derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun, placeTurn } from './rules.js';
 function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo executa o plano guardado
   if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) { const plan = planOf(C, a); if (C.chq) chqResolve(a, plan, C); else runPlan(a, plan); } } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
 }
@@ -285,6 +285,12 @@ const H = {
     if (c.role !== 'gm' || !S.battle.active) return;
     S.battle.ax = RU.axisOf(Object.keys(S.battle.ticks).map(k => S.chars[k]));
     log('Mestre', 'palco reenquadrado.');
+  },
+  ordMove(c, { id, to }) {
+    if (c.role !== 'gm' || !S.battle.active || !Number.isInteger(to) || to < 0 || to > 7) return;
+    if (typeof id !== 'string' || !Object.hasOwn(S.battle.ticks, id)) return;
+    const ch = S.chars[id];
+    if (ch?.scene === S.scene && ch.hp > 0 && !ch.dead) placeTurn(id, to);
   },
   // comandos de ritmo: Defender (Coragem), Concentrar (Tensão) e Ataque Total
   defend(c, m) {

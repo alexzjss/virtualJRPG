@@ -3,8 +3,9 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjcenas-'));
-const { H, S, current, derive, view, handle } = await import('../server.js');
+const { H, S, current, derive, view, handle, order } = await import('../server.js');
 const { inScene, adopt } = await import('../src/state.js');
+const { delay, endTurn } = await import('../src/rules.js');
 process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: true, force: true }); } catch {} }); // registrado depois do servidor: roda após a última gravação ao sair
 const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' }, tv = { role: 'table' };
 const reset = () => {
@@ -109,6 +110,49 @@ test('fim de batalha: refeição e invocações só de quem lutou nela', () => {
   handle(gm, { t: 'battle', on: true }); handle(gm, { t: 'battle', on: false });
   assert.ok(S.meal && !(a.id in S.meal.ids) && S.meal.ids[b.id] === 1, 'Bia não lutou: a refeição dela continua');
   delete S.meal;
+});
+
+test('ordMove: desempata ticks sem mudar os outros e a ação usa o atraso normal', () => {
+  reset();
+  const ids = [mk(ana).id, mk(bia).id, mk(gm, { enemy: true }).id, mk(gm, { enemy: true }).id].sort((a, b) => a.localeCompare(b));
+  handle(gm, { t: 'battle', on: true });
+  const [a, b, c, d] = ids;
+  S.battle.ticks = Object.fromEntries(ids.map(id => [id, 10]));
+
+  H.ordMove(gm, { id: d, to: 0 });
+  assert.equal(order()[0], d);
+  H.ordMove(gm, { id: d, to: 2 });
+  assert.deepEqual(order().slice(0, 4), [a, b, d, c]);
+  assert.deepEqual(S.battle.ticks, Object.fromEntries(ids.map(id => [id, 10])));
+
+  endTurn(a); endTurn(b);
+  assert.equal(current(), d);
+  const next = S.battle.ticks[d] + delay(S.chars[d]);
+  endTurn(d);
+  assert.equal(S.battle.ticks[d], next);
+});
+
+test('ordMove: só o mestre, só vivos em batalha e só índices inteiros de 0 a 7', () => {
+  const { A, B, a, b, ea, eb } = split();
+  handle(gm, { t: 'battle', on: true });
+  S.focus = B; handle(gm, { t: 'battle', on: true }); S.focus = A;
+  const ticksA = { ...S.battle.ticks }, ticksB = { ...S.scenes[B].battle.ticks };
+  const idle = mk(gm);
+  H.ordMove(ana, { id: a.id, to: 0 });
+  H.ordMove(gm, { id: idle.id, to: 0 });
+  a.hp = 0; H.ordMove(gm, { id: a.id, to: 0 });
+  a.hp = 10; a.dead = true; H.ordMove(gm, { id: a.id, to: 0 }); delete a.dead;
+  for (const to of [-1, 8, 0.5, '0', undefined]) H.ordMove(gm, { id: ea.id, to });
+  handle(gm, { t: 'ordMove', id: eb.id, to: 0 });
+  assert.deepEqual(S.battle.ticks, ticksA);
+  assert.deepEqual(S.scenes[B].battle.ticks, ticksB);
+
+  handle(gm, { t: 'ordMove', id: a.id, to: 7 });
+  assert.equal(S.scenes[A].battle.order.indexOf(a.id), 7);
+  assert.deepEqual(S.scenes[B].battle.ticks, ticksB);
+  handle(gm, { t: 'undo' });
+  assert.deepEqual(S.battle.ticks, ticksA);
+  assert.deepEqual(S.scenes[B].battle.ticks, ticksB);
 });
 
 test('saídas: pisar numa saída vira pedido; aprovar leva o herói e ele chega pela volta', () => {
