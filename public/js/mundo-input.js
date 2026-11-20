@@ -94,7 +94,7 @@
   // ----- teclas -----
   const KEYMAP = { w: 'w', a: 'a', s: 's', d: 'd' };
   function down(e) {
-    if (!on || typing() || !worldOk()) return;
+    if (!on || typing() || !worldOk() || g.MHUD?.menu) return; // menu de pausa aberto: o mundo roda, mas o herói não anda
     const k = e.key.toLowerCase();
     if (e.key === 'Control') { ctrlSolo = true; return; }
     ctrlSolo = false;
@@ -121,6 +121,6 @@
   function stop() { on = false; clear(); if (raf) cancelAnimationFrame(raf); raf = 0; local = null; moving = false; g.MHUD?.prompt(null); }
 
   function take(id) { forced = id || null; local = null; moving = false; if (forced) { g.MUNDO?.free?.(null); start(); } else if (!(typeof role !== 'undefined' && role === 'player')) stop(); }
-  g.MINPUT = { start, stop, take, get forced() { return forced; }, onPos, poseOf, tick, alvo, aim, use, get sel() { return selId(); }, get local() { return local; }, get crouch() { return crouch; } };
+  g.MINPUT = { start, stop, take, clear, get forced() { return forced; }, onPos, poseOf, tick, alvo, aim, use, get sel() { return selId(); }, get local() { return local; }, get crouch() { return crouch; } };
   if (typeof role !== 'undefined' && role === 'player') start();
 })(globalThis);

@@ -1,4 +1,4 @@
-// ===== mundo 3D: HUD da exploração — prompt do E, diálogo do NPC, placa, fichas, minimapa, objetivo, nomes, balões, pings e chat =====
+// ===== mundo 3D: HUD da exploração — prompt do E, diálogo do NPC, placa, fichas, minimapa, objetivo, nomes, balões, pings, chat e menu =====
 // Mora fora do #app (fixo no body), então o render() não apaga. O nucleo.js entrega { t:'dlg' } e { t:'placa' } em MHUD.on(m);
 // o mundo-input.js chama MHUD.prompt(obj) com o objeto que o E usaria (ou null).
 // Diálogo: quem abriu escolhe (1 a 6 ou clique) e encerra; quem está perto só lê (ro); o mestre lê, fala como o NPC e encerra.
@@ -89,14 +89,48 @@
     if (typeof role === 'undefined' || role === 'table') return fichas;
     const ls = (chatOn ? (s.log || []).slice(-40).reverse() : (s.log || []).slice(-3)).map(l => `<div class="${l.kind === 'chat' ? 'c' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</div>`).join('');
     return fichas + `<div class="mh-chat ${chatOn ? 'on' : ''}"><button type="button" class="mh-chatT" data-mhc="t" aria-expanded="${chatOn}">Chat <kbd>Enter</kbd></button>`
-      + `<div class="mh-log" aria-live="polite">${ls}</div>${chatOn ? '<input class="chat" data-chat="1" maxlength="300" placeholder="Mensagem · /r 2d6 · /w nome texto · Esc fecha" aria-label="Mensagem">' : ''}</div>`;
+      + `<div class="mh-log" aria-live="polite">${ls}</div>${chatOn ? '<input class="chat" data-chat="1" maxlength="300" placeholder="Mensagem · /r 2d6 · /w nome texto · Esc fecha" aria-label="Mensagem">' : ''}</div>`
+      + (menuOn && isPlayer() ? menuHtml(s) : '');
   }
+
+  // ===== menu de pausa (Tab ou Esc): as páginas do jogador por cima do mundo, que continua rodando por baixo =====
+  // Mora no #app (os botões das páginas são tratados pelo eventos.js); a rolagem da página volta no quadro seguinte ao render.
+  const ABAS = { pers: 'Ficha', itens: 'Itens', hab: 'Skills', forja: 'Forja', ofi: 'Ofícios', camp: 'Acampamento', hist: 'Diário' };
+  let menuOn = false, aba = 'pers', mScroll = 0;
+  const isPlayer = () => typeof role !== 'undefined' && role === 'player';
+  function menuHtml(s) {
+    const meus = Object.values(s.chars).filter(c => typeof mine === 'function' && mine(c) && !c.enemy), c = s.chars[meId()] || meus[0];
+    const body = typeof pageHtml === 'function' ? pageHtml(aba, c) : '';
+    return `<div class="mh-menu" role="dialog" aria-modal="true" aria-label="Menu"><i class="mh-mfx" aria-hidden="true"></i>
+      <nav class="mh-mtabs" aria-label="Páginas"><b class="mh-mtit">Menu</b>${Object.entries(ABAS).map(([k, l], i) => `<button type="button" data-mhm="${k}" class="${aba === k ? 'on' : ''}" aria-current="${aba === k ? 'page' : 'false'}" style="--i:${i}">${l}</button>`).join('')}
+        <button type="button" class="mh-mvolta" data-mhm="x">Voltar <kbd>Tab</kbd></button></nav>
+      <section class="mh-mpage"><header class="mh-mwho">${meus.map(x => `<button type="button" class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b></button>`).join('')}</header>${body}</section></div>`;
+  }
+  const menuSet = v => {
+    if (v === menuOn) return; menuOn = v; if (v) { mScroll = 0; g.MINPUT?.clear?.(); g.MHUD?.prompt?.(null); }
+    if (typeof render === 'function') render();
+    if (v) document.querySelector('.mh-menu [data-mhm].on')?.focus();
+  };
+  document.addEventListener('click', e => {
+    const b = e.target.closest?.('[data-mhm]'); if (!b) return; const k = b.dataset.mhm;
+    if (k === 'x') return menuSet(false); if (ABAS[k] && k !== aba) { aba = k; mScroll = 0; if (typeof render === 'function') render(); }
+  });
+  document.addEventListener('scroll', e => { if (e.target.classList?.contains('mh-mpage')) mScroll = e.target.scrollTop; }, true);
+  const tampa = () => (typeof meOpen !== 'undefined' && meOpen) || (typeof navOpen !== 'undefined' && navOpen) || (typeof rollDlg !== 'undefined' && rollDlg) || (typeof gridFull !== 'undefined' && gridFull);
+  addEventListener('keydown', e => {
+    if (!isPlayer() || e.ctrlKey || e.metaKey || e.altKey || dlg || placa) return; // diálogo e placa fecham primeiro (wire)
+    const stop = () => { e.preventDefault(); e.stopPropagation(); };
+    if (menuOn && (e.key === 'Tab' || e.key === 'Escape') && !(e.key === 'Tab' && typing())) { if (e.key === 'Escape' && typing()) return; stop(); menuSet(false); return; }
+    if (menuOn || typing() || tampa() || st()?.battle?.active || !document.querySelector('[data-mundo] .mh-chat')) return;
+    if (e.key === 'Tab' || e.key === 'Escape') { stop(); menuSet(true); }
+  }, true);
+  const menuTick = () => { const p = document.querySelector('.mh-mpage'); if (p && !p._vj) { p._vj = 1; p.scrollTop = mScroll; } };
   const chatSet = v => { chatOn = v; if (typeof render === 'function') render(); if (v) document.querySelector('[data-mundo] .mh-chat input')?.focus(); }; // o render é síncrono: o campo já existe
   document.addEventListener('click', e => { if (e.target.closest?.('[data-mhc="t"]')) chatSet(!chatOn); });
   addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
     if (e.key === 'Escape' && e.target.closest?.('.mh-chat')) { e.preventDefault(); e.stopPropagation(); e.target.blur?.(); chatSet(false); return; }
-    if (e.key === 'Enter' && !typing() && !dlg && !placa && document.querySelector('[data-mundo] .mh-chat')) { e.preventDefault(); e.stopPropagation(); chatSet(true); }
+    if (e.key === 'Enter' && !typing() && !dlg && !placa && !menuOn && document.querySelector('[data-mundo] .mh-chat')) { e.preventDefault(); e.stopPropagation(); chatSet(true); }
   }, true); // na captura: antes do Enter geral do eventos.js, que levaria ao chat da coluna
   // duplo clique no chão do mundo marca um ping (a mesma mensagem do mapa 2D: casa x, y)
   document.addEventListener('dblclick', e => {
@@ -109,7 +143,7 @@
     if (!lay) { lay = el('mhud-mundo'); lay.innerHTML = '<div class="mh-perigo" aria-hidden="true"></div><div class="mh-goal" role="status" hidden></div><canvas class="mmap" width="180" height="180" role="img" aria-label="Minimapa"></canvas><div class="mh-tags" aria-hidden="true"></div><div class="mh-pings" aria-hidden="true"></div>'; }
     return lay;
   };
-  function off() { if (lay) lay.hidden = true; seq = null; } // ao voltar, só falas novas viram balão
+  function off() { if (lay) lay.hidden = true; seq = null; menuOn = false; } // ao voltar, só falas novas viram balão
 
   // ----- objetivo: pulsa por 2 s quando muda (não na primeira vez) -----
   let goalTxt = null;
@@ -220,10 +254,10 @@
     layer(); if (lay.hidden) { lay.hidden = false; rectT = 0; lay.classList.toggle('gm', typeof role !== 'undefined' && role === 'gm'); } // o mestre tem o editor: sem minimapa nem faixa
     if (now - rectT > 250) { rectT = now; caixa(); rect = slot.getBoundingClientRect(); }
     const cur = g.MUNDO.cur?.(), f = cur?.f;
-    goal(cur?.w); balloons(s, now); drawTags(s, f, rect, now); drawPings(f, rect);
+    menuTick(); lay.classList.toggle('menu', menuOn); goal(cur?.w); balloons(s, now); drawTags(s, f, rect, now); drawPings(f, rect);
     const me = s.chars[meId()], d = me?.pos && f && me.pos.f === f.id && P().decode(P().cell(f, Math.floor(me.pos.x), Math.floor(me.pos.z)));
     lay.classList.toggle('perigo', d?.tipo === 'perigo');
   }
 
-  g.MHUD = { on, prompt, html, tick, off, get alvo() { return alvo; }, get aberto() { return !!(dlg || placa); }, get dlg() { return dlg; }, get chat() { return chatOn; }, rotulo };
+  g.MHUD = { on, prompt, html, tick, off, menuSet, get menu() { return menuOn; }, get alvo() { return alvo; }, get aberto() { return !!(dlg || placa); }, get dlg() { return dlg; }, get chat() { return chatOn; }, rotulo };
 })(globalThis);

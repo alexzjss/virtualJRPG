@@ -127,6 +127,8 @@ function imgBattle(c) {
     <div class="imgq">${['f', 'b', 'p'].map(quadro).join('')}</div>
     <label class="imgs">Tamanho na cena <input type="range" min="0.5" max="2.5" step="0.1" data-id="${c.id}" data-f="imgS" value="${sz}"><output>${sz.toFixed(1).replace('.', ',')}×</output></label></div>`;
 }
+// acampamento aberto: o que este herói faz nesta noite (fica na ficha e na aba Acampamento do menu do mundo)
+const campCard = c => S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips({ ...CAMPL, ...campExtra(c) }, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}" data-w="${campWith[c.id] || S.camp.with?.[c.id] || ''}">${l}</span>`)}</div><div class="row"><label>Conversar com <select data-a="campWith" data-id="${c.id}"><option value="">ninguém em especial</option>${Object.values(S.chars).filter(o => !o.enemy && o.id !== c.id && !o.summon).map(o => `<option value="${o.id}" ${(campWith[c.id] || S.camp.with?.[c.id]) === o.id ? 'selected' : ''}>${esc(o.name)} · laço ${RULES.bondLv(S.bonds?.[[c.id, o.id].sort().join('|')] || 0)}</option>`).join('')}</select></label></div></div>` : '';
 function persPage(c) {
   const eqn = slot => eq(c, slot) ? `<b>${esc(eq(c, slot).name)}</b><small>${esc(idesc(eq(c, slot)))}</small>${wpnInfo(eq(c, slot), c)}${upInfo(c, c.equip[slot], eq(c, slot))}` : slot === 'arma' ? `<b class="none">Punhos</b><small>${esc(wpnLine(null, c))} · equipe uma arma na página Itens</small>` : '<b class="none">Vazio</b><small>equipe na página Itens</small>';
   const res = k => `<div class="resrow ${k}"><em>${L[k]}</em>${bar(k, c, true)}<span class="rn">${edv(c, k, c[k])}<small>/${k === 'limit' ? 100 : c[k + 'Max']}</small></span></div>`;
@@ -144,7 +146,7 @@ function persPage(c) {
       <div class="card"><h3>Ferimentos</h3>${bodyFig(c)}</div>${imgBattle(c)}
       <div class="card"><h3>Equipamento</h3><div class="slots"><div><em>Arma</em>${eqn('arma')}</div><div><em>Armadura</em>${eqn('armadura')}</div><div><em>Acessório</em>${eqn('acess')}</div><div><em>Munição</em>${munLine(c)}</div></div>
         <h3>Afinidades</h3><div class="row chips">${[...c.weak.map(k => `<span class="weak">Fraco: ${EL[k]}</span>`), ...c.resist.map(k => `<span class="res">Resiste: ${EL[k]}</span>`), eq(c, 'acess')?.el ? `<span class="res">Resiste: ${EL[eq(c, 'acess').el]}</span>` : ''].join('') || '<small>Nenhuma fraqueza ou resistência.</small>'}</div></div>
-      ${S.camp.open ? `<div class="card"><h3>Acampamento <small>escolha o que fazer nesta noite${gated('camp') ? ' (o mestre aprova)' : ''}</small></h3><div class="row chips big">${chips({ ...CAMPL, ...campExtra(c) }, (k, l) => `<span class="${S.camp.acts[c.id] === k ? 'weak' : ''}" data-a="campAct" data-id="${c.id}" data-k="${k}" data-w="${campWith[c.id] || S.camp.with?.[c.id] || ''}">${l}</span>`)}</div><div class="row"><label>Conversar com <select data-a="campWith" data-id="${c.id}"><option value="">ninguém em especial</option>${Object.values(S.chars).filter(o => !o.enemy && o.id !== c.id && !o.summon).map(o => `<option value="${o.id}" ${(campWith[c.id] || S.camp.with?.[c.id]) === o.id ? 'selected' : ''}>${esc(o.name)} · laço ${RULES.bondLv(S.bonds?.[[c.id, o.id].sort().join('|')] || 0)}</option>`).join('')}</select></label></div></div>` : ''}
+      ${campCard(c)}
       <div class="card"><h3>Contratos de caça</h3><ul class="plain">${cts || '<li><small>Nenhum contrato aberto.</small></li>'}</ul></div></div></section>`;
 }
 
@@ -248,3 +250,15 @@ let chatSeen = 0, lastPg = null, meOpen = false;
 // exploração: rolagem rápida de atributo e o estado do grupo, logo abaixo do mapa
 const mesaTools = c => `<section class="card qroll" style="--c:${esc(c.color)}"><h3>Rolar atributo <small>${esc(c.name)}${gated('roll') ? ' · o mestre aprova' : ''}</small></h3><div class="qr">${A.map(a => `<button data-a="rollAsk" data-id="${c.id}" data-attr="${a}" aria-label="Rolar ${ATN[a]}, ${at(c, a)}%"><b>${at(c, a)}</b><span>${a}</span></button>`).join('')}</div></section>
   <section class="card"><h3>Grupo</h3><div class="pgroup">${Object.values(S.chars).filter(x => !x.enemy && !x.dead).map(x => `<div style="--c:${esc(x.color)}"><b>${esc(x.name)}</b><small>${x.hp > 0 ? stList(x) || 'bem' : 'caído'}</small>${bar('hp', x)}${bar('aura', x)}${bar('san', x)}</div>`).join('')}</div></section>`;
+
+// página do jogador sem o layout, para o menu de pausa do mundo 3D (mundo-hud.js): pers, itens, hab, forja, ofi, camp, hist
+function pageHtml(k, c) {
+  if (!c) return '<p class="none">Nenhum herói ligado à sua conta.</p>';
+  if (k === 'pers') return persPage(c);
+  if (k === 'hab') return skillPage(c);
+  if (k === 'ofi') return oficiosPage(c);
+  if (k === 'itens' || k === 'forja') { const was = itab; itab = k === 'forja' ? 'forja' : was === 'forja' ? 'inv' : was; try { return itemsPage(c); } finally { if (k === 'forja') itab = was; } }
+  if (k === 'camp') return campCard(c) || '<section class="card"><h3>Acampamento</h3><p class="none">O acampamento ainda não está montado: o mestre abre quando o grupo para para descansar.</p></section>';
+  if (k === 'hist') return `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`;
+  return '';
+}
