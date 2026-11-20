@@ -44,9 +44,9 @@
     </div>`;
     return `<div class="medit" style="--medw:${width()}%">${bar}
       <section class="medit-2d" aria-label="Grid do mapa (vista de cima)"><canvas class="medit-cv"></canvas>
-        <div class="medit-info"><b>${esc(f?.name || 'Sem andar')}</b> <small>${f ? f.w + '×' + f.h : ''}${dr ? ' · rascunho' : ' · publicado'}</small></div></section>
+        <div class="medit-info"><b>${esc(f?.name || 'Sem andar')}</b> <small>${f ? f.w + '×' + f.h : ''}${dr ? ' · rascunho' : ' · publicado'}</small></div>${inspect()}</section>
       <i class="medit-div" role="separator" aria-orientation="vertical" aria-label="Divisor entre o grid e o 3D" title="Arraste para mudar a largura"></i>
-      <section class="medit-3d mundo-slot" data-mundo aria-label="Mapa em 3D ao vivo"></section>
+      <section class="medit-3d mundo-slot" data-mundo aria-label="Mapa em 3D ao vivo">${bar3d()}</section>
     </div>`;
   }
 
@@ -228,6 +228,7 @@
       const s = st(), hit = Object.values(s.chars).filter(c => c.scene === sid() && c.pos?.f === f.id).map(c => [c, Math.hypot(c.pos.x - p.fx, c.pos.z - p.fy)]).sort((a, b) => a[1] - b[1])[0];
       if (hit && hit[1] < .8) Object.assign(E.drag, { hero: hit[0].id, x: hit[0].pos.x, z: hit[0].pos.z }); else E.drag = null;
     }
+    else if (T === 'chamar') { E.drag = null; E.tool = 'sel'; if (inF(f, cx, cy)) callAll(f, w, cx, cy); render(); }
     else { E.drag = null; const ed = edgeAt(p.fx, p.fy, f), ow = ed && ownerAt(w, f.id, ...ed)[0]; E.sel = ow || (inF(f, cx, cy) ? objAt(w, f.id, cx, cy) : null) || null; render(); } // sel
     draw();
   }
@@ -273,7 +274,12 @@
     if (a === 'del') { if (w.floors.length < 2) return typeof toast === 'function' && toast('O mapa precisa de pelo menos um andar.', 'no'); if (await ask({ title: `Apagar "${f.name}"?`, text: 'O andar e os objetos dele somem. Dá para desfazer antes de publicar.', ok: 'Apagar', danger: true }) !== true) return; ops([{ o: 'floor', v: { id: f.id, del: true } }]); E.floor = w.floors.find(o => o.id !== f.id)?.id; return render(); }
   });
   document.addEventListener('change', e => {
+    const ins = e.target.closest?.('.medit [data-mi]'); if (ins) return onInspect(ins);
     const el = e.target.closest?.('.medit [data-mo]'); if (!el) return; const k = el.dataset.mo;
+    if (k === 'follow') { E.follow = el.value || null; if (E.follow) g.MUNDO?.follow?.(E.follow); else { const v = g.MUNDO?.view; if (v) { g.MUNDO.follow(null); g.MUNDO.free(v.tx, v.tz); } } return render(); }
+    if (k === 'asview') { if (el.value) { if (typeof send === 'function') send({ t: 'asView', id: el.value }); } else { E.as = null; g.MUNDO?.follow?.(E.follow || null); render(); } return; }
+    if (k === 'take') { g.MINPUT?.take?.(el.value || null); el.blur(); return render(); }
+    if (k === 'tat') { if (typeof send === 'function') send({ t: 'tatico', n: el.value ? Math.max(1, Math.min(30, +el.value)) : null }); return; }
     if (k === 'brush') E.brush = Math.max(1, Math.min(7, +el.value || 1)); else if (k === 'obj') E.objK = el.value; else E[k] = el.value;
     render();
   });
@@ -283,13 +289,119 @@
     const k = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && !e.altKey) { if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); } return; }
     if (e.altKey || e.ctrlKey || e.metaKey) return;
-    const t = { b: 'pincel', g: 'balde', w: 'parede' }[k]; if (t && !e.repeat) { e.preventDefault(); E.tool = t; return render(); }
+    const t = !g.MINPUT?.forced && { b: 'pincel', g: 'balde', w: 'parede' }[k]; if (t && !e.repeat) { e.preventDefault(); E.tool = t; return render(); }
     if (e.key === 'Escape' && (E.tool !== 'sel' || E.rect)) { e.preventDefault(); E.tool = 'sel'; E.rect = null; if (E.st) strokeEnd(); return render(); }
     if (k === 'q' || k === 'r') e.preventDefault(); // Q/R giram o 3D (mundo3d.js) sem trocar a vista da doca
   }, true);
 
+  // ----- inspetor do objeto selecionado (campos de cfg da seção 6 do spec; o diálogo do NPC vem na Task 5.2) -----
+  const CAMPOS = {
+    porta: [['estado', 'Estado', ['fechada', 'aberta', 'trancada']], ['chave', 'Chave (id do item)'], ['teste.atr', 'Teste: atributo'], ['teste.dif', 'Teste: dificuldade', 'n']],
+    barreira: [['estado', 'Estado', ['fechada', 'aberta']], ['aparencia', 'Aparência', ['grade', 'magia', 'entulho']]],
+    bau: [['ouro', 'Ouro', 'n'], ['modo', 'Quem pega', ['uma', 'cada'], { uma: 'Uma vez para o grupo', cada: 'Uma por herói' }], ['itens', 'Itens (id:qtd, …)', 'itens'], ['teste.atr', 'Teste: atributo'], ['teste.dif', 'Teste: dificuldade', 'n']],
+    item: [['item', 'Item (id)'], ['qtd', 'Quantidade', 'n']],
+    npc: [['nome', 'Nome'], ['retrato', 'Retrato (link)'], ['imgF', 'Imagem no mapa (link)'], ['ch', 'Do bestiário (id)']],
+    placa: [['texto', 'Texto', 'area'], ['imagem', 'Imagem (link)']],
+    alavanca: [['alvos', 'Alvos (ids de objeto, separados por vírgula)', 'lista'], ['acao', 'Ação', ['alternar', 'abrir', 'fechar']], ['estado', 'Posição', ['desligada', 'ligada']]],
+    gatilho: [['quem', 'Dispara com', ['qualquer', 'todos'], { qualquer: 'Qualquer herói', todos: 'Todos os heróis' }], ['vezes', 'Vezes', ['uma', 'sempre']]],
+    armadilha: [['perc', 'Percepção (SAB)', 'n'], ['esq', 'Esquiva (AGI)', 'n'], ['dano', 'Dano', 'n'], ['elem', 'Elemento'], ['cond', 'Condição'], ['rearma', 'Rearma depois de disparar', 'b']],
+    escada: [['para.f', 'Leva ao andar', 'andar'], ['para.x', 'Chega na casa x', 'n'], ['para.y', 'Chega na casa y', 'n']],
+    portal: [['to', 'Cena de destino', 'cena'], ['destino', 'Objeto de chegada (id)']],
+    inimigo: [['ch', 'Inimigo', 'inimigo'], ['modo', 'Modo', ['parado', 'patrulha', 'vagar']], ['visao.r', 'Visão: raio (casas)', 'n'], ['visao.a', 'Visão: ângulo (graus)', 'n'], ['bando', 'Bando']],
+    surgir: [],
+  };
+  const getP = (o, path) => path.split('.').reduce((v, k) => v?.[k], o);
+  const setP = (o, path, v) => { const ks = path.split('.'); let t = o; for (const k of ks.slice(0, -1)) { if (!t[k] || typeof t[k] !== 'object') t[k] = {}; t = t[k]; } t[ks.at(-1)] = v; };
+  const kindOf = (k, path) => CAMPOS[k]?.find(c => c[0] === path)?.[2];
+  const sel = (a, list, v) => `<select ${a}>${list.map(([k, l]) => `<option value="${esc(k)}" ${String(v ?? '') === String(k) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  function field(o, [path, label, kind, names]) {
+    const v = getP(o.cfg, path), a = `data-mi="${path}"`, s = st(), w = world();
+    if (Array.isArray(kind)) return `<label>${label}${sel(a, kind.map(k => [k, names?.[k] || k[0].toUpperCase() + k.slice(1)]), v)}</label>`;
+    if (kind === 'n') return `<label>${label}<input type="number" ${a} value="${v ?? ''}"></label>`;
+    if (kind === 'b') return `<label class="chk"><input type="checkbox" ${a} ${v ? 'checked' : ''}> ${label}</label>`;
+    if (kind === 'area') return `<label>${label}<textarea ${a} rows="3" maxlength="800">${esc(v || '')}</textarea></label>`;
+    if (kind === 'itens') return `<label>${label}<input ${a} value="${esc((v || []).map(i => i.id + ':' + i.n).join(', '))}"></label>`;
+    if (kind === 'lista') return `<label>${label}<input ${a} value="${esc((v || []).join(', '))}"></label>`;
+    if (kind === 'andar') return `<label>${label}${sel(a, [['', '—'], ...(w?.floors || []).map(f => [f.id, f.name])], v)}</label>`;
+    if (kind === 'cena') return `<label>${label}${sel(a, [['', '—'], ...Object.entries(s.scenes).filter(([k]) => k !== sid()).map(([k, c]) => [k, c.name])], v)}</label>`;
+    if (kind === 'inimigo') return `<label>${label}${sel(a, [['', '—'], ...Object.values(s.chars).filter(c => c.enemy && c.scene === sid()).map(c => [c.id, c.name])], v)}</label>`;
+    return `<label>${label}<input ${a} value="${esc(v ?? '')}" maxlength="400"></label>`;
+  }
+  function inspect(id = E.sel) {
+    const w = world(), o = w?.objs?.[id]; if (!o) return '';
+    const nome = OBJ_NOMES.find(n => n[0] === o.k)?.[1] || { porta: 'Porta', barreira: 'Barreira' }[o.k] || o.k;
+    return `<aside class="medit-insp" aria-label="Inspetor do objeto"><header><b>${esc(nome)}</b> <small>${esc(id)} · casa ${o.x},${o.y}</small><button type="button" data-mx="del" title="Apagar o objeto">Apagar</button><button type="button" data-mx="close" aria-label="Fechar o inspetor">×</button></header>
+      <div class="medit-form">
+        <label>Visível${sel('data-mi="@vis"', [['visivel', 'Visível'], ['oculto', 'Oculto até revelar']], o.vis)}</label>
+        <label>Age sozinho${sel('data-mi="@auto"', [['', 'Padrão da mesa'], ['sim', 'Sim'], ['nao', 'Não: vira pedido']], o.auto === true ? 'sim' : o.auto === false ? 'nao' : '')}</label>
+        ${o.k === 'porta' || o.k === 'barreira' ? '' : `<label>Giro${sel('data-mi="@rot"', [[0, '0°'], [1, '90°'], [2, '180°'], [3, '270°']], o.rot)}</label>`}
+        ${(CAMPOS[o.k] || []).map(c => field(o, c)).join('')}
+        ${o.k === 'gatilho' ? `<small>${o.cfg?.casas?.length || 0} casas na zona.</small>` : o.k === 'npc' ? '<small>As falas e escolhas ficam no editor de diálogo.</small>' : ''}
+      </div></aside>`;
+  }
+  function onInspect(el) {
+    const id = E.sel, w = world(); if (!id || !w?.objs?.[id]) return;
+    const o = structuredClone(w.objs[id]), path = el.dataset.mi; let v = el.type === 'checkbox' ? el.checked : el.value;
+    if (path[0] === '@') { const k = path.slice(1); o[k] = k === 'rot' ? +v || 0 : k === 'auto' ? (v === 'sim' ? true : v === 'nao' ? false : null) : v; }
+    else {
+      const kind = kindOf(o.k, path);
+      if (kind === 'n') v = Number.isFinite(+v) ? +v : 0;
+      else if (kind === 'itens') v = String(v).split(',').map(x => x.trim()).filter(Boolean).map(x => { const [i, n] = x.split(':'); return { id: i.trim(), n: Math.max(1, +n || 1) }; });
+      else if (kind === 'lista') v = String(v).split(',').map(x => x.trim()).filter(Boolean);
+      o.cfg = o.cfg || {}; setP(o.cfg, path, v);
+    }
+    ops([{ o: 'obj', id, v: o }]); render();
+  }
+
+  // ----- barra de condução no 3D: seguir, ver como, névoa, assumir NPC, congelar, tático, chamar todos -----
+  function bar3d() {
+    const s = st(), id = sid(), sc = s?.scenes?.[id]; if (!sc) return '';
+    const hs = Object.values(s.chars).filter(c => !c.enemy && !c.npc && c.scene === id && c.pos), foes = Object.values(s.chars).filter(c => (c.enemy || c.npc) && c.scene === id && c.pos && !(c.hp <= 0));
+    const frozen = hs.length > 0 && hs.every(c => c.frozen), tat = sc.tatico?.n || '';
+    return `<div class="m3bar" role="toolbar" aria-label="Condução da cena no 3D">
+      ${sel('data-mo="follow" aria-label="Câmera"', [['', 'Câmera livre'], ...hs.map(c => [c.id, 'Seguir ' + c.name])], E.follow || '')}
+      ${sel('data-mo="asview" aria-label="Ver como"', [['', 'Ver como: mestre'], ...hs.map(c => [c.id, 'Ver como ' + c.name])], E.as?.id || '')}
+      <button type="button" data-m3="fog" aria-pressed="${!!sc.fogOn}" class="${sc.fogOn ? 'on' : ''}" title="Ligar ou desligar a névoa desta cena">Névoa</button>
+      ${sel('data-mo="take" aria-label="Assumir NPC ou inimigo"', [['', 'Assumir…'], ...foes.map(c => [c.id, c.name])], g.MINPUT?.forced || '')}
+      <button type="button" data-m3="freeze" aria-pressed="${frozen}" class="${frozen ? 'on' : ''}" title="Congelar ou soltar todos os heróis da cena">${frozen ? 'Soltar' : 'Congelar'}</button>
+      <label class="m3tat">Tático <input type="number" min="0" max="30" data-mo="tat" value="${tat}" aria-label="Casas por rodada no modo tático (vazio desliga)"></label>${tat ? '<button type="button" data-m3="tatNext">Próxima rodada</button>' : ''}
+      <button type="button" data-m3="chamar" aria-pressed="${E.tool === 'chamar'}" class="${E.tool === 'chamar' ? 'on' : ''}" title="Clique numa casa do grid: todos os heróis da cena vão para lá">Chamar todos</button>
+    </div>`;
+  }
+  // casas livres em espiral (anéis de distância crescente) a partir de (cx, cy)
+  function spiral(f, w, cx, cy, n) {
+    const out = [], C = g.MCOL;
+    for (let r = 0; out.length < n && r < Math.max(f.w, f.h); r++)
+      for (let y = cy - r; y <= cy + r && out.length < n; y++) for (let x = cx - r; x <= cx + r && out.length < n; x++)
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) === r && inF(f, x, y) && !C?.blockedAt(f, w.objs, x + .5, y + .5, false)) out.push([x, y]);
+    return out;
+  }
+  function callAll(f, w, cx, cy) {
+    const s = st(), hs = Object.values(s.chars).filter(c => !c.enemy && !c.npc && c.scene === sid() && c.pos);
+    spiral(f, w, cx, cy, hs.length).forEach(([x, y], i) => { if (typeof send === 'function') send({ t: 'walkGm', id: hs[i].id, f: f.id, x: x + .5, z: y + .5 }); });
+  }
+  // contexto do 3D do mestre: vista Mundo edita o rascunho; "ver como" mostra o world e a névoa de um herói
+  function ctx3d() {
+    const s = st(), ed = typeof gui !== 'undefined' && gui.view === 'mapa', as = E.as && E.as.sc === sid() ? E.as : null;
+    if (as) return { role: 'player', asW: as.w, asSc: as.sc, vis: as.vis, follow: as.id, me: as.id, floor: s?.chars[as.id]?.pos?.f };
+    return { role: 'gm', edit: ed, floor: ed ? E.floor : undefined, follow: E.follow || null };
+  }
+  function onAsView(m) { E.as = { id: m.id, sc: m.sc, w: m.w, vis: m.vis || null }; g.MUNDO?.follow?.(m.id); }
+  document.addEventListener('click', e => {
+    const b = e.target.closest?.('.medit [data-m3], .medit [data-mx]'); if (!b) return;
+    const s = st(), sc = s?.scenes?.[sid()], snd = o => typeof send === 'function' && send(o);
+    const hs = Object.values(s?.chars || {}).filter(c => !c.enemy && !c.npc && c.scene === sid() && c.pos);
+    if (b.dataset.mx === 'close') { E.sel = null; return render(); }
+    if (b.dataset.mx === 'del') { if (E.sel) ops([{ o: 'obj', id: E.sel, v: null }]); E.sel = null; return render(); }
+    const k = b.dataset.m3;
+    if (k === 'fog') snd({ t: 'map', f: 'fogOn', v: !sc?.fogOn });
+    else if (k === 'freeze') snd({ t: 'freeze', ids: hs.map(c => c.id), on: !(hs.length && hs.every(c => c.frozen)) });
+    else if (k === 'tatNext') snd({ t: 'tatNext' });
+    else if (k === 'chamar') { E.tool = E.tool === 'chamar' ? 'sel' : 'chamar'; render(); }
+  });
+
   g.MEDIT = {
-    html, mount, draw, ops, undo, redo, world, floor: null,
+    html, mount, draw, ops, undo, redo, world, inspect, ctx3d, onAsView, floor: null,
     get tool() { return E.tool; }, set tool(v) { E.tool = v; },
     get brush() { return E.brush; }, set brush(v) { E.brush = Math.max(1, Math.min(7, +v || 1)); },
     get tema() { return E.tema; }, set tema(v) { E.tema = v; }, get tipo() { return E.tipo; }, set tipo(v) { E.tipo = v; },

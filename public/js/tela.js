@@ -92,7 +92,7 @@ function render() {
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   PALCO3D.local.aim = LEQUE.camTarget(); // liga a vista tática da mira e ancora a linha de alcance (hover não faz o palco oscilar)
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
-  window.MUNDO?.sync(S, { role, me: role === 'player' ? lastHero : null, follow: role === 'player' ? lastHero : null, edit: role === 'gm' && gui.view === 'mapa', floor: role === 'gm' ? window.MEDIT?.floor : undefined });
+  window.MUNDO?.sync(S, { role, me: role === 'player' ? lastHero : null, follow: role === 'player' ? lastHero : null, ...(role === 'gm' && window.MEDIT ? MEDIT.ctx3d() : {}) });
   if (typeof LEQUE !== 'undefined') LEQUE.lift(); // a coluna de comandos vai para o topo do #app (acima do palco)
   fx();
 }

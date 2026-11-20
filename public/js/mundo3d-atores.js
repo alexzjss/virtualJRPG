@@ -86,6 +86,17 @@ export class Actors {
     }
     for (const [id, s] of this.icons) if (!seen.has(id)) { this.g.remove(s); s.material.dispose(); this.icons.delete(id); }
   }
+  // congelado: cadeado sobre a cabeça; modo tático: anel no chão com o alcance que ainda sobra na rodada
+  marks(a, ch, sc, h) {
+    const T = this.T, hero = ch && !ch.enemy && !ch.npc;
+    if (hero && ch.frozen) { if (!a.lock) { a.lock = new T.Sprite(new T.SpriteMaterial({ map: lockTex(T), depthTest: false, transparent: true })); a.lock.scale.set(.42, .42, 1); a.lock.renderOrder = 12; a.o.add(a.lock); } a.lock.position.set(0, h + .3, 0); }
+    else if (a.lock) { a.o.remove(a.lock); a.lock.material.dispose(); a.lock = null; }
+    const r = hero && sc?.tatico ? Math.max(0, sc.tatico.n - (ch.tatUse || 0)) : 0;
+    if (r > 0) {
+      if (!a.ring) { a.ring = new T.Mesh(new T.BufferGeometry(), new T.MeshBasicMaterial({ color: 0xffc93c, transparent: true, opacity: .7, depthWrite: false, side: T.DoubleSide })); a.ring.renderOrder = 3; a.o.add(a.ring); a.ringR = -1; }
+      if (a.ringR !== r) { a.ring.geometry.dispose(); a.ring.geometry = new T.RingGeometry(Math.max(.01, r - .06), r, 64); a.ring.geometry.rotateX(-Math.PI / 2); a.ring.position.y = .03; a.ringR = r; }
+    } else if (a.ring) { a.o.remove(a.ring); a.ring.geometry.dispose(); a.ring.material.dispose(); a.ring = null; }
+  }
   jump(id, now = performance.now()) { const a = this.m.get(id); if (a) a.jump = now; }
   update(S, f, now, dt, yaw) {
     for (const [id, a] of this.m) {
@@ -103,6 +114,7 @@ export class Actors {
       a.body.position.set(Math.cos(yaw) * a.fit.x * a.h, jy - a.fit.y * a.h, -Math.sin(yaw) * a.fit.x * a.h);
       a.body.rotation.y = yaw; a.body.scale.set(wdt * (a.face.mirror ? -1 : 1), h * bob * crouch, 1);
       a.o.children[0].scale.setScalar(jy ? 1 - jy * .5 : 1);
+      this.marks(a, S.chars[id], S.scenes?.[S.scene], h);
       if (a.moving && mode === 'c') { a.dustAcc += dt * POEIRA_S; while (a.dustAcc >= 1) { a.dustAcc--; this.puff(p.x, p.z); } }
     }
     // poeira: sobe devagar e some em 0,6 s
@@ -112,4 +124,12 @@ export class Actors {
   }
   puff(x, z) { const D = this.dust, i = D.i = (D.i + 1) % D.n; D.pos.set([x + (Math.random() - .5) * .3, .05, z + (Math.random() - .5) * .3], i * 3); D.vel.set([(Math.random() - .5) * .4, .5 + Math.random() * .3, (Math.random() - .5) * .4], i * 3); D.life[i] = 1; }
   height(id) { const a = this.m.get(id); return a ? a.h * (a.fit?.z || 1) : H_HEROI; }
+}
+
+let LOCK = null;
+function lockTex(T) { // cadeado simples: arco e corpo, com contorno escuro
+  if (LOCK) return LOCK; const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
+  x.lineWidth = 7; x.strokeStyle = '#0b0b10'; x.beginPath(); x.arc(32, 26, 13, Math.PI, 0); x.stroke(); x.lineWidth = 4; x.strokeStyle = '#ffc93c'; x.beginPath(); x.arc(32, 26, 13, Math.PI, 0); x.stroke();
+  x.fillStyle = '#0b0b10'; x.fillRect(13, 25, 38, 30); x.fillStyle = '#ffc93c'; x.fillRect(16, 28, 32, 24); x.fillStyle = '#0b0b10'; x.fillRect(30, 34, 4, 11);
+  LOCK = new T.CanvasTexture(cv); LOCK.colorSpace = T.SRGBColorSpace; return LOCK;
 }

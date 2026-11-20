@@ -217,3 +217,26 @@ test('rascunho: mestre que conecta recebe o rascunho no canal draft', async () =
   assert.ok(!p.sent.some(m => m.t === 'draft'));
   delete sc.draft;
 });
+
+// ----- condução do mestre -----
+test('mestre move NPC com walk validado e herói congelado com walkGm', () => {
+  freshWorld(); const g = gmc(), h = hero('Ana', 2, 2);
+  const before = new Set(Object.keys(S.chars)); H.addChar(gm, { enemy: true }); const npc = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(npc);
+  npc.scene = S.focus; handle(gm, { t: 'move', id: npc.id, x: 6, y: 6 });
+  T += 100; walk(g, npc, 6.8, 6.5); assert.equal(npc.pos.x, 6.8); // o mestre anda com o NPC pelo mesmo walk
+  T += 100; walk(g, npc, 12.8, 6.5); assert.equal(npc.pos.x, 6.8); // e o servidor confere igual (salto recusado)
+  handle(gm, { t: 'freeze', ids: [h.id], on: true }); T += 100; walk(cli('Ana'), h, 2.8, 2.5); assert.equal(h.pos.x, 2.5);
+  handle(gm, { t: 'walkGm', id: h.id, f: 'f0', x: 9.5, z: 4.5 }); assert.deepEqual([h.pos.x, h.pos.z], [9.5, 4.5]); // congelado, mas o mestre leva
+  handle(gm, { t: 'freeze', ids: [h.id], on: false });
+});
+
+test('asView: o mestre recebe o world como o herói vê (sem oculto) e sem push', () => {
+  const sc = freshWorld(), g = gmc(), h = hero('Ana', 2, 2), n = net.pushes();
+  sc.world.objs.oc = { k: 'bau', f: 'f0', x: 1, y: 1, rot: 0, vis: 'oculto', auto: null, cfg: {} };
+  sc.world.objs.vi = { k: 'bau', f: 'f0', x: 3, y: 1, rot: 0, vis: 'visivel', auto: null, cfg: {} };
+  handle(g, { t: 'asView', id: h.id });
+  const m = g.sent.find(x => x.t === 'asView'); assert.ok(m, 'resposta asView');
+  assert.equal(m.id, h.id); assert.ok(m.w.objs.vi); assert.equal(m.w.objs.oc, undefined); assert.equal(net.pushes(), n);
+  handle(cli('Ana'), { t: 'asView', id: h.id }); // jogador não pede isso
+  delete sc.world.objs.oc; delete sc.world.objs.vi;
+});

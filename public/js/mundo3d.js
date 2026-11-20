@@ -55,7 +55,7 @@ function ensure() {
 }
 const sceneId = () => S?.scene;
 const tema = (f, p) => { const P = globalThis.MPECAS; if (!f || !P) return ""; const d = P.decode(P.cell(f, Math.floor(p?.x ?? f.w / 2), Math.floor(p?.z ?? f.h / 2))); return d?.tema || ""; };
-const worldOf = () => { const sc = S?.scenes?.[sceneId()]; if (!sc) return null; return ctx.edit ? S.draft?.[sceneId()] || sc.world : sc.world; };
+const worldOf = () => { const sc = S?.scenes?.[sceneId()]; if (!sc) return null; if (ctx.asW && ctx.asSc === sceneId()) return ctx.asW; /* "ver como" do mestre */ return ctx.edit ? S.draft?.[sceneId()] || sc.world : sc.world; };
 const floorFor = w => { if (!w) return null; const id = ctx.floor || view.follow && S.chars[view.follow]?.pos?.f || w.floors[0]?.id; return w.floors.find(f => f.id === id) || w.floors[0]; };
 function resize() {
   if (!slot || !renderer) return;
@@ -119,7 +119,7 @@ function sync(S0, c = {}) {
   if (!ensure()) return;
   const el = renderer.domElement; el.style.display = '';
   if (!view.follow || !S.chars[view.follow]) view.follow = c.follow || null;
-  const w = worldOf(), f = floorFor(w), k = [sceneId(), w?.v, f?.id, ctx.edit ? 'e' : 'p', f?.cell?.length, quality(), f ? [...(globalThis.MCOL?.openIdx(w.objs, f.id) || [])].sort().join() : ''].join('|') + (ctx.edit && f ? f.cell + f.wallH + f.wallV : '');
+  const w = worldOf(), f = floorFor(w), k = [sceneId(), w?.v, f?.id, ctx.edit ? 'e' : ctx.asW ? 'as' + ctx.follow : 'p', f?.cell?.length, quality(), f ? [...(globalThis.MCOL?.openIdx(w.objs, f.id) || [])].sort().join() : ''].join('|') + (ctx.edit && f ? f.cell + f.wallH + f.wallV : '');
   if (k !== key) { key = k; rebuild(w, f); }
   actors.sync(S, f, w, ctx);
   fx.sync(S, f, w, ctx);

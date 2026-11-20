@@ -103,7 +103,7 @@ export class Fx {
   sync(S, f, w, ctx) {
     const sc = S?.scenes?.[S.scene]; this.weather(sc?.clima || '', this.q);
     const on = !!(f && sc?.fogOn && ctx?.role !== 'gm'); U.uFogOn.value = on ? 1 : 0; if (!on) return;
-    const vis = S.vis?.[f.id], key = f.id + '|' + f.w + 'x' + f.h + '|' + (sc.seenW?.[f.id] || '') + '|' + (vis ? [...vis].join(';') : '');
+    const vis = ctx?.vis?.[f.id] || S.vis?.[f.id], key = f.id + '|' + f.w + 'x' + f.h + '|' + (sc.seenW?.[f.id] || '') + '|' + (vis ? [...vis].join(';') : '');
     if (key === this.fogKey) return; this.fogKey = key;
     const t = this.fogTex(f); this.setFog(t, sc.seenW?.[f.id], vis ? new Set(vis) : null); U.uFog.value = t; U.uFogWH.value.set(f.w, f.h);
   }

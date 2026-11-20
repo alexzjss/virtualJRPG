@@ -2,7 +2,8 @@
 // Andar não passa pelo push: as posições que mudaram vão juntas a cada 100 ms, só para quem está na cena (o mestre recebe todas).
 // O state de cada cliente leva o world filtrado: sem rascunho, sem objetos ocultos não revelados e sem armadilhas não percebidas.
 import { S, inScene } from './state.js';
-import { hooks, sceneOfClient, wss } from './net.js';
+import { QUIET, hooks, sceneOfClient, wss } from './net.js';
+import { H, NOUNDO } from './handlers.js';
 import { MUNDO } from './config.js';
 import { MH, sendDraft } from './mundo.js';
 
@@ -47,5 +48,13 @@ hooks.view = (c, v) => {
   if (c.role === 'gm' && !c._draftOk && c.send) { c._draftOk = true; queueMicrotask(() => { for (const [k, sc] of Object.entries(S.scenes || {})) if (sc?.draft) sendDraft(k, c); }); } // mestre que acabou de conectar: os rascunhos vão logo depois do primeiro state
   return v;
 };
+
+// "Ver como": o mestre pede o world que um herói recebe (mesmo filtro) e a visão atual do grupo; só para ele, sem push
+H.asView = (c, m) => {
+  const ch = S.chars[m.id], sc = S.scenes[ch?.scene]; if (c.role !== 'gm' || !ch || !sc?.world || typeof c.send !== 'function') return;
+  const vis = VIS.now(ch.scene), as = { role: 'player', name: ch.owner || '', readyState: 1 };
+  c.send(JSON.stringify({ t: 'asView', id: ch.id, sc: ch.scene, w: visFilter(as, sc, ch.scene), vis: vis ? Object.fromEntries(Object.entries(vis).map(([k, v]) => [k, [...v]])) : null }));
+};
+QUIET.add('asView'); NOUNDO.add('asView');
 
 export { VIS, canSee, flushPos, markPos, visFilter };

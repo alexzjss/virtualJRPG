@@ -24,3 +24,16 @@
 .medit-floors{padding-left:8px;border-left:1px solid var(--line,#34343d)}
 .medit-pub{margin-left:auto}
 .medit-pub .gbdg{margin-left:4px}
+.medit-insp{position:absolute;right:8px;top:8px;bottom:8px;width:min(300px,60%);overflow:auto;background:#0b0b10f2;border:1px solid var(--line,#34343d);border-radius:6px;padding:8px;z-index:2;font-size:13px}
+.medit-insp header{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.medit-insp header small{color:var(--dim,#a8a5b2);flex:1}
+.medit-insp header button{padding:2px 8px;min-height:24px}
+.medit-form{display:grid;gap:6px}
+.medit-form label{display:grid;gap:2px}
+.medit-form label.chk{display:flex;align-items:center;gap:6px}
+.medit-form input,.medit-form select,.medit-form textarea{width:100%}
+.medit .m3bar{position:absolute;left:8px;top:8px;right:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;pointer-events:auto}
+.medit .m3bar select,.medit .m3bar button,.medit .m3bar input{min-height:26px;padding:2px 6px;background:#0b0b10d9}
+.medit .m3bar button.on{background:var(--red,#e4002b)}
+.medit .m3bar .m3tat{display:flex;align-items:center;gap:4px;background:#0b0b10d9;padding:0 6px;border-radius:4px}
+.medit .m3bar .m3tat input{width:52px}

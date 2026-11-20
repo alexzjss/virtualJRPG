@@ -12,7 +12,8 @@
   const worldOk = () => { const s = st(); return !!(s && !s.battle?.active && g.MUNDO?.el && g.MUNDO.el.style.display !== 'none'); };
   // heróis que este jogador move: os seus, com posição, na cena dele (na ordem da ficha)
   const can = () => { const s = st(); if (!s) return []; return Object.values(s.chars).filter(c => !c.enemy && !c.npc && c.pos && c.scene === s.scene && (typeof mine === 'function' ? mine(c) : false)); };
-  const selId = () => { const s = st(), id = typeof lastHero !== 'undefined' ? lastHero : null; return id && s?.chars[id]?.pos ? id : can()[0]?.id || null; };
+  let forced = null; // o mestre assumiu um NPC ou inimigo: o WASD move esse (walk, validado como o de qualquer um)
+  const selId = () => { if (forced) return st()?.chars[forced]?.pos ? forced : null; const s = st(), id = typeof lastHero !== 'undefined' ? lastHero : null; return id && s?.chars[id]?.pos ? id : can()[0]?.id || null; };
   const floorOf = (s, ch) => { const w = s?.scenes?.[ch?.scene]?.world; return w?.floors.find(f => f.id === ch.pos?.f) || null; };
   const fromServer = ch => ({ id: ch.id, f: ch.pos.f, x: ch.pos.x, z: ch.pos.z, d: ch.pos.d || 0, m: 'a' });
 
@@ -81,7 +82,7 @@
     if (e.key === 'Shift') { keys.add('shift'); return; }
     if (k === 'c' && !e.repeat) { crouch = !crouch; return; }
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (e.repeat || !local) return; jT = performance.now(); g.MUNDO.jump?.(local.id); const s = st(); if (s) sendWalk(jT, s); return; }
-    if (/^[1-4]$/.test(e.key) && !e.repeat) { const h = can()[+e.key - 1]; if (h && typeof selCh !== 'undefined') { selCh = h.id; if (typeof render === 'function') render(); } }
+    if (/^[1-4]$/.test(e.key) && !e.repeat && !forced && typeof role !== 'undefined' && role === 'player') { const h = can()[+e.key - 1]; if (h && typeof selCh !== 'undefined') { selCh = h.id; if (typeof render === 'function') render(); } }
   }
   function up(e) {
     const k = e.key.toLowerCase();
@@ -96,6 +97,7 @@
   }
   function stop() { on = false; clear(); if (raf) cancelAnimationFrame(raf); raf = 0; local = null; moving = false; }
 
-  g.MINPUT = { start, stop, onPos, poseOf, tick, get sel() { return selId(); }, get local() { return local; }, get crouch() { return crouch; } };
+  function take(id) { forced = id || null; local = null; moving = false; if (forced) { g.MUNDO?.free?.(null); start(); } else if (!(typeof role !== 'undefined' && role === 'player')) stop(); }
+  g.MINPUT = { start, stop, take, get forced() { return forced; }, onPos, poseOf, tick, get sel() { return selId(); }, get local() { return local; }, get crouch() { return crouch; } };
   if (typeof role !== 'undefined' && role === 'player') start();
 })(globalThis);
