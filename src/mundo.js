@@ -257,4 +257,5 @@ Object.assign(H, {
 
 import { perigoTick, pisou, zoneEnter } from './mundo-obj.js'; // interagir com objetos (usa MH e unstuck só dentro dos handlers)
 MH.onCell.push(pisou, zoneEnter); // armadilhas e gatilhos de área ao trocar de casa
+import './mundo-ia.js'; // inimigos com patrulha, visão e perseguição (5 Hz)
 export { perigoTick, MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };

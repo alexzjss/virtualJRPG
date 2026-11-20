@@ -5,6 +5,7 @@
 //   (as sobrando ficam com intensidade 0) para o shader não recompilar.
 // - torch: luz pontual no herói seguido, à noite e na caverna (raio de 3 casas).
 // - weather: um Points que segue a câmera (chuva, neve, neblina, cinzas, brasas): 600, 300 ou 120 partículas pela qualidade.
+// - inimigos: cone de visão no chão (branco 18% parado/patrulha/volta, vermelho 35% em alerta e perseguição) e "!" no alerta.
 // - fogTex / setFog: textura R8 w×h (0 escuro, 128 lembrado, 255 visível) que o shader das peças lê (uniformes U de pecas).
 import { U } from './mundo3d-pecas.js';
 
@@ -108,6 +109,26 @@ export class Fx {
     if (key === this.fogKey) return; this.fogKey = key;
     const t = this.fogTex(f); this.setFog(t, sc.seenW?.[f.id], typeof vis === 'string' ? vis : vis ? new Set(vis) : null); U.uFog.value = t; U.uFogWH.value.set(f.w, f.h);
   }
+  inimigos(S, f, w, now) {
+    const T = this.T, seen = new Set(); this.cones ||= new Map();
+    for (const [id, o] of Object.entries(w?.objs || {})) {
+      const ch = o?.k === 'inimigo' && S?.chars?.[o.cfg?.ch], p = ch && (globalThis.MINPUT?.poseOf?.(ch.id, now) || ch.pos); if (!p || p.f !== f?.id || !(ch.hp > 0)) continue;
+      const st = o.ia?.s || '', bravo = st === 'alerta' || st === 'persegue', r = o.cfg?.visao?.r ?? 6, a = Math.min(360, o.cfg?.visao?.a ?? 90) * Math.PI / 180, key = r + '|' + a;
+      seen.add(id); let c = this.cones.get(id);
+      if (!c || c.cone.userData.key !== key) {
+        if (c) this.dropCone(c);
+        const geo = new T.CircleGeometry(r, Math.max(8, Math.round(a * 10)), -a / 2, a); geo.rotateX(-Math.PI / 2); // aponta para +X; gira pelo rumo
+        const cone = new T.Mesh(geo, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .18, depthWrite: false })); cone.userData.key = key; cone.renderOrder = 2;
+        const bang = new T.Sprite(new T.SpriteMaterial({ map: bangTex(T), depthTest: false, transparent: true })); bang.scale.set(.5, .5, 1); bang.renderOrder = 12;
+        this.g.add(cone, bang); this.cones.set(id, c = { cone, bang });
+      }
+      c.cone.position.set(p.x, .05, p.z); c.cone.rotation.y = (p.d || 0) - Math.PI / 2;
+      c.cone.material.color.set(bravo ? 0xff2a2a : 0xffffff); c.cone.material.opacity = bravo ? .35 : .18;
+      c.bang.visible = st === 'alerta'; c.bang.position.set(p.x, H_INIM + .45 + Math.abs(Math.sin(now / 1000 * 9)) * .12, p.z);
+    }
+    for (const [id, c] of this.cones) if (!seen.has(id)) { this.dropCone(c); this.cones.delete(id); }
+  }
+  dropCone(c) { this.g.remove(c.cone, c.bang); c.cone.geometry.dispose(); c.cone.material.dispose(); c.bang.material.dispose(); }
   update(now, dt, cam, f, target, ctx) {
     const t = target || { x: (f?.w || 0) / 2, z: (f?.h || 0) / 2 }, d = this.dir || sunDir(this.pal);
     this.sol.position.set(t.x + d[0] * 30, d[1] * 30, t.z + d[2] * 30); this.sol.target.position.set(t.x, 0, t.z);
@@ -124,6 +145,13 @@ export class Fx {
       a.needsUpdate = true;
     }
   }
+}
+const H_INIM = 1.9; // altura do inimigo (mundo3d-atores)
+let BANG = null;
+function bangTex(T) { // "!" vermelho do alerta
+  if (BANG) return BANG; const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
+  x.fillStyle = '#e4002b'; x.strokeStyle = '#fff'; x.lineWidth = 5; x.font = 'bold 56px Anton, Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.strokeText('!', 32, 34); x.fillText('!', 32, 34);
+  BANG = new T.CanvasTexture(cv); BANG.colorSpace = T.SRGBColorSpace; return BANG;
 }
 let GLOW = null;
 function glowTex(T) {

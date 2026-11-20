@@ -447,3 +447,57 @@ test('escada troca de andar; portal vira pedido de passagem e chega no destino',
     handle(gm, { t: 'reqOk', id: rq[0] }); assert.equal(ch.scene, sid2); assert.ok(Math.abs(ch.pos.x - 4.5) <= 1.01 && Math.abs(ch.pos.z - 4.5) <= 1.01, `chegou em ${ch.pos.x},${ch.pos.z}`);
   } finally { S.auto.inter = false; sc.fogOn = false; ch.scene = home; for (const id of Object.keys(S.reqs)) delete S.reqs[id]; }
 });
+// ----- IA dos inimigos (Task 6.1) -----
+const IA = await import('../src/mundo-ia.js');
+const inim = (sc, e, cfg = {}) => put(sc, 'i_' + e.id, { k: 'inimigo', x: e.x, y: e.y, cfg: { ch: e.id, rota: [], modo: 'patrulha', visao: { r: 6, a: 90 }, bando: '', ...cfg } });
+const ia = n => { for (let i = 0; i < n; i++) IA.tickIA(S.focus, .2); };
+const longe = (sc, h) => { const f = sc.world.floors[0]; at(h, f.w - .5, f.h - .5); };
+test('IA: patrulha segue a rota em vaivém', () => {
+  const sc = freshWorld(); nevoa(sc); const e = foe(2, 2), h = hero('Ana', 2, 2); at(e, 2.5, 2.5); longe(sc, h);
+  const o = inim(sc, e, { rota: [[2, 2], [8, 2]] });
+  ia(1); assert.ok(Math.abs(e.pos.x - (2.5 + 3.5 * .2)) < .05, `anda a 3,5 casas/s (${e.pos.x})`); assert.equal(o.ia.s, 'patrulha');
+  let ida = false, volta = false;
+  for (let i = 0; i < 30; i++) { ia(1); if (e.x === 8) ida = true; if (ida && e.x === 2) volta = true; assert.equal(e.y, 2, 'fica na rota'); }
+  assert.ok(ida, 'chegou ao fim da rota'); assert.ok(volta, 'e voltou (vaivém)'); assert.equal(o.ia.s, 'patrulha');
+});
+test('IA: vê herói andando a 5 casas no cone; não vê agachado a 5; vê correndo a 10', () => {
+  const sc = freshWorld(); nevoa(sc); const e = foe(2, 5), h = hero('Ana', 7, 5); at(e, 2.5, 5.5); e.pos.d = Math.PI / 2; at(h, 7.5, 5.5);
+  const o = inim(sc, e, { modo: 'parado' });
+  h._m = 'a'; assert.equal(IA.sees(o, h), true, 'andando a 5');
+  h._m = 'g'; assert.equal(IA.sees(o, h), false, 'agachado a 5');
+  at(h, 12.5, 5.5); h._m = 'c'; assert.equal(IA.sees(o, h), true, 'correndo a 10');
+  h._m = 'a'; assert.equal(IA.sees(o, h), false, 'andando a 10, não');
+  at(h, 2.5, 9.5); h._m = 'c'; assert.equal(IA.sees(o, h), false, 'fora do cone');
+  muro(sc, 5); at(h, 7.5, 5.5); h._m = 'a'; assert.equal(IA.sees(o, h), false, 'parede no meio');
+});
+test('IA: perde de vista 6 s e volta à rota', () => {
+  const sc = freshWorld(); nevoa(sc); const e = foe(2, 5), h = hero('Ana', 6, 5); at(e, 2.5, 5.5); e.pos.d = Math.PI / 2; at(h, 6.5, 5.5); h._m = 'a';
+  const o = inim(sc, e, { rota: [[2, 5], [2, 8]] });
+  ia(1); assert.equal(o.ia.s, 'alerta', 'viu: alerta'); assert.equal(o.ia.alvo, h.id);
+  ia(5); assert.equal(o.ia.s, 'persegue', 'depois de 1 s, persegue');
+  ia(2); assert.ok(e.pos.x > 3.5, 'corre atrás do herói');
+  longe(sc, h); h._m = 'g';
+  ia(27); assert.equal(o.ia.s, 'persegue', 'ainda procura antes de 6 s');
+  ia(4); assert.equal(o.ia.s, 'volta', '6 s sem ver: volta');
+  ia(40); assert.equal(o.ia.s, 'patrulha', 'de volta à patrulha'); assert.equal(e.x, 2, 'na rota');
+});
+test('IA: não roda com batalha ativa', () => {
+  const sc = freshWorld(); nevoa(sc); const e = foe(2, 2), h = hero('Ana', 2, 2); at(e, 2.5, 2.5); longe(sc, h);
+  inim(sc, e, { rota: [[2, 2], [8, 2]] }); sc.battle = { active: true, ticks: {} };
+  try {
+    const p = { ...e.pos }; IA.iaAll(.2); assert.deepEqual(e.pos, p, 'parado durante a batalha');
+    sc.battle = { active: false, ticks: {} }; IA.iaAll(.2); assert.ok(e.pos.x > p.x, 'sem batalha, anda');
+  } finally { sc.battle = { active: false, ticks: {} }; sc.fogOn = false; }
+});
+test('IA: ponto da rota sem passagem é pulado (não trava)', () => {
+  const sc = freshWorld(); nevoa(sc); const e = foe(2, 2), h = hero('Ana', 2, 2); at(e, 2.5, 2.5); longe(sc, h);
+  const f = sc.world.floors[0], c = P.unpack(f.cell, f.w * f.h); c[2 * f.w + 8] = P.code('campo', 'fundo'); f.cell = P.pack(c); sc.world.v++;
+  assert.ok(P.blocksWalk(P.cell(f, 8, 2)), 'a casa 8,2 não dá passagem');
+  const o = inim(sc, e, { rota: [[2, 2], [5, 2], [8, 2]] });
+  let foi = false, voltou = false; for (let i = 0; i < 40; i++) { ia(1); if (e.x === 5) foi = true; if (foi && e.x === 2) voltou = true; }
+  assert.ok(foi && voltou, 'vai até 5,2 e volta, pulando 8,2'); assert.equal(o.ia.s, 'patrulha');
+});
+test('IA: inimigo parado e visível chega com posição no state do jogador', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false; const ca = cli('Vera'), e = foe(6, 2), h = hero('Vera', 2, 2); // dono próprio: outros testes deixam heróis da Ana fora da cena at(e, 6.5, 2.5); at(h, 2.5, 2.5);
+  const v = net.view(ca).chars[e.id]; assert.ok(v, 'o inimigo vai no state'); assert.deepEqual(v.pos, e.pos, 'com a posição no 3D');
+});

@@ -90,7 +90,7 @@ function frame(now) {
   if (view.yawT) { const k = Math.min(1, (now - view.yawT) / ROT_MS), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; view.yaw = view.yaw0 + (Math.PI / 4 + view.yawK * Math.PI / 2 - view.yaw0) * e; if (k >= 1) view.yawT = 0; }
   const t = target(f, now), s = 1 - Math.exp(-dt * 8); view.tx += (t.x - view.tx) * s; view.tz += (t.z - view.tz) * s;
   resize(); placeCam(f);
-  actors.update(S, f, now, dt, view.yaw, ctx);
+  actors.update(S, f, now, dt, view.yaw, ctx); fx.inimigos(S, f, w, now);
   setCutaway(floorG, view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos), view.yaw, T); tickPecas(now);
   const hp = view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos);
   fx.torch(hp && hp.f === f?.id ? hp : null, w?.hora === "noite" || tema(f, hp) === "caverna");

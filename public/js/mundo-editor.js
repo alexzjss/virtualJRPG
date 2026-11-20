@@ -92,6 +92,12 @@
     }
     // sobreposições: objeto selecionado, retângulo em curso, aresta sob o cursor, herói arrastado
     const so = E.sel && w.objs?.[E.sel]; if (so && so.f === f.id) { x.strokeStyle = '#ffc93c'; x.lineWidth = 2; x.setLineDash([4, 3]); x.strokeRect(ox + so.x * cs - 2, oy + so.y * cs - 2, cs + 4, cs + 4); x.setLineDash([]); }
+    if (so?.k === 'inimigo' && so.f === f.id && so.cfg?.rota?.length) { // rota da patrulha: linha e casas numeradas
+      const r = so.cfg.rota; x.strokeStyle = 'rgba(228,0,43,.85)'; x.lineWidth = Math.max(1.5, cs / 8); x.setLineDash([cs / 3, cs / 5]); x.beginPath();
+      r.forEach(([rx, ry], i) => { const px = ox + (rx + .5) * cs, py = oy + (ry + .5) * cs; if (i) x.lineTo(px, py); else x.moveTo(px, py); }); x.stroke(); x.setLineDash([]);
+      x.fillStyle = 'rgba(228,0,43,.3)'; for (const [rx, ry] of r) x.fillRect(ox + rx * cs, oy + ry * cs, cs, cs);
+      if (cs >= 12) { x.fillStyle = '#fff'; x.font = 'bold ' + Math.round(cs * .45) + 'px Barlow, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; r.forEach(([rx, ry], i) => x.fillText(String(i + 1), ox + (rx + .5) * cs, oy + (ry + .5) * cs)); }
+    }
     if (so?.k === 'gatilho' && so.f === f.id) { x.fillStyle = 'rgba(80,200,255,.32)'; for (const [zx, zy] of (E.drag?.tool === 'zona' && E.drag.casas) || so.cfg?.casas || []) x.fillRect(ox + zx * cs, oy + zy * cs, cs, cs); } // zona do gatilho
     if (E.rect) { const [a, b] = E.rect, x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]); x.fillStyle = 'rgba(255,201,60,.25)'; x.strokeStyle = '#ffc93c'; x.lineWidth = 1.5; x.fillRect(ox + x0 * cs, oy + y0 * cs, (Math.abs(a[0] - b[0]) + 1) * cs, (Math.abs(a[1] - b[1]) + 1) * cs); x.strokeRect(ox + x0 * cs, oy + y0 * cs, (Math.abs(a[0] - b[0]) + 1) * cs, (Math.abs(a[1] - b[1]) + 1) * cs); }
     if (E.hover?.e) { const [k, hx, hy] = E.hover.e; x.strokeStyle = 'rgba(255,201,60,.9)'; x.lineWidth = 3; x.beginPath(); if (k === 'h') { x.moveTo(ox + hx * cs, oy + hy * cs); x.lineTo(ox + (hx + 1) * cs, oy + hy * cs); } else { x.moveTo(ox + hx * cs, oy + hy * cs); x.lineTo(ox + hx * cs, oy + (hy + 1) * cs); } x.stroke(); }
@@ -230,6 +236,7 @@
       if (hit && hit[1] < .8) Object.assign(E.drag, { hero: hit[0].id, x: hit[0].pos.x, z: hit[0].pos.z }); else E.drag = null;
     }
     else if (T === 'zona') { E.drag.zona = null; zonaPut(cx, cy, E.drag); }
+    else if (T === 'rota') { E.drag = null; rotaPut(cx, cy, e.shiftKey); }
     else if (T === 'chamar') { E.drag = null; E.tool = 'sel'; if (inF(f, cx, cy)) callAll(f, w, cx, cy); render(); }
     else { E.drag = null; const ed = edgeAt(p.fx, p.fy, f), ow = ed && ownerAt(w, f.id, ...ed)[0]; E.sel = ow || (inF(f, cx, cy) ? objAt(w, f.id, cx, cy) : null) || null; render(); } // sel
     draw();
@@ -342,7 +349,7 @@
         <label>Age sozinho${sel('data-mi="@auto"', [['', 'Padrão da mesa'], ['sim', 'Sim'], ['nao', 'Não: vira pedido']], o.auto === true ? 'sim' : o.auto === false ? 'nao' : '')}</label>
         ${o.k === 'porta' || o.k === 'barreira' ? '' : `<label>Giro${sel('data-mi="@rot"', [[0, '0°'], [1, '90°'], [2, '180°'], [3, '270°']], o.rot)}</label>`}
         ${(CAMPOS[o.k] || []).map(c => field(o, c)).join('')}
-        ${o.k === 'gatilho' ? acoesG(o) : o.k === 'npc' ? dialogo(o) : ''}
+        ${o.k === 'gatilho' ? acoesG(o) : o.k === 'npc' ? dialogo(o) : o.k === 'inimigo' ? rotaG(o) : ''}
       </div></aside>`;
   }
   function onInspect(el) {
@@ -407,6 +414,8 @@
     else if (k === 'tatNext') snd({ t: 'tatNext' });
     else if (k === 'chamar') { E.tool = E.tool === 'chamar' ? 'sel' : 'chamar'; render(); }
     else if (k === 'zona') { E.tool = E.tool === 'zona' ? 'sel' : 'zona'; render(); }
+    else if (k === 'rota') { E.tool = E.tool === 'rota' ? 'sel' : 'rota'; render(); }
+    else if (k === 'rotaX') editSel(v => { v.cfg.rota = []; });
   });
 
   // ----- diálogo do NPC e ações do gatilho (Task 5.2) -----
@@ -449,6 +458,16 @@
   }
   function onAcao(el) { editSel(o => { const [i, k] = el.dataset.mg.split('.'); o.cfg.acoes[+i][k] = el.value; }); }
   function onAcaoBtn(b) { const [k, i] = b.dataset.mgx.split(':'); editSel(o => { o.cfg.acoes ||= []; if (k === 'add') o.cfg.acoes.push({ k: 'texto', alvo: '', v: '' }); else o.cfg.acoes.splice(+i, 1); }); }
+  // ferramenta rota: cada clique põe a casa no fim da patrulha do inimigo selecionado (Shift+clique tira); ele anda em vaivém
+  function rotaG(o) {
+    const n = o.cfg?.rota?.length || 0;
+    return `<div class="medit-dlg"><b>Patrulha</b><button type="button" data-m3="rota" class="${E.tool === 'rota' ? 'on' : ''}" aria-pressed="${E.tool === 'rota'}" title="Clique nas casas do grid, na ordem do caminho; Shift+clique tira uma casa">Desenhar rota (${n} casas)</button>${n ? '<button type="button" data-m3="rotaX">Limpar a rota</button>' : ''}<small>Com rota e modo patrulha, ele vai e volta pelas casas.</small></div>`;
+  }
+  function rotaPut(cx, cy, tira) {
+    const w = world(), o = w?.objs?.[E.sel], f = floor(); if (o?.k !== 'inimigo' || !f || !inF(f, cx, cy) || o.f !== f.id) return;
+    if (!tira && P.blocksWalk(P.cell(f, cx, cy))) { if (typeof toast === 'function') toast('Essa casa não dá passagem: escolha outra para a rota.', 'no'); return; }
+    editSel(v => { const r = v.cfg.rota || []; v.cfg.rota = tira ? r.filter(([x, y]) => x !== cx || y !== cy) : r.length < 64 ? [...r, [cx, cy]] : r; if (!tira && v.cfg.modo === 'parado') v.cfg.modo = 'patrulha'; });
+  }
   // ferramenta zona: arrastar põe casas no gatilho selecionado (ou tira, se a primeira casa já era da zona)
   // (junta as casas no próprio arrasto e manda uma op só ao soltar: re-renderizar no meio trocaria o canvas sob o ponteiro)
   function zonaPut(cx, cy, d) {
