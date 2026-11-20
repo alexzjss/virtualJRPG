@@ -390,7 +390,7 @@ body.ui-pincel .pcm-mesa .mz-top>[aria-expanded=true]{border-color:var(--pc-ouro
 .pcm-mesa .mz-thumb{height:150px}
 .pcm-mesa .mz-thumb::after{background:linear-gradient(transparent 35%,#08090bf0)}
 .pcm-mesa .mz-thumb b{bottom:10px;font:600 25px/1.05 var(--pc-disp);text-shadow:0 2px 8px #000}
-.pcm-mesa .mz-tags em{font:italic 14px var(--pc-disp);background:#08090bcc;padding:1px 8px}.pcm-mesa .mz-tags em.tv{background:var(--pc-ouro)}
+.pcm-mesa .mz-tags em{font:italic 14px var(--pc-disp);background:#08090bcc;padding:1px 8px}
 .pcm-mesa .mz-bat{position:relative;isolation:isolate;margin:6px 8px 0;padding:6px 16px 8px;background:none;font:italic 600 16px var(--pc-disp);color:#f3a7b3}
 .pcm-mesa .mz-bat::before{content:"";position:absolute;inset:0 -4px;z-index:-1;background:#2a0d13;-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
 .pcm-mesa .mz-bat:hover,.pcm-mesa .mz-bat.wait{background:none;color:#fff6dc}

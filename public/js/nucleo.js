@@ -21,7 +21,7 @@ const gen = { el: 'kagutsuchi', role: 'bruto', rank: 'comum' }, ROLEN = { bruto:
 // mesma referência do servidor: heróis na cena e poder do grupo (média dos três maiores atributos)
 const partyRef = () => { const pcs = Object.values(S.chars).filter(c => !c.enemy && !c.dead && c.scene === S.scene), top3 = c => A.map(a => c.attrs[a]).sort((x, y) => y - x).slice(0, 3).reduce((a, b) => a + b, 0) / 3; return { n: pcs.length || 4, p: pcs.length ? Math.round(pcs.reduce((a, c) => a + top3(c), 0) / pcs.length) : 58 }; };
 const ent = id => S.chars[id] || S.bestiary?.[id]; // personagem em jogo ou modelo do bestiário
-const WIN = { sessao: ['Sessão', 440], best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Chat', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720], ofcat: ['Catálogo de ofícios', 780], armas: ['Forja de armas', 1120] };
+const WIN = { sessao: ['Sessão', 440], best: ['Bestiário', 820], chase: ['Perseguição', 380], cena: ['Cena', 330], batalha: ['Batalha', 600], ini: ['Iniciativa', 300], fichas: ['Fichas', 400], chat: ['Registro', 340], skills: ['Skills', 1000], items: ['Itens e loja', 720], ofcat: ['Catálogo de ofícios', 780], armas: ['Forja de armas', 1120] };
 const LAYD = { Exploração: ['cena', 'chat'], Batalha: ['batalha', 'ini', 'chat', 'fichas'], Preparo: ['cena', 'best', 'items'], Armas: ['armas'] }; // arranjos de janelas
 const view = { z: 1, x: 0, y: 0 }; // zoom e deslocamento do mapa (local de cada tela)
 let ctx = null, pan = null, ruler = null, spaceDown = false, zc = 1, pings = [];
@@ -41,12 +41,12 @@ const ls = (k, v) => { try { if (v === undefined) return localStorage[k] || ''; 
 try { const h = new URLSearchParams(location.hash.slice(1)).get('vj'); if (h) { const o = JSON.parse(decodeURIComponent(escape(atob(h.replace(/-/g, '+').replace(/_/g, '/'))))); ls('vj_name', o.n || ''); ls('vj_pass', o.p || ''); history.replaceState(null, '', location.pathname); } } catch {}
 const asWho = role === 'player' ? new URLSearchParams(location.search).get('as') : null, ctl = !!asWho && new URLSearchParams(location.search).has('ctl'); // o mestre olhando a tela de um jogador, ou jogando por ele (ctl)
 let name = asWho || (role === 'gm' ? '' : ls('vj_name')), pass = role === 'gm' || asWho ? '' : ls('vj_pass'), key = gm || asWho ? ls('vj_key') : '';
-const loginForm = msg => { // gm: só a chave; jogador: login e senha; mesa: conta de jogador ou "mestre" + chave
+const loginForm = msg => { // gm: só a chave; jogador: login e senha
   document.body.classList.remove('off');
-  app.innerHTML = `<form class="card login" id="login"><h3>${gm ? 'Chave do mestre' : role === 'table' ? 'Mesa (TV)' : 'Entrar na campanha'}</h3>${msg ? `<p class="msg">${esc(msg)}</p>` : ''}
+  app.innerHTML = `<form class="card login" id="login"><h3>${gm ? 'Chave do mestre' : 'Entrar na campanha'}</h3>${msg ? `<p class="msg">${esc(msg)}</p>` : ''}
     ${gm ? '' : `<label>Login<input name="n" autocomplete="username" required value="${esc(name)}"></label>`}
     <label>${gm ? 'Chave (aparece na janela do programa e em data/gm-key.txt)' : 'Senha'}<input name="p" type="password" autocomplete="current-password" required></label>
-    <small>${gm ? '' : role === 'table' ? 'Use a conta de um jogador, ou o login <b>mestre</b> com a chave do mestre.' : 'O login e a senha são criados pelo mestre. Esqueceu? Peça a ele uma senha nova.'}</small>
+    <small>${gm ? '' : 'O login e a senha são criados pelo mestre. Esqueceu? Peça a ele uma senha nova.'}</small>
     <button class="own">Entrar</button></form>`;
   const f = app.querySelector('#login'); f.querySelector('input:not([value]),input[value=""],input[type=password]')?.focus();
   f.onsubmit = e => { e.preventDefault(); const d = new FormData(f); if (gm) ls('vj_key', key = d.get('p')); else { ls('vj_name', name = d.get('n').trim()); ls('vj_pass', pass = d.get('p')); } app.textContent = 'Conectando…'; connect(); };
@@ -86,7 +86,7 @@ const chips = (obj, fn) => Object.entries(obj).map(([k, v]) => fn(k, v)).join(''
 
 // ícones da navegação (traço simples, herdam a cor do texto)
 const IC = { mesa: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>', pers: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 4-7 8-7s7 2 8 7"/>', hab: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M11 7l-5 9M13 7l5 9M7 18h10"/>',
-  itens: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 016 0v2"/>', hist: '<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/><path d="M9 9h6M9 13h6"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/>', ofi: '<path d="M13 4l7 7-3 3-7-7z"/><path d="M11 9l-7 7 4 4 7-7"/>' };
+  itens: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 016 0v2"/>', hist: '<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/><path d="M9 9h6M9 13h6"/>', reg: '<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>', ofi: '<path d="M13 4l7 7-3 3-7-7z"/><path d="M11 9l-7 7 4 4 7-7"/>' };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const ATN = { FOR: 'Força', CON: 'Constituição', DES: 'Destreza', AGI: 'Agilidade', INT: 'Inteligência', SAB: 'Sabedoria', CAR: 'Carisma', SOR: 'Sorte' };
 const toast = (text, kind = '', why = '') => { // aviso curto no canto (aprovado, negado, lembretes)

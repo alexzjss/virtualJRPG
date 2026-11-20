@@ -16,7 +16,6 @@
 .mz-thumb b{position:absolute;left:10px;right:10px;bottom:6px;z-index:1;font:400 20px var(--disp);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mz-tags{position:absolute;right:6px;top:6px;z-index:1;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .mz-tags em{font:600 11px var(--cond);font-style:normal;text-transform:uppercase;background:#000c;padding:2px 6px;letter-spacing:.4px}
-.mz-tags em.tv{background:var(--gold);color:#000}
 .mz-bat{all:unset;box-sizing:border-box;display:block;background:var(--red2);padding:5px 10px;font:600 13px var(--cond);text-transform:uppercase;cursor:pointer}
 .mz-bat:hover,.mz-bat:focus-visible{background:var(--red)}
 .mz-bat.wait{background:var(--red);animation:mzpul 1.2s ease-in-out infinite alternate}

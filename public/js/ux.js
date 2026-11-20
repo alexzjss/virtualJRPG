@@ -74,8 +74,8 @@ const zoomBy = k => { const w = app.querySelector('.mapwrap'); if (!w) return; c
   Object.assign(view, { x: px - (px - view.x) * z / view.z, y: py - (py - view.y) * z / view.z, z }); applyView(); };
 
 // ===== histórico: filtro e hora =====
-let logF = ls('vj_logf');
-const LOGF = { '': 'Tudo', chat: 'Conversa', roll: 'Rolagens' };
+const LOGF = { '': 'Tudo', roll: 'Rolagens' };
+let logF = ls('vj_logf'); if (logF && !(logF in LOGF)) logF = ''; // o filtro "Conversa" saiu junto com o chat
 function logTools() {
   app.querySelectorAll('.log').forEach(lg => {
     lg.dataset.lf = logF;

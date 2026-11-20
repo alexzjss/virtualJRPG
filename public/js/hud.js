@@ -46,7 +46,7 @@ const HUD = (() => {
     if (body === hovBB) return; hovBB = body;
     if (!(body && LEQUE.hover(body))) handNow(); }); // na mira, passar o mouse troca o alvo (o render chama handNow)
   const topo = (o) => { const lines = S.log.filter(l => !l.to).slice(-3);
-    const icons = o.table || o.gm ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Chat" aria-pressed="${chatOpen}">${ico('chat')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
+    const icons = o.table || o.gm ? '' : `<div class="icons"><button type="button" class="ib" data-a="navT" aria-label="Menu" aria-expanded="${navOpen}">☰</button><button type="button" class="ib ${chatOpen ? 'on' : ''}" data-a="chatT" aria-label="Registro" aria-pressed="${chatOpen}">${ico('reg')}${o.unread ? `<i class="n">${o.unread > 9 ? '9+' : o.unread}</i>` : ''}</button></div>`;
     const menu = navOpen && !o.table && !o.gm ? `<nav class="hud-menu" aria-label="Páginas">${chips(PAGES, (k, l) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${ico(k)}<span>${k === 'mesa' ? 'Batalha' : l}</span></button>`)}</nav>` : '';
     return `<div class="hud-tr">${icons}${menu}${fieldBar()}<div class="hlog" aria-live="polite">${lines.map(l => `<div><b>${esc(l.who)}</b> ${esc(l.text)}</div>`).join('')}</div></div>`; };
   // minimapa: o mapa da cena em ponto pequeno, logo abaixo da ordem dos turnos; arrastar o próprio ponto move o token (o servidor confere o dono)
@@ -153,7 +153,7 @@ const HUD = (() => {
       l = Math.round(Math.max(10, l)); const t = Math.round(Math.max(110 * hk, Math.min(560 * hk, r.top - hr.top + r.height * .15)));
       Object.assign(w.style, { left: l + 'px', top: t + 'px', opacity: '' }); pos = { id: w.dataset.sid, l, t };
     },
-    // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
+    // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: linhas novas no registro; table: versão da mesa (sem ícones nem dicas)
     html({ actorId = null, dim = false, unread = 0, table = false, gm: gmO = false, mini = false } = {}) {
       if (mini) { const hs = Object.values(S.chars).filter(c => !c.enemy && !c.npc && !c.dead && c.scene === S.scene && (c.pos || c.x != null)); return hs.length ? `<div class="hudw mhmini"><div class="hud-br">${grupo(hs, null)}</div></div>` : ''; } // exploração no mundo 3D: só as fichas, a 70%
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table, gm: gmO }, x = gmO ? LEQUE.ctx() : null;

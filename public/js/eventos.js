@@ -39,8 +39,7 @@ function goAct(id) { skQ = ''; if (pick.k === 'sk' && selfSk(SK(pick.id))) tgt =
   if (s1?.cmd && s1.cmd !== 'choque' && who && !who.enemy && !gm && typeof runCmd === 'function') { runCmd(msg.skill, who, S.chars[tgt], cmd => send({ ...msg, cmd })); return; } // minigame de ataque: a nota vai junto no `act`
   send(msg);
 }
-const sayChat = el => { if (el?.value.trim()) { send({ t: 'chat', text: el.value, secret }); el.value = ''; } };
-app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest?.('.skfind2')) { e.preventDefault(); e.stopPropagation(); return skNextHit(); } if (e.key === 'Enter' && e.target.dataset.chat) sayChat(e.target); if (e.key === 'Enter' && e.target.dataset.rqtxt) { e.preventDefault(); send({ t: 'reqOk', id: e.target.dataset.rqtxt, ...reqUi[e.target.dataset.rqtxt] }); } });
+app.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest?.('.skfind2')) { e.preventDefault(); e.stopPropagation(); return skNextHit(); } if (e.key === 'Enter' && e.target.dataset.rqtxt) { e.preventDefault(); send({ t: 'reqOk', id: e.target.dataset.rqtxt, ...reqUi[e.target.dataset.rqtxt] }); } });
 app.addEventListener('focusout', e => {
   if (e.target.dataset?.edin && editing) return commitEd(e.target);
   // campo restaurado após redesenho não dispara "change" sozinho: dispara aqui para não perder a edição
@@ -110,7 +109,6 @@ app.addEventListener('click', e => {
   if (d.a === 'reframe') return send({ t: 'battleReframe' });
   if (d.a === 'navT') { navOpen = !navOpen; return render(); }
   if (d.a === 'chatT') { chatOpen = !chatOpen; return render(); }
-  if (d.a === 'chatSend') return sayChat(e.target.closest('.chatin').querySelector('input'));
   if (d.a === 'meT') { meOpen = !meOpen; return render(); }
   if (d.a === 'itab') { itab = d.k; return render(); }
   if (d.a === 'aimT') { aimOpen = !aimOpen; return render(); }
@@ -167,7 +165,7 @@ app.addEventListener('click', e => {
   if (d.a === 'userAdd') { const n = sess.n.trim(), p = sess.p || genPass(); if (!n) return toast('Escreva o login.', 'no'); send({ t: 'userAdd', name: n, pass: p, char: sess.ch }); sess.last = { n, p }; sess.n = ''; sess.p = ''; sess.ch = ''; return render(); }
   if (d.a === 'userPass') { const p = prompt(`Senha nova para ${d.k}:`, genPass()); if (!p) return; send({ t: 'userPass', name: d.k, pass: p }); sess.last = { n: d.k, p }; return render(); }
   if (d.a === 'replay') { replayAct(+d.n); return; } // rever o golpe, só nesta tela
-  if (d.a === 'logClear') { if (confirm('Apagar todo o chat e o histórico para todos? Não dá para desfazer.')) send({ t: 'logClear' }); return; }
+  if (d.a === 'logClear') { if (confirm('Apagar o registro para todos? Não dá para desfazer.')) send({ t: 'logClear' }); return; }
   if (d.a === 'userDel') { if (confirm(`Apagar a conta ${d.k}? Os personagens dela ficam sem dono.`)) send({ t: 'userDel', name: d.k }); return; }
   if (d.a === 'giveChar') { const id = prompt('Qual personagem? Digite o número:\n' + heroes().map((c, i) => `${i + 1}. ${c.name}${c.owner ? ' (de ' + c.owner + ')' : ''}`).join('\n')); const c = heroes()[+id - 1]; if (c) send({ t: 'set', id: c.id, f: 'owner', v: d.k }); return; }
   if (d.a === 'freeChar') return send({ t: 'set', id: d.id, f: 'owner', v: '' });
@@ -278,7 +276,6 @@ document.addEventListener('keydown', e => {
   if (!gm && S.battle.active && !S.battle.cmd && app.querySelector('.cmd.mine .skw') && skKey(e)) { e.preventDefault(); return; } // seletor de skills: filtro por letras e Shift+F fixa
   if (gm && (e.key === 'Enter' || e.key === 'Delete')) { const first = Object.entries(S.reqs).sort((a, b) => a[1].n - b[1].n)[0]; if (first) { e.preventDefault(); return send(e.key === 'Enter' ? { t: 'reqOk', id: first[0], ...reqUi[first[0]] } : { t: 'reqNo', id: first[0] }); } }
   if (e.key === 'Enter' && !gm && S.battle.active) { const go = app.querySelector('.cmd.mine .cmd-go .go:not(:disabled)'); if (go && !e.target.matches('button')) { e.preventDefault(); go.click(); return; } } // na sua vez, Enter age
-  if (e.key === 'Enter') { const c = app.querySelector('.chat'); if (c) { e.preventDefault(); c.focus(); } return; }
   if (e.key === '0') { Object.assign(view, { z: 1, x: 0, y: 0 }); return applyView(); }
   if (!S.battle.active) return;
   if (e.key === 'Tab') { // percorre os alvos vivos
