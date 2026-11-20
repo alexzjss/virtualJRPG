@@ -112,13 +112,14 @@ function materials(T, pal) {
 
 const IMG = new Map(); // url → Promise<canvas>: a imagem rasterizada uma vez (SVG só com viewBox não sobe direto para a GPU)
 const MAXPX = 2048;
-function raster(url) {
-  if (!IMG.has(url)) IMG.set(url, new Promise((ok, no) => {
+export function raster(url, max = MAXPX) {
+  const key = max + "|" + url;
+  if (!IMG.has(key)) IMG.set(key, new Promise((ok, no) => {
     const im = new Image(); im.crossOrigin = 'anonymous';
-    im.onload = () => { const k = MAXPX / Math.max(im.naturalWidth || 1, im.naturalHeight || 1), cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round((im.naturalWidth || 1) * k)); cv.height = Math.max(1, Math.round((im.naturalHeight || 1) * k)); cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); ok(cv); };
+    im.onload = () => { const k = max / Math.max(im.naturalWidth || 1, im.naturalHeight || 1), cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round((im.naturalWidth || 1) * k)); cv.height = Math.max(1, Math.round((im.naturalHeight || 1) * k)); cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); ok(cv); };
     im.onerror = no; im.src = url;
   }));
-  return IMG.get(url);
+  return IMG.get(key);
 }
 // o chão começa na cor do tema e ganha a imagem (recortada pelo crop) quando ela chega
 function paintImg(T, mat, img) {

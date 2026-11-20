@@ -59,3 +59,14 @@ test('colisão: quem está dentro de casa bloqueante consegue sair', () => {
   const f = sala(s => s.c(5, 5, 'baixo'));
   const p = C.slide(f, {}, { x: 5.5, z: 5.5 }, 0, 1); assert.ok(p.z > 6);
 });
+
+// recorte do ator: costas ao andar para longe da câmera, espelho ao andar para a esquerda da tela (guinada 45° = câmera em +x,+z)
+test('atores: frente, costas e espelho seguem o rumo contra a câmera', async () => {
+  const { facing } = await import('../public/js/mundo3d-atores.js');
+  const yaw = Math.PI / 4, rumo = (x, z) => Math.atan2(x, z);
+  assert.deepEqual(facing(rumo(-1, -1), yaw), { back: true, mirror: false }); // para longe da câmera
+  assert.deepEqual(facing(rumo(1, 1), yaw), { back: false, mirror: false }); // vindo para a câmera
+  assert.equal(facing(rumo(-1, 1), yaw).mirror, true); // esquerda da tela
+  assert.equal(facing(rumo(1, -1), yaw).mirror, false); // direita da tela
+  assert.equal(facing(rumo(1, -1), yaw + Math.PI).mirror, true); // girar a câmera 180° troca o lado
+});

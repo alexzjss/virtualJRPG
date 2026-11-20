@@ -55,8 +55,8 @@ function target(f, now) {
 }
 function frame(now) {
   if (!running) return;
-  const dt = Math.min(.1, (now - (lastT || now)) / 1000); lastT = now;
-  fpsBuf.push(dt); if (fpsBuf.length > 90) fpsBuf.shift();
+  const dt = Math.max(0, Math.min(.1, (now - (lastT || now)) / 1000)); lastT = Math.max(lastT, now); // relógio que volta (quadro manual + rAF) não pode dar dt negativo
+  if (dt > 0) { fpsBuf.push(dt); if (fpsBuf.length > 90) fpsBuf.shift(); }
   const w = worldOf(), f = floorFor(w);
   if (view.yawT) { const k = Math.min(1, (now - view.yawT) / ROT_MS), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; view.yaw = view.yaw0 + (Math.PI / 4 + view.yawK * Math.PI / 2 - view.yaw0) * e; if (k >= 1) view.yawT = 0; }
   const t = target(f, now), s = 1 - Math.exp(-dt * 8); view.tx += (t.x - view.tx) * s; view.tz += (t.z - view.tz) * s;
@@ -116,5 +116,5 @@ addEventListener('keydown', e => { if (!running || typing() || e.ctrlKey || e.al
 let wheelT = 0;
 addEventListener('wheel', e => { if (!running || !e.target.closest?.('[data-mundo]')) return; e.preventDefault(); const t = performance.now(); if (t - wheelT < 180) return; wheelT = t; zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
-globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, draw: () => { if (running) frame(performance.now()); }, T };
+globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, draw: (t = performance.now()) => { if (running) frame(t); }, jump: id => actors?.jump(id), T };
 if (typeof render === 'function') try { render(); } catch {}
