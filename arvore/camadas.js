@@ -311,11 +311,41 @@ function evoluir(el, ramos, linhas, raiz, plano, layerOf) {
     if (!mexeu) break;
   }
 }
+
+// Coerência dos ramos (Leva 12): técnicas sem relação não dividem ramo. Dois nós da MESMA camada (mesma casa, então camadas, kit, Limites e linhas ficam como estão)
+// trocam de ramo dentro do setor quando cada um combina mais com o ramo do outro (função, efeito, tema e palavras do nome).
+const PALAVRAS = /[a-zà-ú]{4,}/g, PARADAS = new Set(['para', 'como', 'todo', 'toda', 'todos', 'sobre', 'mais', 'menos', 'sem', 'com', 'uma', 'que', 'nos', 'das', 'dos', 'ritual', 'aperfeiçoamento']);
+const AFIN = new WeakMap();
+const afin = s => { let a = AFIN.get(s); if (!a) { a = familia(s); for (const w of s.n.toLocaleLowerCase('pt-BR').match(PALAVRAS) || []) if (!PARADAS.has(w)) a.add('w:' + w.replace(/(s|a|o)$/, '')); AFIN.set(s, a); } return a; };
+const jac = (a, b) => { let same = 0; for (const x of a) if (b.has(x)) same++; return same / Math.max(1, a.size + b.size - same); };
+export const AFINACOES = [];
+function afinar(el, ramos, raiz) {
+  const livres = ramos.filter(b => b !== raiz && !b.some(s => s.v2)); // ramos de combinação (v2) têm ligação própria em ligarRamos
+  const peso = (i, j) => (Math.abs(i - j) <= 1 ? 2 : 1);
+  const aff = (s, b, i, fora) => { let t = 0, w = 0; b.forEach((o, j) => { if (o === fora || o === s) return; const p = peso(i, j); t += p * jac(afin(s), afin(o)); w += p; }); return w ? t / w : 0; };
+  const kits = b => b.filter(s => KIT.has(s.n)).length;
+  const preso = s => s.duo || s.trio;
+  for (let volta = 0; volta < 6; volta++) {
+    let mexeu = 0;
+    for (let i = 0; i < CAM; i++) {
+      const cel = livres.filter(b => b[i] && !preso(b[i]));
+      for (let x = 0; x < cel.length; x++) for (let y = x + 1; y < cel.length; y++) {
+        const A = cel[x], B = cel[y], a = A[i], b = B[i]; if (!a || !b || a === b) continue;
+        const atual = aff(a, A, i) + aff(b, B, i), troca = aff(a, B, i, b) + aff(b, A, i, a);
+        if (troca - atual < 0.06) continue;
+        const dk = (KIT.has(a.n) ? 1 : 0) - (KIT.has(b.n) ? 1 : 0);
+        if ((kits(A) - dk > Math.max(5, kits(A))) || (kits(B) + dk > Math.max(5, kits(B)))) continue;
+        A[i] = b; B[i] = a; mexeu++; AFINACOES.push(`${el}: ${a.n} ⇄ ${b.n} (camada ${i + 1})`);
+      }
+    }
+    if (!mexeu) break;
+  }
+}
 export const LINHAS = []; // linhas de variação que não chegam à camada 10 (a Leva 10 completa todas)
 const temaDe = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return ['ofensiva', 'controle', 'defesa', 'maestria', 'especial'][c.indexOf(Math.max(...c))]; };
 const vaga = (el, ramo, b, tema) => { if (b.length < CAM) VAGAS.push({ el, ramo, tem: b.length, faltam: Array.from({ length: CAM - b.length }, (_, k) => b.length + k + 1), tema: tema || temaDe(b) }); };
 export function camadas(TREE, preencher) {
-  VAGAS.length = 0; EVOLUCOES.length = 0;
+  VAGAS.length = 0; EVOLUCOES.length = 0; AFINACOES.length = 0;
   const plano = []; // [nó, camada, casa]: primeiro decide tudo, depois aplica (duplas acertam a camada juntas)
   const layerOf = new Map(), marca = (s, L, i) => { plano.push([s, L, i]); layerOf.set(s.n, L); };
   for (const [el, t] of Object.entries(TREE)) {
@@ -331,6 +361,7 @@ export function camadas(TREE, preencher) {
     for (const b of fixos) b.forEach((s, i) => { marca(s, i + 1, 0); if (b === t.branches[1]) TREINO.add(s); else if (s.k === 'passive') FLAT.set(s, [s.p, s.xp]); }); // ramos iniciais do Marcial: a posição também é a camada
     t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; ordenar(b, b === raiz); b.forEach((s, i) => marca(s, i + 1, i)); vaga(el, bi, b); });
     evoluir(el, t.branches.filter(b => !b.de && !fixos.has(b)), t.branches.filter(b => b.de), raiz, plano, layerOf);
+    afinar(el, t.branches.filter(b => !b.de && !fixos.has(b)), raiz);
   }
   // Árvore de Armas: cada tipo tem 3 ramos (o 1º leva o nome do tipo); o excesso passa para o irmão mais curto; os primordiais só ordenam
   const A = TREE.armas;
