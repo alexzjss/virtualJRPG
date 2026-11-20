@@ -4,3 +4,12 @@
 .mw3d{position:fixed;z-index:5;pointer-events:none;display:block}
 .mundo-slot{position:relative;display:block;height:calc(100vh - 120px);min-height:360px;border-radius:6px;overflow:hidden;background:transparent;outline:none}
 .mundo-slot>*{position:relative;z-index:6}
+/* editor do mestre (vista Mundo): grid 2D à esquerda, divisor, 3D ao vivo à direita; a largura do grid é --medw (gui.medW) */
+.medit{display:grid;grid-template-columns:var(--medw,50%) 8px 1fr;height:calc(100vh - 150px);min-height:360px;gap:0}
+.medit-2d{position:relative;min-width:0;background:#0b0b10;border-radius:6px 0 0 6px;overflow:hidden}
+.medit-cv{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.medit-info{position:absolute;left:8px;top:6px;padding:2px 8px;background:#0009;border-radius:4px;font-size:12px;pointer-events:none}
+.medit-info small{color:var(--dim,#a8a5b2)}
+.medit-div{display:block;cursor:col-resize;background:var(--line,#34343d);transition:background .15s}
+.medit-div:hover{background:var(--gold,#ffc93c)}
+.medit .medit-3d{height:auto;min-height:0;border-radius:0 6px 6px 0}

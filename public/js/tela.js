@@ -63,7 +63,7 @@ function render() {
       <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
     dockFix();
     const body = { ...xWins(), ...(gui.sheet && ent(gui.sheet.slice(2)) ? { [gui.sheet]: gmSheet(ent(gui.sheet.slice(2))) } : {}), pedidos: gui.R === 'pedidos' && sideOpen('R') ? reqStrip() : '', sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
-    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, ((lq) => HUD.gm() + lq)(bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '')) : null; setApp(`${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? map() : '', mesa: gui.view === 'mesa' ? MESA.html() : '' })}${cropper()}${ctxMenu()}`);
+    const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, ((lq) => HUD.gm() + lq)(bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '')) : null; setApp(`${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? (mundoOn() && window.MEDIT ? MEDIT.html() : map()) : '', mesa: gui.view === 'mesa' ? MESA.html() : '' })}${cropper()}${ctxMenu()}`);
   } else if (role === 'player') {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], _hs = c && !asWho && c.id !== lastHero && (lastHero = c.id, send({ t: 'activeHero', id: c.id })), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) { pg = 'mesa'; if (innerWidth > 700) chatOpen = false; navOpen = false; } // a batalha começou: leva o jogador para a mesa (no PC o chat só abre por cima, quando pedido)
@@ -92,7 +92,7 @@ function render() {
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   PALCO3D.local.aim = LEQUE.camTarget(); // liga a vista tática da mira e ancora a linha de alcance (hover não faz o palco oscilar)
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
-  window.MUNDO?.sync(S, { role, me: role === 'player' ? lastHero : null, follow: role === 'player' ? lastHero : null });
+  window.MUNDO?.sync(S, { role, me: role === 'player' ? lastHero : null, follow: role === 'player' ? lastHero : null, edit: role === 'gm' && gui.view === 'mapa', floor: role === 'gm' ? window.MEDIT?.floor : undefined });
   if (typeof LEQUE !== 'undefined') LEQUE.lift(); // a coluna de comandos vai para o topo do #app (acima do palco)
   fx();
 }
