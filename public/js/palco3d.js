@@ -2,6 +2,7 @@
 // O mundo mora fora do #app (fixo no body) e é atualizado por diferença; o #app só guarda um retângulo vazio ([data-p3d]).
 // formation/cameraFor/imgSrc são puros (testados no Node); o que usa document fica dentro de sync e das funções que ele chama.
 (g => {
+  const ESC_PERS = 1.25; // escala geral dos personagens no palco (1 = antiga)
   const POS_H = [[-430, 0], [330, 60], [610, -120], [90, -200]], COLS_F = 5; // heróis: 4 por fileira; inimigos: arco de 5
   const n0 = v => v + 0; // evita -0
   // ----- grid → mundo -----
@@ -120,7 +121,7 @@
       b = clamp(Math.ceil(b / 10) * 10, 0, 1400);
       r = { tx, ty: Math.round(b * .08), tz: tz0 - b, ry };
       if (ln) { const ka = PERSP / Math.max(160, PERSP - (A.z + r.tz)); const W = v.w || 1440, mx = ln.side > 0 ? W / 2 + SX * ka - W * .3 : W * .7 - (W / 2 + SX * ka); r.tx = tx - ln.side * Math.max(0, Math.min(ln.w * .55, W * .25, mx)) / ka; } // a faixa da coluna: o ator sai da frente dela, em pixels de tela (ka: escala do ator depois do recuo)
-    } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x, ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 2.8), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
+    } else if (v.kind === 'zoom') { const ry = v.ry || 0, T = rotP(t, ry), th = t.h || 330; r = { tx: -T.x + (v.sx || 0), ty: -clamp(Math.round(th * .1), 40, 140), tz: -T.z - clamp(Math.round(420 + Math.max(0, th - 380) * 2.8), ZMIN, ZMAX), ry }; } // distância cresce com a altura da figura (corpo inteiro), com piso e teto
     else if (v.kind === 'orbit') { const ry = (v.ry0 || 0) + (v.deg || 0), A = rotP(a, ry); r = { tx: -A.x, ty: -60, tz: -A.z - ORB - (v.back || 0), ry }; } // arco cinematográfico em volta de quem age (de longe: a figura e a aura cabem)
     else if (v.kind === 'aim') r = { tx: -(a.x * .55 + t.x * .45) - 120, ty: 0, tz: -a.z + 380, ry: a.x < 0 ? -4 : 4 };
     else if (v.kind === 'foe') r = { tx: -a.x * .3, ty: 0, tz: 180, ry: 0 };
@@ -209,7 +210,7 @@
   };
 
   // estado só deste navegador, lido por cameraFor via view(); mode: vista escolhida (ombro, lateral, aérea), pitch: inclinação manual
-  const MODES = ['ombro', 'side', 'tres', 'diag', 'frente', 'baixa', 'aerial'], MODE_NAME = { ombro: 'Ombro', side: 'Lateral', tres: 'Três-quartos', diag: 'Diagonal', frente: 'Frontal', baixa: 'Heroica', aerial: 'Aérea' };
+  const MODES = ['ombro', 'foco', 'side', 'tres', 'diag', 'frente', 'baixa', 'aerial'], MODE_NAME = { ombro: 'Ombro', foco: 'Foco no atual', side: 'Lateral', tres: 'Três-quartos', diag: 'Diagonal', frente: 'Frontal', baixa: 'Heroica', aerial: 'Aérea' };
   const FREE = false; // câmera travada: só as posições fixas (V / botão); gire, incline e deslize à mão ligando FREE
   const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } }, lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const local = { aim: null, zoom: null, orbit: 0, px: 0, pz: 0, pitch: 0, mode: MODES.includes(lsGet('vj_cam_mode')) ? lsGet('vj_cam_mode') : 'ombro' };
@@ -308,9 +309,10 @@
     const cur = S.chars[timeline(1)[0]], at = id => F.get(id) || { x: 0, z: 0 }, pts = [...F].map(([id, p]) => ({ x: p.x, z: p.z, h: parseFloat(els.get(id)?.h) || 330 })), w = root?.clientWidth || 1440; // pontos com a altura real da figura
     const tbl = id => ({ kind: 'table', at: at(id), pts, w, h: root?.clientHeight || 860, foe: !!S.chars[id]?.enemy, lane: P.lane });
     const dt = cur?.enemy && S.battle.cmd?.foe === cur.id && (S.battle.cmd.tgs || []).find(id => F.has(id)); // janela de defesa: a câmera fica no ombro do herói alvo (o anel abre sobre ele)
-    const out = local.mode !== 'ombro' && !local.aim ? { kind: local.mode, pts, w, h: root?.clientHeight || 860, fast: !!dt } : null; // vista de fora escolhida: lateral ou aérea, com todos no quadro
+    const out = local.mode !== 'ombro' && local.mode !== 'foco' && !local.aim ? { kind: local.mode, pts, w, h: root?.clientHeight || 860, fast: !!dt } : null; // vista de fora escolhida: lateral ou aérea, com todos no quadro
     const hp = id => ({ ...at(id), h: parseFloat(els.get(id)?.h) || 330 }); // janela de defesa: plano aberto do inimigo com o alvo (o mesmo da investida que vem depois: sem corte)
-    const base = local.aim ? { kind: 'aerial', pts, w, h: root?.clientHeight || 860 } : out ? out : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { kind: 'two', at: hp(cur.id), to: hp(dt), ry0: camRy, ...ACT, w, h: root?.clientHeight || 860, fast: true } : tbl(cur.id);
+    const foco = local.mode === 'foco' && cur && F.has(cur.id) ? { kind: 'zoom', to: hp(cur.id), ry: cameraFor(tbl(cur.id)).ry, sx: P.lane.w > 0 && w >= 900 ? -P.lane.side * 170 : 0 } : null; // vista Foco: zoom no personagem da vez, em todo turno (jogador e mestre); a coluna de comandos cresce junto com o recorte
+    const base = local.aim ? { kind: 'aerial', pts, w, h: root?.clientHeight || 860 } : out ? out : !cur ? { kind: 'table', at: { x: -430, z: 0 }, pts, w } : dt ? { kind: 'two', at: hp(cur.id), to: hp(dt), ry0: camRy, ...ACT, w, h: root?.clientHeight || 860, fast: true } : foco || tbl(cur.id);
     if (local.zoom && F.has(local.zoom)) return { kind: 'zoom', to: { ...F.get(local.zoom), h: parseFloat(els.get(local.zoom)?.h) || 330 }, ry: cameraFor(base).ry };
     return base;
   };
@@ -391,6 +393,7 @@
   const trailBar = (u, w) => { const n = parseFloat(w), o = u.hpw ?? n, p = typeof PFX !== 'undefined' ? PFX.trailPlan(o, n) : null; u.hpw = n;
     if (!p) { u.hpi.style.width = u.hpt.style.width = w; return; } u.hpt.classList.toggle('heal', p.heal); u.hpi.style.transitionDelay = p.bar.delay + 'ms'; u.hpt.style.transitionDelay = p.trail.delay + 'ms'; u.hpi.style.width = u.hpt.style.width = w; };
   const miniSh = (u, hp, sp) => { if (!u.shb || typeof PFX === 'undefined') return; const g2 = PFX.shieldSeg(hp, sp); u.shb.style.left = g2.l + '%'; u.shb.style.width = g2.w + '%'; };
+  const miniBreak = (u, c) => { const m = c?.brk && c.hp > 0 ? '◆' + c.brk.cur : ''; if (u.sh.textContent !== m) u.sh.textContent = m; u.sh.hidden = !m; };
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
     const fr = frameNow(inB), F = formation(inB, fr, penciled()), V = new Map(); // V: onde cada um aparece agora (o inimigo da vez já avançou)
@@ -404,14 +407,15 @@
       if (u.pos !== pos && !u.lunging) { const was = u.xy; u.pos = pos; u.xy = { x, z }; // mudou de lugar: anda até lá (passo com balanço), no tempo da distância
         if (was && !reducedM()) { const d = Math.hypot(x - was.x, z - was.z); if (d > 40) { const ms = Math.round(clamp(d / .9, 450, 1500)); u.el.style.setProperty('--mvd', ms + 'ms'); u.el.classList.add('walk'); clearTimeout(u.walkT); u.walkT = setTimeout(() => { u.el.classList.remove('walk'); u.el.style.removeProperty('--mvd'); }, ms); } }
         u.el.style.setProperty('--x', x); u.el.style.setProperty('--z', z); }
-      const h = Math.round((c.enemy ? 380 : 300) * (Math.min(2.5, (c.boss ? 1.6 : 1) * Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
+      const h = Math.round((c.enemy ? 380 : 300) * ESC_PERS * (Math.min(2.5, (c.boss ? 1.6 : 1) * Math.max(0.5, Number.isFinite(+c.imgS) && c.imgS !== null && c.imgS !== '' ? +c.imgS : 1)))) + 'px'; if (u.h !== h) { u.h = h; u.el.style.setProperty('--h', h); }
       u.c = c; setImg(u); { const col = colorOf(c); if (u.col !== col) { u.col = col; u.el.style.setProperty('--c', col); } }
       { const tag = c.name + (c.hp <= 0 ? ' · CAÍDO' : ''); if (u.tag !== tag) { u.tag = tag; u.picktag.textContent = tag; } }
       setCls(u, 'pickable', pickable.has(c.id));
       u.el.classList.toggle('ko', c.hp <= 0); if (c.hp > 0) u.el.classList.remove('kofall'); setCls(u, 'cur', c === cur); // ko direto (sem cache): o coreo adia o ko e o próximo desenho o repõe
       { const k = c.hp > 0 ? stIcons(c) : ''; if (u.stk !== k) { u.stk = k; u.sts.innerHTML = k; } } setCls(u, 'tgt', c.id === tgt); if (typeof PVIDA !== 'undefined') PVIDA.unit(u, c);
-      if (c.enemy && !(typeof BARHOLD !== 'undefined' && BARHOLD.has(c.id))) { const m = c.brk && c.hp > 0 ? '◆' + c.brk.cur : '', hp = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))), sp = c.hp > 0 ? 100 * (c.shield || 0) / (c.hpMax || 1) : 0, w = hp + '%';
-        if (u.mini !== m + w + sp) { u.mini = m + w + sp; u.sh.textContent = m; u.sh.hidden = !m; trailBar(u, w); miniSh(u, hp, sp); } } // barra presa: o coreo a solta no impacto
+      if (c.enemy && !(typeof BARHOLD !== 'undefined' && BARHOLD.has(c.id))) { const hp = Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))), sp = c.hp > 0 ? 100 * (c.shield || 0) / (c.hpMax || 1) : 0, w = hp + '%';
+        miniBreak(u, c);
+        if (u.mini !== w + sp) { u.mini = w + sp; trailBar(u, w); miniSh(u, hp, sp); } } // barra presa: o coreo a solta no impacto
     }
     lastF = F; lastFr = fr; chao(fr, F, cur); return V;
   };
@@ -519,7 +523,7 @@
     const f = el('i', 'flare', atw); f.style.cssText = `--lit:${color};transform:translate3d(${c.x}px,-2px,${c.z}px) translate(-50%,-50%) rotateX(90deg)`; setTimeout(() => f.remove(), 520); };
   const rectOfU = id => els.get(id)?.el.getBoundingClientRect() || null;
   P.linger = ms => { lingerUntil = Math.max(lingerUntil, performance.now() + ms); };
-  P.miniHp = (id, hp, sp) => { const u = els.get(id); if (!u?.hpi) return; u.mini = null; trailBar(u, hp + '%'); if (sp != null) miniSh(u, hp, sp); }; // o coreo desce a mini barra a cada batida
+  P.miniHp = (id, hp, sp) => { const u = els.get(id); if (!u?.hpi) return; u.mini = null; miniBreak(u, S.chars[id]); trailBar(u, hp + '%'); if (sp != null) miniSh(u, hp, sp); }; // o coreo atualiza as mini barras no impacto
   P.unitOf = id => els.get(id) || null;
   P.facing = id => els.get(id)?.facing;
   P.sun = () => g.TERRENO3D?.sd(camRy) === -1 ? 1 : -1;

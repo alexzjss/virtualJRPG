@@ -10,8 +10,7 @@
   css.textContent = `.stage-cmd{position:fixed;inset:0;z-index:60;overflow:hidden;font-family:Barlow,sans-serif;color:#fff;--ac:#ff2b3d;--ac2:#5a0010;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 .stage-cmd *{box-sizing:border-box}
 .stage-cmd.out{opacity:0;pointer-events:none;transition:opacity var(--out,.28s)}
-.sc-bg{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(24,10,30,.55),rgba(4,2,8,.92));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .35s}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.sc-bg{background:rgba(4,2,8,.93)}}
+.sc-bg{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(24,10,30,.72),rgba(4,2,8,.94));opacity:0;transition:opacity .35s}
 .sc-bar{position:absolute;left:0;right:0;height:11vh;background:#000;z-index:2;transition:transform .35s cubic-bezier(.2,.9,.2,1)}
 .sc-bar::after{content:'';position:absolute;left:0;right:0;height:3px;background:var(--ac);box-shadow:0 0 14px var(--ac)}
 .sc-bar.t{top:0;transform:translateY(-101%)}.sc-bar.t::after{bottom:0}
@@ -83,7 +82,7 @@
 
     let closed = false, frozen = false, speedOn = false, intro = !rm, raf = 0, last = performance.now(), slT = 0, lines = [], dirty = false, resEl = null, resAt = 0, resDone = null, hsT = 0;
     const parts = [], timers = new Set(), paused = new Set(), later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
-    const fit = () => { const d = Math.min(2, devicePixelRatio || 1); cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); g2.setTransform(d, 0, 0, d, 0, 0); dirty = true; };
+    const fit = () => { const d = 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); g2.setTransform(d, 0, 0, d, 0, 0); dirty = true; };
     fit(); addEventListener('resize', fit);
 
     const draw = now => {
@@ -145,7 +144,7 @@
     };
     cur = api;
     root.offsetWidth; root.classList.add('in'); // força o layout inicial para as transições de entrada rodarem
-    api.sfx('whoosh'); later(() => fx.shake(7, 220), 130); later(() => { intro = false; dirty = true; }, 380);
+    later(() => fx.shake(7, 220), 130); later(() => { intro = false; dirty = true; }, 380);
     return api;
   };
 }

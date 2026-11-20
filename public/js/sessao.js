@@ -24,7 +24,6 @@ function sessWin() {
     <li><b>No dia:</b> abra o programa e espere "Internet: Aberta" (na 1ª vez ele baixa o cloudflared, leva um minuto).</li>
     <li>Clique em <b>Copiar convite</b> e cole no grupo. O código muda a cada vez que você abre o programa.</li>
     <li>Durante o jogo, os pedidos dos jogadores aparecem na faixa <b>Pedidos</b>, no alto: Enter aprova, Delete nega. Em "Aprovar sozinho" você libera um tipo de ação sem passar por você.</li>
-    <li>Na TV, abra <b>/table</b> e entre com o login <b>mestre</b> e a sua chave.</li>
     <li>Ao fim, feche a janela do programa: o link para de funcionar e tudo fica salvo na pasta <b>data</b>. Faça cópia dessa pasta de vez em quando.</li>
     <li>Jogador esqueceu a senha: <b>Nova senha</b>. Quem estiver conectado com a senha antiga é desconectado.</li></ol></details>`;
   return net + `<h4>Contas dos jogadores</h4>${acc}<h4>Nova conta</h4>${form}${guide}`;

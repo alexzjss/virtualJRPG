@@ -6,11 +6,51 @@
   const CTRL = ['stun', 'sleep', 'para', 'frozen', 'possess', 'confuse'];
   const ST = { possess: 'Possessão', curse: 'Maldição', frozen: 'Congelado', marked: 'Marcado', down: 'Derrubado', burn: 'Queimadura', bleed: 'Sangramento', poison: 'Veneno', rad: 'Radiação', stun: 'Atordoado', sleep: 'Sono', para: 'Paralisia', silence: 'Silêncio', atkUp: 'ATQ↑', atkDn: 'ATQ↓', defUp: 'DEF↑', defDn: 'DEF↓', agiUp: 'AGI↑', agiDn: 'AGI↓', fear: 'Medo', fury: 'Fúria', confuse: 'Confusão',
     shield: 'Escudo', wet: 'Molhado', oil: 'Oleado', broken: 'Quebrado', regen: 'Regeneração', taunt: 'Provocando', guarded: 'Protegido', counter: 'Contra-ataque', reflect: 'Reflexo', evade: 'Esquiva', stealth: 'Furtivo', focus: 'Foco', exposed: 'Exposto', exaus: 'Exausto', seal: 'Selo', blind: 'Cego', root: 'Enraizado', charge: 'Concentrando', form: 'Transformado', endure: 'Tenacidade', dread: 'Pavor', mark: 'Marca', disarm: 'Desarmado', brand: 'Marca de Caça' };
-  // o que cada condição nova faz (as antigas já são conhecidas na mesa)
-  const STD = { shield: 'absorve dano antes do HP', regen: 'recupera HP no início do turno', taunt: 'inimigos só conseguem mirar nele', guarded: 'um guarda-costas recebe os golpes no lugar', counter: 'revida golpes corpo a corpo com um ataque', reflect: 'devolve 30% do dano recebido',
-    wet: 'conduz raio e vento (reações elementais)', oil: 'queima e explode com fogo e raio', broken: 'perdeu o turno, sofre +50% de dano e não age até se recompor',
-    disarm: 'sem arma: luta com os punhos e perde as técnicas da arma', evade: 'o próximo golpe causa só metade do dano', stealth: 'não pode ser alvo direto; o próximo ataque tem +25% e crítico dobrado', focus: '+15% de acerto e enxerga quem está Furtivo', exposed: 'armadura não conta', exaus: '−15% de acerto, −15% de dano e não pode se transformar', seal: 'explode quando acaba ou ao ser detonado',
-    blind: '−25% de acerto', root: 'a Agilidade não ajuda a esquivar', charge: 'concentrando um golpe; dano forte ou controle interrompe', form: 'transformação ativa', endure: 'o próximo golpe fatal deixa com 1 HP', dread: 'perde Sanidade no início do turno e sofre +25% de dano mental', mark: 'Marca do Caçador desperta: +30% de dano, +20% de velocidade e +10% de crítico' };
+  // Descrições usadas no guia e nas dicas das condições durante o jogo.
+  const dotText = 'No início de cada turno, perde 5% do HP máximo, arredondado, com mínimo de 1. Reaplicar soma duração até 6 turnos. Dano contínuo de condições diferentes soma.';
+  const STD = {
+    possess: 'As ações ofensivas miram em um aliado vivo aleatório, se houver um disponível.',
+    curse: 'Reduz a chance de acerto em 10 pontos percentuais e corta pela metade a cura recebida.',
+    frozen: 'Faz perder o turno e aumenta em 25% o dano recebido. Dano que passa pelo escudo desfaz o gelo. Físico ou Atlas pode causar Estilhaçar.',
+    marked: 'Ataques contra este alvo ganham 20 pontos percentuais de chance de acerto.',
+    down: 'Recebe 25% a mais de dano. Surge ao acertar uma fraqueza de um alvo de pé e conta para liberar o Ataque Total.',
+    burn: dotText, bleed: dotText, poison: dotText, rad: dotText,
+    stun: 'O personagem perde o turno.',
+    sleep: 'O personagem perde o turno. Acorda se receber dano que passe pelo escudo.',
+    para: 'A cada turno, tem 50% de chance de perder a vez.',
+    silence: 'Impede usar técnicas ativas e reações de habilidade. O ataque básico continua disponível.',
+    atkUp: 'O dano causado aumenta em 25%.', atkDn: 'O dano causado diminui em 25%.',
+    defUp: 'O dano recebido de golpes diminui em 25%.', defDn: 'O dano recebido de golpes aumenta em 25%.',
+    agiUp: 'A Agilidade conta 25% a mais para calcular o tempo até a próxima vez.',
+    agiDn: 'A Agilidade conta 25% a menos para calcular o tempo até a próxima vez.',
+    fear: 'Reduz a chance de acerto em 20 pontos percentuais e impõe desvantagem em testes de atributo.',
+    fury: 'Aumenta o dano em 25% e restringe os ataques ao básico.',
+    confuse: 'Uma ação de alvo único pode ser redirecionada para um combatente vivo aleatório, inclusive um aliado.',
+    shield: 'Absorve dano antes que ele chegue ao HP. Some quando a reserva se esgota ou a condição expira.',
+    wet: 'Prepara uma reação quando o alvo é atingido por Raio, Fogo, Vento ou Terra.',
+    oil: 'Prepara Explosão com Fogo ou Faíscas com Raio. Ambas aplicam Queimadura.',
+    broken: 'Perde a vez e recebe 50% a mais de dano enquanto se recompõe. Conta para liberar o Ataque Total.',
+    regen: 'Recupera 5% do HP máximo e trata ferimentos no início do turno, com arredondamento e mínimo de 1. Em chefes, recupera um terço desse valor antes do arredondamento.',
+    taunt: 'Atrai golpes inimigos de alvo único para quem está provocando.',
+    guarded: 'Redireciona golpes de alvo único para o guarda-costas enquanto ele estiver de pé e em combate.',
+    counter: 'Revida golpes físicos de alvo único com um ataque básico. Armas de distância escapam do revide.',
+    reflect: 'Devolve ao atacante 30% do dano não mental que chegou ao HP.',
+    evade: 'É consumido no próximo golpe elegível de alvo único para reduzir o dano dele à metade.',
+    stealth: 'Desvia golpes diretos para aliados visíveis, quando houver. O próximo ataque ganha 25 pontos percentuais de acerto e dobra a chance base de crítico. Foco permite mirar em Furtivos.',
+    focus: 'Aumenta a chance de acerto em 15 pontos percentuais, permite mirar em alvos Furtivos e dá vantagem em testes de atributo. A Tensão acumulada ao Concentrar tem efeito próprio.',
+    exposed: 'O atacante ignora a armadura deste alvo.',
+    exaus: 'Reduz a chance de acerto em 15 pontos percentuais e o dano causado em 15%. Impõe desvantagem em testes de atributo e impede iniciar uma transformação.',
+    seal: 'A marca inflige dano quando expira ou quando uma técnica a detona.',
+    blind: 'Reduz a chance de acerto em 25 pontos percentuais e impõe desvantagem em testes de atributo.',
+    root: 'A Agilidade do alvo deixa de reduzir a chance de o atacante acertar. A condição afeta o cálculo de acerto.',
+    charge: 'A técnica é liberada sozinha após o tempo de preparo. Controle, Quebra ou um golpe que retire pelo menos 20% do HP máximo interrompem a concentração.',
+    form: 'Indica que uma transformação está ativa. A técnica define duração, bônus, drenagem por turno e possíveis sequelas.',
+    endure: 'É consumida ao receber um golpe fatal e deixa o personagem com 1 HP.',
+    dread: 'No início do turno, perde cerca de 1/12 da Sanidade máxima. Recebe 25% a mais de dano mental.',
+    mark: 'A Marca do Caçador concede +30% de dano, +20% de velocidade e +10% de crítico.',
+    disarm: 'A arma deixa de contar. O ataque básico usa os punhos e as técnicas que exigem a arma ficam indisponíveis.',
+    brand: 'Uma técnica que estoura a Marca de Caça a consome para causar dano extra. O bônus é maior quando quem detona é um aliado de quem marcou.',
+  };
   // cargas que se acumulam no próprio personagem durante a batalha (efeitos stack/burst): nome e bônus de dano por carga
   const STK = { doenca: ['Doença', 8], carga: ['Carga Elétrica', 6], brasa: ['Brasa', 6], mare: ['Maré', 6], rocha: ['Rocha', 6], vento: ['Vento', 6], luz: ['Luz', 6], sombra: ['Sombra', 6], sangue: ['Sangue', 6], mutacao: ['Mutação', 6], ressonancia: ['Ressonância', 6], impeto: ['Ímpeto', 6], pavor: ['Pavor', 6] };
   // reações: disparam sozinhas no turno do inimigo (1 por rodada, pagando o custo da técnica)

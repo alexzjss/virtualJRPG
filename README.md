@@ -31,15 +31,16 @@ Janela **Campanha** do mestre:
 ## Mapa e som
 - Janela **Cena**: névoa com "Revelar tudo" / "Esconder tudo" e pincel de 1×1 a 7×7, grade visível ou oculta, metros por casa.
 - Régua: Alt+arrastar; com Shift mede área. Marcador: Ctrl+clique no mapa (Ctrl+Shift+clique cria um que só o mestre vê).
-- Janela **Som**: trilha por link ou arquivo enviado (MP3, OGG, WAV, M4A até 40 MB), lista de faixas, trilha própria por cena, ambiências e efeitos prontos (sintetizados, sem arquivos). Todos ouvem em sincronia; cada pessoa ajusta ou silencia o próprio volume no canto da tela. Golpes, críticos, erros e curas também têm som.
+- A janela **Som** oferece trilha por link ou arquivo enviado (MP3, OGG, WAV, M4A até 40 MB), lista de faixas, trilha própria por cena e efeitos e ambiências em arquivos locais para uso offline. Os sons disparados pelo mestre chegam a todos, e cada pessoa ajusta ou silencia o volume no canto da tela. No combate, os sons acompanham a arma, o elemento, o impacto e os comandos de ataque e defesa. Consulte os [créditos dos áudios](public/audio/CREDITOS.md).
 
 ## Mostrar a todos
 Na janela **Cena**, "Mostrar a todos" abre um texto ou imagem na tela de cada jogador. O jogador pode fechar e rever. "Recolher" tira de todas as telas.
 
 ## Interface
+- Em **Sessão → Interface**, o mestre pode ligar a **Pincelada** para a mesa inteira.
 - Perguntas e confirmações aparecem em janelas do próprio jogo (nada de caixas do navegador); exclusões pedem confirmação.
 - Barra de ferramentas no mapa: zoom, enquadrar, régua, área, sinal e, para o mestre, marcador e névoa. Funciona no toque.
-- **Ctrl+K** (mestre): busca rápida de painéis, cenas, fichas, ações, sons e inimigos; "Restaurar os painéis" volta ao arranjo padrão. Tecla **?**: lista de atalhos.
+- **Regras** no topo (ou **?** no teclado): guia pesquisável de ações, comandos, efeitos, mecânicas e atalhos para mestre e jogadores. **Ctrl+K** (mestre) abre a busca rápida de painéis, cenas, fichas, ações, sons e inimigos. "Restaurar os painéis" volta ao arranjo padrão.
 - O registro mostra as rolagens e os eventos de jogo, com a hora de cada linha ao passar o mouse.
 - O jogador é avisado quando chega a vez dele (aviso, som, vibração e título da aba); o mestre vê na aba quantos pedidos esperam.
 - Mudança de cena mostra o nome da cena em destaque para os jogadores.
@@ -56,15 +57,15 @@ Na janela **Cena**, "Mostrar a todos" abre um texto ou imagem na tela de cada jo
 
 ## Pedidos e aprovação do mestre
 Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, itens fora de combate (usar, equipar, comprar, vender, forjar, descartar) e ações de acampamento do jogador viram **pedidos**. Mover o token e passar a vez não pedem aprovação.
-- O mestre vê os pedidos numa faixa fixa no alto: **Aprovar** (Enter), **Negar** (Delete), negar com motivo, bônus ou penalidade (−20 a +20) e, nas rolagens, **Secreta**.
-- "Aprovar sozinho" liga ou desliga a aprovação por tipo (rolagens, combate, skills, itens, acampamento).
+- O botão **Pedidos** no topo abre a fila. A fila oferece **Aprovar** (Enter), **Negar** (Delete), negar com motivo, bônus ou penalidade (−20 a +20) e rolagem **Secreta**.
+- A seção **Aprovação automática** controla a aprovação de rolagens, combate, skills, itens e acampamento separadamente.
 - Cada jogador tem um pedido por vez e pode cancelar. Pedido de combate some se a vez passar.
 - HP, Aura, Sanidade e Limite só o mestre altera.
 
 ## Ferramentas do mestre
-- No painel **Fichas**, clique em qualquer número para editar (aceita `+5` ou `-12`). Clique nas fichas para selecionar e aplique dano, cura, Aura, Sanidade, XP, ouro, condição ou item a todas de uma vez.
+- Em **Ferramentas → Fichas**, clique em qualquer número da ficha para editar (aceita `+5` ou `-12`). Clique nas fichas para selecionar e aplique dano, cura, Aura, Sanidade, XP, ouro, condição ou item a todas de uma vez.
 - Na ficha aberta: clique no número do atributo para editar e na sigla para rolar; busca por nome para entregar itens e dar ou tirar skills sem custo.
-- **Ver como** abre a tela de um jogador em outra aba, só para olhar.
+- **Mesa → Mais → Ver como** abre a tela de um jogador para consulta.
 
 ## Batalha: fundo, intensidade e efeitos
 - Na janela **Cena**, "Fundo da batalha" escolhe um tema pronto (Rubro, Noite, Floresta, Brasa, Gelo, Vazio, Santuário, Tempestade), o mapa da cena ou uma imagem própria (link ou envio). Vale por cena.
@@ -80,20 +81,20 @@ Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, it
 - Alt+arrastar = régua em casas; duplo clique no mapa = ping para todos
 - Clique direito no token = menu; duplo clique no token = abrir a ficha
 - Batalha: `1`–`9` = comandos, Tab = trocar alvo, Esc = fechar/cancelar
-- Mestre: arrastar as abas entre as docas monta o arranjo, salvo no navegador
+- Mestre: `Q`, `M` e `P` abrem Mesa, Mapa e Palco. `[` e `]` alternam os painéis laterais e `Ctrl+K` abre a busca.
 
 ## Balanceamento
 Os números ficam em `R` no topo de `src/consts.js`. `node tools/sim.js 500` simula batalhas 4x4 com as regras reais;
 `VJ_RULES='{"enemyAttr":45}' node tools/sim.js` testa uma variação sem editar o código.
 
 ## Testes e segurança dos dados
-- `npm test` roda os testes de regras e permissões; `npm run sim` roda o simulador de balanceamento; `npm run ui` abre o jogo no Chromium (Playwright) com mestre, jogadores e mesa e confere batalha, pedidos, acampamento, Ofícios e celular.
+- `npm test` roda os testes de regras e permissões; `npm run sim` roda o simulador de balanceamento; `npm run ui` abre o jogo no Chromium (Playwright) com mestre e jogadores e confere batalha, pedidos, acampamento, Ofícios e celular.
 - `npm run dev` sobe uma cópia de desenvolvimento em `http://localhost:3210/gm` (chave `dev`), com dados separados em `data-dev/`, sem túnel: dá para testar à vontade sem tocar na campanha de verdade.
 - A cada início o servidor copia `data/state.json` para `data/backups/` (guarda as 30 últimas, somando as automáticas e as manuais).
 - Fechar a janela do programa ou apertar Ctrl+C grava o que ainda estava pendente antes de sair.
 - Abrir, importar ou restaurar uma campanha é tudo-ou-nada: se o arquivo não puder ser aberto, a campanha em uso continua exatamente como estava e o mestre vê o motivo. Um arquivo editado à mão, com campos faltando ou de tipo errado, é consertado ao abrir.
 - Campanha importada de fora é limpa antes de entrar: só passam chaves simples, skills e itens no formato do editor, links válidos e um histórico sem marcação.
-- O mestre tem o botão **Desfazer** (até 20 ações) na janela Cena.
+- O mestre pode **Desfazer** até 20 ações em **Ferramentas → Cena → Ações da sessão**.
 
 ## Rede e segurança
 - O estado enviado a cada mudança ficou ~85% menor: as definições de skills e itens (a maior parte) só vão quando mudam. Páginas, scripts e o three.js vão comprimidos e o navegador só baixa de novo o que mudou.

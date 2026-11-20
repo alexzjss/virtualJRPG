@@ -240,7 +240,7 @@ const H = {
   battle(c, m) {
     if (c.role !== 'gm') return;
     const all = Object.keys(S.battle.ticks).map(k => S.chars[k]).filter(Boolean), dead = all.filter(o => o.enemy && o.hp <= 0), pcs = all.filter(o => !o.enemy);
-    all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; delete o.brv; delete o.ten; delete o.brk; delete o.domUsed; delete o.icd; o.shield = 0; });
+    all.forEach(o => { o.st = {}; delete o.dying; delete o.form; delete o.chg; delete o.sealD; delete o.guardBy; delete o.bt; delete o.brv; delete o.ten; delete o.brk; delete o.domUsed; delete o.icd; delete o.imm; o.shield = 0; });
     for (const [k, o] of Object.entries(S.chars)) if (o.summon && (o.scene === S.scene || k in S.battle.ticks)) delete S.chars[k]; // invocações desta cena somem com o fim da luta (as de outra batalha ficam)
     if (!m.on && m.win && pcs.length && dead.length) { // recompensas divididas entre os heróis
       const sum = f => Math.floor(dead.reduce((a, o) => a + o[f], 0) / pcs.length), xp = sum('xpR'), gold = sum('goldR'), drops = [];
@@ -269,7 +269,7 @@ const H = {
     }
     const end = !m.on && S.battle.active ? (m.win ? 'win' : pcs.length && pcs.every(p => p.hp <= 0) ? 'lose' : 'flee') : ''; // o palco faz a pose final certa
     S.battle = { active: !!m.on, ...(m.on && { seed: S.battle.seed ?? randomInt(1, 2 ** 31) }), ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
-    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
+    if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.imm = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
     if (m.on) S.battle.ax = RU.axisOf(Object.keys(S.battle.ticks).map(k => S.chars[k])); // eixo do palco 3D: fixo até o mestre reenquadrar
     if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
     if (m.on) { // ganchos de ofício: emboscada, canção, armadilha e companheiros
@@ -279,7 +279,7 @@ const H = {
       if (S.tenac) { hs.forEach(h => { h.st.endure = 1; }); delete S.tenac; }
       hs.forEach(spawnCompanions); trapStart();
     }
-    log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.', '', end ? { end } : undefined);
+    log('Mestre', m.on ? 'Batalha iniciada!' : 'Batalha encerrada.', '', end ? { end, sc: S.scene } : undefined);
   },
   battleReframe(c) {
     if (c.role !== 'gm' || !S.battle.active) return;
@@ -339,7 +339,7 @@ const H = {
   },
   def(c, m) { // o jogador aperta o botão da defesa: a zona (Aparar, Esquiva, cedo) vem de quanto falta para o impacto da próxima batida
     const ch = S.chars[m.id], C = S.battle.cmd, D = RU.CMD.DEF; if (!C || !ch || ch.enemy || ch.hp <= 0 || !can(c, ch) || !C.tgs.includes(ch.id) || C.chq?.id === ch.id) return;
-    const notes = C.p[ch.id], now = Date.now(), i = C.beats.findIndex((b, k) => notes[k] === undefined && now <= C.at + b + D.grace); if (i < 0) return;
+    const notes = C.p[ch.id], now = Date.now() - Math.max(0, Math.min(250, Math.floor(+m.age) || 0)), i = C.beats.findIndex((b, k) => notes[k] === undefined && now <= C.at + b + D.grace); if (i < 0) return;
     const n = parNode(ch), mods = modsOf(ch, null), canP = !!n && (C.paid[ch.id] || canPar(ch)), left = C.at + C.beats[i] - now;
     let g = RU.CMD.gradeDef(left, (n?.par || 0) + mods.par, (C.esq ?? C.tel) ? D.esq + mods.esq : 0, canP); if (g === 'late') return;
     const fi = C.fin?.[i]; // o anel falso vale primeiro; só sem ele a direção da esquiva é conferida

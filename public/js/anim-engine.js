@@ -24,7 +24,7 @@
   const scaleOf = r => r ? clamp(r.height / 210, .45, 1.6) : 1;
   const skillByName = n => Object.values(g.S?.skills || {}).find(s => s.name === n);
   const qLevel = () => defaults.quality === 'low' || autoLow ? .45 : defaults.quality === 'medium' ? .72 : 1;
-  const NOTE = { kagutsuchi: 165, susanoo: 294, atlas: 110, indra: 440, fuhaku: 392, amaterasu: 659, tsukuyomi: 139, shukketsu: 196, hiruko: 247, aura: 523, oculto: 104, fis: 147 };
+
   const resize = () => { const n = Math.min(qLevel() < .6 ? 1 : 2, devicePixelRatio || 1), w = innerWidth, h = innerHeight; if (w === W && h === H && n === dpr) return; W = w; H = h; dpr = n; cvs.width = Math.round(W * dpr); cvs.height = Math.round(H * dpr); cvs.style.width = W + 'px'; cvs.style.height = H + 'px'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
   addEventListener('resize', resize); resize();
 
@@ -174,7 +174,7 @@
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   function play({ actorId, targetIds = [], skill, fx = {}, delay = 0 } = {}) {
     const aid = actorId || fx.a, P = profile(skill || skillByName(fx.s), fx), ar = rect(aid), a = point(aid, ar, P.origin), ids = [...new Set(targetIds.filter(Boolean))], targets = ids.length ? ids : [fx.id].filter(Boolean), start = clockNow() + delay;
-    try { if (typeof tone === 'function') { const f = NOTE[P.el] || 220, beam = P.family === 'beam' || P.family === 'ritual'; tone(f, Math.min(.5, P.duration / 1000), { type: beam ? 'sawtooth' : P.family === 'heal' ? 'sine' : 'triangle', to: beam ? f * 2 : P.family === 'projectile' ? f * 1.5 : 0, g: .035 + P.tier * .012 }); if (['smash', 'area', 'rain'].includes(P.family) && typeof thud === 'function') thud(.18, 180 + P.tier * 90, .16 + P.tier * .05, 'lowpass', P.duration * P.impact / 1000); } } catch {}
+    if (typeof skillSfx === 'function') skillSfx(P, P.duration * P.impact, delay, fx, skill);
     const list = (targets.length ? targets : ['']).map((id, i) => { const tr = rect(id), b = targetPoint(tr), p = { ...P, seed: P.seed + i * 997, duration: P.duration + i * 40 }; return { id: ++seq, aid, tid: id, start: start + i * 40, from: a, to: b, footA: footPoint(ar), footB: footPoint(tr), sa: scaleOf(ar), sb: scaleOf(tr), profile: p }; });
     effects.push(...list); kick();
     const impactMs = Math.round(P.duration * P.impact + delay), doneMs = Math.round(P.duration + delay);

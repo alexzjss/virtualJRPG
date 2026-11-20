@@ -31,10 +31,10 @@ const ED = {
   skills: [['Skill', 'name', 'text'], ['Tipo', 'kind', KIND], ['Elemento', 'el', EL], ['Atr.', 'attr', AO], ['Poder', 'power'], ['Perfuração (0-1)', 'pierce'], ['Custo', 'cost'], ['Recurso', 'res', RES], ['Status', 'st', { '': '—', ...ST }], ['Área', 'area', 'checkbox'], ['Animação', 'anim', { '': 'Automática', projectile: 'Projétil', beam: 'Feixe', slash: 'Corte', smash: 'Pancada', pierce: 'Perfuração', dash: 'Investida', area: 'Área', rain: 'Chuva', ritual: 'Ritual', summon: 'Invocação', psychic: 'Psíquica', musical: 'Musical', heal: 'Cura', barrier: 'Barreira', form: 'Transformação' }], ['Tempo%', 'ct'], ['Passiva', 'pas', PASL], ['Arma / categoria', 'req', { ...WT, ...ARMAS.CAT_N }], ['Item exigido (tag)', 'reqItem', 'text'], ['Sequela', 'back', { '': '—', ...ST }], ['XP', 'xp'], ['X', 'gx'], ['Y', 'gy'], ['Liga a (nomes com |)', 'lk'], ['Lim.', 'limit', 'checkbox']],
   items: [['Item', 'name', 'text'], ['Tipo', 'type', IT], ['Poder', 'power'], ['Efeito', 'eff', EFF], ['Atr. (acess.)', 'attr', AO], ['Tipo de arma', 'wt', WT], ['Kit (tags)', 'kit', 'text'], ['Elemento', 'el', { '': '—', ...EL }], ['Preço', 'price'], ['Perfuração (0-1)', 'pierce'], ['FOR mín.', 'reqFor']],
 };
-let aim = null, sub = null, pv = 'cena', wdrag = null, capT;
+let aim = null, sub = null, pv = 'cena', wdrag = null;
 let wins = { sessao: { x: 360, y: 64, open: true }, best: { x: 360, y: 56, open: false }, chase: { x: 420, y: 200, open: false }, cena: { x: 16, y: 64, open: true }, batalha: { x: 360, y: 64, open: false }, ini: { x: 360, y: 420, open: false }, fichas: { x: Math.max(380, innerWidth - 420), y: 64, open: true }, chat: { x: 16, y: Math.max(300, innerHeight - 330), open: true }, skills: { x: 60, y: 110, open: false }, items: { x: 90, y: 140, open: false }, ofcat: { x: 120, y: 90, open: false }, armas: { x: 70, y: 60, open: false } };
 try { wins = { ...wins, ...JSON.parse(localStorage.vj_wins) }; } catch {}
-let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null, lastCur;
+let S, ws, pending = false, drag = null, tgt = null, showEd = null, fogMode = false, lastFog = '', secret = false, seen = null;
 const mods = {}, tabs = {}, selNode = {}, open = {};
 // login: a página de entrada (GitHub Pages) manda login e senha no fim do link (#vj=…), que nunca vai ao servidor e é apagado da barra
 const ls = (k, v) => { try { if (v === undefined) return localStorage[k] || ''; if (v === null) delete localStorage[k]; else localStorage[k] = v; } catch { return ''; } };
@@ -114,27 +114,14 @@ const reqBar = () => { const [id, r] = myReq() || []; return r ? `<div class="re
 const edv = (c, f, v, cls = '') => !gm ? `<span class="${cls}">${v}</span>` : editing && editing.id === c.id && editing.f === f ? `<input class="edin ${cls}" data-edin="${f}" data-id="${c.id}" data-cur="${v}" value="${v}" inputmode="text" aria-label="${esc(c.name)}: ${f}">`
   : `<span class="ed ${cls}" data-edit="${f}" data-id="${c.id}" title="Clique para editar (aceita +5 ou -12)">${v}</span>`;
 const commitEd = el => { const cur = +el.dataset.cur, raw = el.value.trim().replace(',', '.'), v = /^[+-]\d+$/.test(raw) ? cur + +raw : +raw; editing = null; if (raw !== '' && Number.isFinite(v) && v !== cur) send({ t: 'set', id: el.dataset.id, f: el.dataset.edin, v: Math.max(0, Math.round(v)) }); render(); };
-let actx; const beep = () => { try { actx ||= new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime; o.type = 'triangle'; o.frequency.setValueAtTime(660, t); o.frequency.setValueAtTime(880, t + .09); g.gain.setValueAtTime(.12, t); g.gain.exponentialRampToValueAtTime(.001, t + .3); o.connect(g).connect(actx.destination); o.start(); o.stop(t + .32); } catch {} };
+const beep = () => playSfx('aviso');
 
 // skills e itens chegam à parte ("defs") e só quando mudam; cada estado diz de qual versão delas depende
 let DEFS = { skills: {}, items: {} }, DEFV = -1, retry = 0;
 // o catálogo de ofícios editado pelo mestre (S.ofiCfg) é mesclado sobre o padrão de oficios.js sempre que muda
 let ofiSig = '';
 const syncOfi = () => { const sg = JSON.stringify(S.ofiCfg || {}); if (sg !== ofiSig) { ofiSig = sg; globalThis.OFI.apply(S.ofiCfg); } };
-// ===== som dos sistemas de ritmo: Tensão, Dívida de Coragem, Cadeia e Domínio (Web Audio sintetizado; respeita o botão de som) =====
-// as animações são por estado (classes ten1-3, debt, chain.full, dom-on): sobrevivem ao redesenho; o som toca só na mudança
-const toneSeq = (seq, { type = 'triangle', vol = .08 } = {}) => {
-  if (snd.mute) return;
-  try { actx ||= new AudioContext(); actx.resume?.(); const t0 = actx.currentTime; for (const [f, at, d, f2] of seq) { const o = actx.createOscillator(), g = actx.createGain(), t = t0 + at; o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + d); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + .03); } } catch {}
-};
-const SFXR = {
-  tensao: n => toneSeq([[330 * 1.26 ** n, 0, .12], [495 * 1.26 ** n, .08, .18]]), // sobe a cada nível acumulado
-  divida: () => toneSeq([[240, 0, .32, 80]], { type: 'sawtooth', vol: .06 }), // grave que cai: ficou devendo tempo
-  cadeia: h => toneSeq([[500 + h * 4, 0, .07]], { vol: .04 }),
-  cadeiaCheia: () => toneSeq([[523, 0, .1], [659, .09, .1], [784, .18, .1], [1047, .27, .32]], { type: 'square', vol: .045 }),
-  dominio: () => toneSeq([[110, 0, 1, 260], [165, .08, 1, 390]], { type: 'sawtooth', vol: .055 }),
-  dominioFim: () => toneSeq([[330, 0, .6, 70]], { vol: .07 }),
-};
+// Os sons de ritmo acompanham as mudanças de estado da batalha.
 let fxPrev = null;
 function fxWatch() {
   const B = S.battle;
@@ -143,9 +130,9 @@ function fxWatch() {
   for (const c of Object.values(S.chars)) if (!c.enemy && c.id in B.ticks) now.u[c.id] = { brv: c.brv || 0, ten: c.ten || 0 };
   const was = fxPrev; fxPrev = now;
   if (!was) return;
-  for (const [id, n] of Object.entries(now.u)) { const o = was.u[id]; if (!o) continue; if (n.ten > o.ten) SFXR.tensao(n.ten); if (n.brv < 0 && n.brv < o.brv) SFXR.divida(); }
-  if (now.h > was.h) now.h >= 100 ? SFXR.cadeiaCheia() : SFXR.cadeia(now.h);
-  if (now.dom && !was.dom) SFXR.dominio(); else if (!now.dom && was.dom) SFXR.dominioFim();
+  for (const [id, n] of Object.entries(now.u)) { const o = was.u[id]; if (!o) continue; if (n.ten > o.ten) playSfx('ritmoTensao', { rate: .85 + .13 * n.ten }); if (n.brv < 0 && n.brv < o.brv) playSfx('divida'); }
+  if (now.h > was.h) now.h >= 100 ? playSfx('cadeiaCheia') : playSfx('cadeia', { rate: 1 + now.h / 140 });
+  if (now.dom && !was.dom) playSfx('dominio'); else if (!now.dom && was.dom) playSfx('dominioFim', { rate: .78 });
 }
 
 function connect() {
@@ -161,7 +148,7 @@ function connect() {
     // vários estados no mesmo instante (rajada pelo túnel) viram um desenho só, no próximo quadro; aba escondida desenha já (sem rAF)
     if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; syncOfi(); if (gm && window.vjOpenAfterState) { const q = window.vjOpenAfterState, id = typeof q === 'string' ? q : S.bestiary?.[q.id] ? q.id : Object.keys(S.bestiary || {}).find(k => !q.before.includes(k)); if (id && S.bestiary?.[id]) { gOpen('f_' + id); window.vjOpenAfterState = ''; } } netRender(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }
-    if (m.t === 'sfx') playSfx(m.k);
+    if (m.t === 'sfx') playSfx(m.k, { maxAge: 4 });
     if (m.t === 'note') { if (m.id && gm && wf.d) wf.id = m.id; /* arma salva na Forja: continua editando ela */ toast(m.text, m.kind, m.why); if (m.kind === 'no') navigator.vibrate?.(120); }
     if (m.t === 'passOk') { ls('vj_pass', pass = m.pass); toast('Senha trocada.', 'ok', 'Na próxima sessão, entre com a nova.'); }
     if (m.t === 'err') { if (!m.bad) return toast(m.msg, 'no'); ws.onclose = null; ws.close(); S = null; ls(gm ? 'vj_key' : 'vj_pass', null); loginForm(m.msg); }

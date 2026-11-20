@@ -1,8 +1,13 @@
 /* Mesa do mestre (public/js/mesa.js) e tela de espera do jogador fora de cena */
 .gview[data-view="mesa"]{overflow:hidden}
-.mesa{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;background:var(--ink)}
-.mz-top{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.mz-sp{flex:1}
+.mesa{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;background:var(--ink);container-type:inline-size}
+.mz-top{position:relative;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.mz-top>[aria-expanded=true]{color:var(--gold);border-color:var(--gold)}
+.mz-more{margin-left:auto}
+.mz-more summary{display:flex;align-items:center;justify-content:center;min-height:34px;padding:4px 10px;cursor:pointer;color:var(--paper);background:var(--ink2);border:1px solid var(--line);font:600 14px var(--cond)}
+.mz-more summary::after{content:"⌄";margin-left:5px;color:var(--gold)}
+.mz-options{position:absolute;top:calc(100% + 4px);right:8px;width:min(270px,calc(100% - 16px));display:grid;gap:8px;padding:10px;border:1px solid var(--line);background:var(--ink2);box-shadow:0 10px 22px #000a}
+.mz-options button{text-align:left}
 .mz-note{color:var(--dim);font:500 12px var(--body)}
 .mz-note select{margin-left:4px}
 .mz-main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px)}
@@ -21,8 +26,7 @@
 .mz-bat.wait{background:var(--red);animation:mzpul 1.2s ease-in-out infinite alternate}
 @keyframes mzpul{to{background:var(--red2)}}
 .mz-meta{display:flex;gap:8px;padding:6px 10px;font:600 12px var(--cond);color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line)}
-.mz-actions{display:flex;gap:6px;padding:6px 8px 0}.mz-actions button{flex:1;padding:4px 6px;font-size:12px}
-.mz-side-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.mz-side-head h2{margin:2px 0}.mz-side-head>button{font-size:22px;line-height:1;padding:2px 9px}.mz-main.side-closed{grid-template-columns:minmax(0,1fr)}.mz-side-open{position:sticky;right:8px;bottom:8px;justify-self:end;align-self:end}
+.mz-main.side-closed{grid-template-columns:minmax(0,1fr)}
 .mz-drop{min-height:116px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
 .mz-empty{color:#5b5966;font:600 12px var(--cond);text-transform:uppercase;margin:auto}
 .mz-hero{width:58px;cursor:grab;text-align:center;position:relative}
@@ -37,9 +41,6 @@
 .mz-col.off{background:repeating-linear-gradient(135deg,#0d0d10 0 10px,#111115 10px 20px);border-style:dashed}
 .mz-col.off .mz-thumb{height:64px;cursor:default;background:#16161b}
 .mz-msg{margin:0 10px 10px;background:var(--ink3);color:var(--paper);border:1px solid var(--line);font:500 13px var(--body);padding:6px;resize:vertical;min-height:52px}
-.mz-col.add{all:unset;box-sizing:border-box;flex:0 0 140px;min-height:220px;border:1px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--dim);font:400 26px var(--disp)}
-.mz-col.add small{font:600 13px var(--cond);text-transform:uppercase}
-.mz-col.add:hover,.mz-col.add:focus-visible{color:var(--paper);border-color:var(--paper)}
 .mz-side{background:var(--ink2);border-left:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:14px;overflow:auto}
 .mz-side h2{font:400 24px var(--disp);margin:0;letter-spacing:.5px}
 .mz-h{display:block;font:600 13px var(--cond);text-transform:uppercase;color:var(--dim);margin:0 0 6px;letter-spacing:.6px}
@@ -56,6 +57,7 @@
 .mz-li button{padding:3px 8px;font-size:12px}
 .mz-li.req{border-left:3px solid var(--gold);background:#2a2410}
 .mz-selbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:#000;border:1px solid var(--gold);padding:8px 12px;display:flex;gap:6px;align-items:center;z-index:5;font:600 14px var(--cond);text-transform:uppercase;max-width:calc(100% - 32px);flex-wrap:wrap}
+.mz-selbar select{max-width:100%}
 .mz-modal{position:absolute;inset:0;background:#000b;display:grid;place-items:center;z-index:6}
 .mz-box{background:var(--ink2);border:1px solid var(--line);border-top:3px solid var(--red);padding:18px;width:min(460px,calc(100% - 32px));display:flex;flex-direction:column;gap:12px}
 .mz-box h2{font:400 26px var(--disp);margin:0}
@@ -78,3 +80,9 @@
 .mexit b{position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%);white-space:nowrap;background:var(--gold);color:#000;font:600 11px var(--cond,sans-serif);text-transform:uppercase;padding:1px 5px;box-shadow:0 0 0 2px #000}
 .mz-note-in{margin:0 0 6px;width:100%;box-sizing:border-box;min-height:70px}
 .mz-li.enc{border-left:3px solid var(--red)}
+@container (width < 560px){
+  .mz-top{padding:8px;gap:6px}
+  .mz-main:not(.side-closed){grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(110px,1fr) minmax(0,1fr)}
+  .mz-board{padding:8px}
+  .mz-main .mz-side{border-left:0;border-top:1px solid var(--line)}
+}

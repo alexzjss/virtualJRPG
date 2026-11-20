@@ -69,13 +69,14 @@ const LEQUE = (() => {
   const PCL = () => typeof PC !== 'undefined' && PC.on(); // UI Pincelada: Atacar, Skills, Itens, Limite e "Mais" (Defender, Concentrar, Coragem, Passar)
   const radial = (c, gun) => PCL() ? [['lim', 'L', 'Limite', 46, -150, -13], ['it', 3, 'Itens', 74, -76, -5], ['sk', 2, 'Skills', 86, 0, 0], ['atk', 1, 'Atacar', 64, 78, 9],
     ...(gun ? [['aim', 'Q', 'Mirar parte', -24, -70, 8]] : []), ['tac', 'Tab', 'Mais', -30, 14, -5]] : [['atk', 1, 'Atacar', 56, 118, 9], ['sk', 2, 'Skills', 64, -132, -11], ['it', 3, 'Itens', 34, -38, 2], ['def', 4, 'Defender', 150, 44, -5],
-    ...(gun ? [['aim', 'Q', 'Mirar parte', -48, 8, 7]] : []), ['tac', 'Tab', 'Tática', -60, -96, -9]];
+    ...(gun ? [['aim', 'Q', 'Mirar parte', -20, 8, 7]] : []), ['tac', 'Tab', 'Tática', -40, -96, -9]];
   // pincelada da coluna: o atalho é uma marca discreta no canto (sem a faixa de dicas)
   const stroke = (lq, key, label, small, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''} ${o.cls || ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
 
   // ===== coluna presa ao herói: segue o recorte da vez (suave), espelha na borda e some durante a investida =====
   // .lqm: uma só coluna (comandos, traço, comandos de turno) no ombro, com a lista aberta ao lado
   const fol = { x: null, y: null, tx: null, ty: null, side: 1, raf: 0, tmo: 0, id: null, last: 0 };
+  const propOf = (rh, L) => rh > 0 && L.height > 0 ? Math.round(Math.min(1.7, Math.max(.6, rh / (L.height * .5))) * 20) / 20 : 1; // escala dos botões pelo tamanho do recorte na tela (zoom no personagem os aumenta; câmera longe os encolhe)
   const GAP = 22, DEAD = 40; // DEAD: px que o herói anda antes da coluna ir atrás
   // a coluna sobe para ser filha direta do #app, fixa sobre o retângulo do palco: fora de qualquer contexto de empilhamento do mestre/jogador, fica sempre acima do mundo 3D e dos recortes (z-index 16 contra 10)
   const lift = () => {
@@ -87,23 +88,24 @@ const LEQUE = (() => {
   // step(snap): mede e posiciona; snap pula a suavização (aba em segundo plano, onde o requestAnimationFrame não roda)
   // leque radial: a âncora (.lqm, tamanho zero) fica no ombro; o lado (espelho) e a lista aberta saem da medida das faixas
   const stepR = (lq, m, L, r, rl, rr, rt, rh, snap) => {
-    const hk = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) || .64;
-    if (fol.s !== 1) { fol.s = 1; lq.style.setProperty('--hk', ''); }
-    const a0 = m.getBoundingClientRect(), mir = lq.classList.contains('l'); let l = 0, rx = 0, t = 0, b = 0;
+    const pr = propOf(rh, L), hk = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) || .64) * pr; // pr: a coluna acompanha o tamanho do recorte
+    if (fol.s !== pr) { fol.s = pr; lq.style.setProperty('--hk', pr !== 1 ? hk.toFixed(3) : ''); }
+    // o leque abre dos dois lados do personagem: Tática e Mirar à esquerda, o resto à direita (--ex/--ew afastam cada metade da borda do recorte); a âncora é o centro dele
+    const hw = r && r.width ? (rr - rl) / 2 : 0, gp = r && r.width ? GAP + rh * .04 : 0;
+    m.style.setProperty('--ex', ((hw + gp) / hk).toFixed(1)); m.style.setProperty('--ew', (-(hw + gp) / hk).toFixed(1));
+    const a0 = m.getBoundingClientRect(); let l = 0, rx = 0, t = 0, b = 0;
     for (const e of m.querySelectorAll('.lqr>.rad')) { const q = e.getBoundingClientRect(); l = Math.min(l, q.left - a0.left); rx = Math.max(rx, q.right - a0.left); t = Math.min(t, q.top - a0.top); b = Math.max(b, q.bottom - a0.top); }
-    if (mir) [l, rx] = [-rx, -l]; // medidas como se o leque abrisse para a direita
     const sub = m.querySelector('.lqsub'), sq = sub?.getBoundingClientRect(), sw = sq ? sq.width : 0, shh = sq ? sq.height : 0, res = Math.max(sw, 380 * hk) + 16;
-    const ax = r && r.width ? (rl + rr) / 2 : L.width * .45, ay = rh ? rt + rh * .3 : L.height * .42;
-    const fits = sd => sd > 0 ? ax + rx + res <= L.width - 8 : ax - rx - res >= 8; // o leque espelhado abre para a esquerda
-    let side = fol.side || 1; if (!fits(side)) side = fits(-side) ? -side : (L.width - ax > ax ? 1 : -1);
-    const el = side > 0 ? l : -rx, er = side > 0 ? rx : -l;
-    const x = Math.max(8 - el, Math.min(L.width - 8 - er, ax)), y = Math.max(8 - t, Math.min(L.height - 8 - b, ay));
-    { const ln = PALCO3D.lane, lw = Math.round(Math.max(0, er) + res); if (ln.w !== lw || ln.side !== side) { ln.w = lw; ln.side = side; if (typeof render === 'function' && !state.busy) { state.busy = true; setTimeout(() => { state.busy = false; render(); }, 0); } } }
+    const ay = rh ? rt + rh * .3 : L.height * .42, mid = r && r.width ? (rl + rr) / 2 : L.width * .45;
+    const fits = sd => sd > 0 ? mid + rx + res <= L.width - 8 : mid + l - res >= 8; // lado da lista aberta (skills, itens)
+    let side = fol.side || 1; if (!fits(side)) side = fits(-side) ? -side : (L.width - mid > mid ? 1 : -1);
+    const el = l, er = rx;
+    const x = Math.max(8 - el, Math.min(L.width - 8 - er, mid)), y = Math.max(8 - t, Math.min(L.height - 8 - b, ay));
+    { const ln = PALCO3D.lane, lw = 0; if (ln.w !== lw || ln.side !== side) { ln.w = lw; ln.side = side; if (typeof render === 'function' && !state.busy) { state.busy = true; setTimeout(() => { state.busy = false; render(); }, 0); } } } // sem faixa reservada: os botões ficam nos dois lados do personagem
     if (fol.id !== cx.actor.id || side !== fol.side) { fol.id = cx.actor.id; fol.x = null; } fol.side = side;
     const hold = ['skills', 'items', 'all'].includes(state.mode);
     const ease = (k, v) => { if (fol[k] == null) return v; if (hold) return fol[k]; const d = v - fol[k]; if (snap) return Math.abs(d) > DEAD ? v : fol[k]; if (Math.abs(d) < 3) return fol[k]; return fol.mv?.[k] || Math.abs(d) > DEAD ? fol[k] + d * .22 : fol[k]; };
     const nx = ease('x', x), ny = ease('y', y); fol.mv = { ...fol.mv, x: Math.abs(x - nx) >= 3, y: Math.abs(y - ny) >= 3 }; fol.x = nx; fol.y = ny; fol.l = nx;
-    lq.classList.toggle('l', side < 0);
     m.style.transform = `translate(${Math.round(nx)}px,${Math.round(ny)}px)`; m.style.visibility = '';
     if (sub) { // a lista abre ao lado do leque, no lado livre; sem espaço, do outro lado
       let sx = side > 0 ? er + 14 : el - 14 - sw; if (nx + sx + sw > L.width - 8) sx = el - 14 - sw; if (nx + sx < 8) sx = er + 14;
@@ -120,11 +122,11 @@ const LEQUE = (() => {
     if (m.querySelector('.lqr')) return stepR(lq, m, L, r, rl, rr, rt, rh, snap);
     // o lado escolhe pela largura com a lista aberta (reserva), para abrir Skills não trocar de lado
     // largura/altura SEM a escala de encolher (fol.s): o lado e a escala saem do recorte, sem realimentar a medida
-    const s0 = fol.s || 1, hk = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) || .64, w0 = mi.width / s0, wr = Math.max(w0, 560 * hk), gap = GAP + rh * .04; // o espaço entre coluna e corpo cresce com o recorte
-    const pk = PALCO3D.pickSide({ left: rl, right: rr }, { width: L.width }, w0, wr, gap), side = pk.side, s = pk.scale;
-    if (s !== fol.s) { fol.s = s; lq.style.setProperty('--hk', s < 1 ? (hk * s).toFixed(3) : ''); }
-    const w = w0 * s, h = mi.height / s0 * s;
-    { const ln = PALCO3D.lane, lw = Math.round(wr * s); if (ln.w !== lw || ln.side !== side) { ln.w = lw; ln.side = side; if (typeof render === 'function' && !state.busy) { state.busy = true; setTimeout(() => { state.busy = false; render(); }, 0); } } } // a câmera reserva a faixa: só re-enquadra quando muda
+    const s0 = fol.s || 1, pr = propOf(rh, L), hk = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hk')) || .64) * pr, w0 = mi.width / s0 * pr, wr = Math.max(w0, 560 * hk), gap = GAP + rh * .04; // o espaço entre coluna e corpo cresce com o recorte
+    const pk = PALCO3D.pickSide({ left: rl, right: rr }, { width: L.width }, w0, wr, gap), side = pk.side, sp = pk.scale, s = sp * pr;
+    if (s !== fol.s) { fol.s = s; lq.style.setProperty('--hk', s !== 1 ? (hk / pr * s).toFixed(3) : ''); }
+    const w = w0 * sp, h = mi.height / s0 * s;
+    { const ln = PALCO3D.lane, lw = Math.round(wr * sp); if (ln.w !== lw || ln.side !== side) { ln.w = lw; ln.side = side; if (typeof render === 'function' && !state.busy) { state.busy = true; setTimeout(() => { state.busy = false; render(); }, 0); } } } // a câmera reserva a faixa: só re-enquadra quando muda
     if (fol.id !== cx.actor.id || side !== fol.side) { fol.id = cx.actor.id; fol.x = fol.tx = null; } fol.side = side;
     // fol.x guarda a borda voltada para o herói (esquerda à direita do ombro; direita no lado espelhado): abrir a lista muda a largura sem deslizar a coluna
     const sx = side > 0 ? 0 : w, x = Math.max(8, Math.min(L.width - w - 8, side > 0 ? rr + gap : rl - gap - w)) + sx;

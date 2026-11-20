@@ -5,7 +5,7 @@
 //   trocada com fade de 1,5 s. A ambiência que o mestre põe para tocar (S.audio.amb) tem a vez: com ela, esta fica calada.
 // MSOM.fx(k, dist): bau, alavanca, pegar, armadilha, alerta.
 // MSOM.tick(now), por quadro (mundo3d.js): passos dos heróis que andam (0,45 s andando, 0,28 s correndo), ambiência da casa de quem
-//   ouve (o herói selecionado; na TV e no mestre, o centro da câmera) e efeitos vindos do histórico e do alerta dos inimigos à vista.
+//   ouve (o herói selecionado; no mestre, o centro da câmera) e efeitos vindos do histórico e do alerta dos inimigos à vista.
 // Respeita o botão de som e o volume de cada pessoa (level() do extras.js).
 const P = () => globalThis.MPECAS;
 let ac = null, bus = null, nbuf = null;

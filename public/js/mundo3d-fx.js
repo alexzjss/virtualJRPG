@@ -218,14 +218,3 @@ export function shatter(renderer, done, q = 'media') {
   passo(t0); // o primeiro quadro já sai agora: o canvas do mundo some logo em seguida
   return cv;
 }
-
-// TV: o centro e a altura da câmera (ortográfica, inclinada 35°) que cabem os pontos com 2 casas de margem, no giro yaw e na
-// proporção asp; nunca mais perto que 8. Sem pontos, o andar inteiro. Eixos da tela no chão: direita (cos, −sin), frente (−sin, −cos).
-export function tvBox(pts, f, yaw, asp = 16 / 9) {
-  const M = 2, st = Math.sin(35 * Math.PI / 180), rx = Math.cos(yaw), rz = -Math.sin(yaw), fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-  const ps = pts.length ? pts : [{ x: 0, z: 0 }, { x: f.w, z: 0 }, { x: 0, z: f.h }, { x: f.w, z: f.h }], m = pts.length ? M : 0;
-  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-  for (const p of ps) { const u = p.x * rx + p.z * rz, v = p.x * fx + p.z * fz; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
-  const um = (u0 + u1) / 2, vm = (v0 + v1) / 2, rw = u1 - u0 + 2 * m, rh = (v1 - v0 + 2 * m) * st;
-  return { x: um * rx + vm * fx, z: um * rz + vm * fz, h: Math.max(rh, rw / asp, 8) };
-}

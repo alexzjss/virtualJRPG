@@ -17,6 +17,7 @@ const reset = () => { S.chars = {}; S.log.length = 0; S.battle = { active: false
 const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, c.role === 'player' ? { ...m, owner: c.name } : m); /* só o mestre cria; o de jogador nasce com dono */ const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; return ch; };
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 const isArm = s => /^armas-/.test(s.br || ''); // Árvore de Armas: bloco isolado (el 'fis', sem ligação com o resto da grade)
+const gridSkills = () => Object.entries(S.skills).filter(([id]) => /^g\d+$/.test(id));
 
 test('uiSet: só o mestre troca a UI e todos veem, mesmo depois de desfazer', () => {
   assert.equal(S.ui, '');
@@ -202,19 +203,29 @@ test('mira: espelha conforme a direção original e mantém a orientação a men
   assert.equal(faceLeft(50, 49, false), true);
 });
 
-test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1330); assert.ok(Object.keys(S.items).length >= 50); });
+test('bestiário inicial, técnicas exclusivas e grade são criados', () => {
+  assert.ok(Object.keys(S.bestiary).length >= 30);
+  assert.equal(gridSkills().length, TOTAL);
+  assert.ok(TOTAL >= 1330 && Object.keys(S.items).length >= 50);
+  const boss = Object.values(S.bestiary).find(ch => ch.name === 'Satan (Renascido)');
+  for (const id of ['satan-katana-1', 'satan-katana-2']) {
+    assert.ok(boss.skills.includes(id));
+    assert.equal(S.skills[id].ln, undefined, 'a técnica exclusiva fica fora das ligações da grade');
+  }
+});
 test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam todos os seus nós passando só por eles e pelo tronco Marcial', () => {
-  const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
+  const ns = gridSkills().map(([, s]) => s); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
   for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
     const set = ns.filter(s => (s.el === el || s.el === 'fis') && !isArm(s)), start = set.findIndex(s => s.el === el && (s.root || s.br === el + '-0')), seen = new Set([start]), q = [start], idOf = new Map(Object.entries(S.skills).map(([k, s]) => [s, k])), ix = new Map(set.map((s, i) => [idOf.get(s), i]));
     assert.ok(start >= 0, 'raiz de ' + el);
     while (q.length) { const x = set[q.pop()]; for (const l of x.ln || []) { const i = ix.get(l); if (i != null && !seen.has(i)) { seen.add(i); q.push(i); } } set.forEach((y, i) => { if (!seen.has(i) && Math.max(Math.abs(x.gx - y.gx), Math.abs(x.gy - y.gy)) <= 1) { seen.add(i); q.push(i); } }); }
     assert.deepEqual(set.filter((_, i) => !seen.has(i)).map(s => s.name), [], el);
-    assert.equal(ns.filter(s => s.el === el).length, TREE[el].branches.flat().length); assert.ok(ns.filter(s => s.el === el).length >= (['aura', 'oculto'].includes(el) ? 120 : 104));
+    const base = ns.filter(s => s.el === el && !s.refino);
+    assert.equal(base.length, TREE[el].branches.flat().length); assert.ok(base.length >= (['aura', 'oculto'].includes(el) ? 120 : 104));
   }
 });
 test('ligações: simétricas, nunca entre setores diferentes (só com o Marcial), sem repetição', () => {
-  for (const [id, s] of Object.entries(S.skills)) {
+  for (const [id, s] of gridSkills()) {
     assert.ok(Array.isArray(s.ln) && s.ln.length, 'sem ligação: ' + s.name);
     assert.equal(new Set(s.ln).size, s.ln.length, s.name);
     for (const j of s.ln) { const o = S.skills[j]; assert.ok(o && o.ln.includes(id), `${s.name} → ${o?.name} não volta`);
@@ -222,22 +233,23 @@ test('ligações: simétricas, nunca entre setores diferentes (só com o Marcial
   }
 });
 test('ligações: cada setor alcança todos os seus nós andando só por ln, por ele e pelo Marcial', () => {
+  const ids = gridSkills().map(([id]) => id);
   for (const el of ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'amaterasu', 'tsukuyomi', 'shukketsu', 'hiruko', 'aura', 'oculto']) {
     const ok = id => [el, 'fis'].includes(S.skills[id].el) && !isArm(S.skills[id]), start = Object.keys(S.skills).find(id => S.skills[id].el === el && S.skills[id].root), seen = new Set([start]), q = [start];
     assert.ok(start, 'raiz de ' + el);
     while (q.length) for (const j of S.skills[q.pop()].ln || []) if (!seen.has(j) && ok(j)) { seen.add(j); q.push(j); }
-    assert.deepEqual(Object.keys(S.skills).filter(id => ok(id) && !seen.has(id)).map(id => S.skills[id].name), [], el);
+    assert.deepEqual(ids.filter(id => ok(id) && !seen.has(id)).map(id => S.skills[id].name), [], el);
   }
 });
 test('mandala: todo nó tem posição e nenhum par de esferas se sobrepõe', () => {
-  const ns = Object.values(S.skills); assert.ok(ns.every(s => Number.isFinite(s.wx) && Number.isFinite(s.wy)), 'nó sem wx/wy');
+  const ns = gridSkills().map(([, s]) => s); assert.ok(ns.every(s => Number.isFinite(s.wx) && Number.isFinite(s.wy)), 'nó sem wx/wy');
   const cell = new Map(), K = s => [Math.floor(s.wx / 34), Math.floor(s.wy / 34)];
   for (const s of ns) { const k = K(s).join(','); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(s); }
   for (const a of ns) { const [cx, cy] = K(a); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const b of cell.get((cx + dx) + ',' + (cy + dy)) || [])
     if (a !== b) assert.ok(Math.hypot(a.wx - b.wx, a.wy - b.wy) >= 30, a.name + ' × ' + b.name); }
 });
 test('mandala: os setores ficam na ordem da roda (ângulo médio crescente)', () => {
-  const ORD = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'aura', 'amaterasu', 'tsukuyomi', 'oculto', 'shukketsu', 'hiruko'], ns = Object.values(S.skills);
+  const ORD = ['kagutsuchi', 'susanoo', 'atlas', 'indra', 'fuhaku', 'aura', 'amaterasu', 'tsukuyomi', 'oculto', 'shukketsu', 'hiruko'], ns = gridSkills().map(([, s]) => s);
   const ang = el => { const v = ns.filter(s => s.el === el).reduce((a, s) => [a[0] + s.wx, a[1] + s.wy], [0, 0]); return Math.atan2(v[1], v[0]); };
   const a0 = ang(ORD[0]), rel = ORD.map(el => ((ang(el) - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
   rel.slice(1).forEach((r, i) => assert.ok(r > rel[i], ORD[i + 1]));
@@ -273,8 +285,9 @@ test('conteúdo: armas de fogo usam DES, técnica exige a arma certa, bomba e re
   reset(); const a = mk(ana, {}), b2 = mk(ana, {}); b2.hp = 0; a.inv[it('Pena de Fênix')] = 1; H.battle(gm, { on: true }); b2.dying = 3; S.battle.ticks[b2.id] = 9999;
   H.use(ana, { id: a.id, item: it('Pena de Fênix'), target: b2.id }); assert.equal(b2.hp, 20);
 });
-test('chefe: ponto fraco dobra o dano, controle dura 1 turno, fúria invoca lacaios', () => {
-  reset(); const h = mk(ana, {}), bid = Object.keys(S.bestiary).find(k => S.bestiary[k].boss); H.bSpawn(gm, { id: bid });
+test('chefe: ponto fraco dobra o dano, controle dura 1 turno, fúria invoca lacaios', t => {
+  t.mock.method(Math, 'random', () => .3); // acerta os dois golpes sem crítico nem aparo do chefe
+  reset(); const h = mk(ana, {}), bid = Object.keys(S.bestiary).find(k => S.bestiary[k].name === 'Ifrit das Fornalhas'); H.bSpawn(gm, { id: bid });
   const boss = Object.values(S.chars).find(c => c.boss); derive(boss); boss.hp = boss.hpMax; h.attrs.FOR = 95; h.attrs.AGI = 99; boss.attrs.AGI = 1;
   H.battle(gm, { on: true }); H.st(gm, { id: boss.id, k: 'stun' }); assert.equal(boss.st.stun, 1);
   delete boss.st.stun; let hp = boss.hp, dmgWeak = 0, dmgTorso = 0;
@@ -390,9 +403,9 @@ test('pedidos: ação do jogador espera o mestre; aprovar com bônus, em segredo
   handle(ana, { t: 'act', id: h.id, skill: 'atk', target: e.id }); assert.equal(Object.keys(S.reqs).length, 0);
   H.battle(gm, {}); handle(ana, { t: 'move', id: h.id, x: 3, y: 2 }); assert.equal(h.x, 3); // mover o token não pede aprovação
   const ctl = { role: 'player', name: 'Ana', ctl: true, appr: true }, n2 = S.log.length; handle(ctl, { t: 'roll', id: h.id, attr: 'FOR' }); assert.equal(S.log.length, n2 + 1); assert.equal(Object.keys(S.reqs).length, 0); // mestre no controle: sem fila
-  handle(gm, { t: 'map', f: 'bbg', v: 'gelo' }); assert.equal(S.scenes[S.scene].bbg, 'gelo'); handle(gm, { t: 'map', f: 'bbg', v: 'javascript:x' }); assert.equal(S.scenes[S.scene].bbg, ''); handle(ana, { t: 'map', f: 'bbg', v: 'noite' }); assert.equal(S.scenes[S.scene].bbg, '');
+  handle(gm, { t: 'map', f: 'bbg', v: 'neve-dia' }); assert.equal(S.scenes[S.scene].bbg, 'neve-dia'); handle(gm, { t: 'map', f: 'bbg', v: 'javascript:x' }); assert.equal(S.scenes[S.scene].bbg, ''); handle(ana, { t: 'map', f: 'bbg', v: 'floresta-noite' }); assert.equal(S.scenes[S.scene].bbg, '');
   // fundos novos e clima visual sobreposto: o mestre escolhe, valor inválido volta a vazio, jogador não mexe
-  handle(gm, { t: 'map', f: 'bbg', v: 'sangue' }); assert.equal(S.scenes[S.scene].bbg, 'sangue'); handle(gm, { t: 'map', f: 'bbg', v: 'aurora' }); assert.equal(S.scenes[S.scene].bbg, 'aurora');
+  handle(gm, { t: 'map', f: 'bbg', v: 'vulcao-tarde' }); assert.equal(S.scenes[S.scene].bbg, 'vulcao-tarde'); handle(gm, { t: 'map', f: 'bbg', v: 'praia-noite' }); assert.equal(S.scenes[S.scene].bbg, 'praia-noite');
   handle(gm, { t: 'map', f: 'clima', v: 'chuva' }); assert.equal(S.scenes[S.scene].clima, 'chuva'); handle(gm, { t: 'map', f: 'clima', v: 'lava' }); assert.equal(S.scenes[S.scene].clima, ''); handle(gm, { t: 'map', f: 'clima', v: 'neve' }); handle(ana, { t: 'map', f: 'clima', v: 'brasas' }); assert.equal(S.scenes[S.scene].clima, 'neve'); handle(gm, { t: 'map', f: 'clima', v: '' }); assert.equal(S.scenes[S.scene].clima, '');
 });
 test('mestre: aplica a vários de uma vez e dá ou tira skill passiva com o bônus', () => {
@@ -1868,8 +1881,8 @@ test('PFX: actsAround junta o golpe inteiro e para no resto do log', async () =>
 });
 test('palco 3D: posições fixas de câmera enquadram todos e são distintas', async () => {
   await import('../public/js/palco3d.js'); const P = globalThis.PALCO3D, pts = [{ x: -430, z: 0 }, { x: 330, z: 60 }, { x: 0, z: -1500 }, { x: 900, z: -1300 }], seen = new Set();
-  assert.deepEqual(P.MODES, ['ombro', 'side', 'tres', 'diag', 'frente', 'baixa', 'aerial']);
-  for (const k of P.MODES.slice(1)) { const v = P.cameraFor({ kind: k, pts, w: 1440, h: 860 }); assert.ok(Number.isFinite(v.tz) && v.tz > -9000, k + ' cabe no quadro'); seen.add(`${v.ry}/${v.rx}`); }
+  assert.deepEqual(P.MODES, ['ombro', 'foco', 'side', 'tres', 'diag', 'frente', 'baixa', 'aerial']);
+  for (const k of P.MODES.slice(1).filter(k => k !== 'foco')) { const v = P.cameraFor({ kind: k, pts, w: 1440, h: 860 }); assert.ok(Number.isFinite(v.tz) && v.tz > -9000, k + ' cabe no quadro'); seen.add(`${v.ry}/${v.rx}`); }
   assert.equal(seen.size, 6);
 });
 test('palco 3D: órbita e contracampo do inimigo', async () => {
@@ -2078,4 +2091,12 @@ test('chefes: bossFx só do mestre, só em inimigo, saneado', () => {
   handle(ana, { t: 'set', id: e.id, f: 'bossFx', v: { in: 'eclipse' } }); assert.equal(S.chars[e.id].bossFx.in, 'fenda', 'jogador não muda');
   handle(gm, { t: 'set', id: h.id, f: 'bossFx', v: { in: 'eclipse' } }); assert.equal(S.chars[h.id].bossFx, undefined, 'herói não tem cena de chefe');
   handle(gm, { t: 'set', id: e.id, f: 'bossFx', v: 'eclipse' }); assert.equal(S.chars[e.id].bossFx, null);
+});
+
+test('controle: vale N turnos perdidos, mesmo se cair no personagem da vez; caído gasta duração; imunidade zera entre batalhas', async () => {
+  const [a, e] = duel(); S.battle.ticks[a.id] = 1; S.battle.ticks[e.id] = 50; assert.equal(current(), a.id);
+  (await import('../src/rules.js')).applySt(a, 'stun', 2); assert.equal(a.st.stun, 3); // o endTurn dele gasta 1
+  const n0 = S.log.length; H.next(gm); assert.equal(S.log.slice(n0).filter(l => /atordoado e perde o turno/.test(l.text)).length, 2); assert.equal(a.st.stun, undefined); // N=2 turnos perdidos
+  a.imm = 2; H.battle(gm, { on: false }); assert.equal(a.imm, undefined);
+  const [b] = duel(); b.hp = 0; b.dying = 3; b.st.stun = 2; S.battle.ticks[b.id] = 1; H.next(gm); assert.ok((b.st.stun ?? 0) < 2 || S.chars[current()] !== b);
 });

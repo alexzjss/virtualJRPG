@@ -1,4 +1,4 @@
-// ===== mesa em pausa: o mestre liga e jogadores/TV veem a tela de título "Vínculos Além do Tempo" =====
+// ===== mesa em pausa: o mestre liga e jogadores veem a tela de título "Vínculos Além do Tempo" =====
 // (variação "Rachado · Éter + selo" do canvas de title cards). O mestre vê só uma faixa discreta.
 {
   const AC = '#9b6fe0', AC2 = '#5b3a96', AC3 = '#d9c2ff', CRACK = '#ffffff';

@@ -1,12 +1,11 @@
-// Só guarda o acesso nas chaves que as telas já usam (vj_key, vj_name, vj_pass_<nome>).
-// Assim as três telas entram sem perguntar de novo.
+// Guarda o acesso nas mesmas chaves das telas do mestre e do jogador.
 const ls = {
   get: k => { try { return localStorage[k] || ''; } catch { return ''; } },
   set: (k, v) => { try { localStorage[k] = v; } catch {} },
   del: k => { try { delete localStorage[k]; } catch {} },
   keys: () => { try { return Object.keys(localStorage); } catch { return []; } },
 };
-const SRC = { gm: '/gm', player: '/player', table: '/table' };
+const SRC = { gm: '/gm', player: '/player' };
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 let mode = 'all';
 
@@ -44,8 +43,8 @@ $('#setup').addEventListener('submit', e => {
   const k = $('#k').value, n = $('#n').value.trim(), p = $('#p').value;
   if (!k) return $('#err').textContent = 'Informe a chave do mestre.';
   if (!n || /\s|@/.test(n)) return $('#err').textContent = 'Nome sem espaços nem @.';
-  if (p.length < 3) return $('#err').textContent = 'Senha com pelo menos 3 caracteres.';
-  ls.set('vj_key', k); ls.set('vj_name', n); ls.set('vj_pass_' + n, p);
+  if (p.length < 4) return $('#err').textContent = 'Senha com pelo menos 4 caracteres.';
+  ls.set('vj_key', k); ls.set('vj_name', n); ls.set('vj_pass', p); ls.del('vj_pass_' + n);
   $('#err').textContent = '';
   start();
 });
@@ -54,7 +53,7 @@ $('#tools').addEventListener('click', e => {
   const b = e.target.closest('[data-focus]');
   if (b) return focusPane(b.dataset.focus);
   if (e.target.id === 'reset') { // esquece o acesso salvo e volta ao formulário
-    ls.keys().filter(k => k === 'vj_key' || k === 'vj_name' || k.startsWith('vj_pass_')).forEach(ls.del);
+    ls.keys().filter(k => ['vj_key', 'vj_name', 'vj_pass'].includes(k) || k.startsWith('vj_pass_')).forEach(ls.del);
     $$('iframe').forEach(f => f.removeAttribute('src'));
     mode = 'all'; apply(); show(false); fillForm();
   }
@@ -63,10 +62,12 @@ $('#grid').addEventListener('click', e => { const b = e.target.closest('[data-fo
 
 function fillForm() {
   const n = ls.get('vj_name');
-  $('#k').value = ls.get('vj_key'); $('#n').value = n; $('#p').value = n ? ls.get('vj_pass_' + n) : '';
+  $('#k').value = ls.get('vj_key'); $('#n').value = n; $('#p').value = n ? ls.get('vj_pass') : '';
 }
 
+const oldPassKey = 'vj_pass_' + ls.get('vj_name');
+if (!ls.get('vj_pass') && ls.get(oldPassKey)) { ls.set('vj_pass', ls.get(oldPassKey)); ls.del(oldPassKey); }
 fillForm();
-const saved = ls.get('vj_key') && ls.get('vj_name') && ls.get('vj_pass_' + ls.get('vj_name'));
+const saved = ls.get('vj_key') && ls.get('vj_name') && ls.get('vj_pass');
 if (saved) start(); else show(false);
 watchDots();

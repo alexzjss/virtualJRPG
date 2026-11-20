@@ -217,9 +217,12 @@ function cantUse(a, s) {
   return '';
 }
 const applySt = (t, k, n = 3) => {
-  if (CTRL.includes(k) && t.imm > 0) return;
+  if (CTRL.includes(k) && t.imm > 0) return false;
   if (CTRL.includes(k) && t.chg) interrupt(t);
-  t.st[k] = t.boss && CTRL.includes(k) ? 1 : DOT.includes(k) ? Math.min(6, (t.st[k] || 0) + n) : n; // dano contínuo acumula até 6 turnos
+  // controle no personagem da vez: o próprio endTurn dele gastaria 1, então soma 1 para o efeito valer N turnos perdidos
+  const now = CTRL.includes(k) && S.battle.active && current() === t.id ? 1 : 0;
+  t.st[k] = (t.boss && CTRL.includes(k) ? 1 : DOT.includes(k) ? Math.min(6, (t.st[k] || 0) + n) : n) + now; // dano contínuo acumula até 6 turnos
+  return true;
 };
 const tickSt = ch => { for (const k in ch.st) if (--ch.st[k] <= 0) { delete ch.st[k]; expire(ch, k); } if (ch.imm > 0) ch.imm--; };
 function expire(ch, k) { // condições com efeito ao acabar
@@ -266,16 +269,16 @@ function chainBurst(a) { // barra de Cadeia cheia: cada aliado ataca em seguida,
   const mates = battlers().filter(o => o.enemy === a.enemy && o.hp > 0 && !skipping(o) && !o.summon);
   if (mates.length < 2) return; // sozinho não há sequência: a barra espera um aliado
   B[sideOf(a)] = 0;
-  log(a.name, 'CADEIA! O grupo ataca em sequência.', 'ok');
+  log(a.name, 'CADEIA! O grupo ataca em sequência.', 'ok', { audioCue: 'cadeia' });
   mates.forEach((o, i) => { const f = battlers().filter(x => x.enemy !== a.enemy && x.hp > 0); if (f.length) strike(o, basicOf(o), pick(f), null, 0, { mult: 1 + .25 * i, nochain: true }); });
 }
 const allDown = side => { const f = battlers().filter(o => o.enemy !== side && o.hp > 0); return f.length > 0 && f.every(o => o.st.down || o.st.broken); };
 function allOut(a) { // Ataque Total: com todo inimigo Derrubado ou Quebrado, o grupo inteiro cai em cima deles
-  log(a.name, 'ATAQUE TOTAL!', 'ok');
+  log(a.name, 'ATAQUE TOTAL!', 'ok', { audioCue: 'ataqueTotal' });
   const mates = battlers().filter(o => o.enemy === a.enemy && o.hp > 0 && !skipping(o) && !o.summon);
   for (const o of mates) { const f = battlers().filter(x => x.enemy !== a.enemy && x.hp > 0); if (!f.length) break; strike(o, basicOf(o), pick(f), null, 0, { mult: 1.5, nochain: true }); }
 }
-function doDefend(a) { a.brv = Math.min(3, Math.max(0, a.brv || 0) + 1); applySt(a, 'defUp', 2); log(a.name, `se defende e guarda Coragem (${a.brv}/3).`, 'ok'); endTurn(a.id, 70); }
+function doDefend(a) { a.brv = Math.min(3, Math.max(0, a.brv || 0) + 1); applySt(a, 'defUp', 2); log(a.name, `se defende e guarda Coragem (${a.brv}/3).`, 'ok', { audioCue: 'guarda' }); endTurn(a.id, 70); }
 function doFocus(a) { a.ten = Math.min(3, (a.ten || 0) + 1); log(a.name, `concentra a Tensão (${a.ten}/3): o próximo golpe causa ×${TEN[a.ten]}.`, 'ok'); endTurn(a.id, 70); }
 function openDomain(a, s) { // Expansão de Domínio: gasta toda a Aura; dois Domínios se chocam numa disputa de Aura
   const B = S.battle, old = B.dom, stat = x => Math.max(at(x, 'INT'), at(x, 'SAB')) + x.aura / 2, mine = stat(a) + d100() / 2;
@@ -311,7 +314,7 @@ function fx1(a, s, t, f, c = {}) {
   if (!t || t.dead) return '';
   const T = S.battle.ticks;
   switch (f.t) {
-    case 'st': if ((t.hp > 0 || f.k === 'regen') && Math.random() * 100 < (f.ch ?? 100)) { applySt(t, f.k, f.n + (t === a && current() === a.id ? 1 : 0)); return ` [${STN[f.k]}${t !== a && f.to ? ' em ' + t.name : ''}]`; } return '';
+    case 'st': if ((t.hp > 0 || f.k === 'regen') && Math.random() * 100 < (f.ch ?? 100)) { if (applySt(t, f.k, f.n + (t === a && !CTRL.includes(f.k) && current() === a.id ? 1 : 0)) === false) return ` [${STN[f.k]}: imune]`; return ` [${STN[f.k]}${t !== a && f.to ? ' em ' + t.name : ''}]`; } return '';
     case 'det': {
       if (t.hp <= 0) return '';
       if (f.k === 'seal') return t.sealD ? sealBoom(t, 1.5) : '';
@@ -423,7 +426,7 @@ function endTurn(id, ct = 100) { // ct: custo de tempo da ação em %
     if (n.hp <= 0) { // contagem de morte
       n.dying = (n.dying ?? 3) - 1;
       if (n.dying <= 0) { n.dead = true; n.fell = true; delete n.dying; delete S.battle.ticks[n.id]; log(n.name, 'não resistiu e morreu.', 'bad'); }
-      else { log(n.name, `está caído: ${n.dying} turno(s) até a morte`, 'bad'); bump(n.id, delay(n)); }
+      else { log(n.name, `está caído: ${n.dying} turno(s) até a morte`, 'bad'); tickSt(n); bump(n.id, delay(n)); }
       continue;
     }
     if (S.battle.dom?.tick && n.enemy !== S.battle.dom.side && !n.summon) applySt(n, S.battle.dom.tick, 1);
@@ -478,6 +481,7 @@ function ammoFor(a, s) { // munição equipada: balas (armas de fogo) ou flechas
   if (!(a.shots[id] > 0)) { if (!(a.inv[id] > 0)) { delete a.equip.mun; return null; } if (--a.inv[id] <= 0) delete a.inv[id]; a.shots[id] = am.shots + OF.hook(a, 'tiros'); log(a.name, `abre um pacote de ${am.name} (${a.shots[id]} tiros).`, ''); }
   a.shots[id]--; return am;
 }
+const weaponSound = (actor, skill) => skill.basic || skill.req || skill.wpn ? { wt: wtype(actor) } : {};
 function strike(a, s, t, aim, bonus = 0, o = {}) {
   { const CW = S.battle.cmd, mw = CW && o.beat != null && CW.foe === a.id ? (CW.perf ? 1.25 : 1) * (CW.xmult || 1) : 1; if (mw !== 1) o = { ...o, mult: (o.mult || 1) * mw }; } // Perfeito de chefe ×1,25; Choque perdido ×1,3
   const am = ammoFor(a, s); if (am) { const pi = Math.max(am.pierce || 0, s.fx?.find(f => f.t === 'pierce')?.p || 0); s = { ...s, el: am.el || s.el, fx: [...(s.fx || []).filter(f => f.t !== 'pierce'), ...(pi ? [{ t: 'pierce', p: pi }] : []), ...(am.st ? [{ t: 'st', k: am.st, n: am.stn || 2, ch: am.stc ?? 100 }] : [])] }; }
@@ -491,7 +495,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
     }
     if (s.st) applySt(t, s.st);
     txt += hitFx(a, s, t, { d: 0, stat, fallen });
-    log(a.name, `${s.name} → ${t.name}${txt ? ': ' + txt.trim() : ''}${stTxt}`, 'ok', { fx: { id: t.id, heal: s.kind === 'heal' ? 1 : 0, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } });
+    log(a.name, `${s.name} → ${t.name}${txt ? ': ' + txt.trim() : ''}${stTxt}`, 'ok', { fx: { id: t.id, heal: s.kind === 'heal' ? 1 : 0, a: a.id, s: s.name, el: s.el, ...weaponSound(a, s), ...(s.limit ? { lim: 1 } : {}) } });
     if (s.kind === 'heal' && t !== a) trig(a, 'heal', t);
     return false;
   }
@@ -509,7 +513,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   const chance = sure ? 95 : int(stat + R.hit - (t.st.root ? 0 : Math.floor(at(t, 'AGI') / 2)) - (a.st.fear ? 20 : 0) - (a.st.curse ? 10 : 0) - (a.st.blind ? 25 : 0) - (a.st.exaus ? 15 : 0) + (a.st.focus ? 15 : 0) + (a.st.stealth ? 25 : 0) + ma.hit + (climaOf()?.[1].hit || 0) + (t.st.marked ? 20 : 0) - (aim ? BODY[aim][2] : 0) + bonus, 5, 95), r = d100();
   if (r > chance && !dodged) {
     if (r >= 96) addLimit(a, 20);
-    log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...(s.limit ? { lim: 1 } : {}) } });
+    log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${r >= 96 ? 'DESASTRE' : 'errou'}`, 'bad', { d: r, rr: { l: s.name, t: chance, res: r >= 96 ? 'DESASTRE' : 'Errou', c: a.id, atk: 1 }, fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, ...weaponSound(a, s), ...(s.limit ? { lim: 1 } : {}) } });
     trig(a, 'miss', t);
     const rf = t.form && t.st.form && SK(t.form)?.form?.ret; if (rf && a.id in S.battle.ticks && t.enemy !== a.enemy) { bump(a.id, Math.round(delay(a) * rf / 100)); log(t.name, `${a.name} perde o ritmo e tem o turno adiado.`, 'ok'); }
     return false;
@@ -555,7 +559,7 @@ function strike(a, s, t, aim, bonus = 0, o = {}) {
   if (t.hp > 0 && t.brk && !o.counter) { const n = (w ? 1 : 0) + (wk ? 1 : 0); if (n) extra += brkHit(t, n, a); }
   extra += hitFx(a, s, t, { d: dh, stat, blk, mid: o.mid });
   if (!mental && dh > 0 && t.st.reflect && t !== a && a.hp > 0) { const rd = Math.max(1, Math.round(dh * .3)); extra += ` ${t.name} reflete ${rd}.${hurt(a, rd, t)}`; }
-  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}), ...(dodged ? { esq: 1 } : {}) } });
+  log(a.name, `${s.name} → ${t.name} (${chance}%) → ${r}: ${crit ? 'CRÍTICO! ' : ''}${d} de dano${mental ? ' mental' : ` (${PL[part]})`}${w ? ' (fraqueza)' : rs ? ' (resistiu)' : ''}${stTxt}.${extra}`, 'ok', { d: r, rr: { l: s.name, t: chance, res: crit ? 'CRÍTICO' : 'Acertou', c: a.id, atk: 1 }, fx: { id: t.id, dmg: d, crit, el: s.el, a: a.id, s: s.name, w, ...weaponSound(a, s), ...(blk || (!mental && d > dh) ? { block: 1 } : {}), ...(s.limit ? { lim: 1 } : {}), ...(o.cx?.g ? { cg: o.cx.g } : {}), ...(bf ? { bf: 1 } : {}), ...(dodged ? { esq: 1 } : {}) } });
   if (!o.nochain) addChain(a, w ? 15 : crit ? 10 : 4);
   if (w) a.bt.wkNow = true;
   if (crit) trig(a, 'crit', t);
@@ -618,7 +622,7 @@ function chqResolve(a, plan, C) { // o cabo de guerra fechou: quem apertou mais 
 function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (golpe anulado), 'esq' (esquiva: golpe reduzido), 'bad' (golpe sai +50%) ou ''
   const C = S.battle.cmd, inWin = C && C.foe === a.id && o.beat != null && C.p?.[t.id] && !o.counter && t !== a && t.enemy !== a.enemy && t.hp > 0 && !sure && ['dmg', 'mental'].includes(s.kind);
   if (inWin) {
-    const v = C.p[t.id][o.beat], fx = { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 };
+    const v = C.p[t.id][o.beat], fx = { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1, ...weaponSound(a, s) };
     if (v === 'par') {
       if (!C.done[t.id]) { C.done[t.id] = 1; const g = parNode(t)?.power || 0; t.aura = Math.min(t.auraMax, t.aura + g); addLimit(t, 10); log(t.name, `APARA ${s.name} de ${a.name}!${g ? ` (+${g} Aura)` : ''}${a.brk ? brkHit(a, 1, t) : ''}`, 'ok', { fx }); }
       else log(t.name, `apara mais uma batida de ${s.name}!`, 'ok', { fx });
@@ -632,7 +636,7 @@ function parryCheck(a, s, t, o, sure) { // chamado a cada golpe; devolve 'ok' (g
   }
   if (!parryable(a, s, t, o, sure)) return '';
   if (t.enemy && !a.enemy && (t.boss || t.rank === 'elite') && !t.parT && !skipping(t) && Math.random() < (t.boss ? .15 : .1)) {
-    t.parT = 1; applySt(a, 'exposed', 2); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1 } }); return 'ok';
+    t.parT = 1; applySt(a, 'exposed', 2); log(t.name, `apara ${s.name} de ${a.name}! ${a.name} fica exposto.`, 'bad', { fx: { id: t.id, miss: 1, a: a.id, s: s.name, el: s.el, par: 1, ...weaponSound(a, s) } }); return 'ok';
   }
   return '';
 }
@@ -742,7 +746,7 @@ function doAct(a, m, bonus = 0) {
     endTurn(a.id, s.ct); return true;
   }
   if (!more && m.brave && a.hp > 0 && (a.brv || 0) > -2) { a.brv = (a.brv || 0) - 1; more = true; log(a.name, `gasta Coragem (${a.brv}) para agir de novo${a.brv < 0 ? ' — fica devendo tempo' : ''}.`, 'ok'); } // Coragem: ação extra, pagando com pontos ou com tempo
-  if (more && a.hp > 0) log(a.name, 'MAIS UM turno!', 'ok'); else endTurn(a.id, Math.round((s.ct || 100) * (haste ? 1 - haste.v / 100 : 1) * (wkNow ? .75 : 1)));
+  if (more && a.hp > 0) log(a.name, 'MAIS UM turno!', 'ok', { audioCue: 'turnoExtra' }); else endTurn(a.id, Math.round((s.ct || 100) * (haste ? 1 - haste.v / 100 : 1) * (wkNow ? .75 : 1)));
   return true;
 }
 function summonOf(a, s) { // invocação: aliado temporário que age sozinho, com atributos tirados do invocador

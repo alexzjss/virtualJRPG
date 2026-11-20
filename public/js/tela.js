@@ -5,15 +5,17 @@ const setApp = h => { const x = gridFull && S.chars[gridFull] ? `<div class="mod
 let gmWasB = null, gmFocus = null, lastHero = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
 // mundo 3D: ligado pelo servidor (VJ_MUNDO=1) ou por ?mundo=1, só no PC; o canvas fica fora do #app e segue o [data-mundo]
 const mundoOn = () => (S.mundo || /[?&]mundo=1/.test(location.search)) && innerWidth > 700 && !!window.MUNDO;
-const mapOr3d = () => mundoOn() ? `<section class="mundo-slot" data-mundo>${window.MHUD?.html?.(S) || ''}</section>` : map(); // HUD da exploração: fichas e chat (mundo-hud.js)
+const mapOr3d = () => mundoOn() ? `<section class="mundo-slot" data-mundo>${window.MHUD?.html?.(S) || ''}</section>` : map(); // HUD da exploração: fichas e registro (mundo-hud.js)
 function render() {
   const ae = document.activeElement;
-  if (drag || wdrag || cdrag || (typeof mzDrag !== "undefined" && mzDrag) || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }
+  if (drag || wdrag || cdrag || (typeof mzDrag !== "undefined" && mzDrag) || (gm && gres) || ae?.matches?.('#app select')) { pending = true; return; }
   pending = false; LEQUE.off();
   // guarda o campo em edição e a rolagem das janelas para devolver depois de redesenhar
   const keep = ae && app.contains(ae) && ae.matches('input:not([type=file]),textarea') ? { v: ae.value, s: ae.selectionStart,
     sel: ae.tagName + Object.entries(ae.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, x => '-' + x.toLowerCase())}="${CSS.escape(v)}"]`).join('') } : null;
-  const scr = [...app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody,.skl')].map(el => el.scrollTop);
+  const scrollAreas = '.win-body,.chatcol,.skside,.pl>main,.fbody,.skl';
+  const scrollKey = (el, i) => el.classList.contains('gbody') ? el.dataset.win : i;
+  const scr = new Map([...app.querySelectorAll(scrollAreas)].map((el, i) => [scrollKey(el, i), el.scrollTop]));
   const b = S.battle.active, sc = S.scenes[S.scene], chars = Object.values(S.chars), on = v => v ? 'class="own"' : '';
   asking = new Set(gm ? Object.values(S.reqs).map(r => r.ch) : []);
   const log = logHtml();
@@ -35,18 +37,29 @@ function render() {
       gui.lo = gui.battleSides.lo; gui.ro = gui.battleSides.ro; gui.battleSides = null; saveGui();
     }
     gmWasB = b; gmFocus = S.focus;
-    // Cena: o que se usa toda hora fica à mostra; mapa, grade, recursos e fundo da batalha ficam em "Mais…" (o aberto fica lembrado)
-    const cena = `<div class="row prim">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1" class="own">Iniciar batalha</button>'}</div>
-      <div class="row"><button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button><button data-a="secret" ${on(secret)}>Rolagem secreta</button><button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button></div>
-      <div class="row"><button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button><button data-a="pause" data-on="${S.paused ? '' : 1}" ${on(S.paused)} title="Mostra a tela de título para os jogadores e a TV">${S.paused ? 'Retomar mesa' : 'Pausar mesa'}</button></div>
-      <div class="row chips">Cena: <b>${esc(sc.name)}</b><span data-g="view" data-v="mesa" title="Criar, trocar e distribuir os heróis entre as cenas">abrir a Mesa</span></div>
-      <div class="row chips">Clima: <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
-      <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)}>Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar; Shift esconde.</small>` : ''}</div>
-      ${xCena(sc)}
+    const cena = `<div class="gc-controls">
+      <div class="row prim">${b ? `<button data-a="battle" data-win="1" class="own ${S.battle.end === 'won' ? 'pulse' : ''}">Vitória</button>` + '<button data-a="battle">Encerrar batalha</button>' : '<button data-a="battle" data-on="1" class="own">Iniciar batalha</button>'}</div>
+      <details class="mais" data-mais="acoes" ${maisO('acoes')}><summary>Ações da sessão${S.paused ? '<small>Pausada</small>' : ''}</summary>
+        <div class="gc-session">
+          <button data-a="undo" title="Desfaz a última ação do mestre (até 20)">Desfazer</button><button data-a="secret" ${on(secret)} aria-pressed="${secret}">Rolagem secreta</button>
+          <button data-a="pause" data-on="${S.paused ? '' : 1}" ${on(S.paused)} title="Mostra a tela de título para os jogadores">${S.paused ? 'Retomar mesa' : 'Pausar mesa'}</button><button data-a="camp" data-on="${S.camp.open ? '' : 1}" ${on(S.camp.open)}>Acampamento</button>
+          <button data-a="rest">Descanso curto</button><button data-a="rest" data-long="1">Descanso longo</button>
+          <button data-a="addChar">+ Personagem</button><button data-a="addChar" data-enemy="1">+ Inimigo</button>
+        </div>
+      </details>
+      <details class="mais" data-mais="notas" ${maisO('notas')}><summary>Notas secretas</summary>
+      <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea></details>
+      <details class="mais" data-mais="handout" ${maisO('handout')}><summary>Mostrar aos jogadores${S.handout ? '<small>Em exibição</small>' : ''}</summary>${gmHandout()}</details>
+      <details class="mais" data-mais="ambiente" ${maisO('ambiente')}><summary>Clima e névoa</summary>
+      <div class="row chips">Clima <span class="${sc.wx ? '' : 'weak'}" data-a="weather" data-k="">Limpo</span>${Object.entries(RULES.CLIMA).map(([k, v]) => `<span class="${sc.wx === k ? 'weak' : ''}" data-a="weather" data-k="${k}">${v[0]}</span>`).join('')}</div>
+      <div class="row"><button data-a="map" data-f="fogOn" data-v="${sc.fogOn ? '' : 1}" ${on(sc.fogOn)} aria-pressed="${!!sc.fogOn}">Névoa</button>${sc.fogOn ? `<button data-a="fogMode" ${on(fogMode)}>Pincel de névoa</button><small>Arraste para revelar. Shift esconde.</small>` : ''}</div>
+      ${sc.fogOn ? gmFog() : ''}
+      </details>
       <details class="mais" data-mais="mapa" ${maisO('mapa')}><summary>Mapa e grade</summary>
       <div class="row"><input aria-label="Nome da cena" data-map="name" value="${esc(sc.name)}"></div>
       <div class="row"><input aria-label="Imagem do mapa" data-map="bg" placeholder="Link da imagem do mapa" value="${esc(sc.bg)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="bg"></label><button data-a="cropOn" ${sc.bg ? '' : 'disabled'}>Recortar área</button></div>
       <div class="row"><label>Casas na largura <input type="number" step="0.25" min="4" max="80" data-map="cols" value="${sc.cols}"></label><small>${Math.round(sc.rows * 10) / 10} de altura</small></div>
+      <div class="row"><button data-a="map" data-f="grid" data-v="${sc.grid === false ? 1 : ''}" ${on(sc.grid !== false)} aria-pressed="${sc.grid !== false}">Grade visível</button><label>Metros por casa <input type="number" min="0" max="1000" step="0.5" data-map="unit" value="${+sc.unit || 0}"></label></div>
       <div class="row"><label>Grade → <input type="range" min="0" max="0.95" step="0.05" data-map="ox" value="${sc.ox}" aria-label="Deslocar grade na horizontal"></label><label>↓ <input type="range" min="0" max="0.95" step="0.05" data-map="oy" value="${sc.oy}" aria-label="Deslocar grade na vertical"></label></div>
       <div class="row"><button data-a="camFix" title="Todos passam a ver o mapa com o seu zoom e posição atuais">Fixar minha vista para todos</button>${sc.cam ? '<button data-a="camFree" class="own">Liberar vista</button>' : ''}</div>
       </details>
@@ -59,12 +72,11 @@ function render() {
       <div class="row chips">Clima da cena: <span class="${sc.clima ? '' : 'weak'}" data-a="map" data-f="clima" data-v="" title="Sem efeito de clima por cima do fundo">Nenhum</span>${chips(CLIMAV, (k, l) => `<span class="${sc.clima === k ? 'weak' : ''}" data-a="map" data-f="clima" data-v="${k}">${l}</span>`)}</div>
       <div class="row"><input aria-label="Imagem própria para o fundo da batalha" data-map="bbg" placeholder="Ou cole o link de uma imagem" value="${esc(sc.bbg && !BBG[sc.bbg] ? sc.bbg : '')}"><label class="up">Enviar fundo<input type="file" accept="image/*" data-up="bbg"></label></div>
       ${[['ceu', 'Céu (camada de trás)'], ['frente', 'Frente (PNG com transparência)'], ['piso', 'Piso do combate (textura do chão)']].map(([k, l]) => `<div class="row"><input aria-label="${l}" data-map="bbL:${k}" placeholder="${l}: link da imagem" value="${esc(sc.bbL?.[k] || '')}"><label class="up">Enviar<input type="file" accept="image/*" data-up="bbL:${k}"></label></div>`).join('')}
-      </details>
-      <textarea aria-label="Notas secretas da cena" data-map="note" placeholder="Notas secretas desta cena">${esc(sc.note)}</textarea>`;
+      </details></div>`;
     dockFix();
     const body = { ...xWins(), ...(gui.sheet && ent(gui.sheet.slice(2)) ? { [gui.sheet]: gmSheet(ent(gui.sheet.slice(2))) } : {}), pedidos: gui.R === 'pedidos' && sideOpen('R') ? reqStrip() : '', sessao: wins.sessao.open ? sessWin() : '', best: wins.best.open ? bestWin() : '', ini: wins.ini.open ? iniWin() : '', chase: wins.chase.open ? chaseWin() : '', cena, fichas: wins.fichas.open ? fichasWin() : '', chat: log, skills: wins.skills.open ? editor('skills') : '', items: wins.items.open ? editor('items') : '', ofcat: wins.ofcat.open ? ofcatWin() : '', armas: wins.armas.open ? armasWin() : '' };
     const bcur = b ? S.chars[timeline(1)[0]] : null, parts = b ? battle(true, ((lq) => HUD.gm() + lq)(bcur ? LEQUE.html(bcur, bcur, { gm: true }) : '')) : null; setApp(`${gmLayout(body, { parts, map: gui.view === 'mapa' || !b ? (mundoOn() && window.MEDIT ? MEDIT.html() : map()) : '', mesa: gui.view === 'mesa' ? MESA.html() : '' })}${cropper()}${ctxMenu()}`);
-  } else if (role === 'player') {
+  } else {
     const my = chars.filter(mine), c = my.find(x => x.id === selCh) || my[0], _hs = c && !asWho && c.id !== lastHero && (lastHero = c.id, send({ t: 'activeHero', id: c.id })), cur = b ? S.chars[timeline(1)[0]] : null, inB = b ? my.filter(x => x.id in S.battle.ticks) : [], actor = inB.includes(cur) ? cur : inB.includes(c) ? c : inB[0];
     if (b && !wasBattle) { pg = 'mesa'; if (innerWidth > 700) chatOpen = false; navOpen = false; } // a batalha começou: leva o jogador para a mesa (no PC o registro só abre por cima, quando pedido)
     const bat3 = b && actor && pg === 'mesa' && innerWidth > 700, unread = chatOpen ? 0 : S.log.filter(l => l.n > chatSeen).length; // bat3: batalha do PC, sem o painel antigo
@@ -78,16 +90,20 @@ function render() {
     lastPg = pg + (c?.id || '');
     setApp(`<header class="top ${bat3 ? 'bat3' : ''}"><div class="who">${my.map(x => `<button class="chb ${x === c ? 'on' : ''}" data-sel="${x.id}" style="--c:${esc(x.color)}" aria-pressed="${x === c}"><b>${esc(x.name)}</b><i class="mhp"><i style="width:${Math.max(0, Math.min(100, 100 * x.hp / (x.hpMax || 1)))}%"></i></i><small>${x.hp}/${x.hpMax} HP</small></button>`).join('')}</div>
       <nav class="tnav" aria-label="Páginas">${chips(PAGES, (k, l) => `<button data-pg="${k}" class="${pg === k ? 'on' : ''} ${k === 'mesa' && b ? 'alert' : ''}" ${pg === k ? 'aria-current="page"' : ''}>${ico(k)}<span>${k === 'mesa' && b ? 'Batalha' : l}</span></button>`)}<button class="tchat ${chatOpen ? 'on' : ''}" data-a="chatT" aria-pressed="${chatOpen}">${ico('reg')}<span>Registro</span>${unread ? `<i class="bdg">${unread > 9 ? '9+' : unread}</i>` : ''}</button></nav>
-      <div class="me"><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? `<div class="pop"><button data-a="mute">${snd.mute ? 'Ligar som' : 'Desligar som'}</button><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>` : ''}</div></header>
+      <div class="me"><button type="button" data-regras aria-haspopup="dialog" title="Guia de regras (?)">Regras</button><button class="ghost" data-a="meT" aria-expanded="${meOpen}">${esc(name)}</button>${meOpen ? `<div class="pop"><button data-a="mute">${snd.mute ? 'Ligar som' : 'Desligar som'}</button><button data-a="myPass">Trocar senha</button><button data-a="logout">Sair</button></div>` : ''}</div></header>
       ${ctl ? `<div class="peek ctl">Você está <b>jogando por ${esc(asWho)}</b>: o que fizer aqui acontece na hora, sem passar pela fila de pedidos.</div>` : asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
       <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg} ${bat3 ? 'bat3' : ''}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Registro</b><button class="ghost" data-a="chatT" aria-label="Fechar o registro">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`);
     lastReq = (myReq() || [])[0] || null;
-  } else setApp(`<main>${chaseBar()}${b ? battle(false, innerWidth > 700 ? HUD.html({ table: true }) : '') : mapOr3d() + party()}</main>`);
+  }
   { const maps = skMount ? app.querySelectorAll(`.skmap[data-cid="${skMount.key}"]`) : [], skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes; uma por vez (a última aberta)
     if (skm && skMount) { MANDALA.mount(skm, skMount); skMount.fresh.forEach(id => MANDALA.learned(id)); } }
   if (editFocus) { editFocus = false; const el = app.querySelector('.edin'); if (el) { el.focus(); el.select(); } }
-  if (keep) { const el = app.querySelector(keep.sel); if (el) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} } }
-  app.querySelectorAll('.win-body,.chatcol,.skside,.pl>main,.fbody,.skl').forEach((el, i) => el.scrollTop = scr[i] || 0);
+  if (keep) {
+    const scope = ae.closest('.gbody')?.dataset.win, selector = scope ? `.gbody[data-win="${CSS.escape(scope)}"] ${keep.sel}` : ae.closest('.mz-side') ? `.mz-side ${keep.sel}` : keep.sel;
+    const el = app.querySelector(selector);
+    if (el && el !== ae) { el._dirty = el.value !== keep.v; el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch {} }
+  }
+  app.querySelectorAll(scrollAreas).forEach((el, i) => el.scrollTop = scr.get(scrollKey(el, i)) || 0);
   { const sc2 = S.scenes[S.scene]; if (sc2.cam && sc2.cam.n !== lastCam) { const w = mapEl()?.offsetWidth; if (w) { lastCam = sc2.cam.n; Object.assign(view, { z: sc2.cam.z, x: sc2.cam.fx * w, y: sc2.cam.fy * w }); applyView(); } } } // vista fixada pelo mestre
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   PALCO3D.local.aim = LEQUE.camTarget(); // liga a vista tática da mira e ancora a linha de alcance (hover não faz o palco oscilar)

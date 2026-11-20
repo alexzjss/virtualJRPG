@@ -137,7 +137,7 @@ app.addEventListener('click', e => {
   if (d.a === 'rqOk') return send({ t: 'reqOk', id: d.id, ...reqUi[d.id] });
   if (d.a === 'rqNo') return send({ t: 'reqNo', id: d.id });
   if (d.a === 'rqWhy') { const why = prompt('Motivo (o jogador vê esta frase):'); return why === null ? null : send({ t: 'reqNo', id: d.id, why }); }
-  if (d.a === 'mute') { snd.mute = !snd.mute; ls('vj_mute', snd.mute ? '1' : null); if (!snd.mute) beep(); drawSnd(); return render(); }
+  if (d.a === 'mute') { snd.mute = !snd.mute; ls('vj_mute', snd.mute ? '1' : null); unlock(); drawSnd(); render(); if (!snd.mute) beep(); return; }
   if (d.a === 'selCard') { if (selC.has(d.id)) selC.delete(d.id); else selC.add(d.id); return render(); }
   if (d.a === 'selAll') { selC.clear(); if (d.k) Object.values(S.chars).filter(c => !!c.enemy === (d.k === 'e')).forEach(c => selC.add(c.id)); return render(); }
   if (d.a === 'bulk') return send({ t: 'bulk', ids: [...selC], k: d.k, v: qa.v, st: qa.st, item: qa.item || Object.entries(S.items).sort((a, b) => a[1].name.localeCompare(b[1].name))[0]?.[0] });
@@ -234,7 +234,7 @@ app.addEventListener('contextmenu', e => { const t = e.target.closest('.tok'); i
 app.addEventListener('dblclick', e => {
   const t = e.target.closest('.tok'), m = e.target.closest('.map');
   if (t && mine(S.chars[t.dataset.id])) { if (gm) gOpen('f_' + t.dataset.id); else { pg = 'pers'; selCh = t.dataset.id; } return render(); }
-  if (m && role !== 'table' && !fogMode) send({ t: 'ping', ...cell(e, m) });
+  if (m && !fogMode) send({ t: 'ping', ...cell(e, m) });
 });
 const drawRuler = e => {
   const m = mapEl(), b = cell(e, m), a = ruler.a, sc = S.scenes[S.scene], n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
@@ -264,6 +264,8 @@ app.addEventListener('pointerup', drop); app.addEventListener('pointercancel', d
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.target.matches('input,textarea,select,button')) { spaceDown = true; e.preventDefault(); return; }
   if (!S || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Enter' && e.target.matches('[data-regras]')) return;
+  if (gm && e.target.closest('.gtop,.gside,.mz-top,.maptools') && (e.key === 'Tab' || (e.key === 'Enter' && e.target.matches('button,summary')))) return;
   if (LEQUE.key(e)) { e.preventDefault(); return; } // batalha no PC: leque, dicas e mira (leque.js)
   if (e.key === 'Escape') { // fecha, nesta ordem: menu de contexto, submenu, mira, janela da frente
     if (e.target.matches('input,textarea')) e.target.blur();

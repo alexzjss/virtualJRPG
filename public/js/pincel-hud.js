@@ -42,7 +42,7 @@
     const menu = navOpen ? `<nav class="pc-paginas" aria-label="Páginas">${Object.entries(PAGES).map(([k, l]) => `<button type="button" data-pg="${k}" class="${pg === k ? 'on' : ''}">${k === 'mesa' ? 'Batalha' : esc(l)}</button>`).join('')}</nav>` : '';
     return `<div class="hudw pc-hud ${dim ? 'dim' : ''}">${ordem(parts.photo)}${chefe(inB, pct)}${icos}${menu}<div class="pc-campo">${fieldBar()}</div>`
       + `<div class="pc-canto">${cm ? `<div class="pc-cmd">${cm}</div>` : ''}<div class="pc-grupo">${inB.filter(c => !c.enemy).map(c => heroi(c, cur, pct)).join('')}</div></div>`
-      + `${parts.faixa()}${parts.miniMapa(false)}</div>`; };
+      + `${parts.faixa()}${parts.miniMapa()}</div>`; };
   // registro e ficha moram numa camada fixa acima do canvas dos corpos (luz-canvas, z 11), fora do #app
   let sobre = null, sobreH = '';
   const camada = () => { const h = on() && S?.battle?.active && actor ? registro() + ficha(S.chars[actor], (a, b) => Math.round(Math.max(0, Math.min(100, 100 * a / (b || 1))))) : '';

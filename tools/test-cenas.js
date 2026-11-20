@@ -173,11 +173,18 @@ test('desfazer: só a cena do foco volta; a outra cena e quem está nela ficam',
   assert.notEqual(S.chars[ea.id].hp, 1, 'A voltou'); assert.equal(S.chars[eb.id].hp, 2, 'B não mexeu'); assert.equal(S.chars[b.id].gold, 77);
 });
 
-test('cenas: duplicar copia mapa e saídas sem batalha; excluir só cena vazia', () => {
-  const { A, B } = split(); S.scenes[A].bg = '/maps/x.png'; S.scenes[A].exits = [{ id: 'e1', x: 1, y: 1, to: B }];
+test('cenas: duplicar copia mapa e saídas; excluir cena sem batalha transfere seus heróis', () => {
+  const { A, B, b, eb } = split(); S.scenes[A].bg = '/maps/x.png'; S.scenes[A].exits = [{ id: 'e1', x: 1, y: 1, to: B }];
   handle(gm, { t: 'sceneAdd', dup: A, name: 'Cópia' }); const C = S.focus; S.focus = A;
   assert.equal(S.scenes[C].bg, '/maps/x.png'); assert.equal(S.scenes[C].exits[0].to, B); assert.notEqual(S.scenes[C].exits[0].id, 'e1'); assert.equal(S.scenes[C].battle.active, false);
-  handle(gm, { t: 'sceneDel', id: B }); assert.ok(S.scenes[B], 'B tem a Bia: não apaga');
+  inScene(B, () => H.battle(gm, { on: true }));
+  handle(gm, { t: 'sceneDel', id: B }); assert.ok(S.scenes[B], 'B tem batalha ativa');
+  inScene(B, () => H.battle(gm, { on: false }));
+  handle(gm, { t: 'sceneDel', id: B, to: A });
+  assert.equal(S.scenes[B], undefined);
+  assert.equal(b.scene, A);
+  assert.equal(S.chars[eb.id], undefined);
+  assert.ok(S.scenes[A].exits.every(e => e.to !== B));
   handle(gm, { t: 'sceneDel', id: C }); assert.ok(!S.scenes[C]);
 });
 

@@ -90,7 +90,9 @@ function reqStrip() {
       ${narrável(r) ? `<input class="rq-txt" data-rqtxt="${id}" maxlength="200" placeholder="Narração do resultado (opcional, o jogador lê)" aria-label="Narração do resultado" value="${esc(u.txt || '')}">` : ''}
       ${r.cat === 'roll' ? `<button class="tog ${u.secret ? 'on' : ''}" data-a="rqSecret" data-id="${id}" aria-pressed="${u.secret}" title="Só você vê o resultado">Secreta</button>` : ''}
       <div class="rq-b"><button class="ok" data-a="rqOk" data-id="${id}">Aprovar${i ? '' : ' <kbd>Enter</kbd>'}</button><button class="no" data-a="rqNo" data-id="${id}">Negar${i ? '' : ' <kbd>Del</kbd>'}</button><button class="ghost" data-a="rqWhy" data-id="${id}" title="Negar e dizer o motivo ao jogador">Negar com motivo</button></div></div>`; };
-  return `<div class="reqs ${rs.length ? 'has' : ''}"><div class="rq-bar"><b>Pedidos${rs.length ? ` <i>${rs.length}</i>` : ''}</b><span>Aprovar sozinho:</span>${chips(AUTOL, (k, l) => `<button class="tog ${S.auto[k] ? 'on' : ''}" data-a="autoSet" data-k="${k}" data-v="${S.auto[k] ? '' : 1}" aria-pressed="${!!S.auto[k]}" title="${S.auto[k] ? 'Acontece na hora, sem passar por você' : 'Espera a sua aprovação'}">${l}</button>`)}<button class="ghost" data-a="mute" aria-pressed="${snd.mute}">${snd.mute ? 'Som desligado' : 'Som ligado'}</button></div>${rs.map(card).join('')}</div>`;
+  return `<div class="reqs"><details class="mais" data-mais="pedidos-auto" ${maisO('pedidos-auto')}>
+    <summary>Aprovação automática</summary><div class="row">${chips(AUTOL, (k, l) => `<button class="tog ${S.auto[k] ? 'on' : ''}" data-a="autoSet" data-k="${k}" data-v="${S.auto[k] ? '' : 1}" aria-pressed="${!!S.auto[k]}">${l}</button>`)}</div></details>
+    ${rs.map(card).join('') || '<p class="none">Nenhum pedido pendente.</p>'}</div>`;
 }
 let reqIn = null;
 function gmPanel(c) {

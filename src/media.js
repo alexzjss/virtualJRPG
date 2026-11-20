@@ -2,9 +2,10 @@ import { S } from './state.js';
 import { wss } from './net.js';
 import { H, NOUNDO } from './handlers.js';
 import { int, okUrl, rid, scene } from './rules.js';
+import '../public/js/som-catalogo.js';
 
-
-const AMB = ['chuva', 'vento', 'fogueira', 'caverna', 'mar', 'multidao'], SFX = ['sino', 'trovao', 'porta', 'grito', 'fanfarra', 'tensao', 'moeda', 'passos'];
+const { ambiencias, efeitos } = globalThis.VJ_AUDIO;
+const AMB = Object.keys(ambiencias);
 // valores padrão no estado (campanhas antigas, cenas novas, campanha recém-aberta)
 const fixMedia = () => {
   S.audio = { url: '', on: false, vol: .6, loop: true, amb: '', t0: 0, n: 0, ...S.audio }; S.tracks ??= {}; S.handout ??= null;
@@ -30,7 +31,7 @@ Object.assign(H, {
   trackDel: gm((c, m) => { delete S.tracks[m.id]; }),
   // "mostrar a todos": uma imagem e/ou um texto (carta, retrato, pista) que abre na tela de cada jogador e na mesa até o mestre recolher
   handout: gm((c, m) => { const img = okUrl(m.img) ? m.img : '', text = String(m.text || '').trim().slice(0, 800); S.handout = img || text ? { img, text, n: ++S.seq } : null; }),
-  sfx: gm((c, m) => { if (SFX.includes(m.k)) cast({ t: 'sfx', k: m.k }); }), // efeito pontual: só retransmite
+  sfx: gm((c, m) => { if (typeof m.k === 'string' && Object.hasOwn(efeitos, m.k)) cast({ t: 'sfx', k: m.k }); }), // efeito pontual: só retransmite
   // ----- mapa -----
   fogAll: gm((c, m) => { const sc = scene(); sc.seen = {}; if (m.v) for (let x = 0; x < Math.ceil(sc.cols); x++) for (let y = 0; y < Math.ceil(sc.rows); y++) sc.seen[x + ',' + y] = 1; }),
   fog: gm((c, m) => { // pincel de raio r (0 = uma casa, 1 = 3x3, 2 = 5x5…)

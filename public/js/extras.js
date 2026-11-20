@@ -23,8 +23,8 @@ function campWin() {
 }
 
 // ===== som: janela do mestre =====
-const AMBL = { chuva: 'Chuva', vento: 'Vento', fogueira: 'Fogueira', caverna: 'Caverna', mar: 'Mar', multidao: 'Multidão' };
-const SFXL = { sino: 'Sino', trovao: 'Trovão', porta: 'Porta', grito: 'Grito', fanfarra: 'Fanfarra', tensao: 'Tensão', moeda: 'Moedas', passos: 'Passos' };
+const AMBL = Object.fromEntries(Object.entries(AUDIO_AMB).map(([key, [label]]) => [key, label]));
+const SFXL = AUDIO_FX;
 function somWin() {
   const A = S.audio || {}, sc = S.scenes[S.scene], on = v => v ? 'class="own"' : '';
   return `<h4>Trilha</h4><div class="row"><input data-x="audUrl" placeholder="Link de um áudio (MP3, OGG…)" value="${esc(A.url)}" aria-label="Link da trilha"><label class="up">Enviar áudio<input type="file" accept="audio/*" data-x="audUp"></label></div>
@@ -39,12 +39,10 @@ const xWins = () => ({ camp: wins.camp.open ? campWin() : '', som: wins.som.open
 // ===== mapa: linhas extras da janela Cena e marcadores =====
 let fogR = 1;
 const hand = { text: '', img: '' }; let handSeen = 0;
-const xCena = sc => `<h4>Mostrar a todos</h4><div class="row"><input data-hand="text" placeholder="Texto: carta, pista, legenda…" aria-label="Texto para mostrar a todos" value="${esc(hand.text)}"></div>
+const gmHandout = () => `<div class="row"><input data-hand="text" placeholder="Texto: carta, pista, legenda…" aria-label="Texto para mostrar a todos" value="${esc(hand.text)}"></div>
   <div class="row"><input data-hand="img" placeholder="Link de uma imagem (opcional)" aria-label="Imagem para mostrar a todos" value="${esc(hand.img)}"><label class="up">Enviar imagem<input type="file" accept="image/*" data-up="hand"></label></div>
-  <div class="row"><button class="own" data-x="handGo" title="Abre a imagem e o texto na tela de cada jogador e na mesa">Mostrar</button>${S.handout ? '<button data-x="handOff">Recolher</button><small>Aberto nas telas dos jogadores.</small>' : ''}</div>
-  <h4>Névoa e grade</h4><div class="row">${sc.fogOn ? `<button data-a="fogAll" data-v="1">Revelar tudo</button><button data-a="fogAll" data-v="">Esconder tudo</button><label>Pincel <select data-x="fogR">${[0, 1, 2, 3].map(r => `<option value="${r}" ${r === fogR ? 'selected' : ''}>${2 * r + 1}×${2 * r + 1}</option>`).join('')}</select></label>` : ''}</div>
-  <div class="row"><button data-a="map" data-f="grid" data-v="${sc.grid === false ? 1 : ''}" class="${sc.grid === false ? '' : 'own'}">Grade visível</button><label>Metros por casa <input type="number" min="0" max="1000" step="0.5" data-map="unit" value="${+sc.unit || 0}"></label></div>
-  <small>Régua: Alt+arrastar (segure Shift para medir área). Marcador: Ctrl+clique no mapa (Ctrl+Shift+clique: só você vê).</small>`;
+  <div class="row"><button class="own" data-x="handGo" title="Abre a imagem e o texto na tela de cada jogador e na mesa">Mostrar</button>${S.handout ? '<button data-x="handOff">Recolher</button><small>Aberto nas telas dos jogadores.</small>' : ''}</div>`;
+const gmFog = () => `<div class="row"><button data-a="fogAll" data-v="1">Revelar tudo</button><button data-a="fogAll" data-v="">Esconder tudo</button><label>Pincel <select data-x="fogR">${[0, 1, 2, 3].map(r => `<option value="${r}" ${r === fogR ? 'selected' : ''}>${2 * r + 1}×${2 * r + 1}</option>`).join('')}</select></label></div>`;
 const handoutHtml = () => { const h = S.handout; if (!h || gm) return '';
   if (role === 'player' && handSeen === h.n) return '<button class="handchip" data-x="handShow">Ver o que o mestre mostrou</button>';
   return `<div class="handout" role="dialog" aria-label="O mestre mostra"><figure><small>O mestre mostra</small>${h.img ? `<img src="${esc(h.img)}" alt="">` : ''}${h.text ? `<figcaption>${esc(h.text)}</figcaption>` : ''}${role === 'player' ? '<button class="own" data-x="handX">Fechar</button>' : ''}</figure></div>`; };
@@ -52,87 +50,75 @@ const xPins = m => Object.entries(m.pins || {}).map(([id, p]) => `<i class="pin 
 const dist = (n, sc) => `${n} ${n === 1 ? 'casa' : 'casas'}${sc.unit ? ` · ${Math.round(n * sc.unit * 10) / 10} m` : ''}`;
 
 // ===== motor de som (todas as telas) =====
-const snd = { vol: ls('vj_vol') === '' ? .8 : +ls('vj_vol'), mute: ls('vj_mute') === '1', n: -1, ctx: null, amb: null, ambK: '', blocked: false, seen: -1 };
-const music = new Audio(); music.preload = 'auto';
-const actxGet = () => snd.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
-const level = () => snd.mute ? 0 : snd.vol * (S?.audio?.vol ?? 1);
-const tone = (f, dur, { type = 'sine', g = .3, to = 0, delay = 0 } = {}) => {
-  const c = actxGet(), o = c.createOscillator(), gg = c.createGain(), t = c.currentTime + delay;
-  o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
-  gg.gain.setValueAtTime(Math.max(.0002, g * level()), t); gg.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  o.connect(gg).connect(c.destination); o.start(t); o.stop(t + dur + .05);
+const snd = { vol: ls('vj_vol') === '' ? .8 : +ls('vj_vol'), mute: ls('vj_mute') === '1', n: -1, musicBlocked: false, fxBlocked: false };
+const music = new Audio();
+music.preload = 'auto';
+const level = () => snd.mute ? 0 : Math.max(0, Math.min(1, snd.vol * (S?.audio?.vol ?? 1))) || 0;
+const playSfx = (key, options) => {
+  if (!level()) return;
+  if (sampleAudio.locked) {
+    if (!snd.fxBlocked) { snd.fxBlocked = true; drawSnd(); }
+    return;
+  }
+  sampleAudio.play(key, options);
 };
-let noiseBuf = null;
-const noise = c => { if (!noiseBuf) { noiseBuf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } const s = c.createBufferSource(); s.buffer = noiseBuf; s.loop = true; return s; };
-const thud = (dur, f, g = .4, type = 'lowpass', delay = 0) => { // estalo de ruído filtrado
-  const c = actxGet(), s = noise(c), fl = c.createBiquadFilter(), gg = c.createGain(), t = c.currentTime + delay;
-  fl.type = type; fl.frequency.value = f; gg.gain.setValueAtTime(Math.max(.0002, g * level()), t); gg.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  s.connect(fl).connect(gg).connect(c.destination); s.start(t); s.stop(t + dur + .05);
-};
-const SFXP = {
-  sino: () => { tone(880, 1.8, { g: .25 }); tone(1320, 1.3, { g: .12 }); tone(2640, .8, { g: .05 }); },
-  trovao: () => { thud(2.4, 170, .9); thud(.35, 2400, .3); },
-  porta: () => { thud(.12, 320, .8); tone(90, .25, { type: 'square', g: .15 }); thud(.1, 300, .6, 'lowpass', .38); },
-  grito: () => { tone(720, .9, { type: 'sawtooth', to: 280, g: .18 }); tone(735, .9, { type: 'sawtooth', to: 300, g: .12 }); },
-  fanfarra: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i === 3 ? .7 : .3, { type: 'triangle', delay: i * .14, g: .25 })),
-  tensao: () => { tone(110, 2.6, { type: 'sawtooth', g: .1 }); tone(116.5, 2.6, { type: 'sawtooth', g: .1 }); },
-  moeda: () => { tone(1568, .08, { type: 'square', g: .12 }); tone(2093, .35, { type: 'square', g: .12, delay: .08 }); },
-  passos: () => [0, .28, .56, .84].forEach(d => thud(.07, 480, .5, 'lowpass', d)),
-  hit: () => { thud(.12, 900, .45); tone(160, .12, { type: 'square', to: 60, g: .15 }); },
-  crit: () => { thud(.28, 1700, .7); tone(220, .32, { type: 'sawtooth', to: 50, g: .25 }); },
-  miss: () => thud(.16, 3000, .14, 'highpass'),
-  heal: () => [660, 880, 1320].forEach((f, i) => tone(f, .32, { delay: i * .09, g: .12 })),
-};
-const playSfx = k => { if (snd.mute || !SFXP[k]) return; try { SFXP[k](); } catch {} };
-// ambiência sintetizada (ruído filtrado), sem arquivos
-const AMBP = { chuva: { type: 'highpass', f: 1300, g: .2 }, vento: { type: 'bandpass', f: 420, q: .6, g: .4, lfo: .13, depth: 240 }, fogueira: { type: 'lowpass', f: 650, g: .3, crack: 1 },
-  caverna: { type: 'lowpass', f: 150, g: .5, drone: 55 }, mar: { type: 'lowpass', f: 520, g: .4, swell: .09 }, multidao: { type: 'bandpass', f: 900, q: .8, g: .2, swell: .31 } };
-function makeAmb(p) {
-  const c = actxGet(), src = noise(c), f = c.createBiquadFilter(), g = c.createGain(), out = c.createGain(), nodes = [src];
-  f.type = p.type; f.frequency.value = p.f; f.Q.value = p.q || .7; g.gain.value = p.g; out.gain.value = 0;
-  src.connect(f).connect(g).connect(out).connect(c.destination);
-  const lfo = (rate, param, depth) => { const o = c.createOscillator(), og = c.createGain(); o.frequency.value = rate; og.gain.value = depth; o.connect(og).connect(param); o.start(); nodes.push(o); };
-  if (p.lfo) lfo(p.lfo, f.frequency, p.depth); if (p.swell) lfo(p.swell, g.gain, p.g * .6);
-  if (p.drone) { const o = c.createOscillator(), og = c.createGain(); o.frequency.value = p.drone; og.gain.value = .12; o.connect(og).connect(out); o.start(); nodes.push(o); }
-  const t = p.crack ? setInterval(() => { if (!snd.mute && Math.random() < .45) thud(.03, 2500 + Math.random() * 2500, .12, 'highpass'); }, 170) : null;
-  src.start();
-  return { out, stop() { clearInterval(t); nodes.forEach(n => { try { n.stop(); } catch {} }); out.disconnect(); } };
-}
+const sfxc = (key, value = 0) => playSfx(key, key === 'cmdCharge' ? { gain: .55 + .45 * value } : undefined);
+
 function syncAudio() { // acompanha o que o mestre pôs para tocar; quem entra depois cai no mesmo ponto da música
   const A = S?.audio; if (!A) return;
-  const v = level(); music.volume = Math.min(1, v); music.loop = !!A.loop;
+  const v = level(); music.volume = v; music.muted = !v; music.loop = !!A.loop;
   if (A.n !== snd.n) {
     snd.n = A.n;
-    if (!A.on || !A.url) music.pause();
+    if (!A.on || !A.url) { music.pause(); snd.musicBlocked = false; }
     else {
       if (music.dataset.u !== A.url) { music.src = A.url; music.dataset.u = A.url; }
-      const go = () => { const el = Math.max(0, (Date.now() - A.t0) / 1000), d = music.duration;
+      const go = () => { if (snd.n !== A.n) return; const el = Math.max(0, (Date.now() - A.t0) / 1000), d = music.duration;
         if (isFinite(d) && d > 0) { if (!A.loop && el >= d) return; music.currentTime = A.loop ? el % d : el; }
-        music.play().catch(() => { snd.blocked = true; drawSnd(); }); };
+        music.play().then(() => {
+          if (snd.n === A.n && snd.musicBlocked) { snd.musicBlocked = false; drawSnd(); }
+        }).catch(error => {
+          if (snd.n === A.n && error.name === 'NotAllowedError') { snd.musicBlocked = true; drawSnd(); }
+        }); };
       if (music.readyState >= 1) go(); else music.addEventListener('loadedmetadata', go, { once: true });
     }
   }
-  if ((A.amb || '') !== snd.ambK) { snd.amb?.stop(); snd.amb = null; snd.ambK = A.amb || ''; if (AMBP[snd.ambK]) { try { snd.amb = makeAmb(AMBP[snd.ambK]); if (actxGet().state !== 'running') { snd.blocked = true; drawSnd(); } } catch {} } }
-  if (snd.amb) snd.amb.out.gain.value = v;
-}
-function sfxFromLog() { // golpes, críticos, erros e curas do histórico viram som (só os novos)
-  if (snd.seen < 0) { snd.seen = S.seq; return; }
-  const fresh = S.log.filter(l => l.n > snd.seen && l.fx).slice(-3); snd.seen = S.seq;
-  void fresh; // o som de cada golpe toca no impacto, junto da animação (coreo.js)
+  sampleAudio.sync(v, A.amb);
+  if (v && Object.hasOwn(AUDIO_AMB, A.amb) && sampleAudio.locked && !snd.fxBlocked) {
+    snd.fxBlocked = true;
+    drawSnd();
+  }
 }
 // controle de volume de cada pessoa, fora da área redesenhada
 const sndBox = document.createElement('div'); sndBox.className = 'sndbox'; document.body.append(sndBox);
-function drawSnd() { const A = typeof ANIMFX !== 'undefined' ? ANIMFX.settings : { quality: 'auto', speed: 1, flashes: true }; sndBox.innerHTML = `<button data-s="mute" class="${snd.mute ? '' : 'own'}" title="Liga ou silencia o som só neste aparelho">${snd.mute ? 'Mudo' : 'Som'}</button><input type="range" min="0" max="1" step="0.05" value="${snd.vol}" aria-label="Volume neste aparelho"><select data-s="quality" aria-label="Qualidade das animações" title="Qualidade das animações"><option value="auto" ${A.quality === 'auto' ? 'selected' : ''}>FX auto</option><option value="low" ${A.quality === 'low' ? 'selected' : ''}>FX baixo</option><option value="medium" ${A.quality === 'medium' ? 'selected' : ''}>FX médio</option><option value="high" ${A.quality === 'high' ? 'selected' : ''}>FX alto</option></select><select data-s="speed" aria-label="Velocidade das animações" title="Velocidade das animações">${[.5, 1, 1.5, 2].map(v => `<option value="${v}" ${A.speed === v ? 'selected' : ''}>${v}×</option>`).join('')}</select><button data-s="flash" class="${A.flashes ? 'own' : ''}" title="Liga ou reduz flashes">Flash</button>${snd.blocked && !snd.mute ? '<button data-s="go" class="own">Ativar som</button>' : ''}`; }
-const unlock = () => { snd.ctx?.resume?.(); if (!snd.blocked) return; snd.blocked = false; if (S?.audio?.on && S.audio.url) music.play().catch(() => {}); drawSnd(); };
-sndBox.addEventListener('click', e => { const k = e.target.dataset.s; if (k === 'mute') { snd.mute = !snd.mute; ls('vj_mute', snd.mute ? '1' : null); } else if (k === 'flash' && typeof ANIMFX !== 'undefined') ANIMFX.setFlashes(!ANIMFX.settings.flashes); unlock(); drawSnd(); if (S) syncAudio(); });
+function drawSnd() { const A = typeof ANIMFX !== 'undefined' ? ANIMFX.settings : { quality: 'auto', speed: 1, flashes: true }; sndBox.innerHTML = `<button data-s="mute" class="${snd.mute ? '' : 'own'}" title="Liga ou silencia o som só neste aparelho">${snd.mute ? 'Mudo' : 'Som'}</button><input type="range" min="0" max="1" step="0.05" value="${snd.vol}" aria-label="Volume neste aparelho"><select data-s="quality" aria-label="Qualidade das animações" title="Qualidade das animações"><option value="auto" ${A.quality === 'auto' ? 'selected' : ''}>FX auto</option><option value="low" ${A.quality === 'low' ? 'selected' : ''}>FX baixo</option><option value="medium" ${A.quality === 'medium' ? 'selected' : ''}>FX médio</option><option value="high" ${A.quality === 'high' ? 'selected' : ''}>FX alto</option></select><select data-s="speed" aria-label="Velocidade das animações" title="Velocidade das animações">${[.5, 1, 1.5, 2].map(v => `<option value="${v}" ${A.speed === v ? 'selected' : ''}>${v}×</option>`).join('')}</select><button data-s="flash" class="${A.flashes ? 'own' : ''}" title="Liga ou reduz flashes">Flash</button>${(snd.fxBlocked || snd.musicBlocked) && !snd.mute ? '<button data-s="go" class="own">Ativar som</button>' : ''}`; }
+const unlock = () => {
+  if (navigator.userActivation?.isActive === false) return;
+  if (sampleAudio.locked && !snd.mute) sampleAudio.unlock().then(() => {
+    if (sampleAudio.locked) return;
+    const wasBlocked = snd.fxBlocked;
+    snd.fxBlocked = false;
+    syncAudio();
+    if (wasBlocked) drawSnd();
+  }).catch(() => {});
+  if (snd.musicBlocked && !snd.mute && S?.audio?.on && S.audio.url) {
+    const n = snd.n;
+    music.play().then(() => {
+      if (snd.n === n) { snd.musicBlocked = false; drawSnd(); }
+    }).catch(() => {});
+  }
+};
+sndBox.addEventListener('click', e => { const k = e.target.dataset.s; if (!['mute', 'flash', 'go'].includes(k)) return; if (k === 'mute') { snd.mute = !snd.mute; ls('vj_mute', snd.mute ? '1' : null); } else if (k === 'flash' && typeof ANIMFX !== 'undefined') ANIMFX.setFlashes(!ANIMFX.settings.flashes); unlock(); drawSnd(); if (S) syncAudio(); });
 sndBox.addEventListener('input', e => { if (e.target.type === 'range') { snd.vol = +e.target.value; ls('vj_vol', String(snd.vol)); if (S) syncAudio(); } });
 sndBox.addEventListener('change', e => { const k = e.target.dataset.s; if (typeof ANIMFX === 'undefined') return; if (k === 'quality') ANIMFX.setQuality(e.target.value); if (k === 'speed') ANIMFX.setSpeed(e.target.value); drawSnd(); });
-addEventListener('pointerdown', unlock, true);
+addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') unlock(); }, true);
+addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') unlock(); }, true);
+addEventListener('click', unlock, true);
+addEventListener('keydown', e => { if (e.key !== 'Escape') unlock(); }, true);
 drawSnd();
 { const render0 = render; render = function () { render0();
   app.querySelectorAll(':scope > .handout, :scope > .handchip').forEach(el => el.remove()); // um redesenho adiado não pode empilhar cópias
   app.insertAdjacentHTML('beforeend', handoutHtml());
-  try { syncAudio(); sfxFromLog(); } catch (e) { console.error(e); } }; }
+  try { syncAudio(); } catch (e) { console.error(e); } }; }
 document.addEventListener('input', e => { const k = e.target.dataset?.hand; if (k) hand[k] = e.target.value; });
 
 // ===== cliques e campos próprios destes extras =====

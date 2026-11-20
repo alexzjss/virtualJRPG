@@ -204,10 +204,6 @@
   const scale = r => r ? clamp(r.height / 210, .45, 1.8) : 1;
   L.geo = { unit, rect, point, target, foot, scale };
 
-  // ----- som (o mesmo do motor antigo: o áudio não muda) -----
-  const NOTE = { kagutsuchi: 165, susanoo: 294, atlas: 110, indra: 440, fuhaku: 392, amaterasu: 659, tsukuyomi: 139, shukketsu: 196, hiruko: 247, aura: 523, oculto: 104, fis: 147 };
-  const sound = (P, dur) => { try { if (typeof tone === 'function') { const f = NOTE[P.el] || 220, beam = P.family === 'beam' || P.family === 'ritual'; tone(f, Math.min(.5, dur / 1000), { type: beam ? 'sawtooth' : P.family === 'heal' ? 'sine' : 'triangle', to: beam ? f * 2 : P.family === 'projectile' ? f * 1.5 : 0, g: .035 + P.tier * .012 }); if (['smash', 'area', 'rain'].includes(P.family) && typeof thud === 'function') thud(.18, 180 + P.tier * 90, .16 + P.tier * .05, 'lowpass', dur * P.impact / 1000); } } catch {} };
-
   // ----- golpe -----
   const skillByName = n => Object.values(g.S?.skills || {}).find(s => s.name === n);
   const sigFor = (s, fx) => fx.lim || fx.dom || s?.limit || s?.dom ? 'ult' : (LP.sigOf && s ? LP.sigOf(s).kind : 'none');
@@ -217,7 +213,7 @@
     if (!L.active()) return minimo({ actorId, targetIds, skill, fx, delay });
     const s = skill || skillByName(fx.s), P = C.profile(s, fx), kind = sig || sigFor(s, fx), dur = LP.duration(P, { speed: settings.speed, reduced: reduced(), sig: kind === 'line' ? 'line' : 'none' }), T = LP.promiseTimes(P, dur);
     const aid = actorId || fx.a, ids = [...new Set(targetIds.filter(Boolean))], targets = ids.length ? ids : [fx.id].filter(Boolean), start = clockNow() + delay;
-    sound(P, dur);
+    if (typeof skillSfx === 'function') skillSfx(P, T.impact, delay, fx, s);
     (targets.length ? targets : ['']).forEach((tid, i) => {
       const ar = () => rect(aid), tr = () => rect(tid);
       const e = { profile: { ...P, seed: P.seed + i * 997 }, aid, tid, i, n: targets.length, start: start + i * 40, dur, sig: kind, skill: s, fx,
@@ -230,7 +226,7 @@
   const glowXY = (x, y, col, size) => { const d = document.createElement('i'); d.className = 'luz-min'; d.style.cssText = `left:${x}px;top:${y}px;--c:${col};--s:${Math.round(size)}px`; document.body.append(d); setTimeout(() => d.remove(), 560); };
   function minimo({ actorId, targetIds = [], skill, fx = {}, delay = 0 } = {}) {
     const s = skill || skillByName(fx.s), P = C.profile(s, fx), dur = LP.duration(P, { speed: settings.speed, reduced: reduced() }), T = LP.promiseTimes(P, dur), ids = targetIds.filter(Boolean).length ? targetIds.filter(Boolean) : [fx.id].filter(Boolean);
-    sound(P, dur);
+    if (typeof skillSfx === 'function') skillSfx(P, T.impact, delay, fx, s);
     if (!reduced()) setTimeout(() => ids.forEach(id => { const r = rect(id); if (r) { const p = target(r); glowXY(p.x, p.y, P.palette?.[1] || '#ffffff', Math.max(60, r.height * .8)); } }), T.impact + delay);
     return { profile: { ...P, duration: dur }, impact: later(T.impact + delay), done: later(T.done + delay) };
   }

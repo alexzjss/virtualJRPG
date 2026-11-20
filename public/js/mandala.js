@@ -26,7 +26,7 @@
   // ---------- desenho ----------
   const lod = () => view === 'all' ? LOD : LOD * .3; // na aba do setor há menos nós: as esferas aparecem já de longe
   const cam = M.cam = { x: 0, y: 0, z: 0.7 }, anim = new Map(); // id → instante em que foi aprendido
-  let disp = 'system-ui,sans-serif', cx0, pv = null, ac, rot = 0, hg = null, rings = [],  tiersS = { sep: [], mid: [] }, tiersC = { sep: [], mid: [] }, core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
+  let disp = 'system-ui,sans-serif', cx0, pv = null, rot = 0, hg = null, rings = [],  tiersS = { sep: [], mid: [] }, tiersC = { sep: [], mid: [] }, core = 0, ro, cv, cx, host, o = null, P = new Map(), E = [], seals = [], stars = [], motes = [], bound = 2000, key = null, hover = null, dirty = true, last = 0, raf = 0, W = 0, H = 0, DPR = 1;
   const hexA = (h, a) => { const v = parseInt((h || '#ffffff').slice(1), 16); return `rgba(${v >> 16},${v >> 8 & 255},${v & 255},${a})`; };
   const col = el => (typeof ELC !== 'undefined' && ELC[el === 'armas' ? 'fis' : el]) || '#ffffff';
   const grp = s => s.br?.startsWith('armas') ? 'armas' : s.el; // a Árvore de Armas é um bloco à parte (el 'fis', sem ligação com o Marcial): ganha o próprio selo
@@ -37,7 +37,6 @@
   const poly = (x, y, r, n, rt = -Math.PI / 2, inner = 0) => { cx.beginPath(); const m = inner ? n * 2 : n; for (let i = 0; i < m; i++) { const rr = inner && i % 2 ? r * inner : r, a = rt + i * TAU / m; i ? cx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : cx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } cx.closePath(); };
   // forma da esfera por tipo: ativa = esfera, passiva = hexágono, forma = losango, limite/proibida = estrela
   const body = (x, y, r, s) => s.limit || s.back ? poly(x, y, r * 1.1, 8, -Math.PI / 2, .64) : s.kind === 'form' ? poly(x, y, r * 1.15, 4) : s.kind === 'passive' ? poly(x, y, r * 1.08, 6, 0) : (cx.beginPath(), cx.arc(x, y, r, 0, TAU));
-  const chime = () => { try { ac ||= new AudioContext(); ac.resume?.(); const t = ac.currentTime; [660, 990, 1320].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(), t0 = t + i * .07; o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(.045, t0 + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + .5); o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + .55); }); } catch {} };
   const ICON = { dmg: '⚔', mental: '⚔', heal: '✚', passive: '◆', util: '✦', form: '変' };
   // nome em até duas linhas de ~13 letras
   const wrap = n => { const out = []; let l = ''; for (const w of n.split(' ')) { if (l && (l + ' ' + w).length > 13) { out.push(l); l = w; } else l = l ? l + ' ' + w : w; } out.push(l); return out.length > 2 ? [out[0], out.slice(1).join(' ').slice(0, 14) + '…'] : out; };
@@ -244,7 +243,7 @@
   M.rotate = k => { if (!o || view !== 'all') return; const d = k * TAU / SECN, c = Math.cos(d), n = Math.sin(d); rot += d; build(); [cam.x, cam.y] = [cam.x * c - cam.y * n, cam.x * n + cam.y * c]; kick(); };
   M.rotateTo = el => { if (!o || view !== 'all') return; const ids = o.ids.filter(id => grp(o.skills[id]) === el); if (!ids.length) return; let x = 0, y = 0; for (const id of ids) { x += P.get(id)[0]; y += P.get(id)[1]; } const d = -Math.PI / 2 - Math.atan2(y, x), c = Math.cos(d), n = Math.sin(d); rot += d; build(); [cam.x, cam.y] = [cam.x * c - cam.y * n, cam.x * n + cam.y * c]; kick(); };
   M.zoom = f => zoomAt(VW() / 2, H / 2, cam.z * f);
-  M.learned = id => { anim.set(id, performance.now()); chime(); kick(); };
+  M.learned = id => { anim.set(id, performance.now()); if (typeof playSfx === 'function') playSfx('aprendeu'); kick(); };
 
   const ptr = new Map(); let drag = null, pinch = null, wantFocus = false;
   function wire() {

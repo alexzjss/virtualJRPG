@@ -5,7 +5,7 @@
 // antes do golpe; Quebra estilhaça; nocaute derruba o cartão. Turno inimigo escurece o palco; início e fim têm abertura e resultado.
 const fxl = document.createElement('div'); fxl.className = 'fxl'; fxl.setAttribute('aria-hidden', 'true'); document.body.append(fxl);
 const lastPct = new Map(), DICE_MS = 950, NUM_MS = 460;
-let cine = null, wasActive = null;
+let cine = null, wasActive = null, turnFxPrev, turnFxTimer;
 const koHold = new Map(), hpPrev = new Map(), stPrev = new Map(), fxMarks = []; // marcas reaplicadas a cada redesenho até expirarem
 let threatUntil = 0, enterUntil = 0, busyUntil = 0;
 // barras presas até o impacto: quem leva golpe nesta leva só vê HP e escudo descerem quando o golpe chega na tela (em degraus no multi-hit)
@@ -38,28 +38,6 @@ const mark = (sel, cls, ms) => fxMarks.push({ sel, cls, until: performance.now()
 const portrait = c => { if (typeof PALCO3D === 'undefined') return face(c); const s = PALCO3D.imgSrc(c, 'p'), t = PALCO3D.imgFit(c, 'p', s); return `<img src="${esc(s.url)}" alt=""${t ? ` style="transform:${t}"` : ''}${s.crop ? ' class="crop"' : ''}>`; };
 const face = c => c?.img ? `<img src="${esc(c.img)}" alt="">` : `<span>${c ? esc(c.enemy ? KANJI[mainEl(c)] : c.name.slice(0, 1).toUpperCase()) : ''}</span>`;
 
-// sons novos (Web Audio sintetizado, sem arquivos; respeitam o botão de som)
-const SFXC = {
-  cut: () => { thud(.22, 3800, .35, 'highpass'); tone(700, .2, { type: 'square', to: 1900, g: .07 }); },
-  weak: () => { tone(1175, .1, { type: 'square', g: .11 }); tone(1568, .28, { type: 'square', g: .11, delay: .09 }); },
-  limit: () => { [262, 330, 392, 523, 659].forEach((f, i) => tone(f, 1, { type: 'sawtooth', g: .05, delay: i * .08 })); thud(.6, 160, .7, 'lowpass', .95); },
-  brk: () => { for (let i = 0; i < 6; i++) thud(.07, 4200 + i * 800, .28, 'highpass', i * .03); tone(1900, .45, { type: 'triangle', to: 500, g: .1 }); },
-  ko: () => { thud(.4, 260, .6); tone(320, .7, { type: 'sawtooth', to: 55, g: .11 }); },
-  start: () => { thud(.18, 170, .9); thud(.18, 170, .9, 'lowpass', .16); thud(.12, 2600, .25, 'highpass', .32); [392, 523, 659, 784].forEach((f, i) => tone(f, .8, { type: 'sawtooth', g: .05, delay: .34 + i * .02 })); },
-  threat: () => { tone(82, 1, { type: 'sawtooth', g: .11 }); tone(87, 1, { type: 'sawtooth', g: .09 }); thud(.35, 130, .55); },
-  perfect: () => [1319, 1568, 2093].forEach((f, i) => tone(f, .2, { type: 'triangle', g: .1, delay: i * .06 })),
-  bf: () => { thud(.3, 90, .85); thud(.16, 3200, .4, 'highpass'); tone(120, .45, { type: 'sawtooth', to: 38, g: .12 }); },
-  chq: () => { thud(.25, 140, .7); tone(220, .35, { type: 'square', to: 880, g: .07 }); },
-  tick: () => tone(1800, .03, { type: 'triangle', g: .12 }),
-  hit: () => { thud(.12, 900, .6); tone(220, .14, { type: 'square', to: 90, g: .1 }); },
-  miss: () => tone(180, .3, { type: 'sawtooth', to: 60, g: .09 }),
-  whoosh: () => { const c = actxGet(), s = noise(c), fl = c.createBiquadFilter(), g = c.createGain(), t = c.currentTime; fl.type = 'highpass'; fl.Q.value = .8; fl.frequency.setValueAtTime(500, t); fl.frequency.exponentialRampToValueAtTime(5500, t + .24); g.gain.setValueAtTime(.0002, t); g.gain.linearRampToValueAtTime(Math.max(.0002, .3 * level()), t + .07); g.gain.exponentialRampToValueAtTime(.0001, t + .28); s.connect(fl).connect(g).connect(c.destination); s.start(t); s.stop(t + .32); },
-  charge: v => tone(180 + 720 * Math.min(1, Math.max(0, v || 0)), .12, { type: 'sawtooth', g: .06 }),
-  boom: () => { thud(.5, 120, .9); tone(70, .5, { to: 35, g: .3 }); },
-  win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i > 4 ? .7 : .16, { type: 'square', g: .07, delay: i * .11 })),
-};
-const sfxc = (k, v) => { if (snd.mute || !SFXC[k]) return; try { SFXC[k](v); } catch {} };
-const hitSfx = f => { if (typeof playSfx === 'function') playSfx(f.miss ? 'miss' : f.heal ? 'heal' : f.crit ? 'crit' : 'hit'); };
 
 function applyCine(fresh) { // foco da ação: o palco aproxima em quem age e nos alvos; o resto escurece
   const st = app.querySelector('.stage'), fld = st?.querySelector('.field');
@@ -97,10 +75,9 @@ function cutscene(a, f) { // Limite e Domínio: retrato (ou a inicial gigante) a
   sfxc('limit');
 }
 function cutIn(kind, a, t) { // Crítico e Fraqueza: corte de tela com o olhar de quem golpeou (no modo luminoso ficam no mundo: clarão + estrela/etiqueta no número)
-  if (luzOn()) { posFx('bloom'); sfxc(kind === 'crit' ? 'cut' : 'weak'); return; }
+  if (luzOn()) { posFx('bloom'); return; }
   fxl.querySelector('.cutin')?.remove();
   fxAdd(`cutin ${kind} ${a?.enemy ? 'foe' : ''}`, `<div class="ci-strip">${face(a)}</div><div class="ci-txt"><b>${kind === 'crit' ? 'Crítico!' : 'Fraqueza!'}</b><small>${esc(a?.name || '')}${t ? ' → ' + esc(t.name) : ''}</small></div>`, 900, `--c:${esc(a?.color || '#e4002b')}`);
-  sfxc(kind === 'crit' ? 'cut' : 'weak');
 }
 function shatter(el) { // Quebra: o cartão estilhaça e a etiqueta entra
   const sh = Array.from({ length: 10 }, (_, i) => `<i style="--a:${i * 36 + Math.random() * 20}deg;--d:${3 + Math.random() * 4}"></i>`).join('');
@@ -121,7 +98,8 @@ const posFx = (k, id, o = {}) => { const P = globalThis.LUZ?.pos; if (!P) return
 function seal(kind, txt) { // selo grande no palco: PERFEITO!, BOM!, CONTRA!, CHOQUE!, BLACK FLASH!
   fxl.querySelector('.seal')?.remove();
   if (kind !== 'bom' && kind !== 'erro') fxAdd('flash' + (kind === 'bf' ? ' dark' : ''), '', 260);
-  fxAdd(`seal ${kind}`, `<b>${esc(txt)}</b>`, 1100); sfxc(kind === 'perf' || kind === 'otimo' ? 'perfect' : kind === 'bf' ? 'bf' : kind === 'chq' ? 'chq' : 'weak');
+  fxAdd(`seal ${kind}`, `<b>${esc(txt)}</b>`, 1100);
+  if (kind === 'chq') playSfx('chq');
 }
 function comandoFx(acts, stage) { // o que os comandos de ação rendem: nota do ataque, contra-ataque, Choque e Black Flash
   const grade = acts.find(e => e.fx.cg), bf = acts.find(e => e.fx.bf), ctr = acts.find(e => e.fx.ctr), chq = acts.find(e => e.fx.chq);
@@ -174,6 +152,7 @@ function strikeFx(acts, f0, a, o = {}) {
   comandoFx(acts, stage);
   if (crit || weak) setTimeout(() => cutIn(crit ? 'crit' : 'weak', a, S.chars[(crit || weak).fx.id]), 180);
   const sk = skByName(f0.s), engine = typeof ANIMFX !== 'undefined';
+  const profile = ANIM_PROFILES.profile(sk, f0);
   if (crit && engine) ANIMFX.flash(ELC[f0.el] || '#fff', 90);
   if (f0.dom) { if (engine) ANIMFX.play({ actorId: f0.a, targetIds: [f0.id], skill: sk, fx: f0 }); setTimeout(done, 1200); return fin; }
   // peso do golpe (3D): hitstop, tremida na direção do golpe, recuo e luz; parry solta faíscas, esquiva deixa fantasmas; o golpe final desacelera
@@ -184,7 +163,9 @@ function strikeFx(acts, f0, a, o = {}) {
   const hit1 = (e, i, j, n, G) => {
     const f = e.fx, el = unitEl(f.id);
     if (!o.replay) releaseBars(f.id, f);
-    hitSfx(f);
+    const hitSkill = f.s === f0.s ? sk : skByName(f.s);
+    const hitProfile = f.s === f0.s ? profile : ANIM_PROFILES.profile(hitSkill, f);
+    for (const [cue, gain] of impactSounds(hitProfile, f, hitSkill)) playSfx(cue, { gain });
     if (!el) return;
     el.style.setProperty('--fx', ELC[f.el] || '#fff');
     const pct = pctOf(f), koNow = !o.replay && j === n - 1 && koHold.has(f.id);
@@ -214,7 +195,7 @@ function strikeFx(acts, f0, a, o = {}) {
     G.parts.forEach((e, j) => { const i = k++, at = d0 + i * 140; last = at; setTimeout(() => hit1(e, i, j, G.parts.length, G.parts.length > 1 && j === G.parts.length - 1 ? G : null), at); });
     setTimeout(done, last + 500); };
   const animate = () => {
-    if (!engine) return void hits(220);
+    if (!engine) { skillSfx(profile, 220, 0, f0, sk); hits(220); return; }
     const run = ANIMFX.play({ actorId: f0.a, targetIds: acts.map(e => e.fx.id), skill: sk, fx: f0 });
     let hitShown = false; const showHits = () => { if (hitShown) return; hitShown = true; hits(0); };
     const fallback = setTimeout(showHits, Math.max(250, run.profile.duration * run.profile.impact + 350));
@@ -229,7 +210,29 @@ function strikeFx(acts, f0, a, o = {}) {
 }
 function threat(c) { // turno inimigo: o palco escurece, faixa vermelha e o inimigo dá um passo à frente
   threatUntil = performance.now() + 1300; fxState();
-  fxAdd('threat', `${stage3d() ? `<i class="th-por">${portrait(c)}</i>` : ''}<div><small>Turno inimigo</small><b>${esc(c.name)}</b></div>`, 1300); sfxc('threat');
+  fxAdd('threat', `${stage3d() ? `<i class="th-por">${portrait(c)}</i>` : ''}<div><small>Turno inimigo</small><b>${esc(c.name)}</b></div>`, 1300);
+}
+function turnFx(cur, n, delay) {
+  const next = { scene: S.scene, id: cur?.id, n };
+  const prev = turnFxPrev;
+  const sameScene = prev && prev.scene === next.scene;
+  if (sameScene && prev.id === next.id && prev.n === n) return;
+  turnFxPrev = next;
+  clearTimeout(turnFxTimer);
+  if (!prev || !cur || (sameScene && prev.id === cur.id && n <= prev.n)) return;
+  const mineT = role === 'player' && !asWho && !cur.enemy && mine(cur);
+  // A abertura já tem um som geral. O primeiro jogador recebe o aviso pessoal.
+  const cue = sameScene && n >= prev.n && (prev.id || mineT)
+    ? cur.enemy ? 'turnoInimigo' : mineT ? 'seuTurno' : 'turno'
+    : null;
+  turnFxTimer = setTimeout(() => {
+    if (cue) playSfx(cue);
+    if (cur.enemy) { threat(cur); return; }
+    const txt = mineT ? 'Seu turno' : 'Turno de ' + esc(cur.name);
+    if (stage3d()) fxAdd(`turncut ${mineT ? 'me' : ''}`, `<i class="tc-por">${portrait(cur)}</i><b>${txt}</b>`, 900, `--c:${esc(cur.color)}`);
+    else fxAdd(`banner ${mineT ? 'me' : ''}`, txt, 1100, `--c:${esc(cur.color)}`);
+    if (mineT) navigator.vibrate?.([60, 40, 60]);
+  }, delay + (cue && !prev.id ? 360 : 0));
 }
 function intro() { // abertura: os dois lados entram e a faixa "Batalha!" corta a tela
   enterUntil = performance.now() + 1400; fxState();
@@ -305,21 +308,24 @@ function fx() {
   if (B.active && wasActive === false) intro();
   wasActive = !!B.active;
   if (rolls.length) (quick ? numRoll : dicePanel)(rolls.at(-1), rolls.filter(e => e.rr.atk).length);
-  if (acts.length) { busyUntil = performance.now() + wait + 8000; setTimeout(() => impact(acts), wait); }
-  const plain = news.filter(e => !e.fx).at(-1), win = news.find(e => /^Vitória!/.test(e.text));
-  if (role === 'table' && plain && !win) { // legenda discreta para o que não é golpe
-    document.querySelector('.caption')?.remove(); clearTimeout(capT);
-    const cp = document.createElement('div'); cp.className = 'caption'; cp.innerHTML = `<b>${esc(plain.who)}</b>${esc(plain.text)}`; document.body.append(cp); capT = setTimeout(() => cp.remove(), 6000);
+  if (acts.length && level()) {
+    const cues = [];
+    for (const { fx } of acts) {
+      const skill = skByName(fx.s), profile = ANIM_PROFILES.profile(skill, fx);
+      const { release } = combatSounds(profile, fx, skill);
+      cues.push(release, ...impactSounds(profile, fx, skill).map(([cue]) => cue));
+    }
+    sampleAudio.warm(cues);
   }
-  const endE = news.find(e => e.end); if (endE && stage3d() && typeof PALCO3D !== 'undefined') endFx(endE.end);
+  for (const e of news) if ((!e.sc || e.sc === S.scene) && Object.hasOwn(BATTLE_COMMAND_SOUNDS, e.audioCue)) playSfx(BATTLE_COMMAND_SOUNDS[e.audioCue]);
+  if (acts.length) { busyUntil = performance.now() + wait + 8000; setTimeout(() => impact(acts), wait); }
+  const win = news.find(e => /^Vitória!/.test(e.text));
+  const endE = news.find(e => e.end && (!e.sc || e.sc === S.scene));
+  if (endE?.end === 'lose' || endE?.end === 'flee') playSfx(endE.end === 'lose' ? 'derrota' : 'retirada');
+  if (endE && stage3d() && typeof PALCO3D !== 'undefined') endFx(endE.end);
   if (win?.res) setTimeout(() => results(win), endE?.end === 'win' && stage3d() ? 2000 : 400);
   else if (win) { const v = document.createElement('div'); v.className = 'victory'; v.innerHTML = `<b>Vitória</b><span>${esc(win.text.replace(/^Vitória!\s*/, ''))}</span>`; document.body.append(v); setTimeout(() => v.remove(), 6500); }
-  if (cur && cur.id !== lastCur && lastCur !== undefined) {
-    const later = wait + (acts.length ? 900 : 0); // a vez troca depois que o golpe anterior terminou
-    if (cur.enemy) setTimeout(() => threat(cur), later);
-    else setTimeout(() => { const mineT = role === 'player' && mine(cur), txt = mineT ? 'Seu turno' : 'Turno de ' + esc(cur.name); if (stage3d()) fxAdd(`turncut ${mineT ? 'me' : ''}`, `<i class="tc-por">${portrait(cur)}</i><b>${txt}</b>`, 900, `--c:${esc(cur.color)}`); else fxAdd(`banner ${mineT ? 'me' : ''}`, txt, 1100, `--c:${esc(cur.color)}`); if (mineT) navigator.vibrate?.([60, 40, 60]); }, later);
-  }
-  lastCur = cur?.id ?? null;
+  turnFx(cur, +B.n || 0, wait + (acts.length ? 900 : 0));
   fxWatch(); gainWatch();
 }
 
@@ -340,6 +346,6 @@ function gainWatch() {
     if (c.gold !== p.gold) out.push(['gold', 'Ouro', `${c.gold > p.gold ? '+' : '−'}${Math.abs(c.gold - p.gold)}`]);
     for (const [k, q] of Object.entries(c.inv)) if (q > (p.inv[k] || 0)) out.push(['it', 'Item', `${S.items[k]?.name || k}${q - (p.inv[k] || 0) > 1 ? ' ×' + (q - (p.inv[k] || 0)) : ''}`]);
     for (const [k, l, v, id] of out.slice(0, 4)) { const i = n++;
-      setTimeout(() => { fxAdd('gain g-' + k, `<small>${esc(c.name)} · ${l}</small><b>${esc(v)}</b>`, 2800, `--i:${i % 4}`); if (k === 'sk' && typeof ANIMFX !== 'undefined') { const s = SK(id); ANIMFX.play({ actorId: c.id, targetIds: [c.id], skill: { ...s, anim: 'form' }, fx: { a: c.id, id: c.id, s: s?.name, el: s?.el, passive: s?.kind === 'passive' } }); } if (!snd.mute) tone(k === 'sk' ? 880 : 660, .14, { type: 'triangle', g: .08, to: k === 'sk' ? 1320 : 990 }); }, i * 320); }
+      setTimeout(() => { fxAdd('gain g-' + k, `<small>${esc(c.name)} · ${l}</small><b>${esc(v)}</b>`, 2800, `--i:${i % 4}`); if (k === 'sk' && typeof ANIMFX !== 'undefined') { const s = SK(id); ANIMFX.play({ actorId: c.id, targetIds: [c.id], skill: { ...s, anim: 'form' }, fx: { a: c.id, id: c.id, s: s?.name, el: s?.el, passive: s?.kind === 'passive' } }); } playSfx(k === 'sk' ? 'aprendeu' : 'aviso'); }, i * 320); }
   }
 }
