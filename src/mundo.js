@@ -3,8 +3,8 @@
 // do mapa como piso (world.legacy): enquanto o mestre não edita a cena no editor novo, o world é refeito a partir do 2D.
 import { MIG, S, isObj } from './state.js';
 import { H, NOUNDO } from './handlers.js';
-import { can } from './rules.js';
-import { QUIET, wss } from './net.js';
+import { can, rid } from './rules.js';
+import { QUIET, hooks, wss } from './net.js';
 import '../public/js/mundo-colisao.js';
 import '../public/js/mundo-gerar.js';
 const P = globalThis.MPECAS, G = globalThis.MGERAR;
@@ -263,6 +263,54 @@ Object.assign(H, {
     sendDraft(m.sc);
   },
 });
+// ----- modelos (S.worldTpl): trecho, objeto configurado e mapa; entram no Pacote de conteúdo e passam por cleanTpl -----
+const TPL_K = ['trecho', 'obj', 'mapa'], TPL_MAX = 300;
+// grade de um trecho ou andar: tamanho, casas com código válido (o resto vira 0) e arestas de 0 a 5, tudo reempacotado
+function cleanGrid(d) {
+  const w = +d.w, h = +d.h; if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > W_LEG || h > W_LEG) return null;
+  const re = (b64, n, ok) => { const a = P.unpack(typeof b64 === 'string' ? b64 : '', n); for (let i = 0; i < n; i++) if (!ok(a[i])) a[i] = 0; return P.pack(a); };
+  return { w, h, cell: re(d.cell, w * h, c => !c || !!P.decode(c)), wallH: re(d.wallH, w * (h + 1), e => e <= 5), wallV: re(d.wallV, (w + 1) * h, e => e <= 5) };
+}
+const objsIn = (src, w, max) => { const out = {}; for (const [id, o] of Object.entries(isObj(src) ? src : {}).slice(0, max)) { if (!okId(id)) continue; const v = cleanObj(o, w); if (v) out[id] = v; } return out; };
+function cleanTpl(t) {
+  if (!isObj(t) || !TPL_K.includes(t.k) || !isObj(t.data)) return null;
+  const name = str(t.name, 40).trim() || 'Modelo', d = t.data;
+  if (t.k === 'trecho') {
+    const gr = cleanGrid(d); if (!gr) return null; const fake = { floors: [{ id: 't', w: gr.w, h: gr.h }] };
+    const objs = objsIn(Object.fromEntries(Object.entries(isObj(d.objs) ? d.objs : {}).map(([id, o]) => [id, isObj(o) ? { ...o, f: 't' } : o])), fake, 200);
+    for (const o of Object.values(objs)) delete o.f;
+    return { name, k: 'trecho', data: { ...gr, objs } };
+  }
+  if (t.k === 'obj') { const v = cleanObj({ ...d, f: 't', x: 0, y: 0 }, { floors: [{ id: 't', w: 1, h: 1 }] }); if (!v) return null; delete v.f; delete v.x; delete v.y; return { name, k: 'obj', data: v }; }
+  const ids = new Set(), floors = (Array.isArray(d.floors) ? d.floors : []).slice(0, MAX_FLOORS).map(f => {
+    if (!isObj(f) || !okId(f.id) || ids.has(f.id)) return null; const gr = cleanGrid(f); if (!gr) return null; ids.add(f.id);
+    return { id: f.id, name: str(f.name, 30) || 'Andar', ...gr, img: null };
+  }).filter(Boolean);
+  if (!floors.length) return null;
+  return { name, k: 'mapa', data: { tema: one(d.tema, P.TEMAS, 'campo'), hora: one(d.hora, ['dia', 'tarde', 'noite']), goal: str(d.goal, 120), floors, objs: objsIn(d.objs, { floors }, 2000) } };
+}
+// junta pelo nome e tipo: o que já existe é atualizado, o resto entra novo; devolve quantos entraram
+function tplMerge(list) {
+  let n = 0;
+  for (const t of (Array.isArray(list) ? list : isObj(list) ? Object.values(list) : []).slice(0, TPL_MAX)) {
+    const v = cleanTpl(t); if (!v) continue;
+    const id = Object.keys(S.worldTpl).find(k => S.worldTpl[k].name === v.name && S.worldTpl[k].k === v.k) || (Object.keys(S.worldTpl).length < TPL_MAX ? 'm' + rid() : null);
+    if (id) { S.worldTpl[id] = v; n++; }
+  }
+  return n;
+}
+hooks.tplImport = tplMerge; // Pacote de conteúdo (campaign.js)
+hooks.tplClean = all => Object.fromEntries(Object.entries(isObj(all) ? all : {}).filter(([id]) => okId(id)).slice(0, TPL_MAX).map(([id, t]) => [id, cleanTpl(t)]).filter(([, t]) => t)); // campanha importada
+H.wTpl = (c, m) => { // salvar (add), apagar (del) ou importar um arquivo de modelos ({ vj: 'modelos', list } ou uma lista)
+  if (c.role !== 'gm') return;
+  if (m.del != null) { if (okId(m.del)) delete S.worldTpl[m.del]; return; }
+  if (m.use != null) { // modelo de mapa: o rascunho inteiro vira o mapa guardado (andares, objetos, tema, hora e objetivo); Descartar volta ao publicado
+    const sc = S.scenes[m.sc], t = okId(m.use) && S.worldTpl[m.use]; if (!sc?.world || t?.k !== 'mapa') return;
+    const d = structuredClone(t.data); sc.draft = { ...structuredClone(sc.world), tema: d.tema, hora: d.hora, goal: d.goal, floors: d.floors, objs: d.objs };
+    return sendDraft(m.sc);
+  }
+  tplMerge(m.add ? [m.add] : isObj(m.import) && Array.isArray(m.import.list) ? m.import.list : m.import);
+};
 ['wDraft', 'wPub', 'wDiscard', 'wGen'].forEach(k => NOUNDO.add(k)); // o editor tem desfazer próprio
 ['wDraft', 'wDiscard', 'wGen'].forEach(k => QUIET.add(k)); // o rascunho não vai no push de todos
 
@@ -270,4 +318,4 @@ import { perigoTick, pisou, zoneEnter } from './mundo-obj.js'; // interagir com 
 MH.onCell.push(pisou, zoneEnter); // armadilhas e gatilhos de área ao trocar de casa
 import { ambush } from './mundo-ia.js'; // inimigos com patrulha, visão e perseguição (5 Hz)
 MH.ambush = ambush; // emboscada do gatilho
-export { perigoTick, MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };
+export { cleanTpl, perigoTick, MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };

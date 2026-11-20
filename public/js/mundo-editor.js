@@ -12,7 +12,7 @@
   const st = () => (typeof S !== 'undefined' ? S : null);
   const DR = g.VJ_DRAFT || (g.VJ_DRAFT = {}); // rascunhos por cena (canal draft); o state não traz e não apaga
   const E = { tool: 'sel', floor: null, brush: 1, tema: null, tipo: 'chao', objK: 'bau', und: [], red: [], cv: null, view: null, pubN: 0, sel: null, hot: false, hover: null, rect: null };
-  const TOOLS = [['sel', 'Selecionar', 'Esc'], ['pincel', 'Pincel', 'B'], ['balde', 'Balde', 'G'], ['ret', 'Retângulo'], ['parede', 'Parede', 'W'], ['porta', 'Porta'], ['barreira', 'Barreira'], ['grade', 'Grade'], ['cerca', 'Cerca'], ['objeto', 'Objeto'], ['nevoa', 'Névoa'], ['mover', 'Mover herói']];
+  const TOOLS = [['sel', 'Selecionar', 'Esc'], ['pincel', 'Pincel', 'B'], ['balde', 'Balde', 'G'], ['ret', 'Retângulo'], ['copiar', 'Copiar trecho'], ['parede', 'Parede', 'W'], ['porta', 'Porta'], ['barreira', 'Barreira'], ['grade', 'Grade'], ['cerca', 'Cerca'], ['objeto', 'Objeto'], ['nevoa', 'Névoa'], ['mover', 'Mover herói']];
   const EDGE_TOOL = { parede: 1, porta: 2, barreira: 3, grade: 4, cerca: 5 };
   const TEMA_NOME = { floresta: 'Floresta', castelo: 'Castelo', praia: 'Praia', neve: 'Neve', deserto: 'Deserto', caverna: 'Caverna', ruinas: 'Ruínas', pantano: 'Pântano', vulcao: 'Vulcão', campo: 'Campo' };
   const TIPO_NOME = { chao: 'Chão', trilha: 'Trilha', denso: 'Denso (bloqueia)', baixo: 'Baixo (pula)', agua: 'Água', fundo: 'Fundo (bloqueia)', perigo: 'Perigo', vazio: 'Vazio (abismo)' };
@@ -37,14 +37,14 @@
         ${T === 'pincel' || T === 'balde' || T === 'ret' ? `<label>Tema <select data-mo="tema">${P.TEMAS.map(t => opt(t, TEMA_NOME[t] || t, E.tema)).join('')}</select></label><label>Tipo <select data-mo="tipo">${P.TIPOS.map(t => opt(t, TIPO_NOME[t] || t, E.tipo)).join('')}</select></label>` : ''}
         ${T === 'pincel' || T === 'nevoa' ? `<label>Tamanho <input type="range" min="1" max="7" value="${E.brush}" data-mo="brush" aria-label="Tamanho do pincel"> <b>${E.brush}×${E.brush}</b></label>` : ''}
         ${T === 'objeto' ? `<label>Objeto <select data-mo="obj">${OBJ_NOMES.map(([k, l]) => opt(k, l, E.objK)).join('')}</select></label>` : ''}
-        ${EDGE_TOOL[T] ? '<small>Arraste pelas bordas das casas. Shift apaga.</small>' : T === 'nevoa' ? '<small>Revela; com Shift esconde. Vale na hora.</small>' : T === 'mover' ? '<small>Arraste um herói: ele vai na hora.</small>' : T === 'objeto' ? '<small>Clique numa casa. Shift+clique apaga.</small>' : ''}
+        ${EDGE_TOOL[T] ? '<small>Arraste pelas bordas das casas. Shift apaga.</small>' : T === 'nevoa' ? '<small>Revela; com Shift esconde. Vale na hora.</small>' : T === 'mover' ? '<small>Arraste um herói: ele vai na hora.</small>' : T === 'objeto' ? `<small>${E.objTpl?.k === E.objK ? 'Modelo escolhido: vem configurado. ' : ''}Clique numa casa. Shift+clique apaga.</small>` : T === 'copiar' ? '<small>Arraste um retângulo: vira um carimbo.</small>' : T === 'carimbo' ? '<small>Clique para carimbar; R gira. Esc termina.</small>' : ''}
       </div>
       <div class="medit-floors" aria-label="Andares">${tabs}<button type="button" data-mfa="add" title="Novo andar">+</button><button type="button" data-mfa="gen" title="Gerar o andar: masmorra, área aberta, vila ou caverna">Gerar</button><button type="button" data-mfa="ren" title="Renomear o andar">Renomear</button><button type="button" data-mfa="size" title="Mudar o tamanho do andar">Tamanho</button><button type="button" data-mfa="del" title="Apagar o andar">Apagar</button></div>
-      <div class="medit-pub"><button type="button" data-mdis ${dr ? '' : 'disabled'}>Descartar</button><button type="button" class="own" data-mpub ${dr ? '' : 'disabled'}>Publicar${E.pubN ? ` <em class="gbdg">${E.pubN}</em>` : ''}</button></div>
+      <div class="medit-pub"><button type="button" data-mlib aria-pressed="${!!E.lib}" class="${E.lib ? 'on' : ''}" title="Biblioteca de modelos: trechos, objetos e mapas">Modelos</button><button type="button" data-mdis ${dr ? '' : 'disabled'}>Descartar</button><button type="button" class="own" data-mpub ${dr ? '' : 'disabled'}>Publicar${E.pubN ? ` <em class="gbdg">${E.pubN}</em>` : ''}</button></div>
     </div>`;
     return `<div class="medit" style="--medw:${width()}%">${bar}
       <section class="medit-2d" aria-label="Grid do mapa (vista de cima)"><canvas class="medit-cv"></canvas>
-        <div class="medit-info"><b>${esc(f?.name || 'Sem andar')}</b> <small>${f ? f.w + '×' + f.h : ''}${dr ? ' · rascunho' : ' · publicado'}</small></div>${inspect()}${genHtml()}</section>
+        <div class="medit-info"><b>${esc(f?.name || 'Sem andar')}</b> <small>${f ? f.w + '×' + f.h : ''}${dr ? ' · rascunho' : ' · publicado'}</small></div>${inspect()}${genHtml()}${libHtml()}</section>
       <i class="medit-div" role="separator" aria-orientation="vertical" aria-label="Divisor entre o grid e o 3D" title="Arraste para mudar a largura"></i>
       <section class="medit-3d mundo-slot" data-mundo aria-label="Mapa em 3D ao vivo">${bar3d()}</section>
     </div>`;
@@ -103,6 +103,12 @@
     if (E.hover?.e) { const [k, hx, hy] = E.hover.e; x.strokeStyle = 'rgba(255,201,60,.9)'; x.lineWidth = 3; x.beginPath(); if (k === 'h') { x.moveTo(ox + hx * cs, oy + hy * cs); x.lineTo(ox + (hx + 1) * cs, oy + hy * cs); } else { x.moveTo(ox + hx * cs, oy + hy * cs); x.lineTo(ox + hx * cs, oy + (hy + 1) * cs); } x.stroke(); }
     else if (E.hover?.c && (E.tool === 'pincel' || E.tool === 'nevoa')) { const [cx, cy] = E.hover.c, n = E.brush, h0 = Math.floor((n - 1) / 2); x.strokeStyle = 'rgba(255,255,255,.8)'; x.lineWidth = 1; x.strokeRect(ox + (cx - h0) * cs, oy + (cy - h0) * cs, n * cs, n * cs); }
     if (E.drag?.hero) { const d = E.drag; x.strokeStyle = '#ffc93c'; x.lineWidth = 2; x.beginPath(); x.arc(ox + d.x * cs, oy + d.z * cs, Math.max(4, cs * .4), 0, Math.PI * 2); x.stroke(); }
+    if (E.tool === 'carimbo' && E.carimbo && E.hover?.c && g.MTPL) { // fantasma do carimbo (já girado) a partir da casa sob o cursor
+      const c = E.carimbo; if (!c.rt) { let t = c.tpl; for (let i = 0; i < c.rot; i++) t = g.MTPL.rotTpl(t); c.rt = t; }
+      const t = c.rt, [hx, hy] = E.hover.c, cl = P.unpack(t.cell, t.w * t.h); x.globalAlpha = .6;
+      for (let y = 0; y < t.h; y++) for (let i = 0; i < t.w; i++) { const v = cl[y * t.w + i]; if (v) { x.fillStyle = cellColor(v); x.fillRect(ox + (hx + i) * cs, oy + (hy + y) * cs, Math.ceil(cs), Math.ceil(cs)); } }
+      x.globalAlpha = 1; x.strokeStyle = '#ffc93c'; x.lineWidth = 2; x.setLineDash([5, 3]); x.strokeRect(ox + hx * cs, oy + hy * cs, t.w * cs, t.h * cs); x.setLineDash([]);
+    }
   }
 
   // ----- montagem: canvas, divisor, câmera livre do 3D -----
@@ -112,7 +118,8 @@
     const cv = root.querySelector('.medit-cv'); E.cv = cv;
     if (!ro && g.ResizeObserver) ro = new ResizeObserver(() => draw());
     if (ro && cv && !cv._ro) { cv._ro = true; ro.observe(cv); }
-    draw(); genDraw();
+    draw(); genDraw(); libDraw();
+    if (!g.MTPL && !E.tplLoad) E.tplLoad = import('/js/mundo-modelos.js').then(() => draw(), err => console.error(err)); // copiar e carimbar precisam do MTPL
   }
   // divisor: arrasta e guarda a largura em gui.medW (persistida com o resto da doca)
   addEventListener('pointerdown', e => {
@@ -222,12 +229,14 @@
     if (T === 'pincel') { strokeStart('cells'); for (const [x, y] of brushCells(f, cx, cy, E.brush)) strokePut('c', x, y, code); }
     else if (EDGE_TOOL[T]) { strokeStart('edge'); const ed = edgeAt(p.fx, p.fy, f); E.drag.shift = e.shiftKey; if (ed) strokePut(ed[0], ed[1], ed[2], e.shiftKey ? 0 : EDGE_TOOL[T]); }
     else if (T === 'balde') { E.drag = null; if (inF(f, cx, cy)) ops([{ o: 'cells', f: f.id, l: flood(f, cx, cy, code) }]); }
-    else if (T === 'ret') { if (inF(f, cx, cy)) E.rect = [[cx, cy], [cx, cy]]; }
+    else if (T === 'ret' || T === 'copiar') { if (inF(f, cx, cy)) E.rect = [[cx, cy], [cx, cy]]; }
+    else if (T === 'carimbo') { E.drag = null; if (E.carimbo && g.MTPL && inF(f, cx, cy)) ops(g.MTPL.stamp(f, E.carimbo.tpl, cx, cy, E.carimbo.rot, rid)); }
     else if (T === 'objeto') {
       E.drag = null; if (!inF(f, cx, cy)) return;
       const cur = objAt(w, f.id, cx, cy);
       if (e.shiftKey) { if (cur) ops([{ o: 'obj', id: cur, v: null }]); return; }
-      const id = rid(), o = { k: E.objK, f: f.id, x: cx, y: cy, rot: 0, vis: 'visivel', auto: null, cfg: E.objK === 'gatilho' ? { casas: [[cx, cy]] } : {} };
+      const m = E.objTpl?.k === E.objK && E.objTpl; // modelo de objeto escolhido na biblioteca: vem com a configuração
+      const id = rid(), o = { k: E.objK, f: f.id, x: cx, y: cy, rot: m?.rot || 0, vis: m?.vis || 'visivel', auto: m ? m.auto : null, cfg: E.objK === 'gatilho' ? { ...(m ? structuredClone(m.cfg) : {}), casas: [[cx, cy]] } : m ? structuredClone(m.cfg) : {} };
       ops([{ o: 'obj', id, v: o }]); E.sel = id; render();
     }
     else if (T === 'nevoa') { fogHide = e.shiftKey; fogBuf.push(...brushCells(f, cx, cy, E.brush)); }
@@ -249,7 +258,7 @@
     const d = E.drag; if (!d) return draw();
     if (T === 'pincel' && E.st) { const code = P.code(E.tema || world().tema, E.tipo); for (const [x, y] of brushCells(f, cx, cy, E.brush)) strokePut('c', x, y, code); }
     else if (EDGE_TOOL[T] && E.st) { const ed = edgeAt(p.fx, p.fy, f); if (ed) strokePut(ed[0], ed[1], ed[2], d.shift ? 0 : EDGE_TOOL[T]); }
-    else if (T === 'ret' && E.rect) E.rect[1] = [Math.max(0, Math.min(f.w - 1, cx)), Math.max(0, Math.min(f.h - 1, cy))];
+    else if ((T === 'ret' || T === 'copiar') && E.rect) E.rect[1] = [Math.max(0, Math.min(f.w - 1, cx)), Math.max(0, Math.min(f.h - 1, cy))];
     else if (T === 'nevoa') { fogBuf.push(...brushCells(f, cx, cy, E.brush)); if (fogBuf.length > 200) fogFlush(); }
     else if (T === 'zona') zonaPut(cx, cy, d);
     else if (T === 'mover' && d.hero) { d.x = Math.max(.05, Math.min(f.w - .05, p.fx)); d.z = Math.max(.05, Math.min(f.h - .05, p.fy)); }
@@ -260,6 +269,7 @@
     if (E.st) return strokeEnd();
     const f = floor(), w = world(); if (!f || !w) return;
     if (d.tool === 'ret' && E.rect) { const [a, b] = E.rect, code = P.code(E.tema || w.tema, E.tipo), l = []; E.rect = null; for (let y = Math.min(a[1], b[1]); y <= Math.max(a[1], b[1]); y++) for (let x = Math.min(a[0], b[0]); x <= Math.max(a[0], b[0]); x++) l.push([x, y, code]); ops([{ o: 'cells', f: f.id, l }]); render(); }
+    else if (d.tool === 'copiar' && E.rect && g.MTPL) { const [a, b] = E.rect; E.rect = null; tplPick(g.MTPL.tplFromRect(w, f, a[0], a[1], b[0], b[1]), true); }
     else if (d.tool === 'nevoa') fogFlush();
     else if (d.tool === 'zona' && d.casas) { const cs = d.casas; editSel(v => { v.cfg.casas = cs; }); }
     else if (d.tool === 'mover' && d.hero && typeof send === 'function') send({ t: 'walkGm', id: d.hero, f: f.id, x: Math.round(d.x * 100) / 100, z: Math.round(d.z * 100) / 100 });
@@ -295,7 +305,7 @@
     if (k === 'asview') { if (el.value) { if (typeof send === 'function') send({ t: 'asView', id: el.value }); } else { E.as = null; g.MUNDO?.follow?.(E.follow || null); render(); } return; }
     if (k === 'take') { g.MINPUT?.take?.(el.value || null); el.blur(); return render(); }
     if (k === 'tat') { if (typeof send === 'function') send({ t: 'tatico', n: el.value ? Math.max(1, Math.min(30, +el.value)) : null }); return; }
-    if (k === 'brush') E.brush = Math.max(1, Math.min(7, +el.value || 1)); else if (k === 'obj') E.objK = el.value; else E[k] = el.value;
+    if (k === 'brush') E.brush = Math.max(1, Math.min(7, +el.value || 1)); else if (k === 'obj') { E.objK = el.value; E.objTpl = null; } else E[k] = el.value;
     render();
   });
   // teclas do editor (só com o ponteiro ou o foco na vista Mundo): Ctrl+Z/Ctrl+Y, B pincel, G balde, W parede, Esc volta a Selecionar
@@ -304,8 +314,9 @@
     const k = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && !e.altKey) { if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); } return; }
     if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (k === 'r' && E.tool === 'carimbo' && E.carimbo) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) { E.carimbo.rot = (E.carimbo.rot + 1) % 4; E.carimbo.rt = null; draw(); } return; } // R gira o carimbo (e não o 3D)
     const t = !g.MINPUT?.forced && { b: 'pincel', g: 'balde', w: 'parede' }[k]; if (t && !e.repeat) { e.preventDefault(); E.tool = t; return render(); }
-    if (e.key === 'Escape' && E.gen) { e.preventDefault(); E.gen = null; return render(); }
+    if (e.key === 'Escape' && (E.gen || E.lib)) { e.preventDefault(); E.gen = null; E.lib = null; return render(); }
     if (e.key === 'Escape' && (E.tool !== 'sel' || E.rect)) { e.preventDefault(); E.tool = 'sel'; E.rect = null; if (E.st) strokeEnd(); return render(); }
     if (k === 'q' || k === 'r') e.preventDefault(); // Q/R giram o 3D (mundo3d.js) sem trocar a vista da doca
   }, true);
@@ -346,7 +357,7 @@
   function inspect(id = E.sel) {
     const w = world(), o = w?.objs?.[id]; if (!o) return '';
     const nome = OBJ_NOMES.find(n => n[0] === o.k)?.[1] || { porta: 'Porta', barreira: 'Barreira' }[o.k] || o.k;
-    return `<aside class="medit-insp" aria-label="Inspetor do objeto"><header><b>${esc(nome)}</b> <small>${esc(id)} · casa ${o.x},${o.y}</small><button type="button" data-mx="del" title="Apagar o objeto">Apagar</button><button type="button" data-mx="close" aria-label="Fechar o inspetor">×</button></header>
+    return `<aside class="medit-insp" aria-label="Inspetor do objeto"><header><b>${esc(nome)}</b> <small>${esc(id)} · casa ${o.x},${o.y}</small><button type="button" data-mx="tpl" title="Salvar este objeto, com a configuração, como modelo">Modelo</button><button type="button" data-mx="del" title="Apagar o objeto">Apagar</button><button type="button" data-mx="close" aria-label="Fechar o inspetor">×</button></header>
       <div class="medit-form">
         <label>Visível${sel('data-mi="@vis"', [['visivel', 'Visível'], ['oculto', 'Oculto até revelar']], o.vis)}</label>
         <label>Age sozinho${sel('data-mi="@auto"', [['', 'Padrão da mesa'], ['sim', 'Sim'], ['nao', 'Não: vira pedido']], o.auto === true ? 'sim' : o.auto === false ? 'nao' : '')}</label>
@@ -410,6 +421,7 @@
     const s = st(), sc = s?.scenes?.[sid()], snd = o => typeof send === 'function' && send(o);
     const hs = Object.values(s?.chars || {}).filter(c => !c.enemy && !c.npc && c.scene === sid() && c.pos);
     if (b.dataset.mx === 'close') { E.sel = null; return render(); }
+    if (b.dataset.mx === 'tpl') { const o = world()?.objs?.[E.sel]; if (o) tplSave('obj', { k: o.k, rot: o.rot, vis: o.vis, auto: o.auto, cfg: semEstado(o.cfg) }, OBJ_NOMES.find(n => n[0] === o.k)?.[1] || o.k); return; }
     if (b.dataset.mx === 'del') { if (E.sel) ops([{ o: 'obj', id: E.sel, v: null }]); E.sel = null; return render(); }
     const k = b.dataset.m3;
     if (k === 'fog') snd({ t: 'map', f: 'fogOn', v: !sc?.fogOn });
@@ -489,7 +501,7 @@
   async function genOpen() {
     const f = floor(); if (!f) return;
     if (!g.MGERAR) { try { await import('/js/mundo-gerar.js'); } catch (err) { console.error(err); return typeof toast === 'function' && toast('O gerador não carregou.', 'no'); } }
-    E.gen = { tipo: 'masmorra', tema: GEN_TEMA.masmorra, w: Math.max(16, Math.min(64, f.w)), h: Math.max(16, Math.min(64, f.h)), seed: semente() };
+    E.lib = null; E.gen = { tipo: 'masmorra', tema: GEN_TEMA.masmorra, w: Math.max(16, Math.min(64, f.w)), h: Math.max(16, Math.min(64, f.h)), seed: semente() };
     render(); document.querySelector('.medit-gen select')?.focus();
   }
   function genHtml() {
@@ -511,7 +523,11 @@
   function genDraw() {
     const cv = document.querySelector('.medit-gencv'), G = E.gen; if (!cv || !G || !g.MGERAR) return;
     const key = [G.tipo, G.tema, G.w, G.h, G.seed].join('|'); if (E.genK !== key) { E.genK = key; E.genR = g.MGERAR.gerar(G.tipo, G.tema, G.w, G.h, G.seed); }
-    const { floor: f, objs } = E.genR, dpr = devicePixelRatio || 1, r = cv.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
+    miniDraw(cv, E.genR.floor, E.genR.objs);
+  }
+  // prévia pequena de um andar ou trecho ({ w, h, cell, wallH, wallV }) com os objetos como pontos (janela Gerar e biblioteca)
+  function miniDraw(cv, f, objs) {
+    const dpr = devicePixelRatio || 1, r = cv.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
     const x = cv.getContext('2d'), cs = Math.min(r.width / f.w, r.height / f.h), ox = (r.width - cs * f.w) / 2, oy = (r.height - cs * f.h) / 2;
     x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, r.width, r.height);
@@ -521,7 +537,7 @@
     const line = (e, x0, y0, x1, y1) => { const c = e === 1 ? '#c9c4b8' : ARESTA[e]?.[0]; if (!c) return; x.strokeStyle = c; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); };
     for (let y = 0; y <= f.h; y++) for (let i = 0; i < f.w; i++) line(wh[y * f.w + i], ox + i * cs, oy + y * cs, ox + (i + 1) * cs, oy + y * cs);
     for (let y = 0; y < f.h; y++) for (let i = 0; i <= f.w; i++) line(wv[y * (f.w + 1) + i], ox + i * cs, oy + y * cs, ox + i * cs, oy + (y + 1) * cs);
-    for (const o of Object.values(objs)) { if (o.k === 'porta') continue; x.fillStyle = ICONE_COR[o.k] || '#f4efe4'; x.strokeStyle = '#0b0b10'; x.lineWidth = 1.5; x.beginPath(); x.arc(ox + (o.x + .5) * cs, oy + (o.y + .5) * cs, Math.max(3, cs * .5), 0, Math.PI * 2); x.fill(); x.stroke(); }
+    for (const o of Object.values(objs || {})) { if (o.k === 'porta') continue; x.fillStyle = ICONE_COR[o.k] || '#f4efe4'; x.strokeStyle = '#0b0b10'; x.lineWidth = 1.5; x.beginPath(); x.arc(ox + (o.x + .5) * cs, oy + (o.y + .5) * cs, Math.max(3, cs * .5), 0, Math.PI * 2); x.fill(); x.stroke(); }
   }
   document.addEventListener('click', e => {
     const b = e.target.closest?.('.medit [data-mgen]'); if (!b || !E.gen) return; const k = b.dataset.mgen;
@@ -530,8 +546,80 @@
     if (k === 'ok') { const f = floor(); if (!f || typeof send !== 'function') return; send({ t: 'wGen', sc: sid(), f: f.id, ...E.gen }); resetStacks(); E.pubN = 1; E.gen = null; return render(); }
   });
 
+  // ----- modelos: copiar trecho vira carimbo (R gira); a biblioteca guarda trechos, objetos configurados e mapas inteiros
+  // (S.worldTpl, só do mestre) e mostra o pacote padrão por tema (MMODELOS, no cliente). Exportar/Importar usa { vj: 'modelos', list }.
+  const semEstado = cfg => { const c = structuredClone(cfg || {}); for (const k of ['aberto', 'por', 'usado', 'tent']) delete c[k]; return c; };
+  const sendT = m => typeof send === 'function' && send({ t: 'wTpl', ...m });
+  async function tplSave(k, data, name0) {
+    const v = await ask({ title: 'Salvar como modelo', text: 'Fica na biblioteca (botão Modelos) e vai junto no Pacote de conteúdo.', input: name0 || '', ok: 'Salvar' });
+    if (typeof v === 'string' && v.trim()) { sendT({ add: { name: v.trim().slice(0, 40), k, data } }); if (typeof toast === 'function') toast('Modelo salvo.', 'ok'); }
+  }
+  async function tplPick(tpl, askName) {
+    if (!tpl?.w || !tpl?.h) return;
+    E.carimbo = { tpl, rot: 0, rt: null }; E.tool = 'carimbo'; E.lib = null; E.rect = null; render();
+    if (askName) await tplSave('trecho', tpl, '');
+  }
+  function libOpen() { if (!g.MTPL) { E.tplLoad ||= import('/js/mundo-modelos.js').then(() => render(), err => console.error(err)); } E.lib = { tema: E.tema || world()?.tema || 'floresta' }; E.gen = null; render(); }
+  const libItems = () => {
+    const mine = Object.entries(st()?.worldTpl || {}).map(([id, t]) => ({ id, ...t, mine: true }));
+    const pack = (g.MMODELOS?.[E.lib?.tema] || []).map((t, i) => ({ id: 'p' + i, k: 'trecho', ...t })); // o pacote só tem trechos
+    return { mine, pack };
+  };
+  const K_NOME = { trecho: 'Trecho', obj: 'Objeto', mapa: 'Mapa' };
+  function libHtml() {
+    const L = E.lib; if (!L) return '';
+    const { mine, pack } = libItems(), opt = (v, l, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`;
+    const item = t => `<li><canvas data-mlbc="${esc((t.mine ? 'm:' : 'p:') + t.id)}" aria-hidden="true"></canvas><span><b>${esc(t.name)}</b><small>${K_NOME[t.k] || t.k}${t.k === 'trecho' ? ` · ${t.data.w}×${t.data.h}` : t.k === 'obj' ? ' · ' + esc(OBJ_NOMES.find(n => n[0] === t.data.k)?.[1] || t.data.k) : ` · ${t.data.floors?.length || 0} andar(es)`}</small></span>
+      <button type="button" class="own" data-mlu="${esc((t.mine ? 'm:' : 'p:') + t.id)}">Usar</button>${t.mine ? `<button type="button" data-mld="${esc(t.id)}" aria-label="Apagar ${esc(t.name)}">Apagar</button>` : ''}</li>`;
+    return `<div class="medit-gen medit-lib" role="dialog" aria-label="Modelos">
+      <header><b>Modelos</b><small>Copiar trecho (ferramenta) também cria um</small><button type="button" data-mlb="x" aria-label="Fechar">✕</button></header>
+      <div class="medit-libbar"><button type="button" data-mlb="mapa" title="Guarda o rascunho inteiro: andares, objetos, tema, hora e objetivo">Salvar mapa</button><button type="button" data-mlb="exp" ${mine.length ? '' : 'disabled'}>Exportar</button><label class="medit-libimp">Importar<input type="file" accept=".json,application/json" data-mlbf hidden></label></div>
+      <h4>Meus modelos</h4>${mine.length ? `<ul>${mine.map(item).join('')}</ul>` : '<p class="medit-gennota">Nenhum ainda. Use Copiar trecho, o botão Modelo de um objeto ou Salvar mapa.</p>'}
+      <h4>Pacote padrão <select data-mlbt aria-label="Tema do pacote">${P.TEMAS.map(t => opt(t, TEMA_NOME[t] || t, L.tema)).join('')}</select></h4>
+      ${g.MTPL ? `<ul>${pack.map(item).join('')}</ul>` : '<p class="medit-gennota">Carregando…</p>'}
+    </div>`;
+  }
+  const libFind = key => { const [s, id] = key.split(/:(.*)/), { mine, pack } = libItems(); return (s === 'm' ? mine : pack).find(t => t.id === id); };
+  function libDraw() {
+    if (!E.lib) return;
+    for (const cv of document.querySelectorAll('.medit-lib [data-mlbc]')) {
+      const t = libFind(cv.dataset.mlbc); if (!t) continue;
+      if (t.k === 'trecho') miniDraw(cv, t.data, t.data.objs);
+      else if (t.k === 'mapa' && t.data.floors?.[0]) miniDraw(cv, t.data.floors[0], Object.fromEntries(Object.entries(t.data.objs || {}).filter(([, o]) => o.f === t.data.floors[0].id)));
+      else { const x = cv.getContext('2d'), r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1; cv.width = r.width * dpr; cv.height = r.height * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.fillStyle = '#0b0b10'; x.beginPath(); x.arc(r.width / 2, r.height / 2, Math.min(r.width, r.height) * .38, 0, Math.PI * 2); x.fill(); x.strokeStyle = x.fillStyle = ICONE_COR[t.data.k] || '#f4efe4'; x.lineWidth = 2; x.stroke(); x.font = `700 ${Math.round(r.height * .4)}px "Barlow Condensed", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ICONE[t.data.k] || '?', r.width / 2, r.height / 2 + 1); }
+    }
+  }
+  async function libUse(t) {
+    if (t.k === 'trecho') return tplPick(t.data, false);
+    if (t.k === 'obj') { E.objTpl = structuredClone(t.data); E.objK = t.data.k; E.tool = 'objeto'; E.lib = null; return render(); }
+    if (await ask({ title: `Usar o mapa "${t.name}"?`, text: 'O rascunho inteiro vira este mapa: andares, objetos, tema, hora e objetivo. Desfazer não volta isso; Descartar volta ao publicado.', ok: 'Usar', danger: true }) !== true) return;
+    sendT({ use: t.id, sc: sid() }); resetStacks(); E.pubN = 1; E.lib = null; E.floor = t.data.floors[0]?.id; render();
+  }
+  function mapData() {
+    const w = world(); if (!w) return null;
+    const objs = Object.fromEntries(Object.entries(w.objs || {}).filter(([, o]) => o.k !== 'inimigo').map(([id, o]) => { const { rev, ...r } = o; return [id, { ...r, cfg: semEstado(o.cfg) }]; }));
+    return { tema: w.tema, hora: w.hora, goal: w.goal || '', floors: w.floors.map(({ id, name, w: fw, h, cell, wallH, wallV }) => ({ id, name, w: fw, h, cell, wallH, wallV })), objs };
+  }
+  document.addEventListener('click', async e => {
+    const b = e.target.closest?.('.medit [data-mlib], .medit [data-mlb], .medit [data-mlu], .medit [data-mld]'); if (!b) return;
+    if (b.hasAttribute('data-mlib')) return E.lib ? (E.lib = null, render()) : libOpen();
+    if (b.dataset.mlu) { const t = libFind(b.dataset.mlu); if (t) libUse(t); return; }
+    if (b.dataset.mld) { const t = st()?.worldTpl?.[b.dataset.mld]; if (t && await ask({ title: `Apagar o modelo "${t.name}"?`, ok: 'Apagar', danger: true }) === true) sendT({ del: b.dataset.mld }); return; }
+    const k = b.dataset.mlb;
+    if (k === 'x') { E.lib = null; return render(); }
+    if (k === 'mapa') { const d = mapData(); if (d) tplSave('mapa', d, world()?.goal?.slice(0, 40) || 'Mapa'); return; }
+    if (k === 'exp') { const list = Object.values(st()?.worldTpl || {}), a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ vj: 'modelos', v: 1, list }, null, 1)], { type: 'application/json' })); a.download = 'modelos-mapa.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+  });
+  document.addEventListener('change', async e => {
+    const t = e.target.closest?.('.medit [data-mlbt]'); if (t && E.lib) { E.lib.tema = t.value; return render(); }
+    const fi = e.target.closest?.('.medit [data-mlbf]'); if (!fi?.files?.[0]) return;
+    try { const j = JSON.parse(await fi.files[0].text()); sendT({ import: j }); if (typeof toast === 'function') toast('Modelos importados.', 'ok'); }
+    catch { if (typeof toast === 'function') toast('Arquivo de modelos inválido.', 'no'); }
+    fi.value = '';
+  });
+
   g.MEDIT = {
-    html, mount, draw, ops, undo, redo, world, inspect, ctx3d, onAsView, floor: null, get gen() { return E.gen; },
+    html, mount, draw, ops, undo, redo, world, inspect, ctx3d, onAsView, floor: null, get gen() { return E.gen; }, get lib() { return E.lib; }, get carimbo() { return E.carimbo; },
     get tool() { return E.tool; }, set tool(v) { E.tool = v; },
     get brush() { return E.brush; }, set brush(v) { E.brush = Math.max(1, Math.min(7, +v || 1)); },
     get tema() { return E.tema; }, set tema(v) { E.tema = v; }, get tipo() { return E.tipo; }, set tipo(v) { E.tipo = v; },

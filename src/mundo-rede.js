@@ -102,7 +102,7 @@ hooks.view = (c, v) => {
   for (const [k, sc] of Object.entries(v.scenes || {})) if (sc && (sc.world || sc.draft)) v.scenes[k] = { ...sc, draft: undefined, world: visFilter(c, S.scenes[k], k) };
   v.mundo = MUNDO;
   for (const [id, ch] of Object.entries(v.chars || {})) if (ch?.enemy && !ch.pos && S.chars[id]?.pos) ch.pos = { ...S.chars[id].pos }; // o scrub tira o pos; inimigo parado e visível precisa aparecer no 3D
-  if (c.role !== 'gm') { const b = visB64(S.scene); if (b) v.vis = b; } // visão atual do grupo (sem ela, a névoa lembrada vale como visível)
+  if (c.role !== 'gm') { const b = visB64(S.scene); if (b) v.vis = b; delete v.worldTpl; } // visão atual do grupo (sem ela, a névoa lembrada vale como visível); os modelos do mapa são do mestre
   if (c.role === 'gm' && !c._draftOk && c.send) { c._draftOk = true; queueMicrotask(() => { for (const [k, sc] of Object.entries(S.scenes || {})) if (sc?.draft) sendDraft(k, c); }); } // mestre que acabou de conectar: os rascunhos vão logo depois do primeiro state
   return v;
 };

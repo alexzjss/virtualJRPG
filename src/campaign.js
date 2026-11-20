@@ -57,6 +57,7 @@ function cleanCampaign(o) {
   if (o.audio && typeof o.audio === 'object') { if (!okUrl(o.audio.url)) { o.audio.url = ''; o.audio.on = false; } } else delete o.audio;
   o.log = (Array.isArray(o.log) ? o.log : []).filter(e => e && typeof e === 'object' && e.kind !== 'chat').slice(-150).map(e => ({ n: int(e.n, 0, 1e9), who: str(e.who, 40), text: str(e.text, 600), kind: KINDS_LOG.includes(e.kind) ? e.kind : '',
     ...(Number.isFinite(e.d) ? { d: int(e.d, 0, 100) } : {}), ...(typeof e.to === 'string' ? { to: str(e.to, 30) } : {}), ...(typeof e.from === 'string' ? { from: str(e.from, 30) } : {}) }));
+  o.worldTpl = hooks.tplClean ? hooks.tplClean(o.worldTpl) : {}; // modelos do mundo 3D: a mesma limpeza dos arquivos de modelos
   o.title = str(o.title || 'Campanha', 40); o.reqs = {}; o.handout = null; delete o.users; delete o.vj;
   if (o.chase) o.chase = null;
   return o;
@@ -116,10 +117,11 @@ function importPack(p) {
     const list = (Array.isArray(e?.list) ? e.list : []).slice(0, 12).filter(x => x && map.best[x.b]).map(x => ({ b: map.best[x.b], tier: Object.hasOwn(TIER, x.tier) ? x.tier : 'normal', n: int(x.n || 1, 1, 12) }));
     if (list.length) { S.encounters[rid()] = { name: String(e.name || 'Encontro').slice(0, 40), list }; n.enc++; }
   }
-  log('Mestre', `importou um pacote de conteúdo: ${n.skills} skills, ${n.items} itens, ${n.best} modelos e ${n.enc} encontros.`, '', { to: GM });
+  n.tpl = hooks.tplImport ? hooks.tplImport(p.worldTpl) : 0; // modelos do mundo 3D (mundo.js)
+  log('Mestre', `importou um pacote de conteúdo: ${n.skills} skills, ${n.items} itens, ${n.best} modelos e ${n.enc} encontros${n.tpl ? `, e ${n.tpl} modelos de mapa` : ''}.`, '', { to: GM });
   return n;
 }
-const exportPack = () => ({ vj: 'conteudo', v: 1, title: S.title, skills: S.skills, items: S.items, bestiary: S.bestiary, encounters: S.encounters });
+const exportPack = () => ({ vj: 'conteudo', v: 1, title: S.title, skills: S.skills, items: S.items, bestiary: S.bestiary, encounters: S.encounters, worldTpl: S.worldTpl || {} });
 
 // ---------- ações do mestre ----------
 ['campName', 'campSave', 'campLoad', 'campNew', 'campDel', 'bkNow', 'bkRestore', 'sessMark'].forEach(k => NOUNDO.add(k));
@@ -192,4 +194,4 @@ function api(req, res) {
 
 hooks.api = api; hooks.store = storeInfo;
 
-export { api, autoBackup, fix, importPack, storeInfo };
+export { api, autoBackup, exportPack, fix, importPack, storeInfo };

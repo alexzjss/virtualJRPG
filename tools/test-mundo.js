@@ -227,3 +227,52 @@ test('gerador: masmorra tem portas nas junções e ao menos 1 baú', async () =>
     n('armadilha', 1, 3); n('bau', 2, 4); // 1 a 3 baús e o baú maior da sala mais distante
   }
 });
+
+// ----- modelos -----
+const aplica = (f, objs, ops) => {
+  for (const op of ops) {
+    if (op.o === 'cells') { const a = P.unpack(f.cell, f.w * f.h); for (const [x, y, v] of op.l) a[y * f.w + x] = v; f.cell = P.pack(a); }
+    else if (op.o === 'edge') { const H = op.k === 'h', rw = H ? f.w : f.w + 1, key = H ? 'wallH' : 'wallV', a = P.unpack(f[key], rw * (H ? f.h + 1 : f.h)); for (const [x, y, v] of op.l) a[y * rw + x] = v; f[key] = P.pack(a); }
+    else if (op.o === 'obj') objs[op.id] = op.v;
+  }
+};
+const poe = (f, key, len, i, v) => { const a = P.unpack(f[key], len); a[i] = v; f[key] = P.pack(a); };
+test('modelo: copiar e carimbar girado preserva paredes e objetos', async () => {
+  await import('../public/js/mundo-modelos.js'); const M = globalThis.MTPL;
+  const f = P.newFloor('f0', 'T', 12, 10, 'castelo'), agua = P.code('castelo', 'agua');
+  poe(f, 'cell', 120, 4 * 12 + 3, agua); // água em (3,4)
+  poe(f, 'wallH', 12 * 11, 3 * 12 + 2, 1); // parede no topo da casa (2,3)
+  poe(f, 'wallV', 13 * 10, 4 * 13 + 2, 2); // porta na esquerda da casa (2,4)
+  const o = (k, x, y, cfg, rot = 0) => ({ k, f: 'f0', x, y, rot, vis: 'visivel', auto: null, cfg });
+  const world = { floors: [f], objs: { p: o('porta', 2, 4, { e: 'v', estado: 'fechada' }), b: o('bau', 5, 5, { ouro: 5, aberto: true }, 1), fora: o('bau', 9, 9, {}) } };
+  const t = M.tplFromRect(world, f, 5, 5, 2, 3); // os cantos em qualquer ordem
+  assert.deepEqual([t.w, t.h], [4, 3]);
+  const os = Object.values(t.objs); assert.equal(os.length, 2, 'só o que está dentro');
+  assert.deepEqual(os.find(x => x.k === 'bau'), { k: 'bau', x: 3, y: 2, rot: 1, vis: 'visivel', auto: null, cfg: { ouro: 5 } }, 'relativo e sem estado de jogo');
+  assert.deepEqual(os.find(x => x.k === 'porta').cfg, { e: 'v', estado: 'fechada' }); assert.deepEqual([os.find(x => x.k === 'porta').x, os.find(x => x.k === 'porta').y], [0, 1]);
+  assert.deepEqual(M.rotTpl(M.rotTpl(M.rotTpl(M.rotTpl(t)))), t, 'quatro giros voltam ao mesmo');
+  // carimbo girado 90° em (1,1): parede de fora que já existia fica; parede de dentro some
+  const g2 = P.newFloor('f1', 'N', 12, 12, 'campo'), objs = {};
+  poe(g2, 'wallH', 12 * 13, 1 * 12 + 1, 1); poe(g2, 'wallV', 13 * 12, 2 * 13 + 2, 1);
+  let n = 0; aplica(g2, objs, M.stamp(g2, t, 1, 1, 1, () => 'n' + ++n));
+  assert.equal(P.cell(g2, 2, 2), agua, 'a água gira junto');
+  assert.equal(P.cell(g2, 1, 1), P.code('castelo', 'chao'), 'o piso do trecho entra');
+  assert.equal(P.edgeV(g2, 4, 1), 1, 'a parede de cima vira a da direita');
+  assert.equal(P.edgeH(g2, 2, 1), 2, 'a porta da esquerda vira a de cima');
+  assert.equal(P.edgeH(g2, 1, 1), 1, 'zero na borda do trecho não apaga a parede de fora');
+  assert.equal(P.edgeV(g2, 2, 2), 0, 'a parede de dentro é trocada pela do trecho');
+  const ns = Object.entries(objs); assert.equal(ns.length, 2); assert.ok(ns.every(([id, v]) => /^n\d$/.test(id) && v.f === 'f1'), 'ids novos no andar');
+  assert.deepEqual((({ x, y, rot }) => [x, y, rot])(ns.find(([, v]) => v.k === 'bau')[1]), [1, 4, 2]);
+  assert.deepEqual((({ x, y, cfg }) => [x, y, cfg.e])(ns.find(([, v]) => v.k === 'porta')[1]), [2, 1, 'h']);
+});
+test('modelo: o pacote padrão tem de 3 a 5 trechos por tema, todos carimbáveis', async () => {
+  await import('../public/js/mundo-modelos.js'); const MM = globalThis.MMODELOS;
+  for (const tema of P.TEMAS) {
+    const l = MM[tema] || []; assert.ok(l.length >= 3 && l.length <= 5, `${tema}: ${l.length}`);
+    for (const { name, data: d } of l) {
+      assert.ok(name && d.w >= 3 && d.h >= 3 && d.w <= 24 && d.h <= 24, `${tema}/${name}`);
+      assert.equal(P.unpack(d.cell, d.w * d.h).filter(c => P.decode(c)?.tema === tema).length > d.w * d.h / 2, true, `${tema}/${name}: tema`);
+      const g2 = P.newFloor('x', 'X', 30, 30, 'campo'), objs = {}; aplica(g2, objs, globalThis.MTPL.stamp(g2, d, 2, 2, 3, () => 'i' + Math.random()));
+    }
+  }
+});

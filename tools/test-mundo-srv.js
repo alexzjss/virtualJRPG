@@ -623,3 +623,51 @@ test('gerador: wGen escreve no rascunho do andar, trocando os objetos dele, e o 
     assert.equal(sc.draft.floors.find(o => o.id === 'f1').cell, ref.floor.cell);
   } finally { off.forEach(f => f()); delete sc.draft; }
 });
+
+test('pacote: worldTpl vai e volta pela exportação e importação, sem campos estranhos', async () => {
+  const camp = await import('../src/campaign.js'); await import('../public/js/mundo-modelos.js');
+  const f = P.newFloor('f0', 'T', 8, 6, 'castelo'), t = globalThis.MTPL.tplFromRect({ floors: [f], objs: { b: { k: 'bau', f: 'f0', x: 1, y: 1, rot: 0, vis: 'visivel', auto: null, cfg: { ouro: 9 } } } }, f, 0, 0, 3, 3);
+  const old = S.worldTpl; S.worldTpl = { a: { name: 'Sala', k: 'trecho', data: t }, o: { name: 'Placa velha', k: 'obj', data: { k: 'placa', rot: 0, vis: 'visivel', auto: null, cfg: { texto: 'Cuidado' } } } };
+  try {
+    const p = JSON.parse(JSON.stringify(camp.exportPack()));
+    assert.deepEqual(Object.values(p.worldTpl).map(x => x.name).sort(), ['Placa velha', 'Sala']);
+    const a = Object.values(p.worldTpl).find(x => x.k === 'trecho');
+    a.evil = 1; a.data.junk = '<script>'; Object.values(a.data.objs)[0].cfg.hack = 'x'; Object.values(a.data.objs)[0].zz = 1; a.data.cell = a.data.cell.slice(0, 4) + 'AAAA'; // casas com código 0 continuam válidas
+    p.worldTpl.ruim = { name: 'x', k: 'nada', data: {} }; p.worldTpl.semDados = { name: 'y', k: 'trecho' };
+    S.worldTpl = {};
+    camp.importPack(p);
+    const vs = Object.values(S.worldTpl); assert.equal(vs.length, 2, 'só os dois válidos');
+    const s = vs.find(x => x.k === 'trecho'); assert.deepEqual(Object.keys(s).sort(), ['data', 'k', 'name']);
+    assert.deepEqual(Object.keys(s.data).sort(), ['cell', 'h', 'objs', 'w', 'wallH', 'wallV']);
+    const b = Object.values(s.data.objs)[0]; assert.deepEqual(b, { k: 'bau', x: 1, y: 1, rot: 0, vis: 'visivel', auto: null, cfg: { itens: [], ouro: 9, modo: 'uma' } });
+    camp.importPack(p); assert.equal(Object.keys(S.worldTpl).length, 2, 'importar de novo atualiza pelo nome, sem duplicar');
+    const g = gmc(); handle(g, { t: 'wTpl', add: { name: 'Nova', k: 'obj', data: { k: 'npc', cfg: { nome: 'Ana', lixo: 1 } } } });
+    const nv = Object.entries(S.worldTpl).find(([, x]) => x.name === 'Nova'); assert.ok(nv && !('lixo' in nv[1].data.cfg));
+    handle(cli('Ana'), { t: 'wTpl', del: nv[0] }); assert.ok(S.worldTpl[nv[0]], 'jogador não apaga');
+    handle(g, { t: 'wTpl', del: nv[0] }); assert.equal(S.worldTpl[nv[0]], undefined);
+    handle(g, { t: 'wTpl', import: { vj: 'modelos', v: 1, list: [{ name: 'Importado', k: 'trecho', data: t }, { k: 'mapa', name: 'Mapa ruim', data: { floors: [] } }] } });
+    assert.ok(Object.values(S.worldTpl).some(x => x.name === 'Importado') && !Object.values(S.worldTpl).some(x => x.name === 'Mapa ruim'));
+  } finally { S.worldTpl = old; }
+});
+
+test('modelo de mapa: usar troca andares, objetos, tema e objetivo do rascunho; o publicado e o jogador não mudam nada', () => {
+  const sc = freshWorld(), g = gmc(), p = cli('Ana'), off = [join(g), join(p)], old = S.worldTpl;
+  const a = P.newFloor('a', 'Térreo', 12, 10, 'neve'), b = P.newFloor('b', 'Torre', 8, 8, 'neve');
+  S.worldTpl = { m1: { name: 'Forte', k: 'mapa', data: { tema: 'neve', hora: 'noite', goal: 'Subir a torre', floors: [a, b], objs: { x1: { k: 'placa', f: 'b', x: 2, y: 2, rot: 0, vis: 'visivel', auto: null, cfg: { texto: 'topo' } } } } }, t1: { name: 'Sala', k: 'trecho', data: { w: 1, h: 1, cell: '', wallH: '', wallV: '', objs: {} } } };
+  try {
+    draft(g, { o: 'obj', id: 'velho', v: { k: 'bau', f: 'f0', x: 1, y: 1, cfg: {} } });
+    handle(p, { t: 'wTpl', use: 'm1', sc: S.focus }); assert.ok(sc.draft.objs.velho, 'jogador não usa');
+    handle(g, { t: 'wTpl', use: 't1', sc: S.focus }); assert.ok(sc.draft.objs.velho, 'trecho não se usa assim');
+    handle(g, { t: 'wTpl', use: 'm1', sc: S.focus });
+    assert.deepEqual(sc.draft.floors.map(f => [f.id, f.name, f.w, f.h]), [['a', 'Térreo', 12, 10], ['b', 'Torre', 8, 8]]);
+    assert.equal(sc.draft.floors[0].cell, a.cell); assert.deepEqual([sc.draft.tema, sc.draft.hora, sc.draft.goal], ['neve', 'noite', 'Subir a torre']);
+    assert.deepEqual(Object.values(sc.draft.objs).map(o => [o.k, o.f, o.cfg.texto]), [['placa', 'b', 'topo']]);
+    assert.equal(sc.world.floors[0].id, 'f0', 'o publicado não muda'); assert.ok(g.sent.some(m => m.t === 'draft' && m.d?.floors?.[0]?.id === 'a'));
+  } finally { off.forEach(f => f()); delete sc.draft; S.worldTpl = old; }
+});
+
+test('view: modelos do mapa só vão para o mestre', () => {
+  const old = S.worldTpl; S.worldTpl = { a: { name: 'Sala', k: 'obj', data: { k: 'placa', rot: 0, vis: 'visivel', auto: null, cfg: { texto: 'segredo' } } } };
+  try { assert.equal(net.view(cli('Ana')).worldTpl, undefined); assert.equal(net.view(gm).worldTpl.a.name, 'Sala'); assert.ok(S.worldTpl.a); }
+  finally { S.worldTpl = old; }
+});
