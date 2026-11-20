@@ -38,6 +38,64 @@ function soPara(c, msg) {
   wss.clients.forEach(x => x.role === 'player' && x.name === c.name && x.readyState === 1 && x.send(out));
 }
 const portaMuda = (sc, sid) => { unstuck(sc); MH.vision(sid); };
+const heroesIn = sid => Object.values(S.chars).filter(o => o.scene === sid && !o.enemy && !o.npc && !o.summon && o.pos && o.x != null);
+const toAll = (sid, msg) => { const out = JSON.stringify(msg); wss.clients.forEach(x => x.readyState === 1 && (x.role === 'gm' || x.role === 'table' || (x.role === 'player' && heroesIn(sid).some(h => h.owner === x.name))) && x.send(out)); };
+// abrir, fechar ou alternar portas e barreiras; mostrar, ocultar ou alternar os outros objetos. Devolve true se mexeu em porta/barreira
+function aplicar(sc, sid, id, acao) {
+  const o = sc.world.objs[id]; if (!o) return false;
+  if (EDGE.has(o.k)) { const ab = acao === 'abrir' || (acao === 'alternar' && o.cfg.estado !== 'aberta'); o.cfg.estado = ab ? 'aberta' : 'fechada'; return true; }
+  const mostra = acao === 'abrir' || (acao === 'alternar' && o.vis === 'oculto'); o.vis = mostra ? 'visivel' : 'oculto'; if (mostra) o.rev = true; else delete o.rev; return false;
+}
+// ----- diálogo de NPC: quem abriu escolhe; heróis a até 3 casas do NPC veem só leitura; o mestre acompanha -----
+const DLG = () => S.dlg || Object.defineProperty(S, 'dlg', { value: {}, enumerable: false, writable: true, configurable: true }).dlg; // fora do state e do save
+function dlgSend(sid, d, extra = {}) {
+  const sc = S.scenes[sid], o = sc?.world?.objs?.[d.obj], no = o?.cfg?.dialogo?.nos?.[d.no], by = S.chars[d.by]; if (!o) return;
+  const [px, pz] = pointOf(o), perto = new Set(heroesIn(sid).filter(h => h.pos.f === o.f && Math.hypot(h.pos.x - px, h.pos.z - pz) <= 3 + 1e-9).map(h => h.owner));
+  const base = { t: 'dlg', sc: sid, obj: d.obj, nome: o.cfg.nome || 'NPC', retrato: o.cfg.retrato || '', by: d.by, fala: no?.fala || '', escolhas: (no?.escolhas || []).map(e => e.txt), extra: d.extra || [], ...extra };
+  wss.clients.forEach(x => {
+    if (x.readyState !== 1) return; const dono = x.role === 'player' && x.name === by?.owner;
+    if (x.role === 'gm' || dono || (x.role === 'player' && perto.has(x.name))) x.send(JSON.stringify({ ...base, ro: !dono }));
+  });
+}
+function dlgEnd(sid) { const d = DLG()[sid]; if (!d) return; dlgSend(sid, d, { fim: true }); delete DLG()[sid]; }
+// o que uma escolha faz: loja, item:<id>, gatilho:<id>, objetivo:<texto>, fim (devolve true para encerrar)
+function faz(sc, sid, ch, f) {
+  const [k, ...r] = String(f || '').split(':'), v = r.join(':');
+  if (k === 'loja') { sc.shop.open = true; log(ch.name, 'abriu a loja.', 'ok'); }
+  else if (k === 'item') { const got = ganho(ch, [{ id: v, n: 1 }], 0); if (got.length) log(ch.name, 'recebeu ' + got.join(', ') + '.', 'ok'); }
+  else if (k === 'gatilho') { const t = sc.world.objs[v]; if (t?.k === 'gatilho') disparar(sc, sid, t); }
+  else if (k === 'objetivo') sc.world.goal = v.slice(0, 120);
+  return k === 'fim';
+}
+// ----- gatilho: ações ao pisar na zona -----
+const revela = (sc, fid, casas) => {
+  const f = sc.world.floors.find(x => x.id === fid), V = globalThis.MVIS; if (!f) return;
+  const b = V.fromB64(sc.seenW?.[fid] || '', f.w * f.h); for (const [x, y] of casas || []) if (x < f.w && y < f.h) b[y * f.w + x] = 1;
+  sc.seenW = { ...sc.seenW, [fid]: V.toB64(b) };
+};
+function disparar(sc, sid, t) {
+  if (t.cfg.vezes === 'uma') { if (t.cfg.usado) return; t.cfg.usado = true; }
+  let portas = false;
+  for (const a of t.cfg.acoes || []) {
+    if (a.k === 'abrir' || a.k === 'fechar') portas = aplicar(sc, sid, a.alvo, a.k) || portas;
+    else if (a.k === 'revelar') { const o = sc.world.objs[a.alvo]; if (o) { o.rev = true; if (o.vis === 'oculto') o.vis = 'visivel'; } else revela(sc, t.f, t.cfg.casas); }
+    else if (a.k === 'texto' && a.v) log('Narração', a.v, '', { sc: sid });
+    else if (a.k === 'som' && a.v) toAll(sid, { t: 'sfx', k: String(a.v).slice(0, 40) });
+    else if (a.k === 'objetivo') sc.world.goal = String(a.v || '').slice(0, 120);
+    else if (a.k === 'batalha') MH.ambush?.(sid, a.v, t.cfg.casas);
+  }
+  if (portas) portaMuda(sc, sid);
+}
+// o herói trocou de casa: gatilhos da casa nova (quem=todos espera todos os heróis da cena dentro da zona)
+function zoneEnter(ch, sc) {
+  if (!sc?.world || ch.enemy || ch.npc || ch.summon || !ch.pos) return;
+  const sid = ch.scene, dentro = (t, h) => h.pos?.f === t.f && t.cfg.casas.some(([x, y]) => x === h.x && y === h.y);
+  for (const t of Object.values(sc.world.objs)) {
+    if (t?.k !== 'gatilho' || !dentro(t, ch) || (t.cfg.vezes === 'uma' && t.cfg.usado)) continue;
+    if (t.cfg.quem === 'todos' && !heroesIn(sid).every(h => dentro(t, h))) continue;
+    disparar(sc, sid, t);
+  }
+}
 const objActs = {
   porta(c, ch, o, m, sc) {
     const cf = o.cfg;
@@ -59,6 +117,20 @@ const objActs = {
     const got = ganho(ch, [{ id: o.cfg.item, n: Math.max(1, o.cfg.qtd || 1) }], 0); delete sc.world.objs[m.obj]; if (sc.draft?.objs) delete sc.draft.objs[m.obj]; // some também do rascunho, senão volta ao publicar
     if (got.length) log(ch.name, `pegou ${got.join(', ')}.`, 'ok');
   },
+  npc(c, ch, o, m, sc) {
+    const sid = ch.scene, D = DLG(), d = D[sid], dg = o.cfg.dialogo;
+    if (!d || d.obj !== m.obj) { if (d) dlgEnd(sid); if (!dg?.nos?.[dg.ini]) return; D[sid] = { obj: m.obj, by: ch.id, no: dg.ini, extra: [] }; return dlgSend(sid, D[sid]); }
+    if (d.by !== ch.id) return;
+    const e = Number.isInteger(m.opt) ? dg.nos[d.no]?.escolhas?.[m.opt] : null; if (!e) return dlgSend(sid, d);
+    const fim = faz(sc, sid, ch, e.faz);
+    if (fim || !e.vai || !dg.nos[e.vai]) return dlgEnd(sid);
+    d.no = e.vai; d.extra = []; dlgSend(sid, d);
+  },
+  alavanca(c, ch, o, m, sc) {
+    let portas = false; for (const id of o.cfg.alvos || []) portas = aplicar(sc, ch.scene, id, o.cfg.acao) || portas;
+    o.cfg.estado = o.cfg.estado === 'ligada' ? 'desligada' : 'ligada'; log(ch.name, 'puxou a alavanca.', '');
+    if (portas) portaMuda(sc, ch.scene);
+  },
   placa(c, ch, o) {
     const text = String(o.cfg.texto || ''), img = String(o.cfg.imagem || '');
     soPara(c, { t: 'placa', text, img }); log(ch.name, `leu a placa: "${text.slice(0, 80)}"`, '', { to: GM });
@@ -70,8 +142,14 @@ H.interact = (c, m) => {
   objActs[o.k](c, ch, o, m, sc);
 };
 // pedido: auto=true nunca pede; false sempre; null segue S.auto.inter
-hooks.interGate = m => { const { o } = objOf(m); return !o || o.auto === true || (o.auto == null && S.auto.inter) ? null : 'inter'; };
+hooks.interGate = m => {
+  const { ch, o } = objOf(m), d = ch && S.dlg?.[ch.scene]; if (o?.k === 'npc' && d?.obj === m.obj && d.by === ch.id) return null; // escolher dentro da conversa já aprovada não pede de novo
+  return !o || o.auto === true || (o.auto == null && S.auto.inter) ? null : 'inter';
+};
+// o mestre põe uma fala extra na caixa do diálogo aberto (fala como o NPC); o dono ou o mestre encerram
+H.dlgSay = (c, m) => { const d = S.dlg?.[m.sc]; if (c.role !== 'gm' || !d) return; d.extra = [...(d.extra || []), String(m.text || '').slice(0, 300)].slice(-6); dlgSend(m.sc, d); };
+H.dlgEnd = (c, m) => { const d = S.dlg?.[m.sc], ch = S.chars[d?.by]; if (d && (c.role === 'gm' || can(c, ch))) dlgEnd(m.sc); };
 const VERBO = { porta: 'abrir a porta', barreira: 'mexer na barreira', bau: 'abrir o baú', item: 'pegar', placa: 'ler a placa', npc: 'falar com', alavanca: 'puxar a alavanca', escada: 'usar a escada', portal: 'atravessar o portal' };
 hooks.interText = m => { const { o } = objOf(m); if (!o) return 'interagir'; const v = VERBO[o.k] || 'interagir'; return o.k === 'item' ? `${v} ${S.items[o.cfg?.item]?.name || 'o item'}` : o.k === 'npc' ? `${v} ${o.cfg?.nome || 'o NPC'}` : v; };
 
-export { objActs, reach };
+export { aplicar, disparar, objActs, reach, zoneEnter };

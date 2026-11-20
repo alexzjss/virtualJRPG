@@ -357,3 +357,49 @@ test('interact vira pedido com auto=false e passa com S.auto.inter', () => {
     put(sc, 'i4', { k: 'item', x: 1, y: 5, auto: true, cfg: { item: k, qtd: 1 } }); S.auto.inter = false; inter(c, ch, 'i4'); assert.equal(sc.world.objs.i4, undefined, 'auto=true nunca pede');
   } finally { S.auto.inter = false; sc.fogOn = false; for (const id of Object.keys(S.reqs)) delete S.reqs[id]; }
 });
+
+// ----- NPC, alavanca e gatilho (Task 5.2) -----
+const dlgs = c => c.sent.filter(m => m.t === 'dlg');
+test('diálogo: escolha leva ao nó certo, faz item entrega, fim fecha; quem está a 4 casas não recebe', () => {
+  const sc = freshWorld(); nevoa(sc); S.auto.inter = false; const k = K();
+  const g = gmc(), ca = cli('Ana'), cb = cli('Bia'), cc = cli('Caio'), a = hero('Ana', 2, 5), b = hero('Bia', 4, 6), cx = hero('Caio', 7, 5), off = [join(g), join(ca), join(cb), join(cc)];
+  at(a, 2.5, 5.5); at(b, 4.5, 6.5); at(cx, 7.5, 5.5); const i0 = a.inv[k] || 0;
+  put(sc, 'n1', { k: 'npc', x: 3, y: 5, auto: true, cfg: { nome: 'Velho', dialogo: { ini: 'a', nos: { a: { fala: 'Olá', escolhas: [{ txt: 'Quero', vai: 'b', faz: 'item:' + k }, { txt: 'Tchau', vai: '', faz: 'fim' }] }, b: { fala: 'Toma', escolhas: [{ txt: 'Valeu', vai: '', faz: 'fim' }] } } } } });
+  try {
+    inter(ca, a, 'n1'); assert.equal(S.dlg[S.focus]?.no, 'a'); assert.ok(!Object.keys(S).includes('dlg'), 'o diálogo não vai no state');
+    assert.equal(dlgs(ca).at(-1).fala, 'Olá'); assert.equal(dlgs(ca).at(-1).ro, false); assert.deepEqual(dlgs(ca).at(-1).escolhas, ['Quero', 'Tchau']);
+    assert.equal(dlgs(cb).at(-1).ro, true, 'quem está perto vê só leitura'); assert.equal(dlgs(cc).length, 0, 'a 4 casas não recebe'); assert.ok(dlgs(g).length, 'o mestre acompanha');
+    handle(g, { t: 'dlgSay', sc: S.focus, text: 'O velho tosse.' }); assert.deepEqual(dlgs(ca).at(-1).extra, ['O velho tosse.']);
+    inter(cb, b, 'n1', { opt: 0 }); assert.equal(S.dlg[S.focus].no, 'a', 'só quem abriu escolhe');
+    inter(ca, a, 'n1', { opt: 0 }); assert.equal(S.dlg[S.focus].no, 'b'); assert.equal(a.inv[k], i0 + 1); assert.equal(dlgs(ca).at(-1).fala, 'Toma');
+    inter(ca, a, 'n1', { opt: 0 }); assert.equal(S.dlg[S.focus], undefined); assert.equal(dlgs(ca).at(-1).fim, true); assert.equal(dlgs(cb).at(-1).fim, true);
+    S.auto.inter = false; sc.world.objs.n1.auto = null; inter(ca, a, 'n1'); const rq = Object.entries(S.reqs).find(([, r]) => r.m.obj === 'n1'); assert.ok(rq, 'puxar conversa vira pedido');
+    handle(gm, { t: 'reqOk', id: rq[0] }); assert.equal(S.dlg[S.focus]?.no, 'a'); inter(ca, a, 'n1', { opt: 1 }); assert.equal(S.dlg[S.focus], undefined, 'escolher não vira pedido');
+  } finally { off.forEach(f => f()); sc.fogOn = false; for (const id of Object.keys(S.reqs)) delete S.reqs[id]; }
+});
+test('alavanca alterna porta e mostra objeto oculto', () => {
+  const sc = freshWorld(); muro(sc, 6, 5); nevoa(sc); S.auto.inter = true;
+  const c = cli('Ana'), ch = hero('Ana', 2, 5); at(ch, 2.5, 5.5);
+  const d = put(sc, 'd1', { k: 'porta', x: 6, y: 5, cfg: { e: 'v', estado: 'fechada' } }), bx = put(sc, 'b1', { k: 'bau', x: 4, y: 7, vis: 'oculto', cfg: { modo: 'uma' } });
+  const l = put(sc, 'l1', { k: 'alavanca', x: 3, y: 5, cfg: { alvos: ['d1', 'b1'], acao: 'alternar', estado: 'desligada' } });
+  try {
+    inter(c, ch, 'l1'); assert.equal(d.cfg.estado, 'aberta'); assert.equal(bx.vis, 'visivel'); assert.equal(l.cfg.estado, 'ligada');
+    assert.equal(bit(sc.seenW.f0, 240, 5 * 20 + 8), 1, 'a porta aberta pela alavanca abre a visão');
+    inter(c, ch, 'l1'); assert.equal(d.cfg.estado, 'fechada'); assert.equal(bx.vis, 'oculto'); assert.equal(l.cfg.estado, 'desligada');
+    l.cfg.acao = 'abrir'; inter(c, ch, 'l1'); inter(c, ch, 'l1'); assert.equal(d.cfg.estado, 'aberta', 'abrir não fecha'); assert.equal(bx.vis, 'visivel');
+  } finally { S.auto.inter = false; sc.fogOn = false; }
+});
+test('gatilho uma vez; quem=todos só com todos dentro', () => {
+  const sc = freshWorld(); nevoa(sc); const c = cli('Ana'), a = hero('Ana', 2, 2), b = hero('Bia', 2, 3); at(a, 2.5, 2.5); at(b, 2.5, 3.5);
+  const d = put(sc, 'd1', { k: 'porta', x: 9, y: 9, cfg: { e: 'v', estado: 'fechada' } });
+  const t1 = put(sc, 't1', { k: 'gatilho', x: 5, y: 5, cfg: { casas: [[5, 5], [5, 6]], quem: 'qualquer', vezes: 'uma', acoes: [{ k: 'objetivo', alvo: '', v: 'Ache a saída' }, { k: 'abrir', alvo: 'd1', v: '' }] } });
+  try {
+    T += 100; walk(c, a, 3.1, 2.5); assert.notEqual(sc.world.goal, 'Ache a saída');
+    at(a, 5.5, 5.5); assert.equal(sc.world.goal, 'Ache a saída'); assert.equal(d.cfg.estado, 'aberta'); assert.equal(t1.cfg.usado, true);
+    sc.world.goal = ''; d.cfg.estado = 'fechada'; at(a, 5.5, 6.5); at(a, 5.5, 5.5); assert.equal(sc.world.goal, '', 'uma vez só');
+    const t2 = put(sc, 't2', { k: 'gatilho', x: 8, y: 2, cfg: { casas: [[8, 2], [8, 3]], quem: 'todos', vezes: 'sempre', acoes: [{ k: 'objetivo', alvo: '', v: 'Todos juntos' }] } });
+    at(a, 8.5, 2.5); assert.notEqual(sc.world.goal, 'Todos juntos', 'falta a Bia');
+    at(b, 8.5, 3.5); assert.equal(sc.world.goal, 'Todos juntos');
+    sc.world.goal = ''; at(b, 7.5, 3.5); at(b, 8.5, 3.5); assert.equal(sc.world.goal, 'Todos juntos', 'sempre: dispara de novo'); void t2;
+  } finally { sc.fogOn = false; }
+});

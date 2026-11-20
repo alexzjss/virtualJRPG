@@ -37,3 +37,9 @@
 .medit .m3bar button.on{background:var(--red,#e4002b)}
 .medit .m3bar .m3tat{display:flex;align-items:center;gap:4px;background:#0b0b10d9;padding:0 6px;border-radius:4px}
 .medit .m3bar .m3tat input{width:52px}
+.medit-dlg{display:grid;gap:6px;border-top:1px solid var(--line,#34343d);padding-top:6px}
+.medit-no{border:1px solid var(--line,#34343d);border-radius:4px;padding:4px 6px;display:grid;gap:4px;margin:0}
+.medit-no legend{font-size:12px;color:var(--dim,#a8a5b2)}
+.medit-no legend button,.medit-esc button{padding:0 6px;min-height:22px}
+.medit-esc{display:grid;grid-template-columns:2fr minmax(0,1fr) 1fr auto;gap:4px;align-items:center}
+.medit-esc input,.medit-esc select{min-width:0}

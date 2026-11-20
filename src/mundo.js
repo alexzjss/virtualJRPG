@@ -77,7 +77,7 @@ fixMundo();
 // ----- movimento -----
 const C = globalThis.MCOL;
 const clock = { now: () => Date.now() }; // os testes trocam o relógio
-const MH = { markPos: () => {}, onCell: [], vision: () => {}, visNow: () => null }; // ganchos: rede (pos agregado), o que acontece ao trocar de casa (névoa, gatilhos…) e recalcular a visão (porta mudou)
+const MH = { markPos: () => {}, onCell: [], vision: () => {}, visNow: () => null, ambush: null }; // ambush: emboscada do gatilho (Task 6.2) // ganchos: rede (pos agregado), o que acontece ao trocar de casa (névoa, gatilhos…) e recalcular a visão (porta mudou)
 const r2 = v => Math.round(v * 100) / 100;
 const floorOf = (sc, fid) => sc?.world?.floors.find(f => f.id === fid);
 const sendTo = (c, o) => { if (c?.readyState === 1) c.send(JSON.stringify(o)); };
@@ -241,6 +241,7 @@ Object.assign(H, {
       if (KEEP_ESTADO.has(o.k) && p.cfg?.estado !== undefined) o.cfg.estado = p.cfg.estado;
       if (o.k === 'bau' && p.cfg?.aberto) o.cfg.aberto = p.cfg.aberto;
       if (o.k === 'bau' && p.cfg?.por) o.cfg.por = p.cfg.por;
+      if (o.k === 'gatilho' && p.cfg?.usado) o.cfg.usado = true;
       if (p.rev) o.rev = true;
     }
     for (const f of d.floors) { const o = old.floors.find(x => x.id === f.id); if (o && (o.w !== f.w || o.h !== f.h)) delete sc.seenW?.[f.id]; } // névoa do tamanho antigo não serve
@@ -253,5 +254,6 @@ Object.assign(H, {
 ['wDraft', 'wPub', 'wDiscard'].forEach(k => NOUNDO.add(k)); // o editor tem desfazer próprio
 ['wDraft', 'wDiscard'].forEach(k => QUIET.add(k)); // o rascunho não vai no push de todos
 
-import './mundo-obj.js'; // interagir com portas, baús, itens e placas (usa MH e unstuck só dentro dos handlers)
+import { zoneEnter } from './mundo-obj.js'; // interagir com objetos (usa MH e unstuck só dentro dos handlers)
+MH.onCell.push(zoneEnter); // gatilhos de área ao trocar de casa
 export { MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };

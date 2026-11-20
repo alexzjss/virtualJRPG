@@ -92,6 +92,7 @@
     }
     // sobreposições: objeto selecionado, retângulo em curso, aresta sob o cursor, herói arrastado
     const so = E.sel && w.objs?.[E.sel]; if (so && so.f === f.id) { x.strokeStyle = '#ffc93c'; x.lineWidth = 2; x.setLineDash([4, 3]); x.strokeRect(ox + so.x * cs - 2, oy + so.y * cs - 2, cs + 4, cs + 4); x.setLineDash([]); }
+    if (so?.k === 'gatilho' && so.f === f.id) { x.fillStyle = 'rgba(80,200,255,.32)'; for (const [zx, zy] of (E.drag?.tool === 'zona' && E.drag.casas) || so.cfg?.casas || []) x.fillRect(ox + zx * cs, oy + zy * cs, cs, cs); } // zona do gatilho
     if (E.rect) { const [a, b] = E.rect, x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]); x.fillStyle = 'rgba(255,201,60,.25)'; x.strokeStyle = '#ffc93c'; x.lineWidth = 1.5; x.fillRect(ox + x0 * cs, oy + y0 * cs, (Math.abs(a[0] - b[0]) + 1) * cs, (Math.abs(a[1] - b[1]) + 1) * cs); x.strokeRect(ox + x0 * cs, oy + y0 * cs, (Math.abs(a[0] - b[0]) + 1) * cs, (Math.abs(a[1] - b[1]) + 1) * cs); }
     if (E.hover?.e) { const [k, hx, hy] = E.hover.e; x.strokeStyle = 'rgba(255,201,60,.9)'; x.lineWidth = 3; x.beginPath(); if (k === 'h') { x.moveTo(ox + hx * cs, oy + hy * cs); x.lineTo(ox + (hx + 1) * cs, oy + hy * cs); } else { x.moveTo(ox + hx * cs, oy + hy * cs); x.lineTo(ox + hx * cs, oy + (hy + 1) * cs); } x.stroke(); }
     else if (E.hover?.c && (E.tool === 'pincel' || E.tool === 'nevoa')) { const [cx, cy] = E.hover.c, n = E.brush, h0 = Math.floor((n - 1) / 2); x.strokeStyle = 'rgba(255,255,255,.8)'; x.lineWidth = 1; x.strokeRect(ox + (cx - h0) * cs, oy + (cy - h0) * cs, n * cs, n * cs); }
@@ -228,6 +229,7 @@
       const s = st(), hit = Object.values(s.chars).filter(c => c.scene === sid() && c.pos?.f === f.id).map(c => [c, Math.hypot(c.pos.x - p.fx, c.pos.z - p.fy)]).sort((a, b) => a[1] - b[1])[0];
       if (hit && hit[1] < .8) Object.assign(E.drag, { hero: hit[0].id, x: hit[0].pos.x, z: hit[0].pos.z }); else E.drag = null;
     }
+    else if (T === 'zona') { E.drag.zona = null; zonaPut(cx, cy, E.drag); }
     else if (T === 'chamar') { E.drag = null; E.tool = 'sel'; if (inF(f, cx, cy)) callAll(f, w, cx, cy); render(); }
     else { E.drag = null; const ed = edgeAt(p.fx, p.fy, f), ow = ed && ownerAt(w, f.id, ...ed)[0]; E.sel = ow || (inF(f, cx, cy) ? objAt(w, f.id, cx, cy) : null) || null; render(); } // sel
     draw();
@@ -242,6 +244,7 @@
     else if (EDGE_TOOL[T] && E.st) { const ed = edgeAt(p.fx, p.fy, f); if (ed) strokePut(ed[0], ed[1], ed[2], d.shift ? 0 : EDGE_TOOL[T]); }
     else if (T === 'ret' && E.rect) E.rect[1] = [Math.max(0, Math.min(f.w - 1, cx)), Math.max(0, Math.min(f.h - 1, cy))];
     else if (T === 'nevoa') { fogBuf.push(...brushCells(f, cx, cy, E.brush)); if (fogBuf.length > 200) fogFlush(); }
+    else if (T === 'zona') zonaPut(cx, cy, d);
     else if (T === 'mover' && d.hero) { d.x = Math.max(.05, Math.min(f.w - .05, p.fx)); d.z = Math.max(.05, Math.min(f.h - .05, p.fy)); }
     draw();
   }
@@ -251,6 +254,7 @@
     const f = floor(), w = world(); if (!f || !w) return;
     if (d.tool === 'ret' && E.rect) { const [a, b] = E.rect, code = P.code(E.tema || w.tema, E.tipo), l = []; E.rect = null; for (let y = Math.min(a[1], b[1]); y <= Math.max(a[1], b[1]); y++) for (let x = Math.min(a[0], b[0]); x <= Math.max(a[0], b[0]); x++) l.push([x, y, code]); ops([{ o: 'cells', f: f.id, l }]); render(); }
     else if (d.tool === 'nevoa') fogFlush();
+    else if (d.tool === 'zona' && d.casas) { const cs = d.casas; editSel(v => { v.cfg.casas = cs; }); }
     else if (d.tool === 'mover' && d.hero && typeof send === 'function') send({ t: 'walkGm', id: d.hero, f: f.id, x: Math.round(d.x * 100) / 100, z: Math.round(d.z * 100) / 100 });
     draw();
   }
@@ -274,6 +278,8 @@
     if (a === 'del') { if (w.floors.length < 2) return typeof toast === 'function' && toast('O mapa precisa de pelo menos um andar.', 'no'); if (await ask({ title: `Apagar "${f.name}"?`, text: 'O andar e os objetos dele somem. Dá para desfazer antes de publicar.', ok: 'Apagar', danger: true }) !== true) return; ops([{ o: 'floor', v: { id: f.id, del: true } }]); E.floor = w.floors.find(o => o.id !== f.id)?.id; return render(); }
   });
   document.addEventListener('change', e => {
+    const md = e.target.closest?.('.medit [data-md]'); if (md) return onDlgField(md);
+    const mg = e.target.closest?.('.medit [data-mg]'); if (mg) return onAcao(mg);
     const ins = e.target.closest?.('.medit [data-mi]'); if (ins) return onInspect(ins);
     const el = e.target.closest?.('.medit [data-mo]'); if (!el) return; const k = el.dataset.mo;
     if (k === 'follow') { E.follow = el.value || null; if (E.follow) g.MUNDO?.follow?.(E.follow); else { const v = g.MUNDO?.view; if (v) { g.MUNDO.follow(null); g.MUNDO.free(v.tx, v.tz); } } return render(); }
@@ -336,7 +342,7 @@
         <label>Age sozinho${sel('data-mi="@auto"', [['', 'Padrão da mesa'], ['sim', 'Sim'], ['nao', 'Não: vira pedido']], o.auto === true ? 'sim' : o.auto === false ? 'nao' : '')}</label>
         ${o.k === 'porta' || o.k === 'barreira' ? '' : `<label>Giro${sel('data-mi="@rot"', [[0, '0°'], [1, '90°'], [2, '180°'], [3, '270°']], o.rot)}</label>`}
         ${(CAMPOS[o.k] || []).map(c => field(o, c)).join('')}
-        ${o.k === 'gatilho' ? `<small>${o.cfg?.casas?.length || 0} casas na zona.</small>` : o.k === 'npc' ? '<small>As falas e escolhas ficam no editor de diálogo.</small>' : ''}
+        ${o.k === 'gatilho' ? acoesG(o) : o.k === 'npc' ? dialogo(o) : ''}
       </div></aside>`;
   }
   function onInspect(el) {
@@ -388,7 +394,9 @@
   }
   function onAsView(m) { E.as = { id: m.id, sc: m.sc, w: m.w, vis: m.vis || null }; g.MUNDO?.follow?.(m.id); }
   document.addEventListener('click', e => {
-    const b = e.target.closest?.('.medit [data-m3], .medit [data-mx]'); if (!b) return;
+    const b = e.target.closest?.('.medit [data-m3], .medit [data-mx], .medit [data-mdx], .medit [data-mgx]'); if (!b) return;
+    if (b.dataset.mdx) return onDlgBtn(b);
+    if (b.dataset.mgx) return onAcaoBtn(b);
     const s = st(), sc = s?.scenes?.[sid()], snd = o => typeof send === 'function' && send(o);
     const hs = Object.values(s?.chars || {}).filter(c => !c.enemy && !c.npc && c.scene === sid() && c.pos);
     if (b.dataset.mx === 'close') { E.sel = null; return render(); }
@@ -398,7 +406,58 @@
     else if (k === 'freeze') snd({ t: 'freeze', ids: hs.map(c => c.id), on: !(hs.length && hs.every(c => c.frozen)) });
     else if (k === 'tatNext') snd({ t: 'tatNext' });
     else if (k === 'chamar') { E.tool = E.tool === 'chamar' ? 'sel' : 'chamar'; render(); }
+    else if (k === 'zona') { E.tool = E.tool === 'zona' ? 'sel' : 'zona'; render(); }
   });
+
+  // ----- diálogo do NPC e ações do gatilho (Task 5.2) -----
+  const FAZ = 'fim · loja · item:<id> · gatilho:<id> · objetivo:<texto>';
+  function dialogo(o) {
+    const d = o.cfg?.dialogo || { ini: '', nos: {} }, ks = Object.keys(d.nos || {});
+    const nos = ks.map(k => {
+      const n = d.nos[k], K = esc(k);
+      return `<fieldset class="medit-no"><legend>${K}${k === d.ini ? ' · início' : ''} <button type="button" data-mdx="delN:${K}" aria-label="Apagar a fala ${K}">×</button></legend>
+      <textarea data-md="${K}.fala" rows="2" maxlength="800" aria-label="Fala ${K}">${esc(n.fala || '')}</textarea>
+      ${(n.escolhas || []).map((e, i) => `<div class="medit-esc"><input data-md="${K}.${i}.txt" value="${esc(e.txt)}" placeholder="Resposta" maxlength="160" aria-label="Resposta ${i + 1}">${sel(`data-md="${K}.${i}.vai" aria-label="Depois da resposta ${i + 1}"`, [['', '→ fim'], ...ks.map(x => [x, '→ ' + x])], e.vai)}<input data-md="${K}.${i}.faz" value="${esc(e.faz)}" placeholder="faz" title="${esc(FAZ)}" aria-label="O que a resposta ${i + 1} faz"><button type="button" data-mdx="delE:${K}:${i}" aria-label="Apagar a resposta ${i + 1}">×</button></div>`).join('')}
+      ${(n.escolhas || []).length < 6 ? `<button type="button" data-mdx="addE:${K}">+ resposta</button>` : ''}</fieldset>`;
+    }).join('');
+    return `<div class="medit-dlg"><b>Diálogo</b>${ks.length ? `<label>Começa em${sel('data-md="@ini"', ks.map(k => [k, k]), d.ini)}</label>` : ''}${nos}<button type="button" data-mdx="addN">+ fala</button><small>${esc(FAZ)}</small></div>`;
+  }
+  function acoesG(o) {
+    const KS = [['abrir', 'Abrir'], ['fechar', 'Fechar'], ['revelar', 'Revelar'], ['texto', 'Texto'], ['som', 'Som'], ['objetivo', 'Objetivo'], ['batalha', 'Batalha (encontro)']], ac = o.cfg?.acoes || [];
+    return `<div class="medit-dlg"><b>Ao pisar</b>${ac.map((a, i) => `<div class="medit-esc">${sel(`data-mg="${i}.k" aria-label="Ação ${i + 1}"`, KS, a.k)}<input data-mg="${i}.alvo" value="${esc(a.alvo)}" placeholder="alvo (id)" aria-label="Objeto alvo da ação ${i + 1}"><input data-mg="${i}.v" value="${esc(a.v)}" placeholder="texto, som ou encontro" aria-label="Valor da ação ${i + 1}"><button type="button" data-mgx="del:${i}" aria-label="Apagar a ação ${i + 1}">×</button></div>`).join('')}
+      ${ac.length < 10 ? '<button type="button" data-mgx="add">+ ação</button>' : ''}
+      <button type="button" data-m3="zona" class="${E.tool === 'zona' ? 'on' : ''}" aria-pressed="${E.tool === 'zona'}" title="Clique e arraste no grid para pôr ou tirar casas da zona">Pintar zona (${o.cfg?.casas?.length || 0} casas)</button></div>`;
+  }
+  // edita uma cópia do objeto selecionado e manda como op do rascunho
+  function editSel(fn) { const id = E.sel, w = world(); if (!id || !w?.objs?.[id]) return; const o = structuredClone(w.objs[id]); o.cfg = o.cfg || {}; fn(o); ops([{ o: 'obj', id, v: o }]); render(); }
+  const novoNo = nos => { for (let i = 1; ; i++) if (!nos['n' + i]) return 'n' + i; };
+  function onDlgField(el) {
+    editSel(o => {
+      const d = o.cfg.dialogo ||= { ini: '', nos: {} }, p = el.dataset.md.split('.');
+      if (p[0] === '@ini') d.ini = el.value; else if (p.length === 2) d.nos[p[0]].fala = el.value; else d.nos[p[0]].escolhas[+p[1]][p[2]] = el.value;
+    });
+  }
+  function onDlgBtn(b) {
+    const [k, a, i] = b.dataset.mdx.split(':');
+    editSel(o => {
+      const d = o.cfg.dialogo ||= { ini: '', nos: {} };
+      if (k === 'addN') { const id = novoNo(d.nos); d.nos[id] = { fala: '', escolhas: [] }; if (!d.ini) d.ini = id; }
+      else if (k === 'delN') { delete d.nos[a]; for (const n of Object.values(d.nos)) for (const e of n.escolhas) if (e.vai === a) e.vai = ''; if (d.ini === a) d.ini = Object.keys(d.nos)[0] || ''; }
+      else if (k === 'addE') d.nos[a].escolhas.push({ txt: '', vai: '', faz: '' });
+      else if (k === 'delE') d.nos[a].escolhas.splice(+i, 1);
+    });
+  }
+  function onAcao(el) { editSel(o => { const [i, k] = el.dataset.mg.split('.'); o.cfg.acoes[+i][k] = el.value; }); }
+  function onAcaoBtn(b) { const [k, i] = b.dataset.mgx.split(':'); editSel(o => { o.cfg.acoes ||= []; if (k === 'add') o.cfg.acoes.push({ k: 'texto', alvo: '', v: '' }); else o.cfg.acoes.splice(+i, 1); }); }
+  // ferramenta zona: arrastar põe casas no gatilho selecionado (ou tira, se a primeira casa já era da zona)
+  // (junta as casas no próprio arrasto e manda uma op só ao soltar: re-renderizar no meio trocaria o canvas sob o ponteiro)
+  function zonaPut(cx, cy, d) {
+    const w = world(), o = w?.objs?.[E.sel], f = floor(); if (o?.k !== 'gatilho' || !f || !inF(f, cx, cy) || o.f !== f.id) return;
+    d.casas ??= (o.cfg.casas || []).map(c => [...c]);
+    const has = d.casas.some(([x, y]) => x === cx && y === cy); if (d.zona == null) d.zona = !has;
+    if (d.zona === has) return;
+    d.casas = d.zona ? [...d.casas, [cx, cy]] : d.casas.filter(([x, y]) => x !== cx || y !== cy);
+  }
 
   g.MEDIT = {
     html, mount, draw, ops, undo, redo, world, inspect, ctx3d, onAsView, floor: null,
