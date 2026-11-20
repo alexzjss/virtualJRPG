@@ -158,6 +158,7 @@ const HUD = (() => {
       if (mini) { const hs = Object.values(S.chars).filter(c => !c.enemy && !c.npc && !c.dead && c.scene === S.scene && (c.pos || c.x != null)); return hs.length ? `<div class="hudw mhmini"><div class="hud-br">${grupo(hs, null)}</div></div>` : ''; } // exploração no mundo 3D: só as fichas, a 70%
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table, gm: gmO }, x = gmO ? LEQUE.ctx() : null;
       const cm = table ? '' : gmO ? (x?.shown ? cmds(x.actor, x.cur, inB, true) : '') : cmds(S.chars[actorId], cur, inB); // sem a fileira de alvos: na mira escolhe-se pelas setas, pelo clique no recorte ou no minimapa (câmera aérea)
+      if (gmO && typeof PCM !== 'undefined' && PCM.on()) return PCM.hud({ actorId: x?.actor?.id, inB, cur, cm, parts: { photo, pct, faixa, miniMapa, pedidos } }); // cockpit do mestre na Pincelada (pincel-mestre.js)
       if (!gmO && !table && typeof PCHUD !== 'undefined' && PCHUD.on()) return PCHUD.html({ actorId, dim, inB, cur, cm, parts: { photo, pct, faixa, miniMapa } }); // UI Pincelada (pincel-hud.js)
       return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''} ${gmO ? 'gmh' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${cm}${grupo(inB, cur)}</div>${alvo()}${faixa()}${gmO ? pedidos() : ''}</div>`;
     },
