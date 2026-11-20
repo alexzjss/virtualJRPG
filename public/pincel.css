@@ -46,3 +46,95 @@ body.ui-pincel{
 /* ---------- opção do mestre ---------- */
 .pc-chave{display:flex;align-items:center;gap:10px;margin:6px 0 2px}
 .pc-chave button.on{border-color:#c9a56a;color:#f3dfb4;box-shadow:0 0 0 1px #c9a56a55 inset}
+/* ===== HUD de combate do jogador (pincel-hud.js); medidas para 1440×860, escaladas pelo --hk do palco ===== */
+.pc-hud{font-family:var(--pc-disp);color:var(--pc-tx)}
+.pc-hud>*{zoom:var(--hk,.85)}
+.pc-hud,.pc-hud *{text-transform:none;letter-spacing:normal}
+.pc-hud .barra{position:relative;display:block;height:5px;background:rgba(239,230,212,.14);overflow:hidden}
+.pc-hud .barra>i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#b8323f,#e9dfc9 70%);transition:width .4s}
+.pc-hud .barra.san>i{background:#a98be6}
+.pc-hud .barra .shbar{position:absolute;top:0;bottom:0;background:#dfefff;box-shadow:0 0 6px #9fd0ff}
+.pc-hud .pc-num small{color:var(--pc-dim);font-size:.75em}
+/* ordem: quem age em destaque e os 3 próximos */
+.pc-ordem{left:24px;top:22px;margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.pc-ordem li{display:flex;align-items:center;gap:12px;cursor:default}
+.pc-ordem .rt{width:44px;height:44px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#0b0f12;box-shadow:0 0 0 1.5px rgba(239,230,212,.35),0 3px 10px #000a;transition:box-shadow .15s}
+.pc-ordem .rt img{width:100%;height:100%;object-fit:cover;transform:none!important}
+.pc-ordem .foe .rt{box-shadow:0 0 0 1.5px #d8455caa,0 3px 10px #000a}
+.pc-ordem .agora .rt{width:70px;height:70px;box-shadow:0 0 0 2px var(--pc-ouro),0 0 18px #c9a56a66}
+.pc-ordem li.hl .rt{box-shadow:0 0 0 2px #fff6dc,0 0 14px #fff6dc66}
+.pc-ordem .nm{font:600 26px var(--pc-disp);text-shadow:0 2px 6px #000}
+/* barra do chefe */
+.pc-chefe{left:50%;top:64px;translate:-50% 0;width:560px;padding:12px 20px 14px;text-align:center}
+.pc-chefe .lavagem{position:absolute;inset:-22px -80px;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat;opacity:.85;pointer-events:none}
+.pc-chefe>*:not(.lavagem){position:relative}
+.pc-chefe small{display:block;font:italic 16px var(--pc-disp);color:var(--pc-ouro);text-shadow:0 1px 4px #000,0 0 10px #000}
+.pc-chefe .nome{display:block;font:600 34px/1 var(--pc-disp);text-shadow:0 2px 6px #000}
+.pc-chefe .vida{display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0 6px}
+.pc-chefe .vida .barra{width:320px}.pc-chefe .vida .pc-num{font-size:18px}
+.pc-chefe .quebra{display:flex;justify-content:center;gap:6px}
+.pc-chefe .quebra i{width:10px;height:10px;rotate:45deg;border:1px solid var(--pc-ouro)}.pc-chefe .quebra i.on{background:var(--pc-ouro)}
+.pc-chefe .mais{display:none;justify-content:center;align-items:center;gap:14px;margin-top:6px;font:italic 15px var(--pc-disp);color:var(--pc-tx);text-shadow:0 1px 4px #000,0 0 10px #000}
+.pc-chefe:hover .mais,.pc-chefe.hl .mais{display:flex}
+.pc-chefe .el{background:#08090b;display:inline-grid;place-items:center;width:22px;height:22px;margin-left:3px;border-radius:50%;border:1px solid rgba(201,165,106,.6);font:13px serif;font-style:normal;color:var(--pc-tx)}
+.pc-chefe .el.w{border-color:#ffb36b;color:#ffcf9e}.pc-chefe .el.r{opacity:.55}.pc-chefe .el.q{color:var(--pc-dim)}
+/* ícones e páginas */
+.pc-icos{right:24px;top:20px;display:flex;gap:10px}
+.pc-icos button,.pc-log header button{width:42px;height:42px;min-height:0;padding:0;border-radius:50%;border:1.5px solid rgba(239,230,212,.45);background:#08090bcc;color:var(--pc-tx);font:20px var(--pc-disp);text-transform:none;box-shadow:none}
+.pc-icos button.on,.pc-icos button[aria-expanded="true"]{border-color:var(--pc-ouro);color:#fff6dc}
+.pc-paginas{right:24px;top:72px;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.pc-paginas button{min-height:0;padding:4px 14px;border:0;background:none;box-shadow:none;font:600 22px var(--pc-disp);text-transform:none;letter-spacing:0;color:var(--pc-tx);text-shadow:0 2px 6px #000}
+.pc-paginas button.on,.pc-paginas button:hover{color:var(--pc-ouro);background:none}
+.pc-campo{right:130px;top:28px;font:italic 15px var(--pc-disp);color:var(--pc-dim)}
+.pc-campo:empty{display:none}
+/* canto: aviso da vez e grupo completo */
+.pc-canto{right:24px;bottom:22px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.pc-cmd .hud-cmd{position:static;display:flex;gap:8px;align-items:center}
+.pc-cmd .hk{font:italic 18px var(--pc-disp);color:var(--pc-dim);background:none;border:0;text-transform:none;letter-spacing:0}
+.pc-cmd .pend{font:italic 18px var(--pc-disp);color:var(--pc-ouro)}
+.pc-grupo{display:flex;flex-direction:column;gap:8px}
+.pc-heroi{display:flex;align-items:center;gap:12px;width:330px;padding:8px 14px 8px 8px;background:linear-gradient(90deg,transparent,#08090bd9 22%);cursor:pointer}
+.pc-heroi .rt{flex:none;width:58px;height:58px;rotate:45deg;overflow:hidden;border:1.5px solid rgba(239,230,212,.4);background:#0b0f12;display:grid;place-items:center}
+.pc-heroi .rt img{width:142%;height:142%;max-width:none;object-fit:cover;rotate:-45deg;transform:none!important}
+.pc-heroi.vez .rt{border-color:var(--pc-ouro);box-shadow:0 0 14px #c9a56a77}
+.pc-heroi.tgt .rt,.pc-heroi.hl .rt{border-color:#fff6dc}
+.pc-heroi.alvo{animation:pc-alvo .6s ease-in-out infinite alternate}@keyframes pc-alvo{to{filter:drop-shadow(0 0 10px #d8455c)}}
+.pc-heroi.ko{opacity:.5}
+.pc-heroi .dados{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pc-heroi .nm{font:600 21px/1 var(--pc-disp)}
+.pc-heroi .vida{display:flex;align-items:center;gap:10px}.pc-heroi .vida .barra{flex:1}.pc-heroi .vida .pc-num{font-size:17px;min-width:62px;text-align:right}
+.pc-heroi .aura{display:flex;align-items:center;gap:4px}.pc-heroi .aura .pc-num{margin-left:auto;font-size:14px;color:#9fd0ff}
+.pc-heroi .aura .barra.au{flex:1;height:3px}.pc-heroi .aura .barra.au>i{background:var(--pc-azul)}
+.pc-heroi .aura i{width:9px;height:9px;rotate:45deg;border:1px solid #9fd0ff}.pc-heroi .aura i.on{background:var(--pc-azul);box-shadow:0 0 6px var(--pc-azul)}
+.pc-heroi .extra{display:flex;align-items:center;gap:10px}.pc-heroi .extra .barra{flex:1;height:3px}
+.pc-heroi .lim{font:italic 14px var(--pc-disp);color:var(--pc-dim)}.pc-heroi .lim.cheio{color:var(--pc-ouro)}
+.pc-heroi .conds{display:flex;flex-wrap:wrap;gap:4px;font:italic 14px var(--pc-disp);color:var(--pc-dim)}.pc-heroi .conds:empty{display:none}
+.pc-heroi .caido{color:#f0a3b0}
+/* registro e ficha: camada fixa acima do palco e do canvas dos corpos */
+.pc-sobre{position:fixed;inset:0;z-index:40;pointer-events:none;font-family:var(--pc-disp);color:var(--pc-tx)}
+.pc-sobre>*{position:absolute;pointer-events:auto;zoom:var(--hk,.85)}
+.pc-sobre,.pc-sobre *{text-transform:none;letter-spacing:normal}
+.pc-log{right:24px;top:150px;width:420px;max-height:520px;display:flex;flex-direction:column;background:#08090bf0;border-left:2px solid var(--pc-ouro);box-shadow:0 10px 30px #000c}
+.pc-log header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px 18px}.pc-log header b{font:600 24px var(--pc-disp)}
+.pc-log header button{width:32px;height:32px;font-size:15px}
+.pc-log .ls{overflow:auto;padding:0 18px 14px;display:flex;flex-direction:column;gap:6px}
+.pc-log p{margin:0;font:17px/1.35 var(--pc-disp);color:var(--pc-tx)}.pc-log p b{color:var(--pc-ouro);font-weight:600}.pc-log p.bad{color:#f0a3b0}.pc-log p.ok{color:#a8e6c4}.pc-log .vazio{color:var(--pc-dim);font-style:italic}
+/* ficha só de leitura (Tab fora da vez) */
+.pc-ficha{left:50%;top:50%;translate:-50% -50%;width:760px;display:flex;gap:30px;padding:30px 36px;background:#08090bf2;border-top:2px solid var(--pc-ouro);box-shadow:0 20px 60px #000e}
+.pc-ficha>.rt{flex:none;width:220px;height:300px;overflow:hidden;display:grid;place-items:center}.pc-ficha>.rt img{width:100%;height:100%;object-fit:cover;transform:none!important}
+.pc-ficha .col{flex:1}.pc-ficha h2{margin:0;font:600 40px/1 var(--pc-disp)}.pc-ficha .dica{font:italic 15px var(--pc-disp);color:var(--pc-dim)}
+.pc-ficha h4{margin:16px 0 6px;font:italic 500 17px var(--pc-disp);color:var(--pc-ouro);text-transform:none;letter-spacing:0}
+.pc-ficha dl{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 16px;margin:0}.pc-ficha dt{font:18px var(--pc-disp);color:var(--pc-dim)}.pc-ficha dd{margin:0;font-size:20px}
+.pc-ficha .conds{display:flex;flex-wrap:wrap;gap:6px;font:italic 16px var(--pc-disp);color:var(--pc-dim)}
+/* inimigo comum no palco: nome e vida só ao sobrevoar ou mirar; o chefe tem a barra do topo */
+body.ui-pincel .p3d .bb.foe .mini{opacity:0;transition:opacity .18s;pointer-events:none}
+body.ui-pincel .p3d .bb.foe:is(.hl,.handed,.tgt):not(.pc-boss) .mini{opacity:1}
+body.ui-pincel .p3d .bb.foe.pc-boss .mini{display:none}
+body.ui-pincel .p3d .bb .picktag{display:none!important}
+body.ui-pincel .p3d .bb.foe:is(.hl,.handed,.tgt):not(.pc-boss) .picktag{display:block!important;top:-64px;padding:0 8px;background:none;border:0;box-shadow:none;font:600 22px var(--pc-disp);color:var(--pc-tx);text-shadow:0 2px 6px #000,0 0 12px #000;text-transform:none;letter-spacing:0;scale:1}
+body.ui-pincel .p3d .bb .mini{top:-30px;right:auto;width:auto;filter:none}
+body.ui-pincel .p3d .bb .mini .hp{width:150px!important;height:8px;background:#08090bd9;border:0;box-shadow:0 0 0 1px #efe6d433}
+body.ui-pincel .p3d .bb .mini .hp>i:not(.trail){background:linear-gradient(90deg,#b8323f,#e9dfc9 80%)}
+body.ui-pincel .hand b{display:none} /* a mão continua marcando o alvo; o nome fica em cima do recorte */
+/* mapa pequeno: embaixo, à esquerda */
+.pc-hud .hud-mini{position:absolute;left:24px;top:auto;bottom:22px;margin:0}

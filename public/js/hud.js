@@ -16,7 +16,7 @@ const HUD = (() => {
       return `${i === gAt ? ghost : ''}<div class="ot ${c.enemy ? 'foe' : 'hero'} ${i ? '' : 'now'} ${id === hlO ? 'hl' : ''}" data-o="${id}" title="${esc(c.name)}"><span class="otp">${photo(c, 'p')}</span><b class="otn">${esc(c.name)}</b></div>`; }).join('') + (gAt >= tl.length ? ghost : '');
     return `<div class="hud-order" aria-label="Ordem dos turnos">${rows}${sl ? `<div class="ot-why">◆ ${esc(pv.name)}: ${sl.approx ? '≈' : 'você volta em'} ${sl.pos + 1}º</div>` : ''}${miniMapa(table)}</div>`; };
   // passar o mouse num retrato acende o recorte no palco e vice-versa (classe hl)
-  const hl = id => { hlO = id; document.querySelectorAll('.ot.hl,.bb.hl').forEach(e => e.classList.remove('hl')); if (!id) return; document.querySelectorAll(`.ot[data-o="${id}"],.bb[data-tgt="${id}"]`).forEach(e => e.classList.add('hl')); };
+  const hl = id => { hlO = id; document.querySelectorAll('[data-o].hl,.bb.hl').forEach(e => e.classList.remove('hl')); if (!id) return; document.querySelectorAll(`[data-o="${id}"],.bb[data-tgt="${id}"]`).forEach(e => e.classList.add('hl')); };
   // mão ☞ estilo JRPG: o único marcador de alvo. Na mira ela fica no alvo atual (passar o mouse num candidato troca o alvo);
   // fora da mira, passar o mouse num inimigo só mostra a mão e o nome. Vive fora do #app (o render não a recria) e segue o recorte a cada quadro.
   const HAND = '<svg viewBox="0 0 64 40" aria-hidden="true"><rect x="2" y="13" width="9" height="22" rx="2" fill="#ffc93c" stroke="#000" stroke-width="2.5"/><path d="M10 14Q10 9 16 9L24 9Q26 4 31 6L33 11L58 11Q62 11 62 15Q62 19 58 19L36 19L36 34Q36 37 32 37L14 37Q10 37 10 33Z" fill="#fff" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/><path d="M19 24H35M19 30H34" stroke="#000" stroke-width="2" fill="none"/></svg>';
@@ -41,7 +41,7 @@ const HUD = (() => {
   })();
   const handNow = () => { const a = LEQUE.aimTarget(), h = hovBB && S.chars[hovBB];
     hand(a || (h && h.enemy && h.hp > 0 && hovBB in (S.battle?.ticks || {}) ? hovBB : null)); };
-  document.addEventListener('mouseover', e => { const u = e.target.closest?.('.ot[data-o],.bb[data-tgt]'); hl(u ? u.dataset.o || u.dataset.tgt : null);
+  document.addEventListener('mouseover', e => { const u = e.target.closest?.('[data-o],.bb[data-tgt]'); hl(u ? u.dataset.o || u.dataset.tgt : null);
     const b = e.target.closest?.('.p3d .bb[data-tgt]'), body = b && !e.target.closest('.mini,.shadow,.sts') ? b.dataset.tgt : null;
     if (body === hovBB) return; hovBB = body;
     if (!(body && LEQUE.hover(body))) handNow(); }); // na mira, passar o mouse troca o alvo (o render chama handNow)
@@ -158,6 +158,7 @@ const HUD = (() => {
       if (mini) { const hs = Object.values(S.chars).filter(c => !c.enemy && !c.npc && !c.dead && c.scene === S.scene && (c.pos || c.x != null)); return hs.length ? `<div class="hudw mhmini"><div class="hud-br">${grupo(hs, null)}</div></div>` : ''; } // exploração no mundo 3D: só as fichas, a 70%
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table, gm: gmO }, x = gmO ? LEQUE.ctx() : null;
       const cm = table ? '' : gmO ? (x?.shown ? cmds(x.actor, x.cur, inB, true) : '') : cmds(S.chars[actorId], cur, inB); // sem a fileira de alvos: na mira escolhe-se pelas setas, pelo clique no recorte ou no minimapa (câmera aérea)
+      if (!gmO && !table && typeof PCHUD !== 'undefined' && PCHUD.on()) return PCHUD.html({ actorId, dim, inB, cur, cm, parts: { photo, pct, faixa, miniMapa } }); // UI Pincelada (pincel-hud.js)
       return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''} ${gmO ? 'gmh' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${cm}${grupo(inB, cur)}</div>${alvo()}${faixa()}${gmO ? pedidos() : ''}</div>`;
     },
   };
