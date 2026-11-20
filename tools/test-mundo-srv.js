@@ -279,3 +279,16 @@ test('névoa: com fogOn desligado tudo fica visível, como hoje', () => {
   const c = cli('Ana'), ch = hero('Ana', 2, 5), e = foe(9, 5);
   try { const v = net.view(c); assert.ok(v.chars[e.id]); assert.equal(v.vis, undefined); } finally { delete S.chars[e.id]; }
 });
+test('fog do mestre liga e desliga bits de seenW no andar certo', () => {
+  const sc = freshWorld(), g = gmc(); draft(g, { o: 'floor', v: { id: 'f1', name: 'Porão', w: 8, h: 6 } }); handle(g, { t: 'wPub', sc: S.focus }); nevoa(sc);
+  const f0 = sc.world.floors[0], n0 = f0.w * f0.h;
+  handle(g, { t: 'wFog', sc: S.focus, f: 'f1', l: [[1, 1], [2, 1], [7, 5], [9, 9], [-1, 0]] });
+  assert.equal(bit(sc.seenW.f1, 48, 1 * 8 + 1), 1); assert.equal(bit(sc.seenW.f1, 48, 1 * 8 + 2), 1); assert.equal(bit(sc.seenW.f1, 48, 5 * 8 + 7), 1);
+  assert.equal(bit(sc.seenW.f0, n0, 1 * f0.w + 1), 0, 'o outro andar não muda');
+  handle(g, { t: 'wFog', sc: S.focus, f: 'f1', l: [[2, 1]], hide: true });
+  assert.equal(bit(sc.seenW.f1, 48, 1 * 8 + 2), 0); assert.equal(bit(sc.seenW.f1, 48, 1 * 8 + 1), 1);
+  handle(cli('Ana'), { t: 'wFog', sc: S.focus, f: 'f1', l: [[3, 3]] }); assert.equal(bit(sc.seenW.f1, 48, 3 * 8 + 3), 0, 'jogador não pinta névoa');
+  handle(g, { t: 'fogAll', v: true }); assert.equal(bit(sc.seenW.f0, n0, n0 - 1), 1); assert.equal(bit(sc.seenW.f1, 48, 47), 1);
+  handle(g, { t: 'fogAll', v: false }); assert.equal(bit(sc.seenW.f1, 48, 1 * 8 + 1), 0);
+  sc.fogOn = false;
+});

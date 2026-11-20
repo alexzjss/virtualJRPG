@@ -57,6 +57,19 @@ MH.vision = vision;
 MH.onCell.push(ch => vision(ch.scene));
 hooks.foeSeen = ch => { const sc = S.scenes[ch.scene]; return use3d(sc) ? cellSeen(visNow(ch.scene), ch) : !!sc?.seen?.[ch.x + ',' + ch.y]; };
 const visSent = new Map(); // cena → chave da última visão que foi no pos
+// pincel de névoa do mestre no editor (casas de um andar) e "revelar/esconder tudo": no 3D valem sobre sc.seenW
+H.wFog = (c, m) => {
+  const sc = S.scenes[m.sc], f = sc?.world?.floors.find(x => x.id === m.f); if (c.role !== 'gm' || !f || !Array.isArray(m.l)) return;
+  const n = f.w * f.h, b = V.fromB64(sc.seenW?.[f.id] || '', n);
+  for (const xy of m.l.slice(0, 4000)) { const x = Array.isArray(xy) ? xy[0] : NaN, y = Array.isArray(xy) ? xy[1] : NaN; if (Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < f.w && y < f.h) b[y * f.w + x] = m.hide ? 0 : 1; }
+  sc.seenW = { ...sc.seenW, [f.id]: V.toB64(b) };
+};
+NOUNDO.add('wFog');
+const fogAll0 = H.fogAll;
+H.fogAll = (c, m) => {
+  fogAll0(c, m); const sc = S.scenes[S.scene]; if (c.role !== 'gm' || !sc?.world || sc.world.legacy) return; // cena legacy: o 2D refaz o seenW sozinho
+  sc.seenW = Object.fromEntries(sc.world.floors.map(f => [f.id, V.toB64(new Uint8Array(f.w * f.h).fill(m.v ? 1 : 0))]));
+};
 function flushPos() {
   if (!dirty.size) return;
   const batch = [...dirty]; dirty.clear();
