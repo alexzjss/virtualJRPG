@@ -136,7 +136,7 @@ function disparar(sc, sid, t) {
     else if (a.k === 'texto' && a.v) log('Narração', a.v, '', { sc: sid });
     else if (a.k === 'som' && a.v) toAll(sid, { t: 'sfx', k: String(a.v).slice(0, 40) });
     else if (a.k === 'objetivo') sc.world.goal = String(a.v || '').slice(0, 120);
-    else if (a.k === 'batalha') MH.ambush?.(sid, a.v, t.cfg.casas);
+    else if (a.k === 'batalha') MH.ambush?.(sid, a.v, t.cfg.casas, t.f);
   }
   if (portas) portaMuda(sc, sid);
 }

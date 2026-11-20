@@ -1,10 +1,14 @@
 // ===== mundo 3D: IA dos inimigos no mapa — patrulha, cone de visão, perseguição e volta à rota =====
-// Roda no servidor a 5 Hz (startIA), só em cenas sem batalha com algum herói presente, dentro de inScene.
+// Roda no servidor a 5 Hz (startIA), em cenas com algum herói presente, dentro de inScene; com batalha, só quem persegue anda (entrada tardia).
 // Só age o inimigo com um objeto `inimigo` ligado (cfg.ch). O estado fica em obj.ia = { s, t, alvo, i, dir, ult }:
 //   parado | patrulha | vagar → alerta (viu um herói; 1 s olhando) → persegue (A*, correndo) → 6 s sem ver → volta (A* até a rota).
 // O caminho calculado mora fora do state (RUN), para não ir ao save nem às telas.
-import { S, inScene } from './state.js';
+import { S, inScene, log } from './state.js';
 import { push } from './net.js';
+import { H } from './handlers.js';
+import { can } from './rules.js';
+import { RU } from './config.js';
+import { BBG } from './consts.js';
 import { MH, floorOf, place } from './mundo.js';
 
 const TICK = .2, ALERTA = 1, PERDE = 6, PERTO = .8, VAGA = 4, EPS = 1e-9;
@@ -82,13 +86,15 @@ function tickIA(sid, dt = TICK) {
     const f = floorOf(sc, e.pos.f); if (!f) continue;
     const ia = o.ia ||= { s: base(o), t: 0, i: 0, dir: 1 }, s0 = ia.s, cx = e.x, cy = e.y;
     let run = RUN.get(id); if (!run) RUN.set(id, run = { path: [], pk: '' });
+    const toque = heroes.find(h => h.pos.f === e.pos.f && Math.hypot(h.pos.x - e.pos.x, h.pos.z - e.pos.z) < PERTO);
+    if (toque) { engage(sid, toque, o, ia.s === 'persegue' ? 'alcance' : 'toque'); return; } // encostou (ou foi alcançado): começa a batalha
     const viu = heroes.find(h => h.id === ia.alvo && sees(o, h)) || heroes.find(h => sees(o, h));
     if (viu && ia.s !== 'alerta' && ia.s !== 'persegue') { ia.s = 'alerta'; ia.t = 0; ia.alvo = viu.id; ia.ult = [viu.x, viu.y]; run.pk = ''; }
     if (ia.s === 'alerta') {
       if (viu) { ia.alvo = viu.id; ia.ult = [viu.x, viu.y]; olha(e, sc, f, viu); }
       if ((ia.t += dt) >= ALERTA - EPS) { ia.s = 'persegue'; ia.t = 0; }
     } else if (ia.s === 'persegue') {
-      if (viu) { ia.alvo = viu.id; ia.ult = [viu.x, viu.y]; ia.t = 0; if (Math.hypot(viu.pos.x - e.pos.x, viu.pos.z - e.pos.z) > PERTO) irPara(e, sc, f, run, viu.x, viu.y, SP.c, dt); else olha(e, sc, f, viu); }
+      if (viu) { ia.alvo = viu.id; ia.ult = [viu.x, viu.y]; ia.t = 0; irPara(e, sc, f, run, viu.x, viu.y, SP.c, dt); }
       else if ((ia.t += dt) >= PERDE - EPS) { ia.s = 'volta'; ia.t = 0; ia.alvo = null; run.pk = ''; }
       else if (ia.ult) irPara(e, sc, f, run, ia.ult[0], ia.ult[1], SP.c, dt);
     } else if (ia.s === 'volta') {
@@ -121,12 +127,110 @@ function tickIA(sid, dt = TICK) {
 }
 function iaAll(dt = TICK) {
   for (const [sid, sc] of Object.entries(S.scenes)) {
-    if (!sc?.world || sc.battle?.active || !Object.values(sc.world.objs).some(o => o?.k === 'inimigo') || !heroesOf(sid).length) continue;
-    inScene(sid, () => tickIA(sid, dt));
+    if (!sc?.world || !Object.values(sc.world.objs).some(o => o?.k === 'inimigo') || !heroesOf(sid).length) continue;
+    inScene(sid, () => sc.battle?.active ? tardios(sid, dt) : tickIA(sid, dt));
   }
+}
+
+// ===== começo da batalha no mundo: toque, golpe (F), alcance e emboscada (Task 6.2) =====
+// engage junta todos os heróis vivos da cena, o inimigo tocado, o bando dele e quem está a até 8 casas vendo algum combatente,
+// e chama o H.battle com ids, abre (surpresa | emboscada) e at (a casa do contato: arena e clima do lugar).
+const cone = (a, b, graus) => { const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, L = Math.hypot(dx, dz); return L < 1e-6 || graus >= 360 || (dx * Math.sin(a.pos.d || 0) + dz * Math.cos(a.pos.d || 0)) / L >= Math.cos(graus / 2 * Math.PI / 180) - EPS; };
+const ligados = (sc, sid) => Object.values(sc.world.objs).filter(x => { const xe = x?.k === 'inimigo' && S.chars[x.cfg?.ch]; return xe?.enemy && xe.scene === sid && xe.pos && xe.hp > 0; });
+function comecar(sid, ids, abre, at) {
+  inScene(sid, () => {
+    H.battle({ role: 'gm' }, { on: true, ids, abre, at });
+    if (abre && S.battle.active) log('Mestre', abre === 'surpresa' ? 'Ataque surpresa! Os heróis agem primeiro e os inimigos ficam Expostos.' : 'Emboscada! Os inimigos agem primeiro.', abre === 'surpresa' ? 'ok' : 'bad');
+  });
+  push(); return !!S.scenes[sid]?.battle?.active;
+}
+function engage(sid, h, o, kind) {
+  const sc = S.scenes[sid], e = S.chars[o?.cfg?.ch]; if (!sc?.world || sc.battle?.active || !e?.pos || !h?.pos) return false;
+  const heroes = heroesOf(sid), lig = ligados(sc, sid), foes = new Set([e.id]);
+  if (o.cfg.bando) for (const x of lig) if (x.cfg.bando === o.cfg.bando) foes.add(x.cfg.ch);
+  const comb = [...heroes, ...[...foes].map(id => S.chars[id])];
+  for (const x of lig) { const xe = S.chars[x.cfg.ch]; if (!foes.has(xe.id) && comb.some(c => c.pos.f === xe.pos.f && Math.hypot(c.pos.x - xe.pos.x, c.pos.z - xe.pos.z) <= 8 + EPS && sees(x, c))) foes.add(xe.id); }
+  const visto = o.ia?.s === 'alerta' || o.ia?.s === 'persegue';
+  const abre = kind === 'golpe' || (kind === 'toque' && (!cone(e, h, o.cfg.visao?.a ?? 90) || (h._m === 'g' && !visto))) ? 'surpresa'
+    : kind === 'gatilho' || (kind === 'alcance' && !cone(h, e, 180)) ? 'emboscada' : null;
+  return comecar(sid, [...heroes.map(x => x.id), ...foes], abre, { f: h.pos.f, x: h.x, y: h.y });
+}
+// golpe no mapa (F): arco de 1,2 casa e 90° à frente; o inimigo mais perto no arco começa a batalha com surpresa
+H.strike = (c, m) => {
+  const h = S.chars[m?.id], sid = h?.scene, sc = S.scenes[sid];
+  if (!h?.pos || h.enemy || h.frozen || !can(c, h) || !sc?.world || sc.battle?.active) return;
+  let alvo = null, best = Infinity;
+  for (const o of ligados(sc, sid)) {
+    const e = S.chars[o.cfg.ch], L = Math.hypot(e.pos.x - h.pos.x, e.pos.z - h.pos.z);
+    if (e.pos.f === h.pos.f && L <= 1.2 + EPS && cone(h, e, 90) && L < best) { best = L; alvo = o; }
+  }
+  if (alvo) engage(sid, h, alvo, 'golpe');
+};
+// gatilho com ação batalha: o encontro salvo aparece nas casas marcadas e ataca primeiro
+const ambush = (sid, encId, casas, fid) => {
+  const sc = S.scenes[sid]; if (!sc?.world || sc.battle?.active || !S.encounters?.[encId]) return false;
+  const hs = heroesOf(sid); if (!hs.length) return false;
+  const f = floorOf(sc, fid) || floorOf(sc, hs[0].pos.f) || sc.world.floors[0]; if (!f) return false;
+  const antes = new Set(Object.keys(S.chars)); inScene(sid, () => H.encSpawn({ role: 'gm' }, { id: encId }));
+  const novos = Object.keys(S.chars).filter(k => !antes.has(k)).map(k => S.chars[k]).filter(ch => ch.enemy && ch.scene === sid); if (!novos.length) return false;
+  const cs = Array.isArray(casas) && casas.length ? casas : [[hs[0].x + 2, hs[0].y]];
+  novos.forEach((ch, i) => { const [x, y] = cs[i % cs.length]; place(ch, sc, f, Math.min(f.w - 1, Math.max(0, x)) + .5, Math.min(f.h - 1, Math.max(0, y)) + .5, 0); });
+  return comecar(sid, [...hs.map(x => x.id), ...novos.map(x => x.id)], 'emboscada', { f: f.id, x: hs[0].x, y: hs[0].y });
+};
+// H.battle: com ids, só eles entram (os outros saem do mapa só durante a chamada); abre adianta um lado; at dá arena, clima e eixo
+const battle0 = H.battle;
+H.battle = (c, m) => {
+  if (c?.role !== 'gm') return battle0(c, m);
+  const sid = S.scene, sc = S.scenes[sid];
+  if (!m?.on) { const was = S.battle.active, part = new Set(Object.keys(S.battle.ticks)); battle0(c, m); if (was && sc?.world) fimMundo(sc, part); return; }
+  const ids = Array.isArray(m.ids) ? new Set(m.ids.filter(x => typeof x === 'string')) : null, fora = [];
+  if (ids) for (const ch of Object.values(S.chars)) if (ch.scene === sid && ch.x != null && !ids.has(ch.id)) { fora.push([ch, ch.x]); ch.x = null; }
+  try { battle0(c, m); } finally { for (const [ch, x] of fora) ch.x = x; }
+  if (!S.battle.active || !sc) return;
+  const T = S.battle.ticks, ks = Object.keys(T), hs = ks.filter(k => !S.chars[k]?.enemy), es = ks.filter(k => S.chars[k]?.enemy);
+  if (hs.length && es.length && (m.abre === 'surpresa' || m.abre === 'emboscada')) {
+    const [antes, depois] = m.abre === 'surpresa' ? [hs, es] : [es, hs], shift = Math.max(...antes.map(k => T[k])) - Math.min(...depois.map(k => T[k])) + 1;
+    if (shift > 0) for (const k of depois) T[k] += shift;
+    if (m.abre === 'surpresa') for (const k of es) S.chars[k].st.exposed = 1;
+  }
+  const at = m.at && Number.isInteger(m.at.x) && Number.isInteger(m.at.y) ? m.at : null; if (!at || !sc.world) return;
+  // num mapa grande, o eixo do palco sai das posições comprimidas em direção ao contato (ch.x/ch.y ficam como estão)
+  const list = ks.map(k => S.chars[k]).filter(o => o?.x != null); let far = 0;
+  for (const p of list) for (const q of list) far = Math.max(far, Math.hypot(p.x - q.x, p.y - q.y));
+  if (far > 10) { const k = 10 / far; S.battle.ax = RU.axisOf(list.map(o => ({ enemy: o.enemy, x: at.x + (o.x - at.x) * k, y: at.y + (o.y - at.y) * k }))); }
+  const f = sc.world.floors.find(x => x.id === at.f), d = f && P().decode(P().cell(f, at.x, at.y)); if (!d) return;
+  const bb = d.tema + '-' + (sc.world.hora || 'dia'); if (!sc.bbgFixo && BBG.includes(bb)) sc.bbg = bb;
+  if (!sc.clima) { const cl = d.tipo === 'agua' ? 'chuva' : d.tipo === 'perigo' && d.tema === 'vulcao' ? 'brasas' : d.tema === 'neve' ? 'neve' : d.tema === 'pantano' ? 'neblina' : ''; if (cl) { sc.clima = cl; sc.climaAuto = true; } }
+};
+// fim da luta: derrotados com objeto somem do mapa; quem lutou e sobreviveu volta à rota; o clima automático sai
+function fimMundo(sc, part) {
+  for (const [id, o] of Object.entries(sc.world.objs)) {
+    const e = o?.k === 'inimigo' && S.chars[o.cfg?.ch]; if (!e) continue;
+    if (e.hp <= 0) { delete sc.world.objs[id]; if (sc.draft?.objs) delete sc.draft.objs[id]; RUN.delete(id); }
+    else if (part.has(e.id)) { o.ia = { i: 0, dir: 1, ...o.ia, s: 'volta', t: 0, alvo: null }; RUN.delete(id); }
+  }
+  if (sc.climaAuto) { sc.clima = ''; delete sc.climaAuto; }
+}
+// o mestre escolheu o fundo da batalha à mão: o lugar do contato não troca mais
+const map0 = H.map;
+H.map = (c, m) => { map0(c, m); if (c?.role === 'gm' && m?.f === 'bbg') { const sc = S.scenes[S.scene]; if (sc) sc.bbgFixo = !!sc.bbg; } };
+// durante a batalha: quem persegue corre até o combatente mais perto e entra no fim da fila (como quem chega no meio da luta)
+function tardios(sid, dt) {
+  const sc = S.scenes[sid], T = sc.battle.ticks, SP = C().SPEED; let moveu = false;
+  const comb = Object.keys(T).map(k => S.chars[k]).filter(c => c?.pos && !c.enemy && c.scene === sid);
+  for (const [id, o] of Object.entries(sc.world.objs)) {
+    const e = o?.k === 'inimigo' && o.ia?.s === 'persegue' && S.chars[o.cfg?.ch];
+    if (!e?.enemy || e.scene !== sid || !(e.hp > 0) || !e.pos || e.id in T || e.frozen) continue;
+    const f = floorOf(sc, e.pos.f), dist = c => Math.hypot(c.pos.x - e.pos.x, c.pos.z - e.pos.z), alvo = comb.filter(c => c.pos.f === e.pos.f).sort((a, b) => dist(a) - dist(b))[0];
+    if (!f || !alvo) continue;
+    let run = RUN.get(id); if (!run) RUN.set(id, run = { path: [], pk: '' });
+    if (dist(alvo) < PERTO) { T[e.id] = Math.max(0, ...Object.values(T)) + 1; e.bt = {}; log('Mestre', `${e.name} chega e entra na luta!`, 'bad'); push(); continue; }
+    const x0 = e.x, y0 = e.y; irPara(e, sc, f, run, alvo.x, alvo.y, SP.c, dt); if (e.x !== x0 || e.y !== y0) moveu = true;
+  }
+  if (moveu) MH.vision(sid);
 }
 let timer = null;
 function startIA() { if (timer) return; timer = setInterval(() => { try { iaAll(TICK); } catch (e) { console.error('Falha na IA do mundo:', e); } }, TICK * 1000); timer.unref?.(); }
 startIA();
 
-export { astar, iaAll, sees, startIA, tickIA };
+export { ambush, astar, engage, iaAll, sees, startIA, tickIA };

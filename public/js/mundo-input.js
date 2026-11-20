@@ -2,7 +2,7 @@
 // O herói selecionado anda já no cliente (MCOL.slide, o mesmo código que o servidor confere) e manda `walk` a cada 100 ms
 // enquanto se move, e uma vez ao parar. O servidor corrige com { t:'pos', fix:[id, f, x, z] } quando discorda.
 // Os outros chegam pelo canal pos agregado (10 Hz) e são desenhados 100 ms atrás, interpolando entre as duas amostras vizinhas.
-// Teclas: WASD (girado pela câmera), Shift corre, Ctrl (toque) ou C agacha e levanta, Espaço pula, 1 a 4 trocam o herói, E interage.
+// Teclas: WASD (girado pela câmera), Shift corre, Ctrl (toque) ou C agacha e levanta, Espaço pula, 1 a 4 trocam o herói, E interage, F golpeia.
 (g => {
   const C = g.MCOL, DELAY = 100, SEND_MS = 100, JUMP_MS = 400, KEEP_MS = 1500;
   const st = () => (typeof S !== 'undefined' ? S : null);
@@ -103,6 +103,7 @@
     if (e.key === 'Shift') { keys.add('shift'); return; }
     if (k === 'c' && !e.repeat) { crouch = !crouch; return; }
     if (k === 'e') { e.preventDefault(); if (!e.repeat) use(); return; }
+    if (k === 'f') { e.preventDefault(); const id = selId(); if (!e.repeat && id) send({ t: 'strike', id }); return; } // golpe no mapa: acertar um inimigo começa com surpresa
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (e.repeat || !local) return; jT = performance.now(); g.MUNDO.jump?.(local.id); const s = st(); if (s) sendWalk(jT, s); return; }
     if (/^[1-4]$/.test(e.key) && !e.repeat && !forced && typeof role !== 'undefined' && role === 'player') { const h = can()[+e.key - 1]; if (h && typeof selCh !== 'undefined') { selCh = h.id; if (typeof render === 'function') render(); } }
   }

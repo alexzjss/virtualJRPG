@@ -501,3 +501,95 @@ test('IA: inimigo parado e visível chega com posição no state do jogador', ()
   const sc = freshWorld(); nevoa(sc); sc.fogOn = false; const ca = cli('Vera'), e = foe(6, 2), h = hero('Vera', 2, 2); // dono próprio: outros testes deixam heróis da Ana fora da cena at(e, 6.5, 2.5); at(h, 2.5, 2.5);
   const v = net.view(ca).chars[e.id]; assert.ok(v, 'o inimigo vai no state'); assert.deepEqual(v.pos, e.pos, 'com a posição no 3D');
 });
+// ----- começo da batalha no mundo (Task 6.2) -----
+const T0 = () => S.scenes[S.focus].battle.ticks;
+const fim = () => { if (S.scenes[S.focus].battle?.active) handle(gm, { t: 'battle', on: false }); };
+const cara = (ch, d) => { ch.pos.d = d; }; // rumo: 0 = +z, π/2 = +x
+test('batalha por toque: entram todos os heróis, o bando e quem vê a até 8; o resto não', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false;
+  const a = hero('Ana', 5, 5), b = hero('Bia', 2, 9); at(a, 5.5, 5.5); at(b, 2.5, 9.5);
+  const e1 = foe(6, 5), e2 = foe(18, 2), e3 = foe(9, 5), e4 = foe(10, 8), e5 = foe(12, 2);
+  at(e1, 6.1, 5.5); at(e2, 18.5, 2.5); at(e3, 9.5, 5.5); cara(e3, -Math.PI / 2); at(e4, 10.5, 8.5); cara(e4, Math.PI / 2); at(e5, 12.5, 2.5);
+  inim(sc, e1, { bando: 'lobos', modo: 'parado' }); inim(sc, e2, { bando: 'lobos', modo: 'parado' }); inim(sc, e3, { modo: 'parado' }); inim(sc, e4, { modo: 'parado' });
+  try {
+    ia(1); assert.equal(sc.battle.active, true, 'o toque começa a batalha');
+    const T = T0(); for (const ch of [a, b, e1, e2, e3]) assert.ok(ch.id in T, ch.name + ' entra');
+    for (const ch of [e4, e5]) assert.ok(!(ch.id in T), 'quem não vê e não é do bando fica fora');
+    assert.ok(e4.x != null && e5.x != null, 'os de fora continuam no mapa');
+  } finally { fim(); }
+});
+test('surpresa: todos os heróis antes do primeiro inimigo e inimigos Expostos', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false;
+  const a = hero('Ana', 5, 5), e1 = foe(6, 5), e2 = foe(7, 5); at(a, 5.5, 5.5); at(e1, 6.1, 5.5); cara(e1, Math.PI / 2); at(e2, 7.5, 5.5); cara(e2, Math.PI / 2);
+  inim(sc, e1, { bando: 'b', modo: 'parado' }); inim(sc, e2, { bando: 'b', modo: 'parado' });
+  try {
+    ia(1); const T = T0(); assert.ok(sc.battle.active);
+    assert.ok(T[a.id] < Math.min(T[e1.id], T[e2.id]), 'o herói age antes'); assert.equal(e1.st.exposed, 1); assert.equal(e2.st.exposed, 1);
+  } finally { fim(); }
+});
+test('emboscada: inimigos antes', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false;
+  const a = hero('Ana', 5, 5), b = hero('Bia', 3, 3), e1 = foe(4, 5); at(a, 5.5, 5.5); cara(a, Math.PI / 2); at(b, 3.5, 3.5); at(e1, 4.9, 5.5); cara(e1, Math.PI / 2);
+  const o = inim(sc, e1, { modo: 'parado' }); o.ia = { s: 'persegue', t: 0, i: 0, dir: 1, alvo: a.id, ult: [5, 5] };
+  try {
+    ia(1); const T = T0(); assert.ok(sc.battle.active);
+    assert.ok(T[e1.id] < Math.min(T[a.id], T[b.id]), 'o inimigo age antes'); assert.ok(!e1.st.exposed);
+  } finally { fim(); }
+});
+test('arena e clima vêm da casa do contato; mestre com fundo fixo mantém o dele', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false; sc.clima = ''; delete sc.bbgFixo; sc.world.hora = 'noite';
+  const f = sc.world.floors[0], c = P.unpack(f.cell, f.w * f.h); c[5 * f.w + 5] = P.code('neve', 'chao'); f.cell = P.pack(c); sc.world.v++;
+  const a = hero('Ana', 5, 5), e1 = foe(6, 5); at(a, 5.5, 5.5); at(e1, 6.1, 5.5); const o = inim(sc, e1, { modo: 'parado' });
+  try {
+    ia(1); assert.ok(sc.battle.active); assert.equal(sc.bbg, 'neve-noite'); assert.equal(sc.clima, 'neve'); assert.equal(sc.climaAuto, true);
+    fim(); assert.equal(sc.clima, '', 'o clima automático sai no fim');
+    handle(gm, { t: 'map', f: 'bbg', v: 'castelo-dia' }); assert.equal(sc.bbgFixo, true);
+    o.ia = { s: 'parado', t: 0, i: 0, dir: 1 }; at(e1, 6.1, 5.5); ia(1); assert.ok(sc.battle.active); assert.equal(sc.bbg, 'castelo-dia', 'fundo do mestre fica');
+  } finally { fim(); delete sc.bbgFixo; sc.bbg = ''; }
+});
+test('H.battle sem ids continua igual ao de hoje', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false; const rnd = Math.random; Math.random = () => .5;
+  const a = hero('Ana', 2, 2), e1 = foe(9, 9), e2 = foe(12, 3); at(a, 2.5, 2.5); at(e1, 9.5, 9.5); at(e2, 12.5, 3.5); inim(sc, e1, { modo: 'parado' });
+  try {
+    handle(gm, { t: 'battle', on: true }); const T = T0();
+    const want = Object.values(S.chars).filter(ch => ch.scene === S.focus && ch.x != null && ch.hp > 0 && !ch.dead).map(ch => ch.id).sort();
+    assert.deepEqual(Object.keys(T).sort(), want, 'todos no mapa entram, como sempre'); assert.ok(!e1.st.exposed && !e2.st.exposed);
+  } finally { Math.random = rnd; fim(); }
+});
+test('vitória apaga inimigos derrotados do mapa e devolve sobreviventes à rota', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false;
+  const a = hero('Ana', 5, 5), e1 = foe(6, 5), e2 = foe(8, 5); at(a, 5.5, 5.5); at(e1, 6.1, 5.5); at(e2, 8.5, 5.5);
+  inim(sc, e1, { bando: 'b', modo: 'parado' }); const o2 = inim(sc, e2, { bando: 'b', rota: [[8, 5], [8, 8]] });
+  ia(1); assert.ok(sc.battle.active); e1.hp = 0;
+  handle(gm, { t: 'battle', on: false, win: true });
+  assert.equal(sc.world.objs['i_' + e1.id], undefined, 'derrotado some do mapa'); assert.equal(o2.ia.s, 'volta', 'sobrevivente volta à rota');
+});
+test('golpe F: acerta o inimigo à frente e começa com surpresa; sem alvo nada acontece', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false; const c = cli('Ana');
+  const a = hero('Ana', 5, 5), e1 = foe(6, 5); at(a, 5.5, 5.5); cara(a, 0); at(e1, 6.5, 5.5); cara(e1, -Math.PI / 2); inim(sc, e1, { modo: 'parado' });
+  try {
+    handle(c, { t: 'strike', id: a.id }); assert.ok(!sc.battle.active, 'olhando para o lado: errou');
+    cara(a, Math.PI / 2); handle(c, { t: 'strike', id: a.id }); assert.ok(sc.battle.active, 'acertou'); assert.equal(e1.st.exposed, 1, 'surpresa');
+  } finally { fim(); }
+});
+test('emboscada do gatilho: o encontro aparece nas casas marcadas e age antes', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false; const b = Object.keys(S.bestiary)[0]; assert.ok(b, 'há bestiário');
+  S.encounters.encT = { name: 'Teste', list: [{ b, tier: 'normal', n: 2 }] };
+  const a = hero('Ana', 5, 5); at(a, 5.5, 5.5); const before = new Set(Object.keys(S.chars));
+  try {
+    MW.MH.ambush(S.focus, 'encT', [[8, 8], [9, 8]], 'f0'); const novos = Object.keys(S.chars).filter(k => !before.has(k)).map(k => S.chars[k]).filter(ch => ch.enemy);
+    assert.equal(novos.length, 2); assert.deepEqual(novos.map(ch => [ch.x, ch.y]).sort(), [[8, 8], [9, 8]]); assert.ok(novos.every(ch => ch.pos?.f === 'f0'));
+    const T = T0(); assert.ok(sc.battle.active); assert.ok(Math.max(...novos.map(ch => T[ch.id])) < T[a.id], 'emboscada: eles antes');
+  } finally { fim(); delete S.encounters.encT; }
+});
+test('entrada tardia: quem persegue e alcança um combatente entra no fim da fila', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false;
+  const a = hero('Ana', 5, 5), e1 = foe(6, 5), e2 = foe(12, 5); at(a, 5.5, 5.5); at(e1, 6.1, 5.5); at(e2, 12.5, 5.5); cara(e2, Math.PI / 2);
+  inim(sc, e1, { modo: 'parado' }); const o2 = inim(sc, e2, { modo: 'parado' });
+  try {
+    ia(1); assert.ok(sc.battle.active); assert.ok(!(e2.id in T0()));
+    o2.ia = { s: 'persegue', t: 0, i: 0, dir: 1, alvo: a.id, ult: [5, 5] }; const p = e2.pos.x; IA.iaAll(.2); assert.ok(e2.pos.x < p, 'corre até a luta');
+    for (let i = 0; i < 20 && !(e2.id in T0()); i++) IA.iaAll(.2);
+    const T = T0(); assert.ok(e2.id in T, 'entrou'); assert.ok(T[e2.id] > Math.max(...Object.entries(T).filter(([k]) => k !== e2.id).map(([, v]) => v)), 'no fim da fila');
+  } finally { fim(); }
+});
