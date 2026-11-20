@@ -5,7 +5,7 @@ const setApp = h => { const x = gridFull && S.chars[gridFull] ? `<div class="mod
 let gmWasB = null, gmFocus = null, lastHero = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
 // mundo 3D: ligado pelo servidor (VJ_MUNDO=1) ou por ?mundo=1, só no PC; o canvas fica fora do #app e segue o [data-mundo]
 const mundoOn = () => (S.mundo || /[?&]mundo=1/.test(location.search)) && innerWidth > 700 && !!window.MUNDO;
-const mapOr3d = () => mundoOn() ? '<section class="mundo-slot" data-mundo></section>' : map();
+const mapOr3d = () => mundoOn() ? `<section class="mundo-slot" data-mundo>${window.MHUD?.html?.(S) || ''}</section>` : map(); // HUD da exploração: fichas e chat (mundo-hud.js)
 function render() {
   const ae = document.activeElement;
   if (drag || wdrag || cdrag || (typeof mzDrag !== "undefined" && mzDrag) || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }

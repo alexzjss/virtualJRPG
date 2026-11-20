@@ -4,7 +4,7 @@
 import * as T from '/vendor/three.module.js';
 import { buildFloor, setCutaway, tickPecas, disposeFloor } from './mundo3d-pecas.js';
 import { Actors } from './mundo3d-atores.js';
-import { Fx, shatter } from './mundo3d-fx.js';
+import { Fx, fogData, shatter } from './mundo3d-fx.js';
 import './mundo-hud.js'; // prompt do E, diálogo e placa (MHUD)
 
 const TILT = 35 * Math.PI / 180, ROT_MS = 250;
@@ -116,7 +116,7 @@ function sync(S0, c = {}) {
   if (S?.battle?.active) { if (!paused) { quebra(); pause(); } return; } // batalha: o mundo quebra em cacos e a GPU fica para o palco e o luz.js
   if (paused) { paused = false; if (lost === true) teardown(); }
   const on = !!slot && S;
-  if (!on) { if (renderer) { renderer.domElement.style.display = 'none'; stopLoop(); } return; }
+  if (!on) { if (renderer) { renderer.domElement.style.display = 'none'; stopLoop(); } globalThis.MHUD?.off?.(); return; }
   if (!ensure()) return;
   const el = renderer.domElement; el.style.display = '';
   if (!view.follow || !S.chars[view.follow]) view.follow = c.follow || null;
@@ -135,7 +135,7 @@ const follow = id => { view.follow = id; view.free = null; };
 const free = (x, z) => { view.free = x == null ? null : { x, z }; };
 // rumo das teclas: W vai para "cima da tela" no chão, girado com a câmera
 const axes = () => { const y = view.yaw; return { fwd: { x: -Math.sin(y), z: -Math.cos(y) }, right: { x: Math.cos(y), z: -Math.sin(y) } }; };
-const screen = id => { const p = S?.chars?.[id]?.pos; if (!p || !renderer) return null; return project(p.x, actors.height(id), p.z); };
+const screen = id => { const p = globalThis.MINPUT?.poseOf?.(id) || S?.chars?.[id]?.pos; if (!p || !renderer) return null; return project(p.x, actors.height(id), p.z); }; // a posição desenhada (interpolada), não a última do servidor
 function project(x, y, z) { const v = new T.Vector3(x, y, z).project(cam), el = renderer.domElement, r = el.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, vis: v.z > -1 && v.z < 1 }; }
 function pick(cx, cy) { if (!renderer) return null; const r = renderer.domElement.getBoundingClientRect(), ray = new T.Raycaster(); ray.setFromCamera(new T.Vector2((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), cam); const hit = new T.Vector3(); if (!ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), hit)) return null; const f = floorFor(worldOf()); return { f: f?.id, x: hit.x, z: hit.z }; }
 const fps = () => fpsBuf.length ? Math.round(fpsBuf.length / fpsBuf.reduce((a, b) => a + b, 0)) : 0;
@@ -146,7 +146,7 @@ function quebra() {
 }
 // pausa (batalha): para o laço, libera o mapa de sombra; na Média e na Baixa derruba o contexto para devolver a memória da GPU
 function pause() {
-  paused = true; stopLoop(); if (!renderer) return;
+  paused = true; stopLoop(); globalThis.MHUD?.off?.(); if (!renderer) return;
   renderer.domElement.style.display = 'none';
   if (fx?.sol.shadow.map) { fx.sol.shadow.map.dispose(); fx.sol.shadow.map = null; }
   renderer.renderLists.dispose();
@@ -166,5 +166,6 @@ addEventListener('keydown', e => { if (!running || typing() || e.ctrlKey || e.al
 let wheelT = 0;
 addEventListener('wheel', e => { if (!running || !e.target.closest?.('[data-mundo]')) return; e.preventDefault(); const t = performance.now(); if (t - wheelT < 180) return; wheelT = t; zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
-globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, quality, get lost() { return lost; }, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, draw: (t = performance.now()) => { if (running) frame(t); }, jump: id => actors?.jump(id), T };
+const cur = () => { const w = renderer && S ? worldOf() : null; return { w, f: floorFor(w) }; }; // o mundo e o andar que estão na tela (HUD, minimapa)
+globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, quality, cur, fogData, get lost() { return lost; }, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, draw: (t = performance.now()) => { if (running) frame(t); }, jump: id => actors?.jump(id), T };
 if (typeof render === 'function') try { render(); } catch {}

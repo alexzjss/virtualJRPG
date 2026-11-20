@@ -1,4 +1,5 @@
 // ===== HUD da batalha no PC (jogador e mesa): ordem, topo direito, grupo e dicas por cima do palco 3D =====
+// html({ mini: true }): só as fichas do grupo, a 70%, para a exploração no mundo 3D (mundo-hud.js).
 // Desenhado para 1440×860 e escalado pelo --hk (palco3d.js mede o retângulo do palco). Tudo aqui é HTML dentro de #app (redesenhado a cada estado).
 // O leque de comandos (pinceladas) mora em leque.js; as dicas de baixo mostram o que o teclado faz agora.
 let navOpen = false; // menu ☰ aberto (páginas do jogador, escondidas na barra de cima durante a batalha)
@@ -153,7 +154,8 @@ const HUD = (() => {
       Object.assign(w.style, { left: l + 'px', top: t + 'px', opacity: '' }); pos = { id: w.dataset.sid, l, t };
     },
     // actorId: herói do jogador que está no leque (a vez dele ou o que o jogador escolheu); dim: não é a vez dele; unread: mensagens novas do chat; table: versão da mesa (sem ícones nem dicas)
-    html({ actorId = null, dim = false, unread = 0, table = false, gm: gmO = false } = {}) {
+    html({ actorId = null, dim = false, unread = 0, table = false, gm: gmO = false, mini = false } = {}) {
+      if (mini) { const hs = Object.values(S.chars).filter(c => !c.enemy && !c.npc && !c.dead && c.scene === S.scene && (c.pos || c.x != null)); return hs.length ? `<div class="hudw mhmini"><div class="hud-br">${grupo(hs, null)}</div></div>` : ''; } // exploração no mundo 3D: só as fichas, a 70%
       const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]], o = { actorId, unread, table, gm: gmO }, x = gmO ? LEQUE.ctx() : null;
       const cm = table ? '' : gmO ? (x?.shown ? cmds(x.actor, x.cur, inB, true) : '') : cmds(S.chars[actorId], cur, inB); // sem a fileira de alvos: na mira escolhe-se pelas setas, pelo clique no recorte ou no minimapa (câmera aérea)
       return `<div class="hudw ${dim ? 'dim' : ''} ${table ? 'table' : ''} ${gmO ? 'gmh' : ''}">${ordem(timeline(8), table)}${topo(o)}<div class="hud-br">${cm}${grupo(inB, cur)}</div>${alvo()}${faixa()}${gmO ? pedidos() : ''}</div>`;

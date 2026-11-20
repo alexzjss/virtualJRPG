@@ -1,4 +1,4 @@
-// ===== mundo 3D: HUD da exploração — prompt do E, caixa de diálogo do NPC e placa =====
+// ===== mundo 3D: HUD da exploração — prompt do E, diálogo do NPC, placa, fichas, minimapa, objetivo, nomes, balões, pings e chat =====
 // Mora fora do #app (fixo no body), então o render() não apaga. O nucleo.js entrega { t:'dlg' } e { t:'placa' } em MHUD.on(m);
 // o mundo-input.js chama MHUD.prompt(obj) com o objeto que o E usaria (ou null).
 // Diálogo: quem abriu escolhe (1 a 6 ou clique) e encerra; quem está perto só lê (ro); o mestre lê, fala como o NPC e encerra.
@@ -9,7 +9,7 @@
   function send(o) { if (typeof ws !== 'undefined' && ws?.readyState === 1) ws.send(JSON.stringify(o)); }
   let root = null, alvo = null, pKey = '', dlg = null, placa = null;
   // a HUD fica sobre a área do 3D ([data-mundo]), não sobre o chat ao lado
-  const caixa = () => { const r = document.querySelector('[data-mundo]')?.getBoundingClientRect(); if (!root || !r?.width) return; const st = root.style; st.setProperty('--mc', r.left + r.width / 2 + 'px'); st.setProperty('--mw', r.width + 'px'); st.setProperty('--mb', Math.max(0, innerHeight - r.bottom) + 'px'); };
+  const caixa = () => { const r = document.querySelector('[data-mundo]')?.getBoundingClientRect(); if (!root || !r?.width) return; const st = root.style; st.setProperty('--mc', r.left + r.width / 2 + 'px'); st.setProperty('--mw', r.width + 'px'); st.setProperty('--mb', Math.max(0, innerHeight - r.bottom) + 'px'); st.setProperty('--ml', r.left + 'px'); st.setProperty('--mt', r.top + 'px'); st.setProperty('--mh', r.height + 'px'); };
   const el = cls => { if (!root) { root = document.createElement('div'); root.className = 'mhud'; document.body.appendChild(root); wire(); } let e = root.querySelector(':scope > .' + cls); if (!e) { e = document.createElement('div'); e.className = cls; root.appendChild(e); } return e; };
 
   // ----- prompt: "E · Abrir o baú" -----
@@ -74,5 +74,156 @@
     }, true);
   }
 
-  g.MHUD = { on, prompt, get alvo() { return alvo; }, get aberto() { return !!(dlg || placa); }, get dlg() { return dlg; }, rotulo };
+
+  // ===== HUD da exploração =====
+  // Dentro do [data-mundo] (no #app, refeito pelo render): fichas P5 em miniatura (HUD.html mini) e o chat recolhível.
+  // Fora do #app, numa camada fixa que acompanha o retângulo do [data-mundo]: minimapa (5 Hz), faixa de objetivo, nomes com mini
+  // barra de HP e balões de fala (por quadro, em MHUD.tick), marcas e setas de pings e a borda vermelha de quem pisa em perigo.
+  const st = () => (typeof S !== 'undefined' ? S : null);
+  const meId = () => (typeof lastHero !== 'undefined' ? lastHero : null);
+  const P = () => g.MPECAS;
+  let chatOn = false;
+  function html(S0) {
+    const s = S0 || st(); if (!s) return '';
+    const fichas = typeof HUD !== 'undefined' ? HUD.html({ mini: true }) : '';
+    if (typeof role === 'undefined' || role === 'table') return fichas;
+    const ls = (chatOn ? (s.log || []).slice(-40).reverse() : (s.log || []).slice(-3)).map(l => `<div class="${l.kind === 'chat' ? 'c' : ''}"><b>${esc(l.who)}</b> ${esc(l.text)}</div>`).join('');
+    return fichas + `<div class="mh-chat ${chatOn ? 'on' : ''}"><button type="button" class="mh-chatT" data-mhc="t" aria-expanded="${chatOn}">Chat <kbd>Enter</kbd></button>`
+      + `<div class="mh-log" aria-live="polite">${ls}</div>${chatOn ? '<input class="chat" data-chat="1" maxlength="300" placeholder="Mensagem · /r 2d6 · /w nome texto · Esc fecha" aria-label="Mensagem">' : ''}</div>`;
+  }
+  const chatSet = v => { chatOn = v; if (typeof render === 'function') render(); if (v) document.querySelector('[data-mundo] .mh-chat input')?.focus(); }; // o render é síncrono: o campo já existe
+  document.addEventListener('click', e => { if (e.target.closest?.('[data-mhc="t"]')) chatSet(!chatOn); });
+  addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    if (e.key === 'Escape' && e.target.closest?.('.mh-chat')) { e.preventDefault(); e.stopPropagation(); e.target.blur?.(); chatSet(false); return; }
+    if (e.key === 'Enter' && !typing() && !dlg && !placa && document.querySelector('[data-mundo] .mh-chat')) { e.preventDefault(); e.stopPropagation(); chatSet(true); }
+  }, true); // na captura: antes do Enter geral do eventos.js, que levaria ao chat da coluna
+  // duplo clique no chão do mundo marca um ping (a mesma mensagem do mapa 2D: casa x, y)
+  document.addEventListener('dblclick', e => {
+    const slot = e.target.closest?.('[data-mundo]'); if (!slot || e.target.closest('button,input,a,.hudw>*,.mh-chat') || typeof role === 'undefined' || role === 'table') return;
+    const p = g.MUNDO?.pick?.(e.clientX, e.clientY); if (p && p.x >= 0 && p.z >= 0) send({ t: 'ping', x: Math.floor(p.x), y: Math.floor(p.z) });
+  });
+
+  let lay = null, rect = null, rectT = 0;
+  const layer = () => {
+    if (!lay) { lay = el('mhud-mundo'); lay.innerHTML = '<div class="mh-perigo" aria-hidden="true"></div><div class="mh-goal" role="status" hidden></div><canvas class="mmap" width="180" height="180" role="img" aria-label="Minimapa"></canvas><div class="mh-tags" aria-hidden="true"></div><div class="mh-pings" aria-hidden="true"></div>'; }
+    return lay;
+  };
+  function off() { if (lay) lay.hidden = true; seq = null; } // ao voltar, só falas novas viram balão
+
+  // ----- objetivo: pulsa por 2 s quando muda (não na primeira vez) -----
+  let goalTxt = null;
+  function goal(w) {
+    const t = w?.goal || ''; if (t === goalTxt) return; const first = goalTxt === null; goalTxt = t;
+    const e = lay.querySelector('.mh-goal'); e.innerHTML = t ? `<small>Objetivo</small><b>${esc(t)}</b>` : ''; e.hidden = !t;
+    if (!first && t) { e.classList.remove('pulse'); void e.offsetWidth; e.classList.add('pulse'); }
+  }
+
+  // ----- balões: fala do chat sobre o herói de quem falou, por 5 s -----
+  const bal = new Map(); let seq = null;
+  function balloons(s, now) {
+    if (seq === null) { seq = s.seq || 0; return; }
+    for (const l of s.log || []) {
+      if (l.n <= seq || l.kind !== 'chat' || l.to) continue;
+      const hs = Object.values(s.chars).filter(c => !c.enemy && c.pos && c.scene === s.scene), who = l.from || l.who;
+      const h = hs.find(c => c.name === who) || (typeof name !== 'undefined' && who === name && hs.find(c => c.id === meId())) || hs.find(c => c.owner === who);
+      if (h) bal.set(h.id, { text: l.text, ate: now + 5000 });
+    }
+    seq = s.seq || 0;
+  }
+
+  // ----- nomes e mini barra de HP sobre os atores (um div por ator, movido por transform) -----
+  const tags = new Map();
+  function drawTags(s, f, r, now) {
+    const box = lay.querySelector('.mh-tags'), seen = new Set();
+    if (f) for (const c of Object.values(s.chars)) {
+      if (!c.pos || c.pos.f !== f.id || c.scene !== s.scene || (c.enemy && !(c.hp > 0))) continue;
+      const p = g.MUNDO.screen(c.id); if (!p?.vis || p.x < r.left || p.x > r.right || p.y < r.top || p.y > r.bottom) continue;
+      seen.add(c.id); let e = tags.get(c.id);
+      if (!e) { e = document.createElement('div'); e.className = 'mh-tag'; e.innerHTML = '<div class="in"><p class="mh-bal" hidden></p><b></b><i><i></i></i></div>'; box.appendChild(e); tags.set(c.id, e); }
+      const hp = Math.round(Math.max(0, Math.min(100, 100 * c.hp / (c.hpMax || 1))));
+      if (e._n !== c.name) { e._n = c.name; e.querySelector('b').textContent = c.name; }
+      if (e._hp !== hp) { e._hp = hp; e.querySelector('i>i').style.width = hp + '%'; e.classList.toggle('low', hp < 25); }
+      if (e._c !== c.color) { e._c = c.color; e.style.setProperty('--c', c.color || '#fff'); e.classList.toggle('foe', !!c.enemy); }
+      const b = bal.get(c.id), bp = e.querySelector('.mh-bal');
+      if (b && b.ate > now) { if (bp._t !== b.text) { bp._t = b.text; bp.textContent = b.text; } bp.hidden = false; }
+      else if (!bp.hidden || b) { bp.hidden = true; bal.delete(c.id); }
+      e.style.transform = `translate(${Math.round(p.x)}px,${Math.round(p.y)}px)`;
+    }
+    for (const [id, e] of tags) if (!seen.has(id)) { e.remove(); tags.delete(id); }
+  }
+
+  // ----- pings: anel no lugar; fora da tela, seta na borda apontando para ele -----
+  const pEl = new Map();
+  function drawPings(f, r) {
+    const box = lay.querySelector('.mh-pings'), ps = f && typeof pings !== 'undefined' ? pings : [];
+    for (const p of ps) {
+      const q = g.MUNDO.project(p.x + .5, .1, p.y + .5); if (!q) continue;
+      let e = pEl.get(p); if (!e) { e = document.createElement('i'); box.appendChild(e); pEl.set(p, e); }
+      const dentro = q.vis && q.x >= r.left + 8 && q.x <= r.right - 8 && q.y >= r.top + 8 && q.y <= r.bottom - 8;
+      if (dentro) { if (e.className !== 'mh-ping') e.className = 'mh-ping'; e.style.transform = `translate(${Math.round(q.x)}px,${Math.round(q.y)}px)`; continue; }
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2; let dx = q.x - cx, dy = q.y - cy; if (!q.vis) { dx = -dx; dy = -dy; }
+      const k = Math.min((r.width / 2 - 26) / Math.max(1e-6, Math.abs(dx)), (r.height / 2 - 26) / Math.max(1e-6, Math.abs(dy)));
+      if (e.className !== 'mh-seta') e.className = 'mh-seta'; e.style.transform = `translate(${Math.round(cx + dx * k)}px,${Math.round(cy + dy * k)}px) rotate(${Math.atan2(dy, dx).toFixed(3)}rad)`;
+    }
+    for (const [p, e] of pEl) if (!ps.includes(p)) { e.remove(); pEl.delete(p); }
+  }
+
+  // ----- minimapa: casas (por tema e tipo), paredes, névoa (lembrado mais escuro), objetos vistos, aliados, inimigos à vista,
+  // pings e a câmera como um losango (com a ponta para o "cima" da tela). A base fica em cache até o andar ou a névoa mudar.
+  const TEMA = { floresta: [63, 122, 58], castelo: [122, 122, 134], praia: [216, 196, 138], neve: [226, 234, 242], deserto: [216, 168, 96], caverna: [90, 80, 96], ruinas: [138, 130, 112], pantano: [74, 90, 58], vulcao: [96, 58, 50], campo: [122, 160, 74] };
+  const OBJ = { porta: '#c08040', bau: '#f0c040', item: '#f0e070', npc: '#60d0ff', placa: '#ffffff', alavanca: '#d0a0ff', escada: '#b070ff', portal: '#b070ff' };
+  let base = null, baseK = '';
+  function cor(d) {
+    if (!d || d.tipo === 'vazio') return [6, 6, 10]; if (d.tipo === 'agua') return [58, 122, 208]; if (d.tipo === 'fundo') return [14, 14, 22]; if (d.tipo === 'perigo') return [224, 80, 32];
+    const c = TEMA[d.tema] || [120, 120, 120], k = d.tipo === 'denso' ? .6 : d.tipo === 'baixo' ? .8 : d.tipo === 'trilha' ? 1.18 : 1; return c.map(v => Math.min(255, v * k));
+  }
+  function drawMap() {
+    const s = st(), cur = g.MUNDO?.cur?.(), w = cur?.w, f = cur?.f, cv = lay.querySelector('.mmap'), x = cv.getContext('2d'); if (!s || !f) { x.clearRect(0, 0, 180, 180); return; }
+    const sc = s.scenes?.[s.scene], fogOn = !!sc?.fogOn && !(typeof role !== 'undefined' && role === 'gm'), vis = s.vis?.[f.id];
+    const k = 172 / Math.max(f.w, f.h), ox = (180 - f.w * k) / 2, oy = (180 - f.h * k) / 2;
+    const fk = [f.id, f.w, f.h, f.cell, f.wallH, f.wallV, fogOn ? (sc.seenW?.[f.id] || '') + '|' + (typeof vis === 'string' ? vis : vis ? [...vis].join(';') : '') : 'semnevoa'].join('|');
+    const fog = fogOn ? (g.MHUD._fog = g.MHUD._fog?.k === fk ? g.MHUD._fog : { k: fk, d: g.MUNDO.fogData(f.w, f.h, sc.seenW?.[f.id], typeof vis === 'string' ? vis : vis ? new Set(vis) : null) }).d : null;
+    if (fk !== baseK) {
+      baseK = fk; const px = document.createElement('canvas'); px.width = f.w; px.height = f.h; const pc = px.getContext('2d'), im = pc.createImageData(f.w, f.h), cs = P().cells(f);
+      for (let i = 0; i < f.w * f.h; i++) { const v = fog ? fog[i] : 255, c = v ? cor(P().decode(cs[i])) : [0, 0, 0], m = v === 255 ? 1 : .42; im.data.set([c[0] * m, c[1] * m, c[2] * m, 255], i * 4); }
+      pc.putImageData(im, 0, 0);
+      base = document.createElement('canvas'); base.width = base.height = 180; const b = base.getContext('2d'); b.fillStyle = '#05050a'; b.fillRect(0, 0, 180, 180); b.imageSmoothingEnabled = false; b.drawImage(px, ox, oy, f.w * k, f.h * k);
+      const lit = (cx, cy) => !fog || (cx >= 0 && cy >= 0 && cx < f.w && cy < f.h && fog[cy * f.w + cx] > 0);
+      b.strokeStyle = '#f2ecd8'; b.lineWidth = Math.max(1, k * .28); b.beginPath();
+      for (let yy = 0; yy <= f.h; yy++) for (let xx = 0; xx < f.w; xx++) { const e = P().edgeH(f, xx, yy); if (e && yy > 0 && yy < f.h && (lit(xx, yy) || lit(xx, yy - 1))) { b.moveTo(ox + xx * k, oy + yy * k); b.lineTo(ox + (xx + 1) * k, oy + yy * k); } }
+      for (let yy = 0; yy < f.h; yy++) for (let xx = 0; xx <= f.w; xx++) { const e = P().edgeV(f, xx, yy); if (e && xx > 0 && xx < f.w && (lit(xx, yy) || lit(xx - 1, yy))) { b.moveTo(ox + xx * k, oy + yy * k); b.lineTo(ox + xx * k, oy + (yy + 1) * k); } }
+      b.stroke();
+    }
+    x.clearRect(0, 0, 180, 180); x.drawImage(base, 0, 0);
+    const seenAt = (cx, cy) => !fog || fog[Math.min(f.h - 1, Math.max(0, cy)) * f.w + Math.min(f.w - 1, Math.max(0, cx))] > 0;
+    for (const o of Object.values(w?.objs || {})) {
+      if (o?.f !== f.id || !OBJ[o.k] || (o.vis === 'oculto' && !o.rev) || !seenAt(o.x, o.y)) continue;
+      x.fillStyle = OBJ[o.k]; const r2 = Math.max(2, k * .5); x.fillRect(ox + (o.x + .5) * k - r2 / 2, oy + (o.y + .5) * k - r2 / 2, r2, r2);
+    }
+    for (const c of Object.values(s.chars)) {
+      if (!c.pos || c.pos.f !== f.id || c.scene !== s.scene || (c.enemy && !(c.hp > 0))) continue;
+      const p = g.MINPUT?.poseOf?.(c.id) || c.pos, me = c.id === meId();
+      x.beginPath(); x.arc(ox + p.x * k, oy + p.z * k, me ? 4 : 3, 0, Math.PI * 2); x.fillStyle = c.enemy ? '#ff3030' : c.color || '#fff'; x.fill();
+      if (me) { x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.stroke(); }
+    }
+    for (const p of typeof pings !== 'undefined' ? pings : []) { x.beginPath(); x.arc(ox + (p.x + .5) * k, oy + (p.y + .5) * k, 5, 0, Math.PI * 2); x.strokeStyle = '#ffd23c'; x.lineWidth = 2; x.stroke(); }
+    const v = g.MUNDO.view, a = g.MUNDO.axes(), cx = ox + v.tx * k, cy = oy + v.tz * k;
+    x.save(); x.translate(cx, cy); x.rotate(Math.atan2(a.fwd.z, a.fwd.x) + Math.PI / 2);
+    x.beginPath(); x.moveTo(0, -8); x.lineTo(5, 0); x.lineTo(0, 6); x.lineTo(-5, 0); x.closePath(); x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.stroke(); x.fillStyle = '#ffffff40'; x.fill(); x.restore();
+  }
+  setInterval(() => { if (lay && !lay.hidden && !lay.classList.contains('gm')) try { drawMap(); } catch (e) { console.warn('Minimapa:', e); } }, 200);
+
+  // ----- por quadro (mundo3d.js chama dentro do laço) -----
+  function tick(now = performance.now()) {
+    const s = st(), slot = document.querySelector('[data-mundo]'); if (!s || !slot || s.battle?.active || !g.MUNDO?.el) { off(); return; }
+    layer(); if (lay.hidden) { lay.hidden = false; rectT = 0; lay.classList.toggle('gm', typeof role !== 'undefined' && role === 'gm'); } // o mestre tem o editor: sem minimapa nem faixa
+    if (now - rectT > 250) { rectT = now; caixa(); rect = slot.getBoundingClientRect(); }
+    const cur = g.MUNDO.cur?.(), f = cur?.f;
+    goal(cur?.w); balloons(s, now); drawTags(s, f, rect, now); drawPings(f, rect);
+    const me = s.chars[meId()], d = me?.pos && f && me.pos.f === f.id && P().decode(P().cell(f, Math.floor(me.pos.x), Math.floor(me.pos.z)));
+    lay.classList.toggle('perigo', d?.tipo === 'perigo');
+  }
+
+  g.MHUD = { on, prompt, html, tick, off, get alvo() { return alvo; }, get aberto() { return !!(dlg || placa); }, get dlg() { return dlg; }, get chat() { return chatOn; }, rotulo };
 })(globalThis);
