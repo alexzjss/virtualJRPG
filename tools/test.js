@@ -154,6 +154,52 @@ test('migração: mede imagens de fichas antigas ao abrir a campanha', async () 
   } finally { adopt(keep); }
 });
 
+const miraChars = () => ['a', 'b', 'x', 'y', 'z'].map(id => ({ id, enemy: 'xyz'.includes(id), hp: 30 }));
+
+test('mira: alvos determinísticos por semente e independentes da ordem das fichas', async () => {
+  await import('../public/js/mira.js');
+  const { targets } = globalThis.MIRA_R, chars = miraChars(), opts = { seed: 7 };
+  const expected = { a: 'z', b: 'x', x: 'b', y: 'b', z: 'a' };
+  assert.deepEqual(targets(chars, opts), expected);
+  assert.deepEqual(targets(chars.slice().reverse(), opts), expected);
+  assert.notDeepEqual(targets(chars, { seed: 8 }), expected);
+});
+
+test('mira: trava só vale para um oponente vivo', async () => {
+  await import('../public/js/mira.js');
+  const { targets } = globalThis.MIRA_R, chars = miraChars();
+  assert.equal(targets(chars, { seed: 7, locks: { a: 'x' } }).a, 'x');
+  assert.equal(targets(chars, { seed: 7, locks: { a: 'b' } }).a, 'z');
+  chars.find(ch => ch.id === 'x').dead = true;
+  const aims = targets(chars, { seed: 7, locks: { a: 'x' } });
+  assert.equal(aims.a, 'z');
+  assert.equal(aims.x, null);
+  assert.deepEqual(targets(chars.filter(ch => !ch.enemy), { seed: 7 }), { a: null, b: null });
+});
+
+test('mira: quando um alvo cai, só muda quem mirava nele', async () => {
+  await import('../public/js/mira.js');
+  const { targets } = globalThis.MIRA_R, chars = miraChars(), opts = { seed: 7 };
+  const before = targets(chars, opts);
+  assert.notEqual(before.a, before.b);
+  chars.find(ch => ch.id === before.a).hp = 0;
+  const after = targets(chars, opts);
+  assert.equal(after.a, 'y');
+  assert.equal(after.b, before.b);
+  assert.equal(after[before.a], null);
+});
+
+test('mira: espelha conforme a direção original e mantém a orientação a menos de 1 px', async () => {
+  await import('../public/js/mira.js');
+  const { faceLeft } = globalThis.MIRA_R;
+  assert.equal(faceLeft(100, 50, false), true);
+  assert.equal(faceLeft(100, 50, true), false);
+  assert.equal(faceLeft(50, 100, false), false);
+  assert.equal(faceLeft(50, 100, true), true);
+  assert.equal(faceLeft(50, 50.5, false), null);
+  assert.equal(faceLeft(50, 49, false), true);
+});
+
 test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1330); assert.ok(Object.keys(S.items).length >= 50); });
 test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam todos os seus nós passando só por eles e pelo tronco Marcial', () => {
   const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
