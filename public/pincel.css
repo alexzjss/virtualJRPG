@@ -207,3 +207,77 @@ body.ui-pincel .lq .pc-sk .nm{font:inherit;letter-spacing:0;text-transform:none;
 .pc-skdesc small{display:block;margin:2px 0 6px;font:italic 16px var(--pc-disp);color:var(--pc-dim)}.pc-skdesc small .af.w{color:#7dffb0}
 .pc-skdesc p{margin:0 0 6px}.pc-skdesc .why{color:#ff9aa6}
 .pc-skills .vazio{font:italic 18px var(--pc-disp);color:var(--pc-dim)}
+/* ===== palco das reações (palco-cmd.js, comandos.js, cmd-ataque.js) em tinta e ouro =====
+   Só aparência: o tempo das janelas, os anéis e as faixas de acerto continuam onde estavam. Palavras que o jogo escreve em caixa alta
+   viram frase normal aqui (minúsculas e primeira letra maiúscula). */
+body.ui-pincel .stage-cmd,body.ui-pincel .qte3d{font-family:var(--pc-disp)}
+body.ui-pincel .stage-cmd .sc-bg{background:radial-gradient(ellipse at center,#14100bb8,#050403f5 78%)}
+body.ui-pincel .stage-cmd .sc-bar{background:var(--pc-tinta)}
+body.ui-pincel .stage-cmd .sc-bar::after{height:1.5px;background:linear-gradient(90deg,transparent,var(--pc-ouro) 20%,var(--pc-ouro) 80%,transparent);box-shadow:0 0 10px #c9a56a66}
+/* retratos: borda que some na tinta em vez do corte reto, nome em serifa */
+body.ui-pincel .stage-cmd .sc-por .sh{filter:drop-shadow(0 0 14px #c9a56a40)}
+body.ui-pincel .stage-cmd .sc-por .pf{background:linear-gradient(160deg,#1c1710,var(--pc-tinta) 72%);clip-path:none;-webkit-mask:linear-gradient(90deg,#000 70%,transparent);mask:linear-gradient(90deg,#000 70%,transparent)}
+body.ui-pincel .stage-cmd .sc-por.r .pf{-webkit-mask:linear-gradient(270deg,#000 70%,transparent);mask:linear-gradient(270deg,#000 70%,transparent)}
+body.ui-pincel .stage-cmd .sc-por .ini{font:600 min(20vw,180px)/1 var(--pc-disp);color:#efe6d4cc;text-shadow:0 4px 18px #000}
+body.ui-pincel .stage-cmd .sc-por .nm{font:italic 600 20px/1 var(--pc-disp);letter-spacing:0;text-transform:none;color:var(--pc-tx);background:linear-gradient(transparent,#08090be6)}
+/* letreiro: o nome do golpe numa pincelada, sem a caixa inclinada */
+body.ui-pincel .stage-cmd .sc-title{transform:translateX(-50%);padding:12px 70px 14px;background:none;border:0;box-shadow:none;isolation:isolate}
+body.ui-pincel .stage-cmd .sc-title::before{content:"";position:absolute;inset:-6px -14px;z-index:-1;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat;opacity:.94}
+body.ui-pincel .stage-cmd .sc-title::after{content:"";position:absolute;left:70px;right:70px;bottom:10px;height:1.5px;background:linear-gradient(90deg,transparent,var(--ac),var(--pc-ouro),transparent)}
+body.ui-pincel .stage-cmd .sc-title b{font:600 clamp(24px,4.6vmin,44px)/1.1 var(--pc-disp);letter-spacing:0;text-transform:none;transform:none;color:var(--pc-tx);text-shadow:0 2px 8px #000}
+body.ui-pincel .stage-cmd.in .sc-title{animation-name:pc-letreiro}
+@keyframes pc-letreiro{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+body.ui-pincel .stage-cmd .sc-hint,body.ui-pincel .qte3d .q3h{font:italic 500 clamp(17px,2.6vmin,23px)/1.3 var(--pc-disp);color:var(--pc-tx);text-shadow:0 2px 6px #000,0 0 12px #000}
+/* palavras de impacto (Perfeito!, Whoosh): serifa grande, tinta com brilho da cor do golpe */
+body.ui-pincel .stage-cmd .sc-word,body.ui-pincel .qte3d .q3w,body.ui-pincel .df-warn,body.ui-pincel .stage-cmd .sc-res .g{font-family:var(--pc-disp);font-style:italic;font-weight:700;letter-spacing:0;text-transform:lowercase;-webkit-text-stroke:0;text-shadow:0 3px 0 #000,0 0 .35em #000,0 0 .5em var(--wc,var(--g2,var(--pc-ouro)))}
+body.ui-pincel .stage-cmd .sc-word::first-letter,body.ui-pincel .qte3d .q3w::first-letter,body.ui-pincel .df-warn::first-letter,body.ui-pincel .stage-cmd .sc-res .g::first-letter{text-transform:uppercase}
+body.ui-pincel .df-warn{color:var(--pc-perigo)}
+/* resultado: nota em serifa e as linhas em pinceladas */
+body.ui-pincel .stage-cmd .sc-res{background:radial-gradient(ellipse at center,#08090be0 30%,#08090b99 62%,transparent 82%)}
+body.ui-pincel .stage-cmd .sc-res .g{transform:none;animation-name:pc-nota}
+@keyframes pc-nota{from{opacity:0;scale:1.6;filter:blur(6px)}to{opacity:1;scale:1;filter:none}}
+body.ui-pincel .stage-cmd .sc-res li{position:relative;isolation:isolate;padding:9px 46px 11px 30px;background:none;border:0;transform:none;font:600 clamp(18px,3.4vmin,27px)/1.2 var(--pc-disp);color:var(--pc-tx);animation-name:pc-linha}
+body.ui-pincel .stage-cmd .sc-res li::before{content:"";position:absolute;inset:-2px -8px;z-index:-1;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
+body.ui-pincel .stage-cmd .sc-res li::after{content:"";position:absolute;left:30px;width:22%;bottom:7px;height:1.5px;background:var(--g1)}
+@keyframes pc-linha{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+body.ui-pincel .stage-cmd .sc-res small{font:italic 15px var(--pc-disp);letter-spacing:0;color:var(--pc-dim);opacity:1}
+body.ui-pincel .stage-cmd.rm .sc-title,body.ui-pincel .stage-cmd.rm .sc-res .g,body.ui-pincel .stage-cmd.rm .sc-res li{animation:scfade .25s both!important}
+/* anéis: o que fecha é um traço de ouro; o alvo é um fio claro; a janela de aparar fica em ouro cheio */
+body.ui-pincel .stage-cmd .df .cm-ring{width:min(100%,54vmin)} /* deixa espaço para a dica embaixo dos botões */
+body.ui-pincel .cm-ring i{border-width:5px;border-color:var(--pc-ouro);box-shadow:0 0 18px #c9a56a88,inset 0 0 14px #c9a56a55,0 0 0 1px var(--ac)}
+body.ui-pincel .cm-ring i.fk{border-color:#b893ff;box-shadow:0 0 18px #9a5bff88}
+body.ui-pincel .cm-ring u{border:1.5px solid #efe6d466}
+body.ui-pincel .cm-ring u.o,body.ui-pincel .df .cm-ring u.o{border:2px solid var(--pc-azul)}
+body.ui-pincel .cm-ring u.p,body.ui-pincel .df .cm-ring u.p{border:3px solid var(--pc-ouro);box-shadow:0 0 12px #c9a56a77}
+body.ui-pincel .cm-ring b{background:radial-gradient(#fff6dc,#c9a56a 70%);box-shadow:0 0 24px #c9a56a,0 0 60px var(--ac)}
+/* barras, teclas, pista e mira: fundo de tinta e contorno de ouro fino no lugar da borda preta grossa */
+body.ui-pincel .cm-bar,body.ui-pincel .df-tug{border-radius:3px;background:#0d0b08;border:0;box-shadow:0 0 0 1.5px var(--pc-ouro),0 0 18px #000}
+body.ui-pincel .cm-bar em.p{background:#c9a56ad9}
+body.ui-pincel .df-tug i{background:linear-gradient(90deg,#7a5a2a,var(--pc-ouro))}
+body.ui-pincel .cm-big,body.ui-pincel .df-count,body.ui-pincel .df-dir{font-family:var(--pc-num);font-style:normal;font-weight:600;-webkit-text-stroke:0;text-shadow:0 3px 0 #000,0 0 18px #000}
+body.ui-pincel .df-count{color:var(--pc-ouro)}body.ui-pincel .df-dir{color:var(--pc-azul)}
+body.ui-pincel .cm-keys span{border-radius:4px;background:#0d0b08;border:0;box-shadow:0 0 0 1.5px #efe6d455;font-family:var(--pc-num);font-weight:600}
+body.ui-pincel .cm-keys span i{border:2px solid var(--pc-ouro);border-radius:6px}
+body.ui-pincel .cm-keys span.now{background:#2a2114;box-shadow:0 0 0 2px var(--pc-ouro),0 0 22px #c9a56a99}
+body.ui-pincel .cm-keys span.ok{background:#1d3a2a;box-shadow:0 0 0 1.5px var(--pc-verde)}body.ui-pincel .cm-keys span.miss{background:#3a1018;opacity:.7}
+body.ui-pincel .cm-pad button{border-radius:4px;border:0;background:#0d0b08;box-shadow:0 0 0 1.5px var(--pc-ouro);font-family:var(--pc-num)}
+body.ui-pincel .cm-lane,body.ui-pincel .cm-aim,body.ui-pincel .cm canvas{border-radius:4px;background:#0d0b08d9;border:0;box-shadow:0 0 0 1.5px var(--pc-ouro),0 0 24px #000}
+body.ui-pincel .cm-lane .line{height:3px;background:var(--pc-ouro);box-shadow:0 0 12px var(--pc-ouro)}
+body.ui-pincel .cm-lane i{background:#efe6d4;border:3px solid var(--pc-ouro)}
+body.ui-pincel .cm-aim .pt{border-color:var(--pc-ouro);background:#c9a56a33}
+/* placas de batida (Aparou, Esquivou...) e botões de defesa: pinceladas */
+body.ui-pincel .df-chips span{position:relative;isolation:isolate;padding:5px 26px 7px 18px;background:none;border:0;transform:none;font:italic 600 clamp(15px,2.6vmin,21px)/1.2 var(--pc-disp);letter-spacing:0;text-transform:lowercase;color:var(--pc-dim)}
+body.ui-pincel .df-chips span::first-letter{text-transform:uppercase}
+body.ui-pincel .df-chips span::before{content:"";position:absolute;inset:0 -6px;z-index:-1;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
+body.ui-pincel .df-chips span.par{background:none;color:var(--pc-ouro)}body.ui-pincel .df-chips span.esq{background:none;color:var(--pc-azul)}
+body.ui-pincel .df-chips span.cedo,body.ui-pincel .df-chips span.late{background:none;color:var(--pc-perigo)}
+body.ui-pincel .df-row button{position:relative;isolation:isolate;padding:14px 46px 16px 32px;border:0;border-radius:0;background:none;box-shadow:none;transform:none;font:600 clamp(20px,4vmin,30px)/1 var(--pc-disp);letter-spacing:0;text-transform:lowercase;color:var(--pc-tx);text-shadow:0 2px 6px #000}
+body.ui-pincel .df-row button::first-letter{text-transform:uppercase}
+body.ui-pincel .df-row button::before{content:"";position:absolute;inset:0 -8px;z-index:-1;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
+body.ui-pincel .df-row button::after{content:"";position:absolute;left:32px;right:46px;bottom:9px;height:1.5px;background:linear-gradient(90deg,var(--pc-ouro),transparent)}
+body.ui-pincel .df-row button.chq{background:none;color:var(--pc-ouro)}body.ui-pincel .df-row button.dr{background:none;min-width:70px;padding:14px 26px;font-family:var(--pc-num)}
+body.ui-pincel .df-row button:hover{filter:drop-shadow(0 0 10px #c9a56a66)}
+body.ui-pincel .qte3d .df-row button{font-size:21px;padding:10px 36px 12px 24px}
+body.ui-pincel .cm-skip{border:0;border-radius:0;background:none;padding:10px 30px 12px 22px;font:italic 600 19px/1 var(--pc-disp);letter-spacing:0;text-transform:lowercase;color:var(--pc-tx);isolation:isolate}
+body.ui-pincel .cm-skip::first-letter{text-transform:uppercase}
+body.ui-pincel .cm-skip::before{content:"";position:absolute;inset:0 -6px;z-index:-1;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
