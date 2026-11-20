@@ -816,13 +816,15 @@ try {
       const select = async id => {
         if (!await aimAt(anaD, id)) throw new Error('o leque não alcançou o alvo ' + id);
         await anaD.waitForFunction(([actor, id]) => PALCO3D.unitOf(actor)?.el.dataset.mira === id && LEQUE.aimTarget() === id, [actor, id], { timeout: 6000 });
-        return anaD.evaluate(actor => ({ dir: PALCO3D.facing(actor), esp: PALCO3D.unitOf(actor).el.classList.contains('esp'), step: !!PALCO3D.unitOf(actor).passoAt }), actor);
+        await anaD.waitForFunction(([actor, id]) => { const a = PALCO3D.rectOf(actor), b = PALCO3D.rectOf(id); return a && b && PALCO3D.facing(actor) === (b.left + b.width / 2 < a.left + a.width / 2 ? -1 : 1); }, [actor, id], { timeout: 6000 });
+        return anaD.evaluate(actor => { const u = PALCO3D.unitOf(actor), target = PALCO3D.unitOf(u.el.dataset.mira), a = u.el.getBoundingClientRect(), b = target.el.getBoundingClientRect(); return { dir: PALCO3D.facing(actor), expected: b.left + b.width / 2 < a.left + a.width / 2 ? -1 : 1, esp: u.el.classList.contains('esp'), scale: getComputedStyle(u.img).scale, step: !!u.passoAt }; }, actor);
       };
       const a = await select(left), b = await select(right);
-      check(a.dir === -1 && b.dir === 1 && a.esp !== b.esp && b.step, 'o herói vira e dá um passo ao cruzar a mira');
+      check(a.dir === a.expected && b.dir === b.expected, 'o herói se orienta para cada alvo');
+      check(a.dir === a.expected && b.dir === b.expected && (a.dir === b.dir || (a.esp !== b.esp && a.scale !== b.scale)), 'a orientação acompanha a posição visível e espelha a imagem');
       go({ t: 'set', id: actor, f: 'imgL', v: true });
       await anaD.waitForFunction(([id, mirror]) => PALCO3D.unitOf(id)?.mirror !== mirror, [actor, b.esp], { timeout: 6000 });
-      check(await anaD.evaluate(id => PALCO3D.facing(id) === 1, actor), 'a direção original do PNG inverte só o espelho');
+      check(await anaD.evaluate(([id, direction]) => PALCO3D.facing(id) === direction, [actor, b.dir]), 'a direção original do PNG inverte só o espelho');
       go({ t: 'set', id: actor, f: 'imgL', v: false });
       check(await bia.evaluate(actor => !PALCO3D.aimLocks()[actor], actor), 'o alvo selecionado fica só na tela da Ana');
       await anaD.evaluate(() => { window.pincelStage = document.querySelector('.p3d'); });

@@ -341,10 +341,8 @@
     const list = [...els.values()].map(u => u.c), targets = on ? g.MIRA_R.targets(list, { seed: S.battle.seed, locks: aimLocks() }) : {};
     const screen = new Map();
     if (on) for (const { id } of list) {
-      const p = els.get(id).home || F.get(id);
-      if (!p) continue;
-      const r = rotP(p, v.ry), q = rotX({ ...r, y: 0 }, v.rx || 0);
-      screen.set(id, PERSP * (q.x + v.tx) / Math.max(1, PERSP - q.z - v.tz));
+      const rect = els.get(id).el.getBoundingClientRect();
+      screen.set(id, rect.left + rect.width / 2);
     }
     for (const u of els.values()) {
       const id = u.c.id, target = targets[id], x = screen.get(id), tx = screen.get(target);
@@ -452,7 +450,7 @@
     if (heal() && typeof render === 'function') setTimeout(render); // redesenha o HUD sem a ficha do alvo que sumiu
     camera(units());
     if (typeof HUD !== 'undefined') { HUD.place(); clearTimeout(hs1); clearTimeout(hs2); hs1 = setTimeout(HUD.place, 650); hs2 = setTimeout(HUD.place, 1250); } // a câmera leva ~1,1 s para chegar
-    requestAnimationFrame(place); clearTimeout(settle); settle = setTimeout(place, 400); // a página ainda anima a entrada (a posição final só vem depois)
+    requestAnimationFrame(place); clearTimeout(settle); settle = setTimeout(() => { place(); if (lastF) aimUnits(lastF, view(lastF)); }, 1250); // recalcula a direção depois da transição da câmera
   };
   // investida: a câmera corre até o alvo (0,45 s) e o recorte de quem age avança até a frente dele; resolve no impacto e volta sozinho
   const LG_HOLD = 500; // pausa no alvo (o número nasce aqui); ida e volta duram lungeMs(distância)
