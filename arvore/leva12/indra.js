@@ -65,4 +65,86 @@ export const ABRIR = {
     N('Gaiola Viva', 'A gaiola responde a cada golpe com um revide.', 'u/10', 'shield 14; st counter 1 self'),
     N('Gaiola Coletiva', 'A gaiola se abre e cobre todos os aliados.', 'u/12 a', 'shield 16'),
   ],
+  // ---------- Rodada 2: bases das camadas 1 e 2 (linhas de 8 e 9 nós) ----------
+  // base na camada 1: 9 nós
+  'Estalo': [
+    N('Estalo Duplo', 'Dois estalos de dedo, um colado no outro.', 'd5/3 x2', 'st para 1 20%'),
+    N('Estalo Que Marca', 'A pontinha do estalo deixa o alvo carregado.', 'd5/3', 'st marked 2'),
+    N('Estalo Seco', 'Um estalo que não tem como errar.', 'd7/4', 'sure; st para 1 25%'),
+    N('Estalo Que Pula', 'O estalo pula para o alvo do lado.', 'd7/4', 'chain 1 .6; st para 1 20%'),
+    N('Estalo Molhado', 'Com a água de um aliado, o estalo corre pela pele inteira.', 'd9/6', 'st wet 2; st para 1 45%', { v2: 'susanoo' }),
+    N('Estalo em Leque', 'Estalos em todas as direções, um por inimigo.', 'd9/7 a', 'st para 1 35%'),
+    N('Estalo Que Trava', 'Quem já está travado sente o estalo dobrado.', 'd10/7', 'vs para 1.6; st marked 1'),
+    N('Estalo Detonador', 'O estalo fica guardado no alvo e solta tudo no próximo.', 'd12/9', 'pop 1.9; st para 1'),
+    N('Estalo Supremo', 'O estalo que o rei dos deuses dá com os dedos e o céu atende.', 'd18/12 a', 'chain 3 .8; st para 2 60%'),
+  ],
+  // base na camada 1: 9 nós
+  'Fagulha Veloz': [
+    N('Faísca Veloz Dupla', 'Duas faíscas tão rápidas que parecem uma.', 'd5/3 x2', 'st para 1 15%'),
+    N('Faísca Veloz Que Fura', 'A faísca entra pela fresta da guarda.', 'd6/3', 'pierce 40'),
+    N('Faísca Veloz Tripla', 'Três faíscas, cada uma antes da anterior acabar.', 'd5/4 x3', 'st para 1 15%'),
+    N('Faísca Veloz Que Marca', 'A faísca deixa o alvo mais fácil para a próxima.', 'd7/4', 'st marked 2; haste 25 self'),
+    N('Faísca Veloz em Rajada', 'Uma rajada de faíscas miúdas que acha todos.', 'd7/6 a', 'st para 1 25%'),
+    N('Faísca Veloz Ventada', 'O vento de um aliado empurra as faíscas ainda mais rápido.', 'd9/6 a', 'haste 40 self; push 25', { v2: 'fuhaku' }),
+    N('Faísca Veloz Contínua', 'Não para: cada faísca chama a seguinte.', 'd10/7 x3', 'echo 70; st para 1 30%'),
+    N('Faísca Veloz Detonadora', 'As faíscas se acumulam no alvo e estouram juntas.', 'd12/9', 'pop 2; st para 1'),
+    N('Faísca Veloz Suprema', 'Uma saraivada tão veloz que o raio chega antes do som.', 'd16/11 x4', 'sure; st para 1 60%'),
+  ],
+  // base na camada 1: 9 nós
+  'Corte Voltaico': [
+    N('Corte Voltaico Duplo', 'Dois cortes, e a lâmina estala nos dois.', 'd9/5 x2', 'st para 1 15%'),
+    N('Corte Voltaico Fundo', 'A lâmina entra mais fundo e deixa a carga lá dentro.', 'd10/5', 'st bleed 1; st para 1 25%'),
+    N('Corte Voltaico Que Quebra', 'A lâmina carregada racha a guarda do alvo.', 'd11/6', 'brk 1'),
+    N('Corte Voltaico Que Marca', 'O corte deixa um risco que atrai o próximo raio.', 'd11/6', 'st marked 2; st para 1 25%'),
+    N('Corte Voltaico Terrestre', 'A lâmina cai com o peso da terra de um aliado e racha o chão.', 'd13/8', 'st exposed 2; st down 1 40%', { v2: 'atlas' }),
+    N('Corte Voltaico em Arco', 'Um arco largo da lâmina que passa por todos.', 'd13/9 a', 'st para 1 35%'),
+    N('Corte Voltaico Cruzado', 'Dois cortes em X: um abre, o outro descarrega.', 'd15/9 x2', 'pierce 60; st exposed 1'),
+    N('Corte Voltaico Detonador', 'A lâmina fica cravada e a carga explode na retirada.', 'd17/11', 'pop 2; st para 1'),
+    N('Corte Voltaico Supremo', 'Um único corte que parte o ar e o que estava no caminho.', 'd24/13', 'pierce 100; st para 2 70%'),
+  ],
+  // base na camada 1: 9 nós
+  'Tempestade': [
+    N('Tempestade Dupla', 'A nuvem solta duas ondas de raios.', 'd7/5 a x2', 'st para 1 15%'),
+    N('Tempestade Que Marca', 'Cada raio que cai deixa o alvo marcado.', 'd7/6 a', 'st marked 2'),
+    N('Tempestade Carregada', 'As nuvens carregam mais antes de cair.', 'd9/7 a', 'stack carga 5 self; st para 1 25%'),
+    N('Tempestade Que Prende', 'O ar fica tão carregado que os músculos travam.', 'd10/8 a', 'st para 1 45%; st root 1 30%'),
+    N('Tempestade de Lâminas de Ar', 'Com o vento de um aliado, as nuvens cortam além de eletrizar.', 'd12/10 a', 'st bleed 1; st para 1 40%', { v2: 'fuhaku' }),
+    N('Tempestade Em Cadeia', 'Os raios saltam de inimigo em inimigo.', 'd12/10 a', 'chain 2 .7; st para 1 30%'),
+    N('Tempestade Que Repete', 'O trovão volta e a tempestade cai de novo.', 'd13/11 a', 'echo 80; st para 1 35%'),
+    N('Tempestade Detonadora', 'A carga fica guardada em todos e explode de uma vez.', 'd16/13 a', 'pop 1.9; st para 1'),
+    N('Tempestade Suprema', 'O céu todo vira um só raio sobre todos.', 'd24/16 a', 'burst carga .4; st para 2 70%'),
+  ],
+  // base na camada 2: 8 nós
+  'Raio de Indra': [
+    N('Raio de Indra Duplo', 'Dois raios do rei dos deuses, um atrás do outro.', 'd14/10 x2', 'st para 1 30%'),
+    N('Raio de Indra Que Marca', 'O raio deixa o alvo marcado para o céu.', 'd16/10', 'st marked 2; st para 1'),
+    N('Raio de Indra Certeiro', 'O relâmpago que nunca erra o alvo.', 'd18/11', 'sure; st para 1 60%'),
+    N('Raio de Indra em Cadeia', 'O raio salta pelos inimigos como por degraus.', 'd18/12', 'chain 3 .75; st para 1'),
+    N('Raio de Indra Solar', 'Com a luz de um aliado, o raio ofusca antes de acertar.', 'd20/13', 'st blind 2 60%; st para 1 70%', { v2: 'amaterasu' }),
+    N('Raio de Indra Que Atravessa', 'O raio corta a guarda e o corpo atrás dela.', 'd24/14', 'pierce 90; st para 1'),
+    N('Raio de Indra Detonador', 'O raio fica dentro do alvo e o céu o chama de volta.', 'd28/15', 'pop 2.2; st para 1'),
+    N('Raio de Indra Supremo', 'O raio original: Indra desce em pessoa e o céu inteiro treme.', 'd38/18 a', 'chain 4 .85; st para 2'),
+  ],
+  // base na camada 2: 8 nós
+  'Lança de Trovão': [
+    N('Lança de Trovão Dupla', 'Duas lanças de trovão, uma em cada mão.', 'd14/8 x2', 'sure'),
+    N('Lança de Trovão Que Fura', 'A lança atravessa a guarda como se não existisse.', 'd16/9', 'sure; pierce 60'),
+    N('Lança de Trovão Que Prende', 'A lança crava o alvo no chão por um instante.', 'd16/10', 'sure; st root 1 50%; st para 1 30%'),
+    N('Lança de Trovão Rasante', 'Uma lança só, que varre a fila inteira.', 'd18/11 a', 'sure; chain 2 .7'),
+    N('Lança de Trovão Pétrea', 'A lança de pedra de um aliado desce com o raio e abre o alvo.', 'd20/12', 'st exposed 2; pierce 80', { v2: 'atlas' }),
+    N('Lança de Trovão Que Repete', 'O trovão da lança volta e crava de novo.', 'd24/13', 'echo 90; sure'),
+    N('Lança de Trovão Detonadora', 'A lança fica cravada e explode quando o céu quiser.', 'd28/15', 'pop 2.2; st para 1'),
+    N('Lança de Trovão Suprema', 'A lança do rei dos deuses, arremessada de um horizonte a outro.', 'd36/18 a', 'sure; pierce 100; st para 2'),
+  ],
+  // base na camada 2: 8 nós
+  'Raio Rompe-Guarda': [
+    N('Rompe-Guarda Duplo', 'Dois raios na mesma guarda: o segundo já a encontra aberta.', 'd14/10 x2', 'brk 1'),
+    N('Rompe-Guarda Que Marca', 'A guarda racha e o alvo fica marcado.', 'd16/10', 'brk 1; st marked 2'),
+    N('Rompe-Guarda Que Expõe', 'Sem guarda, o corpo fica à mostra.', 'd16/11', 'brk 1; st exposed 2'),
+    N('Rompe-Guarda Que Fura', 'O raio entra pela fresta que ele mesmo abriu.', 'd18/12', 'brk 1; pierce 70'),
+    N('Rompe-Guarda Terrestre', 'O peso de um aliado de terra derruba a guarda e o dono dela.', 'd20/13', 'brk 2; st down 1 60%', { v2: 'atlas' }),
+    N('Rompe-Guarda em Área', 'Um raio para cada guarda no campo.', 'd22/14 a', 'brk 1; st para 1 50%'),
+    N('Rompe-Guarda Detonador', 'A guarda rachada guarda a carga e solta tudo depois.', 'd26/15', 'pop 2; brk 1; st para 1'),
+    N('Rompe-Guarda Supremo', 'O raio que racha qualquer guarda, qualquer escudo, qualquer deus.', 'd34/18 a', 'brk 3; pierce 100; st para 2'),
+  ],
 };

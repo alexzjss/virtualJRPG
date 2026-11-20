@@ -2,7 +2,18 @@
 //  ESTENDER: { 'Base': [N(...), ...] }  nós novos no fim da linha de variação que já existe para a base (como arvore/leva10*.js)
 //  ABRIR:    { 'Base': [N(...), ...] }  linha de variação nova para uma base que ainda não tem (como LINHAS11 em arvore/leva11b.js)
 import { N } from '../l8.js';
-export const ESTENDER = {};
+export const ESTENDER = {
+  // o degrau Detonador que faltava (as linhas já chegam à camada 10: o nó novo divide a camada 10 com o último)
+  'Rajada Cortante': [
+    N('Rajada Cortante Detonadora', 'Todas as feridas abertas pelo vento estouram de uma vez.', 'd18/12', 'burst vento 0.4; vs bleed 1.4'),
+  ],
+  'Corrente de Vento': [
+    N('Corrente de Vento Detonadora', 'Cada elo guardado estala de uma vez e arremessa quem estiver preso.', 'd20/12', 'burst vento 0.4; push 60'),
+  ],
+  'Terceira Rajada': [
+    N('Terceira Rajada Detonadora', 'O ar que a contagem guardou sai inteiro na terceira rajada.', 'd20/12 a', 'burst vento 0.4; every 3 2.5'),
+  ],
+};
 export const ABRIR = {
   // ---------- áreas: Vendaval, Rajada Ampla ----------
   'Vendaval': [
@@ -78,7 +89,7 @@ export const ABRIR = {
     N('Marca do Vento Dupla', 'Duas espirais no mesmo alvo, uma dentro da outra.', 'd8/5 x2', 'brand 2'),
     N('Marca do Vento em Leque', 'Espirais marcam todos os inimigos de uma só vez.', 'd9/6 a', 'brand 2'),
     N('Marca do Vento Funda', 'A espiral aprofunda e a marca dura até o fim da luta.', 'd10/6', 'brand 3'),
-    N('Marca Que Sangra', 'A espiral corta devagar e a ferida não para de abrir.', 'd10/6', 'brand 2; st bleed 2'),
+    N('Marca do Vento Que Sangra', 'A espiral corta devagar e a ferida não para de abrir.', 'd10/6', 'brand 2; st bleed 2'),
     N('Marca do Vento Acumulada', 'Cada marca guarda ar para a seguinte.', 'd12/7', 'brand 2; stack vento 5'),
     N('Marca do Vento Gélida', 'Uma espiral de ar frio de altitude que enrijece a marca.', 'd13/7', 'brand 2; st frozen 1 40%'),
     N('Marca do Vento Caçadora', 'Toda presa marcada leva o corte da tormenta.', 'd15/8', 'pop 1.6; st bleed 2'),
@@ -95,5 +106,129 @@ export const ABRIR = {
     N('Escudo de Ar Esquivo', 'O escudo gira e o golpe escorrega para o lado.', 'u/8', 'shield 14; st evade 1'),
     N('Escudo de Ar Que Cobre o Grupo', 'Uma cúpula de ar segura o grupo inteiro por um instante.', 'u/10 a', 'shield 20; st evade 1'),
     N('Escudo do Furacão', 'No olho do furacão, nenhum golpe chega ao aliado.', 'u/11 a', 'shield 28; st evade 2; st counter 1'),
+  ],
+  // ---------- Rodada 2: bases que ainda estavam sem linha ----------
+  'Talho Preciso': [
+    N('Talho Preciso Duplo', 'Dois talhos no mesmo ponto, o segundo mais fundo que o primeiro.', 'd8/6 x2', 'st bleed 1'),
+    N('Talho no Ponto Fraco', 'O vento encontra a fresta da armadura e deixa o alvo exposto.', 'd12/7', 'st exposed 1 50%; st bleed 1'),
+    N('Talho Preciso Acumulado', 'Cada talho deixa o ar mais afiado para o próximo.', 'd14/8', 'stack vento 5; st bleed 1'),
+    N('Talho Preciso Detonador', 'As feridas abertas guardam o vento e estouram juntas.', 'd18/10', 'burst vento 0.3; vs bleed 1.4'),
+    N('Talho Preciso Supremo', 'Um único corte, sem desvio, que nenhuma guarda impede.', 'd24/13', 'sure; pierce 100; st bleed 2'),
+  ],
+  'Golpe de Ar': [
+    N('Golpe de Ar Duplo', 'Dois socos de ar comprimido, quase no mesmo instante.', 'd9/6 x2', 'push 20'),
+    N('Golpe de Ar Que Derruba', 'O soco de ar tira os pés do alvo do chão.', 'd13/7', 'st down 1 50%; push 40'),
+    N('Golpe de Ar Gélido', 'O soco traz o ar frio de altitude e enrijece o que toca.', 'd14/8', 'st frozen 1 45%; push 30'),
+    N('Golpe de Ar Detonador', 'Todo o ar guardado nos punhos sai num único estampido.', 'd20/10', 'burst vento 0.3; push 60'),
+    N('Golpe de Ar Supremo', 'O soco que ninguém vê chegar e que atravessa o corpo todo.', 'd26/13', 'pierce 100; push 80; st stun 1 40%'),
+  ],
+  'Estocada Ciclone': [
+    N('Estocada Ciclone Dupla', 'Duas estocadas em espiral, uma dentro da outra.', 'd14/9 x2', 'st bleed 1'),
+    N('Estocada Ciclone Detonadora', 'O vento preso na espiral abre a ferida de dentro para fora.', 'd24/12', 'burst vento 0.3; vs bleed 1.5'),
+    N('Estocada Ciclone Suprema', 'A espiral de um ciclone inteiro, concentrada na ponta da lâmina.', 'd30/14', 'pierce 100; st bleed 3'),
+  ],
+  'Corte de Brisa': [
+    N('Corte de Brisa Duplo', 'Dois cortes leves, um atrás do outro.', 'd5/3 x2'),
+    N('Corte de Brisa Cortante', 'A brisa leva fios finos e deixa um talho raso.', 'd7/4', 'st bleed 1'),
+    N('Corte de Brisa Largo', 'O corte se abre e passa por todos os inimigos.', 'd7/5 a'),
+    N('Corte de Brisa Acumulado', 'Cada corte deixa um pouco de ar guardado.', 'd9/5', 'stack vento 5'),
+    N('Corte de Brisa Gélido', 'Uma brisa de altitude que enrijece a pele no ponto do corte.', 'd10/6', 'st frozen 1 40%'),
+    N('Corte de Brisa Elétrico', 'Com um aliado de Indra, a brisa chia de carga e trava o alvo.', 'd12/7', 'st para 1 40%', { v2: 'indra' }),
+    N('Corte de Brisa Que Rasga a Guarda', 'A brisa encontra a junta da defesa e abre caminho.', 'd13/8', 'brk 1; st bleed 1'),
+    N('Corte de Brisa Detonador', 'O ar guardado nos cortes estoura de uma vez só.', 'd18/10', 'burst vento 0.3; push 40'),
+    N('Corte de Brisa Supremo', 'Um corte tão leve que o alvo só percebe depois, e tão fundo que não fecha.', 'd24/12', 'sure; pierce 100; st bleed 2'),
+  ],
+  'Leque de Balas': [
+    N('Leque de Balas Duplo', 'O leque abre duas vezes seguidas sobre os inimigos.', 'd7/8 a x2'),
+    N('Leque de Balas Perfurante', 'As balas saem tão apertadas que atravessam a guarda.', 'd10/8 a', 'pierce 50'),
+    N('Leque de Balas Gélido', 'Balas de ar rarefeito, frias como o topo de uma montanha.', 'd11/9 a', 'st frozen 1 40%'),
+    N('Leque de Balas Acumulado', 'Cada abertura do leque deixa o ar mais denso para a próxima.', 'd12/9 a', 'stack vento 5; push 20'),
+    N('Leque de Balas Detonador', 'O ar guardado se abre num leque único, imenso.', 'd16/11 a', 'burst vento 0.3; push 40'),
+    N('Leque de Balas Supremo', 'Um leque do tamanho do campo, sem um canto sem bala.', 'd22/13 a', 'pierce 100; push 60'),
+  ],
+  'Laço de Vento': [
+    N('Laço de Vento Duplo', 'Dois laços, um em cada perna.', 'd6/4 x2', 'st agiDn 1 50%'),
+    N('Laço Que Aperta', 'O laço se fecha e prende o alvo no lugar.', 'd8/5', 'st root 1 55%'),
+    N('Laços em Leque', 'Vários laços saem de uma só mão e prendem todos os inimigos.', 'd8/7 a', 'st agiDn 1 45%'),
+    N('Laço de Vento Cortante', 'O fio de ar é fino como navalha e corta enquanto aperta.', 'd10/6', 'st bleed 1; st agiDn 1'),
+    N('Laço de Vento Acumulado', 'Cada laço guarda o ar do anterior.', 'd12/7', 'stack vento 5; st root 1 45%'),
+    N('Laço Que Derruba', 'O laço puxa as pernas e o alvo cai.', 'd13/8', 'st down 1 55%; st root 1 40%'),
+    N('Laço de Vento Detonador', 'O ar preso nas amarras estoura em quem está preso.', 'd18/10', 'burst vento 0.3; vs root 1.5'),
+    N('Laço do Fim do Céu', 'Um laço do tamanho do campo, que prende todos até o fim da luta.', 'd22/12 a', 'st root 2 70%; st agiDn 2'),
+  ],
+  'Redemoinho': [
+    N('Redemoinho Duplo', 'O redemoinho gira para um lado e volta para o outro.', 'd6/6 a x2'),
+    N('Redemoinho Cortante', 'O redemoinho leva navalhas de ar e esfola todos.', 'd9/7 a', 'st bleed 1'),
+    N('Redemoinho Gélido', 'Um redemoinho de ar frio, que arrepia e atrasa quem arrasta.', 'd10/8 a', 'st frozen 1 35%'),
+    N('Redemoinho Que Prende', 'O redemoinho enrola os inimigos e os mantém dentro.', 'd11/8 a', 'st root 1 50%'),
+    N('Redemoinho Acumulado', 'Cada volta alimenta a próxima com mais ar.', 'd12/9 a', 'stack vento 5; push 30'),
+    N('Redemoinho de Brasas', 'Com um aliado de Kagutsuchi, o redemoinho leva brasa e chamusca todos.', 'd14/10 a', 'st burn 1 60%', { v2: 'kagutsuchi' }),
+    N('Redemoinho Que Derruba', 'A força do giro tira todos do chão.', 'd15/10 a', 'st down 1 55%; push 40'),
+    N('Redemoinho Detonador', 'Todo o ar guardado na espiral se solta de uma vez.', 'd20/12 a', 'burst vento 0.3; push 60'),
+    N('Redemoinho Supremo', 'Um redemoinho do tamanho do campo, e ninguém sai dele.', 'd26/14 a', 'pierce 100; push 70; st down 1'),
+  ],
+  'Dois Cortes': [
+    N('Dois Cortes Fundos', 'Os dois cortes entram na mesma ferida e a aprofundam.', 'd6/4 x2', 'st bleed 1'),
+    N('Dois Cortes em Cruz', 'Os cortes se cruzam sobre todos os inimigos.', 'd6/6 a x2'),
+    N('Quatro Cortes', 'Quatro cortes seguidos, rápidos como um só.', 'd5/7 x4'),
+    N('Dois Cortes Certeiros', 'O vento encontra o alvo, esteja ele onde estiver.', 'd9/6 x2', 'sure'),
+    N('Dois Cortes Gélidos', 'Cada corte traz o frio do ar de altitude.', 'd9/7 x2', 'st frozen 1 35%'),
+    N('Dois Cortes Acumulados', 'Cada par de cortes deixa o ar mais afiado para o seguinte.', 'd10/8 x2', 'stack vento 5'),
+    N('Seis Cortes', 'Seis cortes em três pares, tão rápidos que formam uma só linha.', 'd7/9 x6'),
+    N('Dois Cortes Detonador', 'As feridas guardam o vento e estouram juntas.', 'd14/10 x2', 'burst vento 0.3; vs bleed 1.4'),
+    N('Cortes do Fim do Céu', 'Oito cortes de vento, um depois do outro, sem intervalo.', 'd10/13 x8', 'pierce 100'),
+  ],
+  'Três Ventos': [
+    N('Três Ventos Fundos', 'Os três cortes deixam três feridas que não fecham.', 'd6/5 x3', 'st bleed 1'),
+    N('Três Ventos em Leque', 'Os três ventos se abrem e alcançam todos.', 'd6/7 a x3'),
+    N('Cinco Ventos', 'Cinco cortes em leque, cada um de um lado.', 'd5/8 x5'),
+    N('Três Ventos Certeiros', 'Os três ventos acham o alvo mesmo de costas.', 'd8/7 x3', 'sure'),
+    N('Três Ventos Gélidos', 'Três ventos de ar frio, um depois do outro.', 'd8/8 x3', 'st frozen 1 35%'),
+    N('Três Ventos Acumulados', 'Cada vento prende um pouco de ar para o seguinte.', 'd9/9 x3', 'stack vento 5'),
+    N('Três Ventos Detonador', 'Os três ventos estouram ao mesmo tempo no mesmo ponto.', 'd12/10 x3', 'burst vento 0.3; vs bleed 1.4'),
+    N('Sete Ventos do Fim do Céu', 'Sete ventos, sete cortes, uma só direção: o alvo.', 'd8/13 x7', 'pierce 100'),
+  ],
+  'Vento Curador': [
+    N('Vento Curador Revigorante', 'A brisa fica mais forte e a cura dura mais.', 'h12/8 a', 'st regen 3'),
+    N('Vento Curador Que Limpa', 'O vento leva embora o que estava grudado no corpo.', 'h12/9 a', 'cleanse; st regen 2'),
+    N('Vento Curador Veloz', 'A brisa também acelera o passo de quem ela cura.', 'h12/9 a', 'st regen 2; haste 25'),
+    N('Vento Curador Acumulado', 'Cada brisa deixa o ar mais denso e a cura mais firme.', 'h14/10 a', 'stack vento 5; st regen 2'),
+    N('Vento Curador Protetor', 'A brisa se fecha em volta do grupo e endurece a pele.', 'h14/11 a', 'st regen 2; st defUp 1'),
+    N('Vento Curador Supremo', 'Um vento de cura que sopra sobre o grupo inteiro e leva embora o que pesa.', 'h18/13 a', 'st regen 3; cleanse; st defUp 1'),
+  ],
+  'Vento Cruzado': [
+    N('Vento Cruzado Duplo', 'Dois ventos de lado, um contra o outro.', 'd9/6 x2', 'st agiDn 1 45%'),
+    N('Vento Cruzado Largo', 'O vento lateral alcança todos os inimigos.', 'd12/8 a', 'st agiDn 1 45%'),
+    N('Vento Cruzado Que Derruba', 'O vento bate de lado com tanta força que o alvo perde o apoio.', 'd16/9', 'st down 1 55%; st agiDn 1'),
+    N('Vento Cruzado Detonador', 'O ar guardado estoura de lado e arrasta o alvo para longe.', 'd20/11', 'burst vento 0.3; push 60'),
+    N('Vento Cruzado Supremo', 'Um vento de lado que não deixa o alvo nem andar.', 'd26/13 a', 'st agiDn 2; st down 1; push 50'),
+  ],
+  'Parede de Ar': [
+    N('Parede de Ar Dupla', 'Duas camadas de ar adensado, uma atrás da outra.', 'u/5', 'shield 14'),
+    N('Parede de Ar Larga', 'A parede se abre e cobre todos os aliados.', 'u/7 a', 'shield 10'),
+    N('Parede de Ar Que Devolve', 'Quem bate na parede leva a pancada de volta.', 'u/7', 'shield 12; st counter 1'),
+    N('Parede de Ar Acumulada', 'Cada golpe amortecido deixa a parede mais densa.', 'u/8', 'shield 14; stack vento 5'),
+    N('Parede de Ar Esquiva', 'A parede se move e o golpe escorrega para o lado.', 'u/8', 'shield 14; st evade 1'),
+    N('Parede de Ar Revigorante', 'O ar da parede também devolve o fôlego a quem está atrás.', 'u/9', 'shield 16; st regen 2'),
+    N('Parede de Ar Suprema', 'Uma parede do tamanho do campo, que nenhum golpe atravessa.', 'u/11 a', 'shield 26; st evade 1; st counter 1'),
+  ],
+  'Bolsão de Ar': [
+    N('Bolsão de Ar Duplo', 'Dois bolsões, um dentro do outro, amortecem o dobro.', 'u/5 s', 'shield 14 self'),
+    N('Bolsão de Ar Veloz', 'O bolsão sopra para trás e dá impulso ao passo.', 'u/5 s', 'shield 10 self; haste 30 self'),
+    N('Bolsão de Ar Que Devolve', 'O impacto volta pelo bolsão e atinge quem bateu.', 'u/6 s', 'shield 12 self; st counter 1'),
+    N('Bolsão de Ar Acumulado', 'Cada impacto amortecido deixa o bolsão mais fundo.', 'u/7 s', 'shield 14 self; stack vento 5'),
+    N('Bolsão de Ar Que Cobre o Aliado', 'O bolsão se estende para fora e cobre quem está ao lado.', 'u/8', 'shield 18 ally'),
+    N('Bolsão de Ar Supremo', 'Um bolsão tão fundo que nenhum golpe chega até o centro.', 'u/10 s', 'shield 30 self; st evade 2'),
+  ],
+  'Passo do Vendaval': [
+    N('Passo do Vendaval Duplo', 'Dois passos cortantes, um atravessando o outro.', 'd5/4 x2', 'haste 20 self'),
+    N('Passo do Vendaval Cortante', 'O rastro deixado pelo passo abre um talho no inimigo.', 'd8/5', 'haste 20 self; st bleed 1'),
+    N('Passo do Vendaval Largo', 'O passo atravessa todos os inimigos numa só linha.', 'd7/7 a', 'haste 20 self'),
+    N('Passo do Vendaval Certeiro', 'O passo acha o alvo, esteja ele onde estiver.', 'd9/6', 'haste 20 self; sure'),
+    N('Passo do Vendaval Veloz', 'O passo vem tão rápido que o corpo ainda está em movimento no fim.', 'd10/7', 'haste 40 self'),
+    N('Passo do Vendaval Acumulado', 'Cada passo deixa o ar mais denso e o seguinte mais rápido.', 'd11/8', 'stack vento 5; haste 30 self'),
+    N('Passo do Vendaval Elétrico', 'Com um aliado de Indra, o passo corre em carga e trava quem atravessa.', 'd13/9', 'haste 30 self; st para 1 40%', { v2: 'indra' }),
+    N('Passo do Vendaval Detonador', 'Todo o ar guardado nos passos estoura no último rastro.', 'd18/11', 'burst vento 0.3; haste 30 self'),
+    N('Passo do Vendaval Supremo', 'O passo que o olho não segue: o alvo já foi atravessado antes de ver.', 'd24/13', 'sure; pierce 100; haste 50 self'),
   ],
 };

@@ -5,8 +5,145 @@
 // abrimos as bases ofensivas centrais que ficaram sem variação: Pesadelo, Eclipse, Lâmina Lunar, Lança de Sombra, Canção de Ninar,
 // Terror Absoluto, Sono Profundo, Hipnose Lunar, Lua Negra e Marca da Noite (Dupla -> Detonador -> Supremo, com combinações v2).
 import { N } from '../l8.js';
-export const ESTENDER = {};
+export const ESTENDER = {
+  'Pesadelo': [
+    N('Pesadelo Sem Saída', 'Toda porta do sonho abre para o mesmo quarto escuro.', 'm14/10', 'st confuse 1 40%; st fear 1'),
+    N('Pesadelo Lúcido', 'O alvo sabe que sonha e não consegue acordar.', 'm14/10', 'vs sleep 1.5; st fear 1'),
+    N('Pesadelo em Coro', 'O mesmo sonho ruim, dormido por todos.', 'm14/13 a', 'st fear 2 35%'),
+  ],
+  'Eclipse': [
+    N('Eclipse Que Apaga', 'A sombra cai e leva junto o que o alvo enxergava.', 'm14/11 a', 'st blind 2; st atkDn 1'),
+    N('Eclipse em Cascata', 'Uma sombra empilhada sobre a outra.', 'm15/12 a', 'stack sombra 5; st blind 1'),
+    N('Eclipse Que Devora o Medo', 'O medo do alvo vira cegueira.', 'm16/12 a', 'conv fear blind'),
+  ],
+  'Lâmina Lunar': [
+    N('Lâmina Lunar em Arco', 'Um arco largo de lua que pega todos na frente.', 'd12/12 a'),
+    N('Lâmina Lunar Que Fura', 'A ponta do crescente acha a fresta da armadura.', 'd14/10', 'pierce 50'),
+    N('Lâmina Lunar Cobradora', 'A lua cobra o medo de quem já recuou.', 'd15/10', 'vs fear 1.5; st fear 1'),
+  ],
+  'Lança de Sombra': [
+    N('Lança de Sombra Que Atravessa', 'A lança passa pelo escudo como se fosse névoa.', 'd15/10', 'pierce 60'),
+    N('Lanças de Sombra em Leque', 'Uma fileira de lanças abre sobre os inimigos.', 'd10/13 a x2'),
+    N('Lança de Sombra Cobradora', 'A lança vai direto ao olho que já está cego.', 'd16/10', 'vs blind 1.5; st blind 1'),
+  ],
+  'Canção de Ninar': [
+    N('Ninar Que Cobra o Sono', 'Quem já cochila leva o verso inteiro.', 'm14/10', 'vs sleep 1.5; st sleep 1'),
+    N('Ninar de Voz Baixa', 'Tão baixinho que o alvo se inclina para ouvir.', 'm11/7', 'st sleep 1 55%'),
+    N('Ninar Que Vira Pavor', 'O sono do alvo se desfaz em medo.', 'm15/11', 'conv sleep fear'),
+  ],
+  'Terror Absoluto': [
+    N('Terror Que Cobra', 'O pavor pesa mais em quem já tremia.', 'm16/10', 'vs fear 1.6; st fear 1'),
+    N('Terror em Eco', 'O medo volta em todos, cada vez mais alto.', 'm16/13 a', 'st fear 2; st atkDn 1'),
+    N('Terror Que Paralisa', 'O corpo para antes da cabeça entender.', 'm18/12', 'st fear 2; st defDn 1'),
+  ],
+  'Sono Profundo': [
+    N('Sono Que Cobra', 'Quem já dormia afunda de vez.', 'm16/11 a', 'vs sleep 1.5; st sleep 1'),
+    N('Sono em Coro', 'Todos bocejam ao mesmo tempo.', 'm14/13 a', 'st sleep 1 30%'),
+    N('Sono Sem Sonho', 'O escuro mais fundo, onde nem o medo chega.', 'm20/13 a', 'st sleep 2 45%'),
+  ],
+  'Hipnose Lunar': [
+    N('Hipnose Lunar Cobradora', 'O pêndulo pesa mais em quem já está perdido.', 'm16/12 a', 'vs confuse 1.5; st confuse 1'),
+    N('Hipnose Lunar em Coro', 'Todos seguem o mesmo pêndulo.', 'm15/14 a', 'st confuse 1 30%; st sleep 1 25%'),
+    N('Hipnose Lunar Que Assusta', 'No fim do transe, o alvo vê o que não devia.', 'm18/13 a', 'st fear 2 40%'),
+  ],
+  'Lua Negra': [
+    N('Lua Negra Que Cega', 'A lua sem brilho apaga a vista.', 'd20/12', 'st blind 2 50%; st marked 1'),
+    N('Lua Negra Que Assusta', 'Olhar a lua negra dá um frio que não passa.', 'd22/12', 'st fear 2 45%'),
+    N('Lua Negra Acumuladora', 'Cada noite sem lua empilha mais sombra.', 'd24/13', 'stack sombra 5; st fear 1'),
+    N('Lua Negra Cobradora', 'A lua negra cobra o medo de quem já a viu.', 'd26/14', 'vs fear 1.6; st fear 1'),
+  ],
+  'Marca da Noite': [
+    N('Marca da Noite em Todos', 'A noite marca cada inimigo na linha.', 'd10/12 a', 'st marked 1'),
+    N('Marca da Noite Que Racha a Guarda', 'A marca abre uma fresta na defesa.', 'd14/9', 'brk 1; st marked 1'),
+  ],
+  'Voz Hipnótica': [
+    N('Voz Que Confunde', 'A ordem chega torta e o alvo obedece errado.', 'm12/9', 'st confuse 1 40%'),
+    N('Voz Que Cobra o Sono', 'A voz pesa mais em quem já bocejou.', 'm14/10', 'vs sleep 1.5; st sleep 1'),
+    N('Voz Que Assusta', 'A ordem vem em tom de aviso.', 'm14/10', 'st fear 1 45%'),
+  ],
+  'Lâmina de Sombra': [
+    N('Lâmina de Sombra Longa', 'A lâmina cresce até onde o alvo achava estar a salvo.', 'd16/10', 'pierce 50'),
+    N('Lâminas de Sombra em Leque', 'Várias lâminas abrem de uma só sombra.', 'd10/13 a x2', 'st blind 1 25%'),
+    N('Lâmina de Sombra Que Assusta', 'O fio some e aparece no pescoço do alvo.', 'd16/10', 'st fear 2 40%'),
+    N('Lâmina de Sombra Acumuladora', 'Cada corte guarda uma sombra para o próximo.', 'd16/11', 'stack sombra 5; st blind 1'),
+  ],
+  'Voz no Escuro': [
+    N('Voz Que Assusta no Escuro', 'Uma voz que ninguém sabe de onde vem.', 'm12/8', 'st fear 1 45%'),
+    N('Voz Que Cobra o Medo', 'A voz fala mais alto para quem já tem medo.', 'm14/9', 'vs fear 1.5; st fear 1'),
+    N('Voz do Escuro Total', 'No escuro, só a voz sobra, e ela chama todos.', 'm18/12 a', 'st fear 2; st sleep 1 25%'),
+  ],
+  'Loucura Súbita': [
+    N('Loucura Que Cobra', 'A loucura pesa em quem já duvidava.', 'm16/10', 'vs confuse 1.5; st confuse 1'),
+    N('Loucura em Coro', 'Cada cabeça enlouquece a de ao lado.', 'm14/13 a', 'st confuse 1 35%; st fear 1 30%'),
+    N('Loucura Que Acumula', 'Uma ideia errada sobre a outra.', 'm14/10', 'stack sombra 5; st confuse 1'),
+  ],
+};
 export const ABRIR = {
+  'Rajada Sombria': [
+    N('Rajada Sombria Dupla', 'Duas rajadas, uma sobre a outra.', 'd8/6 x2'),
+    N('Rajada Sombria Cega', 'A rajada solta uma poeira de breu nos olhos.', 'd10/6', 'st blind 1 35%'),
+    N('Rajada Sombria em Leque', 'A rajada abre em leque sobre a linha.', 'd10/10 a'),
+    N('Rajada Sombria Que Assusta', 'Cada tiro chega com um sussurro.', 'd12/8', 'st fear 1 40%'),
+    N('Rajada Sombria Detonadora', 'As sombras cravadas estouram juntas.', 'd18/11', 'burst sombra .4; det fear 6'),
+    N('Rajada Sombria Suprema', 'Uma rajada que come a luz do lugar.', 'd36/16', 'st blind 2; st fear 2'),
+  ],
+  'Bala de Breu': [
+    N('Bala de Breu Dupla', 'Dois tiros de breu no mesmo ponto.', 'd8/6 x2'),
+    N('Bala de Breu Grudenta', 'O breu gruda e atrasa o alvo.', 'd10/6', 'st root 1 40%'),
+    N('Bala de Breu Que Cega', 'O breu escorre sobre os olhos.', 'd11/7', 'st blind 1 40%'),
+    N('Bala de Breu Perfurante', 'O breu endurece na ponta e fura.', 'd12/8', 'pierce 50'),
+    N('Bala de Breu Que Assusta', 'O estampido vem sem clarão.', 'd13/8', 'st fear 1 40%'),
+    N('Bala de Breu Detonadora', 'O breu grudado se acende por dentro.', 'd18/11', 'burst sombra .4; det fear 6'),
+    N('Bala de Breu Suprema', 'Um tiro só, que leva a noite junto.', 'd38/16', 'pierce 70; st blind 2'),
+  ],
+  'Soco Entorpecente': [
+    N('Soco Entorpecente Duplo', 'Dois socos, dois braços dormentes.', 'd8/6 x2', 'st atkDn 1 30%'),
+    N('Soco Que Adormece', 'O golpe deixa o alvo sonolento.', 'd10/7', 'st sleep 1 30%'),
+    N('Soco Entorpecente em Cadeia', 'O soco passa o torpor para o vizinho.', 'd10/10 a', 'st atkDn 1'),
+    N('Soco Entorpecente Supremo', 'Um golpe só, e o corpo inteiro desliga.', 'd30/14', 'st sleep 2 50%; st atkDn 2'),
+  ],
+  'Murmúrio Coletivo': [
+    N('Murmúrio Coletivo Duplo', 'O murmúrio dá duas voltas no campo.', 'm8/8 a x2'),
+    N('Murmúrio Que Assusta', 'O murmúrio fala de coisas que o alvo escondeu.', 'm10/9 a', 'st fear 1 35%'),
+    N('Murmúrio Que Confunde', 'Tantas vozes que ninguém sabe a quem ouvir.', 'm10/9 a', 'st confuse 1 30%'),
+    N('Murmúrio Que Acumula', 'Cada rodada soma mais vozes.', 'm12/10 a', 'stack sombra 5; st fear 1'),
+    N('Murmúrio Detonador', 'Todas as vozes calam, e depois gritam.', 'm18/12 a', 'burst sombra .4; det fear 6'),
+    N('Murmúrio Coletivo Supremo', 'Um coro sem rosto que enche a cabeça de todos.', 'm36/18 a', 'st fear 2; st confuse 2'),
+  ],
+  'Cortina de Trevas': [
+    N('Cortina de Trevas Dupla', 'Duas cortinas, uma atrás da outra.', 'm10/9 a', 'st blind 1 30%'),
+    N('Cortina de Trevas Que Assusta', 'Do outro lado, há algo olhando.', 'm12/10 a', 'st fear 1 40%'),
+    N('Cortina de Trevas Pesada', 'A cortina cai com peso de pano molhado.', 'm14/11 a', 'st blind 1 35%; st atkDn 1'),
+    N('Cortina de Trevas Suprema', 'A cortina que fecha o mundo, ato final.', 'm34/16 a', 'st blind 2; st sleep 1 40%'),
+  ],
+  'Fim do Sonho': [
+    N('Fim do Sonho Duplo', 'O sonho acaba duas vezes.', 'm10/8 x2'),
+    N('Fim do Sonho Brusco', 'O sonho corta sem aviso.', 'm10/7', 'st confuse 1 35%'),
+    N('Fim do Sonho Que Assusta', 'Acordar assusta mais que dormir.', 'm12/8', 'st fear 1 40%'),
+    N('Fim do Sonho em Coro', 'Todos acordam ao mesmo tempo, sem saber onde estão.', 'm12/11 a', 'st confuse 1 30%'),
+    N('Fim do Sonho Que Cobra', 'Quem dormia profundo cai com força.', 'm16/10', 'vs sleep 1.6; st confuse 1'),
+    N('Fim do Sonho Detonador', 'Todo o sono guardado vira susto de uma vez.', 'm20/12', 'burst sombra .4; det sleep 6'),
+    N('Fim do Sonho Supremo', 'O último sonho, sem despertar nenhum.', 'm38/17 a', 'st sleep 2 50%; st fear 2'),
+  ],
+  'Devorar Sonhos': [
+    N('Devorar Sonhos Duplo', 'A sombra mastiga duas vezes.', 'm10/8 x2', 'st fear 1 30%'),
+    N('Devorar Sonhos Faminto', 'Quanto mais sonho, mais fome.', 'm12/9', 'drain hp 20; st sleep 1 30%'),
+    N('Devorar Sonhos em Coro', 'A sombra come os sonhos de todos de uma vez.', 'm12/12 a', 'st sleep 1 30%'),
+    N('Devorar Sonhos Que Cobra', 'Quem já dormia perde mais.', 'm16/11', 'vs sleep 1.6; drain hp 25'),
+    N('Devorar Sonhos Supremo', 'Nada sobra, nem lembrança.', 'm36/17', 'drain hp 45; st sleep 2 50%'),
+  ],
+  'Réquiem Lunar': [
+    N('Réquiem Lunar Duplo', 'Duas estrofes, a lua canta junto.', 'm12/10 a', 'st fear 1 35%'),
+    N('Réquiem Lunar Que Adormece', 'O canto fecha os olhos da plateia.', 'm14/11 a', 'st sleep 1 35%'),
+    N('Réquiem Lunar Detonador', 'O coro agudo estoura o sono de todos.', 'm20/13 a', 'burst sombra .4; det sleep 6'),
+    N('Réquiem Lunar Supremo', 'A canção final, e a lua não toca mais.', 'm40/19 a', 'st sleep 2 50%; st fear 2'),
+  ],
+  'Lua Cadente': [
+    N('Lua Cadente Dupla', 'Duas luas caem uma atrás da outra.', 'm14/12 a', 'st fear 1 35%'),
+    N('Lua Cadente Que Cega', 'O brilho da queda apaga a visão.', 'm16/13 a', 'st blind 1 40%'),
+    N('Lua Cadente Detonadora', 'O impacto da lua espalha a sombra guardada.', 'm22/14 a', 'burst sombra .4; det fear 6'),
+    N('Lua Cadente Suprema', 'A lua inteira cai sobre o campo.', 'm44/20 a', 'st fear 2; st blind 2'),
+  ],
   'Pesadelo': [
     N('Pesadelo Duplo', 'Dois pesadelos, um em cima do outro.', 'm9/6 x2'),
     N('Pesadelo Que Assusta', 'O sonho ruim acorda com medo no peito.', 'm10/6', 'st fear 1 40%'),
