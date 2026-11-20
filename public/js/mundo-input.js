@@ -2,7 +2,7 @@
 // O herói selecionado anda já no cliente (MCOL.slide, o mesmo código que o servidor confere) e manda `walk` a cada 100 ms
 // enquanto se move, e uma vez ao parar. O servidor corrige com { t:'pos', fix:[id, f, x, z] } quando discorda.
 // Os outros chegam pelo canal pos agregado (10 Hz) e são desenhados 100 ms atrás, interpolando entre as duas amostras vizinhas.
-// Teclas: WASD (girado pela câmera), Shift corre, Ctrl (toque) ou C agacha e levanta, Espaço pula, 1 a 4 trocam o herói.
+// Teclas: WASD (girado pela câmera), Shift corre, Ctrl (toque) ou C agacha e levanta, Espaço pula, 1 a 4 trocam o herói, E interage.
 (g => {
   const C = g.MCOL, DELAY = 100, SEND_MS = 100, JUMP_MS = 400, KEEP_MS = 1500;
   const st = () => (typeof S !== 'undefined' ? S : null);
@@ -39,7 +39,27 @@
       if (now - lastSend >= SEND_MS) sendWalk(now, s);
     } else if (moving) { moving = false; sendWalk(now, s); } // parou: uma última posição
   }
-  function loop(t) { tick(t); raf = on ? requestAnimationFrame(loop) : 0; }
+  function loop(t) { tick(t); aim(t); raf = on ? requestAnimationFrame(loop) : 0; }
+
+  // ----- E: o objeto interativo visível mais próximo a até 1,5 casa, à frente (cone de 60°) ou colado ao lado -----
+  const USA = new Set(['porta', 'bau', 'item', 'npc', 'placa', 'alavanca', 'escada', 'portal']), PERTO = 1.5, CONE = Math.cos(Math.PI / 3);
+  const ptOf = o => o.k === 'porta' ? (o.cfg?.e === 'h' ? [o.x + .5, o.y] : [o.x, o.y + .5]) : [o.x + .5, o.y + .5]; // porta: meio da aresta, como no servidor
+  function alvo() {
+    const s = st(), id = selId(), ch = id && s?.chars[id]; if (!ch?.pos || !worldOk()) return null;
+    const p = local?.id === id ? local : ch.pos, w = s.scenes?.[ch.scene]?.world; if (!w) return null;
+    const hx = Math.sin(p.d || 0), hz = Math.cos(p.d || 0); let best = null, bs = Infinity;
+    for (const [oid, o] of Object.entries(w.objs || {})) {
+      if (o?.f !== p.f || !USA.has(o.k) || (o.vis === 'oculto' && !o.rev)) continue;
+      if (o.k === 'bau' && (o.cfg?.modo === 'cada' ? o.cfg.por?.[id] : o.cfg?.aberto)) continue; // baú já aberto (por este herói, no modo cada)
+      const [ox, oz] = ptOf(o), dx = ox - p.x, dz = oz - p.z, dd = Math.hypot(dx, dz); if (dd > PERTO) continue;
+      const fr = dd < 1e-6 ? 1 : (dx * hx + dz * hz) / dd; if (fr < CONE && dd > 1) continue; // fora do cone só vale colado
+      const sc = dd - fr * .5; if (sc < bs) { bs = sc; best = { ...o, id: oid }; }
+    }
+    return best;
+  }
+  let aimT = 0;
+  function aim(now = performance.now()) { if (now - aimT < 120) return; aimT = now; g.MHUD?.prompt(on ? alvo() : null); }
+  function use() { const a = alvo(), id = selId(); if (a && id) send({ t: 'interact', id, obj: a.id }); }
 
   // ----- rede -----
   function onPos(m) {
@@ -82,6 +102,7 @@
     if (KEYMAP[k]) { keys.add(KEYMAP[k]); e.preventDefault(); return; }
     if (e.key === 'Shift') { keys.add('shift'); return; }
     if (k === 'c' && !e.repeat) { crouch = !crouch; return; }
+    if (k === 'e') { e.preventDefault(); if (!e.repeat) use(); return; }
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); if (e.repeat || !local) return; jT = performance.now(); g.MUNDO.jump?.(local.id); const s = st(); if (s) sendWalk(jT, s); return; }
     if (/^[1-4]$/.test(e.key) && !e.repeat && !forced && typeof role !== 'undefined' && role === 'player') { const h = can()[+e.key - 1]; if (h && typeof selCh !== 'undefined') { selCh = h.id; if (typeof render === 'function') render(); } }
   }
@@ -96,9 +117,9 @@
     if (!wired) { wired = true; addEventListener('keydown', down); addEventListener('keyup', up); addEventListener('blur', clear); document.addEventListener('focusin', () => { if (typing()) clear(); }); }
     if (on) return; on = true; lastT = 0; raf = requestAnimationFrame(loop);
   }
-  function stop() { on = false; clear(); if (raf) cancelAnimationFrame(raf); raf = 0; local = null; moving = false; }
+  function stop() { on = false; clear(); if (raf) cancelAnimationFrame(raf); raf = 0; local = null; moving = false; g.MHUD?.prompt(null); }
 
   function take(id) { forced = id || null; local = null; moving = false; if (forced) { g.MUNDO?.free?.(null); start(); } else if (!(typeof role !== 'undefined' && role === 'player')) stop(); }
-  g.MINPUT = { start, stop, take, get forced() { return forced; }, onPos, poseOf, tick, get sel() { return selId(); }, get local() { return local; }, get crouch() { return crouch; } };
+  g.MINPUT = { start, stop, take, get forced() { return forced; }, onPos, poseOf, tick, alvo, aim, use, get sel() { return selId(); }, get local() { return local; }, get crouch() { return crouch; } };
   if (typeof role !== 'undefined' && role === 'player') start();
 })(globalThis);

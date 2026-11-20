@@ -120,7 +120,8 @@ export class Actors {
     // poeira: sobe devagar e some em 0,6 s
     const D = this.dust; for (let i = 0; i < D.n; i++) { if (D.life[i] <= 0) continue; D.life[i] -= dt / .6; if (D.life[i] <= 0) { D.pos[i * 3 + 1] = -999; continue; } for (let k = 0; k < 3; k++) D.pos[i * 3 + k] += D.vel[i * 3 + k] * dt; }
     this.dustPts.geometry.attributes.position.needsUpdate = true;
-    for (const s of this.icons.values()) { const b = s.userData.base; s.position.set(b.x, b.y + Math.sin(now / 1000 * 2.4 + b.x) * .1, b.z); }
+    const hi = globalThis.MHUD?.alvo; // o alvo do E cresce um pouco
+    for (const [id, s] of this.icons) { const b = s.userData.base, k = id === hi ? .78 : .55; s.position.set(b.x, b.y + Math.sin(now / 1000 * 2.4 + b.x) * .1, b.z); s.scale.set(k, k, 1); }
   }
   puff(x, z) { const D = this.dust, i = D.i = (D.i + 1) % D.n; D.pos.set([x + (Math.random() - .5) * .3, .05, z + (Math.random() - .5) * .3], i * 3); D.vel.set([(Math.random() - .5) * .4, .5 + Math.random() * .3, (Math.random() - .5) * .4], i * 3); D.life[i] = 1; }
   height(id) { const a = this.m.get(id); return a ? a.h * (a.fit?.z || 1) : H_HEROI; }

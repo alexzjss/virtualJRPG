@@ -5,6 +5,7 @@ import * as T from '/vendor/three.module.js';
 import { buildFloor, setCutaway, tickPecas, disposeFloor } from './mundo3d-pecas.js';
 import { Actors } from './mundo3d-atores.js';
 import { Fx } from './mundo3d-fx.js';
+import './mundo-hud.js'; // prompt do E, diálogo e placa (MHUD)
 
 const TILT = 35 * Math.PI / 180, ROT_MS = 250;
 const ZOOMS = ['perto', 'medio', 'andar'], ZH = { perto: 8, medio: 14 };

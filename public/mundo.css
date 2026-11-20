@@ -43,3 +43,25 @@
 .medit-no legend button,.medit-esc button{padding:0 6px;min-height:22px}
 .medit-esc{display:grid;grid-template-columns:2fr minmax(0,1fr) 1fr auto;gap:4px;align-items:center}
 .medit-esc input,.medit-esc select{min-width:0}
+/* ----- HUD da exploração: prompt do E, diálogo do NPC (estilo Persona), placa ----- */
+.mhud-prompt button{position:fixed;left:var(--mc,50%);bottom:calc(var(--mb,0px) + 104px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) skewX(-8deg);z-index:60;display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 16px 5px 6px;background:#0b0b0df0;border:0;border-left:4px solid var(--gold,#e8c040);color:#fff;font:600 15px var(--cond,sans-serif);letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;box-shadow:0 6px 18px #000a}
+.mhud-prompt button>*{transform:skewX(8deg)}
+.mhud kbd{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 6px;background:#fff;color:#0b0b0d;font:700 16px var(--cond,sans-serif);border-radius:3px}
+.mhud-dlg section{position:fixed;left:var(--mc,50%);bottom:calc(var(--mb,0px) + 18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:420;width:min(900px,calc(var(--mw,100vw) - 24px));display:grid;grid-template-columns:auto minmax(0,1fr);align-items:end;animation:mhudIn .18s ease-out}
+.mhud-ret{position:relative;z-index:1;width:136px;height:168px;margin-right:-22px;display:grid;place-items:center;overflow:hidden;background:#16161b;border:3px solid #fff;transform:skewX(-6deg);box-shadow:7px 7px 0 #e4002b;font:400 70px var(--disp,sans-serif);color:#fff}
+.mhud-ret img{width:115%;height:100%;object-fit:cover;transform:skewX(6deg)}
+.mhud-fala{position:relative;isolation:isolate;min-height:124px;padding:22px 44px 14px 42px;color:#f4efe4;display:grid;gap:8px;align-content:start}
+.mhud-fala::before{content:'';position:absolute;inset:0;z-index:-1;background:#0b0b0df4;border:2px solid #fff;transform:skewX(-6deg);box-shadow:0 18px 40px #000c}
+.mhud-fala p{margin:0;font:500 18px/1.45 var(--body,sans-serif);overflow-wrap:anywhere}
+.mhud-fala .mhud-extra{color:#ffd9a0}
+.mhud-fala small{font:600 12px var(--cond,sans-serif);letter-spacing:1.5px;text-transform:uppercase;color:var(--dim,#a8a5b2)}
+.mhud-nome{position:absolute;top:-18px;left:36px;padding:6px 16px;background:#e4002b;color:#fff;font:400 21px/1 var(--disp,sans-serif);letter-spacing:1.5px;text-transform:uppercase;transform:skewX(-10deg);box-shadow:4px 4px 0 #000}
+.mhud-esc{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:4px}
+.mhud-esc button,.mhud-seg{width:100%;display:flex;align-items:center;gap:10px;min-height:38px;padding:4px 10px;text-align:left;background:transparent;border:1px solid #ffffff38;color:#fff;font:600 16px var(--body,sans-serif);cursor:pointer}
+.mhud-esc button:hover,.mhud-esc button:focus-visible,.mhud-seg:hover,.mhud-seg:focus-visible{background:#fff;color:#0b0b0d;outline:0}
+.mhud-esc button:hover kbd,.mhud-esc button:focus-visible kbd{background:#e4002b;color:#fff}
+.mhud-x{position:absolute;top:6px;right:14px;min-width:32px;min-height:32px;background:transparent;border:0;color:#fff;font:700 22px/1 var(--body,sans-serif);cursor:pointer}
+.mhud-say{display:flex;gap:6px}.mhud-say input{flex:1;min-width:0}
+@keyframes mhudIn{from{opacity:0;translate:0 14px}}
+@media (max-width:600px){.mhud-ret{width:72px;height:92px;margin-right:-14px;font-size:40px}.mhud-fala{padding:20px 30px 12px 26px}.mhud-fala p{font-size:16px}.mhud-prompt button{bottom:calc(var(--mb,0px) + 150px + env(safe-area-inset-bottom,0px))}}
+@media (prefers-reduced-motion:reduce){.mhud-dlg section{animation:none}}
