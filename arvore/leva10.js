@@ -17,15 +17,14 @@ import { LEVA10M } from './leva10m.js';
 import { LEVA10AU } from './leva10au.js';
 import { ESTENDER12 } from './leva12/index.js';
 
-export const LEVA10 = { ...LEVA10K, ...LEVA10S, ...LEVA10A, ...LEVA10I, ...LEVA10F, ...LEVA10AM, ...LEVA10T, ...LEVA10SH, ...LEVA10H, ...LEVA10M, ...LEVA10AU };
-for (const [b, ns] of Object.entries(ESTENDER12)) LEVA10[b] = [...(LEVA10[b] || []), ...ns]; // Leva 12: nós novos no fim das linhas que já existem
+export const LEVA10 = { ...LEVA10K, ...LEVA10S, ...LEVA10A, ...LEVA10I, ...LEVA10F, ...LEVA10AM, ...LEVA10T, ...LEVA10SH, ...LEVA10H, ...LEVA10M, ...LEVA10AU };
 
 // base → nós novos. Herdam do primeiro nó da linha o atributo, o tipo de aura (cat) e a arma exigida (req).
 const REP = [];
-export function completar(TREE) {
+export function completar(TREE, mapa = LEVA10) { // mapa: base → nós novos no fim da linha dela (a Leva 12 roda depois de abrir(), para alcançar também as linhas da Leva 11)
   REP.length = 0;
   const feitos = new Set();
-  for (const [base, ns] of Object.entries(LEVA10)) {
+  for (const [base, ns] of Object.entries(mapa)) {
     const b = Object.values(TREE).flatMap(t => t.branches).find(b => b.de === base || RENOMES[b.de]?.[0] === base);
     if (!b) throw new Error(`Leva 10: não há linha de variação de "${base}"`);
     const ref = b[0], nomes = new Set(Object.values(TREE).flatMap(t => t.branches.flat()).map(s => s.n));

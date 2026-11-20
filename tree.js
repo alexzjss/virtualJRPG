@@ -22,6 +22,7 @@ import { temas } from './arvore/temas.js';
 import { LEVA8 } from './arvore/leva8.js';
 import { LEVA9, preencher } from './arvore/leva9.js';
 import { completar } from './arvore/leva10.js';
+import { ESTENDER12 } from './arvore/leva12/index.js';
 import { abrir } from './arvore/leva11b.js';
 import { variar8 } from './arvore/leva8e.js';
 import { ARMAS, ARMAS_BASE, NOVOS, ARMAS_NOVAS } from './arvore/marcial.js';
@@ -758,6 +759,7 @@ marcarComandos(TREE); // Leva 4: comandos de ação nos nós que já existiam
 variar(TREE); // arvore/variacoes.js: comandos nos disparos e golpes rápidos e 3 variações por família
 completar(TREE); // arvore/leva10.js: completa as linhas de variação até a camada 10
 abrir(TREE); // arvore/leva11b.js: linhas de variação novas a partir de técnicas que ainda não tinham
+completar(TREE, ESTENDER12); // arvore/leva12/: nós novos no fim de qualquer linha (inclusive as abertas pela Leva 11)
 reorganizar(TREE); // arvore/ordem.js: funde ramos curtos e põe cada setor em colunas temáticas (básico perto do centro)
 temas(TREE); // arvore/temas.js: cada elemento só na árvore do dono (fora das combinações); falha o build se algo escapar
 camadas(TREE, preencher); // arvore/camadas.js: posição no ramo = camada (1–10) e a camada define o poder, por orçamento (a Leva 9 entra nas casas livres)
