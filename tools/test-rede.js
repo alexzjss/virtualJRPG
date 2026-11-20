@@ -22,7 +22,7 @@ async function boot(data, env = {}) {
 const tmps = [], tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'vjrede-')); tmps.push(d); return d; };
 process.on('exit', () => { for (const d of tmps) try { fs.rmSync(d, { recursive: true, force: true }); } catch {} }); // as pastas de dados dos servidores de teste não ficam para trás
 const hello = (p, msg) => new Promise(res => { const ws = new WebSocket(`ws://127.0.0.1:${p}`); ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', ...msg }))); ws.on('message', d => { const m = JSON.parse(d); if (m.t === 'err' || m.t === 'state') { ws.close(); res(m); } }); });
-const poke = (p, key) => new Promise(res => { const ws = new WebSocket(`ws://127.0.0.1:${p}`); ws.on('open', () => { ws.send(JSON.stringify({ t: 'hello', role: 'gm', key })); setTimeout(() => { ws.send(JSON.stringify({ t: 'chat', text: 'oi' })); setTimeout(() => { ws.close(); res(); }, 600); }, 200); }); }); // qualquer ação do mestre grava o estado
+const poke = (p, key) => new Promise(res => { const ws = new WebSocket(`ws://127.0.0.1:${p}`); ws.on('open', () => { ws.send(JSON.stringify({ t: 'hello', role: 'gm', key })); setTimeout(() => { ws.send(JSON.stringify({ t: 'offMsg', v: 'Volto já' })); setTimeout(() => { ws.close(); res(); }, 600); }, 200); }); }); // qualquer ação do mestre grava o estado
 const up = (p, headers, body = PNG, type = 'image/png') => fetch(`http://127.0.0.1:${p}/upload`, { method: 'POST', headers: { 'Content-Type': type, ...headers }, body });
 
 test('sem GM_KEY: a chave é sorteada e guardada, e "mestre" não abre o painel', async () => {
@@ -79,7 +79,7 @@ const talk = (p, key, extra = []) => new Promise(res => { const ws = new WebSock
 test('estado leve: skills e itens vão uma vez em "defs"; os estados seguintes não os repetem', async () => {
   const data = tmp(), s = await boot(data, { GM_KEY: 'chave' }); assert.ok(!s.failed, s.out());
   try {
-    const got = await talk(s.p, 'chave', [{ t: 'chat', text: 'oi' }, { t: 'sync' }]), kinds = got.map(m => m.t);
+    const got = await talk(s.p, 'chave', [{ t: 'offMsg', v: 'Volto já' }, { t: 'sync' }]), kinds = got.map(m => m.t);
     assert.deepEqual(kinds.slice(0, 2), ['defs', 'state']); assert.ok(Object.keys(got[0].d.skills).length > 500); assert.ok(Object.keys(got[0].d.items).length > 50);
     const st = got.filter(m => m.t === 'state'); assert.ok(st.length >= 3); for (const m of st) { assert.equal(m.s.skills, undefined); assert.equal(m.s.items, undefined); assert.equal(m.dv, got[0].v); }
     assert.equal(kinds.filter(k => k === 'defs').length, 2); // a 2ª só porque o cliente pediu ("sync")

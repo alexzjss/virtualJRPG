@@ -36,7 +36,7 @@ function swap(o, isNew = false) { // troca a campanha em uso, sempre com uma có
   backup('antes-de-trocar'); adopt(o, isNew, () => { if (isNew) seed(); fix(); prep(); }); undoClear(); touch();
 }
 // campanha vinda de um arquivo de fora: só passam chaves simples, definições no esquema e um histórico limpo
-const okKey = k => /^[\w-]{1,32}$/.test(k), KINDS_LOG = ['', 'ok', 'bad', 'chat'];
+const okKey = k => /^[\w-]{1,32}$/.test(k), KINDS_LOG = ['', 'ok', 'bad'];
 function cleanCampaign(o) {
   const str = (v, n) => String(v ?? '').slice(0, n);
   for (const k of ['chars', 'scenes', 'bestiary', 'skills', 'items', 'encounters', 'contracts', 'tracks']) if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) o[k] = Object.fromEntries(Object.entries(o[k]).filter(([id, v]) => okKey(id) && v && typeof v === 'object'));
@@ -55,7 +55,7 @@ function cleanCampaign(o) {
   }
   for (const [id, t] of Object.entries(o.tracks || {})) { if (okUrl(t.url)) o.tracks[id] = { name: str(t.name, 40), url: t.url }; else delete o.tracks[id]; }
   if (o.audio && typeof o.audio === 'object') { if (!okUrl(o.audio.url)) { o.audio.url = ''; o.audio.on = false; } } else delete o.audio;
-  o.log = (Array.isArray(o.log) ? o.log : []).filter(e => e && typeof e === 'object').slice(-150).map(e => ({ n: int(e.n, 0, 1e9), who: str(e.who, 40), text: str(e.text, 600), kind: KINDS_LOG.includes(e.kind) ? e.kind : '',
+  o.log = (Array.isArray(o.log) ? o.log : []).filter(e => e && typeof e === 'object' && e.kind !== 'chat').slice(-150).map(e => ({ n: int(e.n, 0, 1e9), who: str(e.who, 40), text: str(e.text, 600), kind: KINDS_LOG.includes(e.kind) ? e.kind : '',
     ...(Number.isFinite(e.d) ? { d: int(e.d, 0, 100) } : {}), ...(typeof e.to === 'string' ? { to: str(e.to, 30) } : {}), ...(typeof e.from === 'string' ? { from: str(e.from, 30) } : {}) }));
   o.title = str(o.title || 'Campanha', 40); o.reqs = {}; o.handout = null; delete o.users; delete o.vj;
   if (o.chase) o.chase = null;
@@ -158,10 +158,10 @@ function autoBackup() { let last = S.seq; setInterval(() => { if (S.seq === last
 const diaryText = () => {
   flushDiary(); let raw = ''; try { raw = fs.readFileSync(diaryFile(), 'utf8'); } catch {}
   let day = ''; const out = [`Diário — ${S.title}`, ''];
-  for (const l of raw.split('\n')) { let e; try { e = JSON.parse(l); } catch { continue; } const d = new Date(e.t), dd = d.toLocaleDateString('pt-BR');
+  for (const l of raw.split('\n')) { let e; try { e = JSON.parse(l); } catch { continue; } if (!e || e.kind === 'chat') continue; const d = new Date(e.t), dd = d.toLocaleDateString('pt-BR');
     if (dd !== day) { day = dd; out.push('', `== ${dd} ==`); }
     out.push(e.who === 'Sessão' ? `\n--- ${e.text} ---` : `[${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}] ${e.who}: ${e.text}`); }
-  return out.join('\n') + (raw ? '\n' : '\nNada registrado ainda.\n');
+  return out.join('\n') + (day ? '\n' : '\nNada registrado ainda.\n');
 };
 function api(req, res) {
   const u = new URL(req.url, 'http://x'), p = u.pathname, what = u.searchParams.get('what');

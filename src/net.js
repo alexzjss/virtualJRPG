@@ -99,7 +99,7 @@ const wss = new WebSocketServer({ server, maxPayload: 65536, perMessageDeflate: 
 wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('error')
 
 const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, battle: undefined, enc: undefined, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
-// cada cliente só recebe o que pode ver (sussurros, rolagens secretas e notas do mestre ficam de fora)
+// cada cliente só recebe o que pode ver (rolagens secretas e notas do mestre ficam de fora)
 // jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
 // fraquezas do inimigo para jogadores: Identificar revela tudo; o acerto revela só o elemento usado (S.lore, por tipo)
 const scrub = ch => { const k = 100 / (ch.hpMax || 1), L0 = S.lore?.[ch.tpl || ch.name], lr = { w: Array.isArray(L0?.w) ? L0.w : [], r: Array.isArray(L0?.r) ? L0.r : [] }; return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, imgF: ch.imgF, imgB: ch.imgB, imgP: ch.imgP, imgS: ch.imgS, imgK: ch.imgK, fxK: ch.fxK, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, brk: ch.brk, shield: Math.ceil((ch.shield || 0) * k), form: ch.form, hp: Math.ceil(ch.hp * k), hpMax: 100,
@@ -127,9 +127,9 @@ const sceneOfClient = c => {
 // cena em que uma mensagem acontece: a do personagem dela; sem personagem, a do cliente
 const sceneOfMsg = (c, m) => { if (m?.t === 'ordMove') return sceneOfClient(c); const ch = S.chars[m?.id]; if (ch && (c.role === 'gm' || can(c, ch) || ch.enemy)) return okSc(ch.scene) ? ch.scene : ch.enemy ? S.focus : null; return sceneOfClient(c); };
 const OFF0 = 'Seu personagem está em outro lugar por enquanto. Aguarde o mestre chamar você de volta.';
-const viewIn = c => c.role === 'gm' ? { ...S, chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...heroOut(ch), gmNote: ch.gmNote }])), users: undefined, accounts: Object.keys(S.users).sort(), online: onlineAccts(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
+const viewIn = c => c.role === 'gm' ? { ...S, log: S.log.filter(e => e.kind !== 'chat'), chars: Object.fromEntries(Object.entries(S.chars).map(([id, ch]) => [id, ch.enemy ? ch : { ...heroOut(ch), gmNote: ch.gmNote }])), users: undefined, accounts: Object.keys(S.users).sort(), online: onlineAccts(), store: hooks.store(), net: { ...net, portal: PORTAL, lan: lan() } } :
    { ...S, users: undefined, bestiary: undefined, encounters: undefined, scenes: strip(S.scenes), chars: pubChars(), reqs: Object.fromEntries(Object.entries(S.reqs).filter(([, r]) => r.by === c.name)),
-  log: S.log.filter(e => (!e.to || (c.name && (e.to === c.name || e.from === c.name))) && (!e.sc || e.sc === S.scene)) };
+  log: S.log.filter(e => e.kind !== 'chat' && (!e.to || (c.name && (e.to === c.name || e.from === c.name))) && (!e.sc || e.sc === S.scene)) };
 const view = c => {
   const sid = sceneOfClient(c);
   if (sid === null) { // fora de cena: só a tela de espera (sem mapa, sem inimigos, sem batalha)
@@ -226,8 +226,6 @@ const push = (dirty = true) => {
 const OFFSTAGE = new Set(['move', 'walk', 'act', 'defend', 'focus', 'allOut']);
 // ações que mudam o estado em memória sem push completo (o mundo 3D manda as posições pelo canal pos)
 const QUIET = new Set(['walk']);
-// conversa não pertence a uma cena: roda sem contexto (não ganha a marca de cena no histórico)
-const NOSCENE = new Set(['chat']);
 function handle(c, m) {
   if (typeof m.t !== 'string' || !Object.hasOwn(H, m.t)) return;
   const ch0 = S.chars[m.id];
@@ -314,7 +312,7 @@ function onMsg(c, raw) {
     if (m.t === 'sync') { if (c.role) { c.defsV = -1; sendState(c); } return; } // o cliente pede tudo de novo (perdeu as definições)
     if (!c.role || c.peek) return;
     if (m.t === 'activeHero') { const ch = S.chars[m.id]; if (c.role === 'player' && ch && !ch.enemy && ch.owner === c.name && c.hero !== ch.id) { c.hero = ch.id; sendState(c); } return; } // herói escolhido na tela: decide a cena que o jogador vê
-    if (c.role !== 'gm' && (flood(c, 'all', 80) || (m.t === 'chat' && flood(c, 'chat', 10)) || (m.t === 'ping' && flood(c, 'ping', 12)))) return;
+    if (c.role !== 'gm' && (flood(c, 'all', 80) || (m.t === 'ping' && flood(c, 'ping', 12)))) return;
     if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
       if (c.role === 'table') return;
       const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) }), sid = sceneOfClient(c);

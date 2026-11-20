@@ -880,20 +880,4 @@ function spawn(tpl, tier = 'normal', x = 0, y = 0) { // cria um inimigo a partir
 }
 const wtype = ch => eq(ch, 'arma')?.wt || 'punho'; // sem arma equipada luta com os punhos
 
-// /r do chat: soma de dados e números, como 2d6+1d4+3 ou d20-1 (até 8 termos e 40 dados)
-function rollExpr(expr) {
-  const src = String(expr).replace(/\s+/g, '');
-  if (!/^[+-]?(\d{0,2}d\d{1,3}|\d{1,4})([+-](\d{0,2}d\d{1,3}|\d{1,4})){0,7}$/i.test(src) || !/d/i.test(src)) return null;
-  let total = 0, dice = 0; const parts = [], shown = [];
-  for (const [, sg, n, f, k] of src.matchAll(/([+-]?)(?:(\d{0,2})d(\d{1,3})|(\d{1,4}))/gi)) {
-    const neg = sg === '-' ? -1 : 1;
-    if (f !== undefined) {
-      const q = int(n || 1, 1, 20), faces = int(f, 2, 100), rs = Array.from({ length: q }, () => 1 + Math.floor(Math.random() * faces));
-      if ((dice += q) > 40) return null;
-      total += neg * rs.reduce((a, x) => a + x, 0); parts.push(`${shown.length ? (neg < 0 ? '-' : '+') : neg < 0 ? '-' : ''}${q}d${faces}`); shown.push(`${neg < 0 ? '−' : ''}[${rs.join(', ')}]`);
-    } else { total += neg * +k; parts.push(`${neg < 0 ? '-' : shown.length || parts.length ? '+' : ''}${+k}`); }
-  }
-  return { text: parts.join(''), shown: shown.join(' '), total };
-}
-
-export { manualPlan, runPlan, cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, finPlan, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };
+export { manualPlan, runPlan, cantUse, effSkill, chqMeta, chqResolve, iaExtra, defWindow, finPlan, telOf, autoTel, canPar, parNode, BASE, SK, addLimit, aiAct, aiPlan, aiRun, allDown, allOut, applySt, at, at0, basicOf, bondAdd, breakCheck, breakVow, can, current, d100, delay, derive, doAct, doDefend, doFocus, endTurn, eq, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, makeFoe, modsOf, newChar, nextOf, normSlots, ofiSync, okUrl, onMap, order, partyRef, passive, pick, prep, reseat, rid, sanPen, scene, skipping, slotMax, slotted, spawn, spot, strike, summonOf, tally, tickSt, trig, usable, vows, wtype };

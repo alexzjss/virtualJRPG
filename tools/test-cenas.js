@@ -94,13 +94,10 @@ test('batalhas simultâneas: cada cena tem a sua fila, e uma não mexe na outra'
   handle(gm, { t: 'moveTo', ids: [a.id], scene: A }); assert.ok(!(a.id in S.scenes[B].battle.ticks));
 });
 
-test('batalhas simultâneas: log de batalha não vaza para a outra cena; chat continua para todos', () => {
-  const { A, B, a, b, ea } = split();
+test('batalhas simultâneas: log de batalha não vaza para a outra cena', () => {
+  const { A } = split();
   handle(gm, { t: 'battle', on: true });
-  handle(gm, { t: 'chat', text: 'oi, mesa' });
-  const la = view(ana).log.map(e => e.text), lb = view(bia).log.map(e => e.text);
-  assert.ok(lb.includes('oi, mesa') && la.includes('oi, mesa'));
-  assert.ok(S.log.some(e => e.sc === A), 'entradas da batalha têm a cena');
+  assert.ok(view(ana).log.some(e => e.sc === A), 'Ana recebe as entradas da batalha de A');
   assert.ok(!view(bia).log.some(e => e.sc === A), 'Bia (na Mina) não recebe o log da batalha de A');
 });
 

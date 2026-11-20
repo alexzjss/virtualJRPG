@@ -191,11 +191,11 @@ const save = () => { clearTimeout(saveT); saveT = setTimeout(flush, 300); };
 process.on('exit', flush); // não perde o que ainda esperava para ser gravado ao fechar
 // Ctrl+C, fechar a janela do console (SIGHUP no Windows) ou encerrar o processo: grava antes de sair. Sem isto o Node sai sem passar pelo 'exit'.
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { flush(); process.exit(0); });
-// entradas de batalha ganham a cena (sc): o jogador de outra cena não as recebe. Chat e narração fora de batalha continuam para todos.
+// entradas de batalha ganham a cena (sc): o jogador de outra cena não as recebe.
 const log = (who, text, kind = '', x = {}) => { if (CTX && !x.to && !x.sc && S.scenes?.[CTX]?.battle?.active) x = { ...x, sc: CTX }; if (!x.to) diary.push({ t: Date.now(), who, text, kind }), diary.length > 3000 && diary.shift(); S.log.push({ n: ++S.seq, ts: Date.now(), who, text, kind, ...x }); if (S.log.length > 150) S.log.shift(); };
 // ---------- diário, backups e troca de campanha ----------
 const slug = n => String(n || 'campanha').normalize('NFD').replace(/[^\w -]/g, '').trim().replace(/\s+/g, '-').toLowerCase().slice(0, 40) || 'campanha';
-// diário: tudo o que é público no histórico vai para um arquivo por campanha, sem o limite de 150 linhas do chat
+// diário: tudo o que é público no histórico vai para um arquivo por campanha, sem o limite de 150 linhas do registro
 const diary = [], diaryFile = () => path.join(DATA, 'diario', slug(S.title) + '.jsonl');
 const flushDiary = () => { if (!diary.length) return; try { fs.mkdirSync(path.join(DATA, 'diario'), { recursive: true }); fs.appendFileSync(diaryFile(), diary.splice(0).map(e => JSON.stringify(e)).join('\n') + '\n'); } catch (e) { console.error('Falha ao gravar o diário:', e.message); } };
 // cópia de segurança com etiqueta (inicio, auto, manual, antes-de-…); mantém as 30 mais recentes

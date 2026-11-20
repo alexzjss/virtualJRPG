@@ -338,7 +338,7 @@ test('pedidos: ação do jogador espera o mestre; aprovar com bônus, em segredo
   handle(ana, { t: 'act', id: h.id, skill: 'atk', target: e.id, aim: 'head' }); [id, r] = one(); assert.match(r.text, /^Ataque → Inimigo \(mira: cabeça\)/); assert.equal(current(), h.id);
   const n = S.log.length; handle(gm, { t: 'reqOk', id, mod: 100 }); assert.ok(S.log.length > n); assert.ok(S.log.slice(n).some(l => /\(95%\)/.test(l.text))); // bônus do mestre entra no acerto
   handle(ana, { t: 'act', id: h.id, skill: 'atk', target: e.id }); assert.equal(Object.keys(S.reqs).length, 1);
-  H.ini(gm, { k: 'down', id: h.id }); S.battle.ticks[h.id] = 99999; handle(gm, { t: 'chat', text: 'oi' }); assert.equal(Object.keys(S.reqs).length, 0); // passou a vez: o pedido some
+  handle(gm, { t: 'ini', k: 'set', id: h.id, v: 99999 }); assert.equal(Object.keys(S.reqs).length, 0); // passou a vez: o pedido some
   handle(ana, { t: 'act', id: h.id, skill: 'atk', target: e.id }); assert.equal(Object.keys(S.reqs).length, 0);
   H.battle(gm, {}); handle(ana, { t: 'move', id: h.id, x: 3, y: 2 }); assert.equal(h.x, 3); // mover o token não pede aprovação
   const ctl = { role: 'player', name: 'Ana', ctl: true, appr: true }, n2 = S.log.length; handle(ctl, { t: 'roll', id: h.id, attr: 'FOR' }); assert.equal(S.log.length, n2 + 1); assert.equal(Object.keys(S.reqs).length, 0); // mestre no controle: sem fila
@@ -370,12 +370,12 @@ test('passiva aprendida soma bônus permanente e gasta XP', () => {
   reset(); const h = mk(ana, {}); h.xp = 15; const before = h.hpMax;
   H.learn(ana, { id: h.id, skill: sk('Vigor') }); derive(h); assert.equal(h.hpMax, before + 10); assert.equal(h.xp, 0);
 });
-test('jogadores não recebem números de inimigos, notas nem sussurros alheios', () => {
+test('jogadores não recebem números de inimigos, notas nem rolagens secretas', () => {
   reset(); const h = mk(ana, {}), e = mk(gm, { enemy: true }); e.gmNote = 'segredo'; h.gmNote = 'nota';
-  H.chat(bia, { text: '/w mestre oi' }); H.roll(gm, { id: e.id, attr: 'FOR', secret: true });
+  H.roll(gm, { id: e.id, attr: 'FOR', secret: true });
   const v = view(ana), ve = v.chars[e.id];
   assert.equal(ve.hpMax, 100); assert.equal(ve.attrs.FOR, 0); assert.equal(ve.gmNote, undefined); assert.equal(v.chars[h.id].gmNote, undefined);
-  assert.equal(v.log.length, 0); assert.equal(v.users, undefined); assert.equal(v.bestiary, undefined); assert.equal(view(gm).log.length, 2);
+  assert.equal(v.log.length, 0); assert.equal(v.users, undefined); assert.equal(v.bestiary, undefined); assert.equal(view(gm).log.length, 1);
   H.place(gm, { id: e.id }); assert.equal(view(ana).chars[e.id], undefined); // fora do mapa: invisível
 });
 test('nova cena muda só o foco; heróis e inimigos ficam onde estão (o mestre os move pela Mesa)', () => {
@@ -541,12 +541,16 @@ test('batalha: alvo caído não gasta o turno; placar aponta o destaque na vitó
   // a tela de resultado recebe XP, ouro, espólios e o placar de cada herói
   assert.equal(v.res.mvp, h.id); const st = v.res.st.find(s => s.id === h.id); assert.ok(st.dmg > 0); assert.equal(st.ko, 1); assert.ok(Number.isFinite(v.res.xp) && Number.isFinite(v.res.gold) && Array.isArray(v.res.drops));
 });
-test('chat: /r soma vários dados e números; expressão ruim não vira rolagem', async () => {
-  const { rollExpr } = await import('../src/rules.js');
-  for (let i = 0; i < 50; i++) { const r = rollExpr('2d6 + 1d4 + 3'); assert.equal(r.text, '2d6+1d4+3'); assert.ok(r.total >= 6 && r.total <= 19); }
-  assert.equal(rollExpr('d20-1').text, '1d20-1'); assert.equal(rollExpr('3'), null); assert.equal(rollExpr('2d6+'), null); assert.equal(rollExpr('1d6;alert(1)'), null);
-  const n = S.log.length; H.chat(gm, { text: '/r 3d6+2' }); assert.match(S.log.at(-1).text, /^rolou 3d6\+2: \[\d, \d, \d\] = \d+$/);
-  H.chat(gm, { text: '/r banana' }); assert.equal(S.log.length, n + 1);
+test('chat legado é ignorado e o registro continua mostrando rolagens', () => {
+  reset();
+  const h = mk(ana, {});
+  handle(ana, { t: 'chat', text: 'oi' });
+  handle(gm, { t: 'chat', text: '/r d20' });
+  assert.deepEqual(S.log, []);
+  S.log.push({ kind: 'chat', who: 'Ana', text: 'mensagem antiga' });
+  H.roll(ana, { id: h.id, attr: 'FOR' });
+  for (const who of [ana, gm]) assert.deepEqual(view(who).log, [S.log.at(-1)]);
+  assert.equal(S.log.at(-1).rr.l, 'FOR');
 });
 test('mostrar a todos: só o mestre abre e recolhe; link ruim é descartado', () => {
   H.handout(ana, { text: 'oi' }); assert.equal(S.handout, null);

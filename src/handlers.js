@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { BASICS, ITEMS_V, VEHICLES, buildItems, buildSkills } from '../content.js';
-import { BASE, addLimit, aiAct, allDown, allOut, applySt, at, at0, bondAdd, breakVow, can, current, d100, delay, doAct, doDefend, doFocus, endTurn, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, newChar, normSlots, ofiSync, okUrl, onMap, partyRef, passive, pick, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, trig, usable, vows } from './rules.js';
+import { BASE, addLimit, aiAct, allDown, allOut, applySt, at, at0, bondAdd, breakVow, can, current, d100, delay, doAct, doDefend, doFocus, endTurn, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, newChar, normSlots, ofiSync, okUrl, onMap, partyRef, passive, pick, rid, sanPen, scene, skipping, slotMax, slotted, spawn, spot, trig, usable, vows } from './rules.js';
 import { S, inScene, log, newScene } from './state.js';
 import { ATTRS, BBG, CAMP, CLIMA, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, STN, TIER, VN, it, sk } from './consts.js';
 import { AR, GM, OF, RU } from './config.js';
@@ -20,7 +20,7 @@ const planOf = (C, a) => { const K = cmdOf(); if (K.for !== C || !K.plan) { K.pl
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
-const NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'tvSet', 'offMsg', 'uiSet']);
+const NOUNDO = new Set(['undo', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'tvSet', 'offMsg', 'uiSet']);
 // Desfazer por cena: cada cena tem a sua pilha. A foto guarda o estado global, a cena e os personagens que não estão em outra cena;
 // desfazer devolve isso e deixa intactas as outras cenas (e as batalhas delas) e quem está nelas.
 const undoBy = {};
@@ -53,7 +53,7 @@ const H = {
     if (okSc(p.sid)) S.scenes[p.sid] = p.sc;
     log('Mestre', 'desfez a última ação.');
   },
-  logClear(c) { if (c.role === 'gm') S.log = []; }, // mestre apaga o chat e o histórico de todos
+  logClear(c) { if (c.role === 'gm') S.log = []; }, // mestre apaga o registro de todos
   uiSet(c, { v }) { if (c.role === 'gm' && (v === '' || v === 'pincel')) S.ui = v; },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
@@ -605,18 +605,6 @@ const H = {
     log('Mestre', `restaurou o conteúdo padrão (${m.coll}).`);
   },
   bDel(c, m) { if (c.role === 'gm') delete S.bestiary[m.id]; },
-  // ----- chat: texto livre, /r 2d6+1d4+3, /w nome mensagem -----
-  chat(c, m) {
-    if (c.role === 'table') return;
-    const who = c.role === 'gm' ? 'Mestre' : c.name, me = c.role === 'gm' ? GM : c.name, text = String(m.text || '').trim().slice(0, 300), priv = c.role === 'gm' && m.secret ? { to: GM } : {};
-    let mm;
-    if (!text) return;
-    const dice = (mm = text.match(/^\/r(?:oll)?\s+(.+)$/i)) && rollExpr(mm[1]);
-    if (dice) log(who, `rolou ${dice.text}: ${dice.shown} = ${dice.total}`, 'ok', priv);
-    else if (mm) c.send?.(JSON.stringify({ t: 'note', kind: 'no', text: 'Rolagem não entendida.', why: 'Exemplos: /r 2d6+1 · /r d20 · /r 2d6+1d4+3' }));
-    else if ((mm = text.match(/^\/w\s+(\S+)\s+(.+)/i))) log(who, `(sussurro → ${mm[1]}) ${mm[2]}`, 'chat', { to: /^mestre$/i.test(mm[1]) ? GM : mm[1], from: me });
-    else log(who, text, 'chat');
-  },
   // ----- editores do mestre (skills / itens) -----
   edAdd(c, m) { if (c.role === 'gm' && Object.hasOwn(NEW, m.coll)) S[m.coll][rid()] = NEW[m.coll](); },
   edDel(c, m) {
