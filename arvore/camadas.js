@@ -351,11 +351,22 @@ export function camadas(TREE, preencher) {
       const c = Math.min(CAM, L0 + 1 + ord.length), i = rest.findIndex(s => min(s) <= c), s = rest.splice(i < 0 ? rest.reduce((m, x, k) => min(x) < min(rest[m]) ? k : m, 0) : i, 1)[0];
       ord.push(s);
     }
+    // Linha com mais nós que camadas livres: os v2 (cada Vínculo abre o próprio caminho) se espalham em vez de empilhar na 10.
+    // Tronco neutro sobe uma camada por nó (o último, o nó final, vai à 10); os v2 sobem de dois em dois a partir da base + 2, até a 9.
+    let esp = null;
+    if (ord.length > CAM - L0) {
+      const nv = ord.filter(s => !s.v2), v2s = ord.filter(s => s.v2), ult = new Map(); esp = new Map();
+      nv.forEach((s, k) => esp.set(s, k === nv.length - 1 && FINAL.test(s.n) ? CAM : Math.max(min(s), Math.min(CAM - 1, L0 + 1 + k))));
+      v2s.forEach((s, j) => { const l = Math.min(CAM, Math.max(min(s), Math.min(CAM - 1, L0 + 2 + Math.floor(j / 2)), (ult.get(s.v2) ?? 0) + 1)); esp.set(s, l); ult.set(s.v2, l); });
+      if (nv.length && ![...esp.values()].includes(CAM)) esp.set(nv.at(-1), CAM);
+      const pos = new Map(ord.map((s, i) => [s, i]));
+      ord.sort((x, y) => esp.get(x) - esp.get(y) || !!y.v2 - !!x.v2 || pos.get(x) - pos.get(y));
+    }
     b.length = 0; b.push(...ord);
     let tronco = b.de;
     const pontas = new Map();
     b.forEach((s, i) => {
-      marca(s, Math.max(min(s), Math.min(CAM, L0 + 1 + i)), 0);
+      marca(s, esp ? esp.get(s) : Math.max(min(s), Math.min(CAM, L0 + 1 + i)), 0);
       s.pre = pontas.get(s.v2) ?? tronco;
       if (s.v2) pontas.set(s.v2, s.n);
       else tronco = s.n;
