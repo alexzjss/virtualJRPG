@@ -13,6 +13,7 @@ import { H } from './src/handlers.js';
 import { view, handle, start, server, push } from './src/net.js';
 import { fix, importPack, autoBackup } from './src/campaign.js';
 import './src/mundo.js'; // mundo 3D: world por cena, migração do 2D, movimento e editor
+import './src/mundo-rede.js'; // mundo 3D: canal pos e projeção filtrada
 
 if (fresh) { seed(); fix(); }
 prep();

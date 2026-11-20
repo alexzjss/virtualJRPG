@@ -18,7 +18,7 @@ import { nodeOf } from './oficios.js';
 
 
 // ---------- http ----------
-const hooks = { api: null, store: () => ({ camps: [], backups: [] }) }; // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
+const hooks = { api: null, store: () => ({ camps: [], backups: [] }), view: (c, v) => v }; // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
 // abre o painel do mestre no navegador já com a chave (ela vai depois do #, que nunca sai do computador)
 const openGm = () => { const url = `http://localhost:${PORT}/gm#k=${encodeURIComponent(KEY)}`, [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   try { runCmd(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true }).on('error', () => {}).unref(); } catch {} };
@@ -140,7 +140,7 @@ const view = c => {
     const v = viewIn(c);
     v.scene = S.scene; v.battle = S.battle; // ponteiros não enumeráveis: o {...S} não os copia
     if (c.role !== 'gm') v.scenes = Object.fromEntries(Object.entries(v.scenes).map(([k, sc]) => [k, k === S.scene ? sc : { name: sc.name }])); // das outras cenas, só o nome (destino das saídas)
-    return v;
+    return hooks.view(c, v); // o mundo 3D filtra o world (sem rascunho nem ocultos)
   });
 };
 // As definições de skills e itens são ~85% do estado e quase nunca mudam: vão numa mensagem à parte ("defs"), só para quem ainda

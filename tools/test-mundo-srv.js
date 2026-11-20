@@ -50,7 +50,7 @@ test('migração: mover token no 2D leva ch.pos para o centro da casa', () => {
 
 // ----- walk -----
 const net = await import('../src/net.js');
-const cli = (name, sent = []) => ({ role: 'player', name, readyState: 1, sent, send: s => sent.push(JSON.parse(s)) });
+const cli = (name, sent = []) => ({ role: 'player', name, readyState: 1, sent, send: s => sent.push(JSON.parse(s)), ping() {}, terminate() {}, close() {} });
 let seq = 0, T = 1e6;
 MW.clock.now = () => T;
 const hero = (owner = 'Ana', x = 2, y = 2) => {
@@ -109,4 +109,43 @@ test('walk: não chama push', () => {
 test('walkGm teleporta sem validar e avisa o dono', () => {
   freshWorld(); const ch = hero(); handle(gm, { t: 'walkGm', id: ch.id, f: 'f0', x: 10.5, z: 7.5 });
   assert.deepEqual([ch.pos.x, ch.pos.z, ch.x, ch.y], [10.5, 7.5, 10, 7]);
+});
+
+// ----- canal pos e projeção -----
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const join = c => { net.wss.clients.add(c); return () => net.wss.clients.delete(c); };
+const posMsgs = c => c.sent.filter(m => m.t === 'pos' && m.l);
+
+test('pos: 10 clientes a 10 Hz geram um pos por cena a cada ~100 ms e nenhum push', async () => {
+  freshWorld(); const cs = [], hs = [], off = [];
+  for (let i = 0; i < 10; i++) { const c = cli('P' + i); cs.push(c); hs.push(hero('P' + i, 1 + i, 1)); off.push(join(c)); }
+  const n = net.pushes(); let k = 0;
+  const iv = setInterval(() => { T += 100; k++; hs.forEach((h, i) => walk(cs[i], h, h.pos.x, Math.min(10, h.pos.z + .3))); }, 100);
+  await sleep(360); clearInterval(iv); await sleep(120);
+  try {
+    assert.equal(net.pushes(), n);
+    for (const c of cs) { const p = posMsgs(c); assert.ok(p.length >= 2 && p.length <= 5, `recebeu ${p.length}`); assert.ok(p.every(m => m.sc === S.focus)); }
+    const last = posMsgs(cs[0]).at(-1).l; assert.ok(last.length >= 2 && last.every(r => r.length === 6));
+  } finally { off.forEach(f => f()); }
+});
+
+test('pos: cliente de outra cena não recebe', async () => {
+  freshWorld(); const c = cli('Ana'), ch = hero('Ana'), fora = cli('Zed'), off = [join(c), join(fora)];
+  H.addChar(gm, { owner: 'Zed' }); const z = Object.values(S.chars).find(o => o.owner === 'Zed'); z.scene = null; z.x = z.y = null;
+  T += 100; walk(c, ch, 2.8, 2.5); await sleep(150);
+  try { assert.equal(posMsgs(fora).length, 0); assert.ok(posMsgs(c).length >= 1); } finally { off.forEach(f => f()); }
+});
+
+test('view: ninguém recebe draft no state; jogador não recebe objeto oculto sem rev; mestre recebe', () => {
+  const sc = freshWorld(); hero('Ana');
+  sc.world.objs.o1 = { k: 'bau', f: 'f0', x: 1, y: 1, rot: 0, vis: 'oculto', auto: null, cfg: {} };
+  sc.world.objs.o2 = { k: 'armadilha', f: 'f0', x: 2, y: 1, rot: 0, vis: 'visivel', auto: null, cfg: {} };
+  sc.world.objs.o3 = { k: 'bau', f: 'f0', x: 3, y: 1, rot: 0, vis: 'oculto', auto: null, cfg: {}, rev: true };
+  sc.draft = structuredClone(sc.world);
+  const vp = net.view(cli('Ana')).scenes[S.focus], vg = net.view(gm).scenes[S.focus];
+  assert.equal(vp.draft, undefined); assert.equal(vg.draft, undefined);
+  assert.deepEqual(Object.keys(vp.world.objs).filter(k => k[0] === 'o').sort(), ['o3']);
+  assert.deepEqual(Object.keys(vg.world.objs).filter(k => k[0] === 'o').sort(), ['o1', 'o2', 'o3']);
+  assert.ok(sc.world.objs.o1, 'o filtro não mexe no estado');
+  delete sc.draft;
 });

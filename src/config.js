@@ -26,4 +26,5 @@ const IMG = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 
 const AUD = { 'audio/mpeg': '.mp3', 'audio/mp3': '.mp3', 'audio/ogg': '.ogg', 'audio/wav': '.wav', 'audio/x-wav': '.wav', 'audio/wave': '.wav', 'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a' };
 const MIME = { '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', ...Object.fromEntries(Object.entries(IMG).map(([m, e]) => [e, m])) };
 
-export { AR, AUD, DATA, FILE, GM, IMG, KEY, MIME, OF, PORT, PORTAL, PUB, RU, SEA, UP, VEND, dir, keyFile, seaMod };
+const MUNDO = process.env.VJ_MUNDO === '1'; // mundo 3D explorável ligado para todos (até a troca final, só em desenvolvimento)
+export { AR, AUD, DATA, FILE, GM, IMG, KEY, MIME, MUNDO, OF, PORT, PORTAL, PUB, RU, SEA, UP, VEND, dir, keyFile, seaMod };
