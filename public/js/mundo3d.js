@@ -28,6 +28,7 @@ function ensure() {
   return true;
 }
 const sceneId = () => S?.scene;
+const tema = (f, p) => { const P = globalThis.MPECAS; if (!f || !P) return ""; const d = P.decode(P.cell(f, Math.floor(p?.x ?? f.w / 2), Math.floor(p?.z ?? f.h / 2))); return d?.tema || ""; };
 const worldOf = () => { const sc = S?.scenes?.[sceneId()]; if (!sc) return null; return ctx.edit ? S.draft?.[sceneId()] || sc.world : sc.world; };
 const floorFor = w => { if (!w) return null; const id = ctx.floor || view.follow && S.chars[view.follow]?.pos?.f || w.floors[0]?.id; return w.floors.find(f => f.id === id) || w.floors[0]; };
 function resize() {
@@ -63,7 +64,9 @@ function frame(now) {
   resize(); placeCam(f);
   actors.update(S, f, now, dt, view.yaw, ctx);
   setCutaway(floorG, view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos), view.yaw, T); tickPecas(now);
-  fx.update(now, dt, cam, f);
+  const hp = view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos);
+  fx.torch(hp && hp.f === f?.id ? hp : null, w?.hora === "noite" || tema(f, hp) === "caverna");
+  fx.update(now, dt, cam, f, { x: view.tx, z: view.tz }, ctx);
   globalThis.MHUD?.tick?.(now);
   renderer.render(scene, cam);
 }

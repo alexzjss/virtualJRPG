@@ -70,3 +70,22 @@ test('atores: frente, costas e espelho seguem o rumo contra a câmera', async ()
   assert.equal(facing(rumo(1, -1), yaw).mirror, false); // direita da tela
   assert.equal(facing(rumo(1, -1), yaw + Math.PI).mirror, true); // girar a câmera 180° troca o lado
 });
+
+// luzes do tema: lava a cada 3 casas de perigo do vulcão, braseiro a cada 6 arestas de parede do castelo
+test('fx: pontos de luz da lava e dos braseiros', async () => {
+  const { lightPoints } = await import('../public/js/mundo3d-fx.js');
+  const f = P.newFloor('f0', 'T', 12, 12, 'castelo'), cell = P.unpack(f.cell, 144), wh = P.unpack(f.wallH, 12 * 13);
+  for (let x = 0; x < 6; x++) cell[x] = P.code('vulcao', 'perigo'); // linha 0: 6 casas de lava
+  for (let x = 0; x < 12; x++) wh[5 * 12 + x] = 1; // 12 arestas de parede no castelo
+  f.cell = P.pack(cell); f.wallH = P.pack(wh);
+  const pts = lightPoints(f);
+  assert.equal(pts.filter(p => p.k === 'lava').length, 2); // (0,0) e (3,0)
+  assert.equal(pts.filter(p => p.k === 'braseiro').length, 2); // 12 arestas / 6
+});
+test('fx: névoa por casa (0 escuro, 128 lembrado, 255 visível)', async () => {
+  const { fogData } = await import('../public/js/mundo3d-fx.js');
+  const seen = new Uint8Array(1); seen[0] = 0b0110; // casas 1 e 2 vistas, num andar 4×1
+  const d = fogData(4, 1, P.pack(seen), new Set(['2,0']));
+  assert.deepEqual([...d], [0, 128, 255, 0]);
+  assert.deepEqual([...fogData(4, 1, P.pack(seen), null)], [0, 255, 255, 0]); // sem visão calculada, o visto vale como visível
+});

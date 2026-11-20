@@ -14,6 +14,7 @@ const AGUA = { pantano: ['#4a7a50', '#2a4a34'], caverna: ['#3a6aa0', '#1a3060'],
 const PERIGO = { vulcao: '!#ff6a20', caverna: '!#7af0ff', pantano: '!#9adf40' }, PERIGO0 = '!#c050d0';
 const PAREDE = { floresta: '#7a5a3a', castelo: '#9a948a', praia: '#c8a870', neve: '#d8e0e8', deserto: '#c89860', caverna: '#5a5060', ruinas: '#9aa088', pantano: '#5a4a34', vulcao: '#3a3030', campo: '#a8885a' };
 const VAZIO = '!#05070c';
+const HORA_TINT = { dia: 0xffffff, tarde: 0xffd8b0, noite: 0x6a78a8 }; // o piso de imagem não recebe luz: tinge pelo horário
 
 // ----- geometria low-poly em código: partes coloridas fundidas numa só malha (cor por vértice) -----
 function merge(T, parts) {
@@ -75,15 +76,23 @@ function edgeGeos(T) {
   };
 }
 
-// ----- materiais: toon de 3 tons, contorno, água ondulando; uniformes do cutaway compartilhados -----
-const U = { uCut: { value: null }, uCutR: { value: CUT_R }, uCutOn: { value: 0 }, uCamDir: { value: null }, uTime: { value: 0 } };
+// ----- materiais: toon de 3 tons, contorno, água ondulando; uniformes do cutaway e da névoa compartilhados (fx escreve a névoa) -----
+export const U = { uCut: { value: null }, uCutR: { value: CUT_R }, uCutOn: { value: 0 }, uCamDir: { value: null }, uTime: { value: 0 }, uFog: { value: null }, uFogOn: { value: 0 }, uFogWH: { value: null } };
 let GRAD = null;
 function gradMap(T) { if (GRAD) return GRAD; GRAD = new T.DataTexture(new Uint8Array([90, 90, 90, 255, 170, 170, 170, 255, 255, 255, 255, 255]), 3, 1, T.RGBAFormat); GRAD.minFilter = GRAD.magFilter = T.NearestFilter; GRAD.generateMipmaps = false; GRAD.needsUpdate = true; return GRAD; }
-// injeta o cutaway (e a ondulação, na água) no shader de vértice
+// injeta o cutaway (e a ondulação, na água) no shader de vértice e a névoa no de fragmento.
+// Névoa (textura R8 w×h, linear): 1 visível, 0,5 lembrado (dessatura 35% e escurece 55%), 0 escuro (#05070c). A cor já está em sRGB nesse ponto.
+const FOG_FRAG = `if (uFogOn > 0.5) {
+  float fv = texture2D(uFog, vFogXZ / uFogWH).r; vec3 c = gl_FragColor.rgb, dk = vec3(0.0196, 0.0275, 0.047);
+  vec3 rem = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), 0.35) * 0.45;
+  gl_FragColor.rgb = fv >= 0.5 ? mix(rem, c, (fv - 0.5) * 2.0) : mix(dk, rem, fv * 2.0);
+}
+#include <dithering_fragment>`;
 function cutShader(mat, { cut = false, wave = false, grow = 0 } = {}) {
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'uniform vec3 uCut; uniform float uCutR; uniform float uCutOn; uniform vec3 uCamDir; uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.fragmentShader = 'uniform sampler2D uFog; uniform float uFogOn; uniform vec2 uFogWH; varying vec2 vFogXZ;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', FOG_FRAG);
+    sh.vertexShader = 'uniform vec3 uCut; uniform float uCutR; uniform float uCutOn; uniform vec3 uCamDir; uniform float uTime; varying vec2 vFogXZ;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
 ${grow ? `transformed *= ${(1 + grow).toFixed(3)};` : ''}
 #ifdef USE_INSTANCING
   vec3 cutO = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -91,7 +100,12 @@ ${grow ? `transformed *= ${(1 + grow).toFixed(3)};` : ''}
   vec3 cutO = (modelMatrix * vec4(transformed, 1.0)).xyz;
 #endif
 ${cut ? `{ vec2 dd = cutO.xz - uCut.xz; if (uCutOn > 0.5 && length(dd) < uCutR && dot(dd, uCamDir.xz) > -0.6) transformed.y *= 0.18; }` : ''}
-${wave ? `transformed.y += sin(uTime * 1.6 + (cutO.x + transformed.x) * 2.1) * 0.025 + cos(uTime * 1.2 + (cutO.z + transformed.z) * 1.7) * 0.02;` : ''}`);
+${wave ? `transformed.y += sin(uTime * 1.6 + (cutO.x + transformed.x) * 2.1) * 0.025 + cos(uTime * 1.2 + (cutO.z + transformed.z) * 1.7) * 0.02;` : ''}
+#ifdef USE_INSTANCING
+  vFogXZ = cutO.xz + vec2(0.001);
+#else
+  vFogXZ = cutO.xz;
+#endif`);
   };
   mat.customProgramCacheKey = () => 'mw' + (cut ? 'c' : '') + (wave ? 'w' : '') + grow;
   return mat;
@@ -99,14 +113,14 @@ ${wave ? `transformed.y += sin(uTime * 1.6 + (cutO.x + transformed.x) * 2.1) * 0
 function materials(T, pal) {
   const ink = pal?.INK || '#1c3038', toon = o => new T.MeshToonMaterial({ gradientMap: gradMap(T), vertexColors: true, ...o });
   return {
-    chao: toon({}), // chão
+    chao: cutShader(toon({})), // chão
     peca: cutShader(toon({}), { cut: true }),
-    pecaBaixa: toon({}),
+    pecaBaixa: cutShader(toon({})),
     contorno: cutShader(new T.MeshBasicMaterial({ color: ink, side: T.BackSide }), { cut: true, grow: .04 }),
     contornoBaixo: cutShader(new T.MeshBasicMaterial({ color: ink, side: T.BackSide }), { grow: .06 }),
     agua: cutShader(new T.MeshToonMaterial({ gradientMap: gradMap(T), transparent: true, opacity: .86 }), { wave: true }),
-    perigo: new T.MeshBasicMaterial({}),
-    barreira: new T.MeshBasicMaterial({ color: 0x7ae0ff, transparent: true, opacity: .42, depthWrite: false }),
+    perigo: cutShader(new T.MeshBasicMaterial({})),
+    barreira: cutShader(new T.MeshBasicMaterial({ color: 0x7ae0ff, transparent: true, opacity: .42, depthWrite: false })),
   };
 }
 
@@ -126,7 +140,7 @@ function paintImg(T, mat, img) {
   raster(img.url).then(cv => {
     const t = new T.CanvasTexture(cv), c = img.crop || { x: 0, y: 0, w: 1, h: 1 };
     t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; t.repeat.set(c.w, c.h); t.offset.set(c.x, 1 - c.y - c.h);
-    mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true;
+    mat.map = t; mat.color.set(mat.userData.tint ?? 0xffffff); mat.needsUpdate = true;
   }).catch(() => console.warn('Mundo 3D: imagem do mapa não carregou', img.url));
 }
 
@@ -196,7 +210,7 @@ export function buildFloor(T, f, w, pal, opts = {}) {
       if (outline) { const ol = new T.InstancedMesh(gm, kind === 'b' ? mats.contornoBaixo : mats.contorno, list.length); ol.instanceMatrix = im.instanceMatrix; ol.boundingSphere = im.boundingSphere; ol.name = k + ':contorno'; blk.add(ol); }
     }
   }
-  if (f.img?.url) { const pg = new T.PlaneGeometry(f.w, f.h); pg.rotateX(-Math.PI / 2); pg.translate(f.w / 2, 0, f.h / 2); const mat = new T.MeshBasicMaterial({ color: 0x5a7a4a }); paintImg(T, mat, f.img); const ch = new T.Mesh(pg, mat); ch.name = 'chao'; root.add(ch); }
+  if (f.img?.url) { const pg = new T.PlaneGeometry(f.w, f.h); pg.rotateX(-Math.PI / 2); pg.translate(f.w / 2, 0, f.h / 2); const mat = cutShader(new T.MeshBasicMaterial({ color: 0x5a7a4a })); mat.userData.tint = HORA_TINT[hora] ?? 0xffffff; paintImg(T, mat, f.img); const ch = new T.Mesh(pg, mat); ch.name = 'chao'; root.add(ch); }
   return root;
 }
 // cutaway: liga e posiciona o recorte em volta do herói (camDir = yaw da câmera)
