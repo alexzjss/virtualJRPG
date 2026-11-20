@@ -373,3 +373,76 @@ body.ui-pincel .gms.pcm .gph b{font-weight:600;font-size:20px}
 .pcm-fim{padding:14px 18px}.pcm-fim b{font:600 22px var(--pc-disp)}.pcm-fim p{margin:4px 0 10px;font:italic 16px var(--pc-disp);color:var(--pc-dim)}
 .pcm-fim div{display:flex;gap:8px}.pcm-fim div button{min-height:0;padding:6px 14px;border:1px solid #efe6d433;border-radius:2px;background:none;color:var(--pc-tx);font:600 16px var(--pc-disp)}
 body.ui-pincel .cm-skip::before{content:"";position:absolute;inset:0 -6px;z-index:-1;background:var(--pc-tinta);-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
+/* ===== mestre fora do combate (F6) ===== */
+/* Mesa: cenas em cartões pintados; o cartão em foco tem fio de ouro; heróis em losangos com "ver como" ao passar o mouse */
+body.ui-pincel .pcm-mesa{background:radial-gradient(ellipse at 50% 0,#17130d,#08090b 70%);font-family:var(--pc-disp);color:var(--pc-tx)}
+.pcm-mesa,.pcm-mesa *{text-transform:none;letter-spacing:normal}
+.pcm-mesa .mz-top{border-bottom:1px solid #c9a56a33;gap:10px}
+body.ui-pincel .pcm-mesa .mz-top>button,body.ui-pincel .pcm-mesa .mz-more summary{min-height:0;padding:7px 16px;border:1px solid #efe6d433;border-radius:2px;background:none;box-shadow:none;color:var(--pc-tx);font:600 18px var(--pc-disp)}
+body.ui-pincel .pcm-mesa .mz-top>button.own{border-color:var(--pc-ouro);color:var(--pc-ouro)}
+body.ui-pincel .pcm-mesa .mz-top>[aria-expanded=true]{border-color:var(--pc-ouro);color:#fff6dc}
+.pcm-mesa .mz-more summary::after{color:var(--pc-ouro)}
+.pcm-mesa .mz-options{background:#08090bf5;border:0;border-left:2px solid var(--pc-ouro)}
+.pcm-mesa .mz-board{gap:18px;padding:20px}
+.pcm-mesa .mz-col{flex-basis:250px;background:#0d0c0a;border:0;box-shadow:0 0 0 1px #efe6d41f,0 14px 30px #0009}
+.pcm-mesa .mz-col.focus{box-shadow:0 0 0 1.5px var(--pc-ouro),0 0 26px #c9a56a33,0 14px 30px #0009}
+.pcm-mesa .mz-col.over{transform:translateY(-3px);box-shadow:0 0 0 1.5px #fff6dc,0 12px 30px #c9a56a44}
+.pcm-mesa .mz-thumb{height:150px}
+.pcm-mesa .mz-thumb::after{background:linear-gradient(transparent 35%,#08090bf0)}
+.pcm-mesa .mz-thumb b{bottom:10px;font:600 25px/1.05 var(--pc-disp);text-shadow:0 2px 8px #000}
+.pcm-mesa .mz-tags em{font:italic 14px var(--pc-disp);background:#08090bcc;padding:1px 8px}.pcm-mesa .mz-tags em.tv{background:var(--pc-ouro)}
+.pcm-mesa .mz-bat{position:relative;isolation:isolate;margin:6px 8px 0;padding:6px 16px 8px;background:none;font:italic 600 16px var(--pc-disp);color:#f3a7b3}
+.pcm-mesa .mz-bat::before{content:"";position:absolute;inset:0 -4px;z-index:-1;background:#2a0d13;-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
+.pcm-mesa .mz-bat:hover,.pcm-mesa .mz-bat.wait{background:none;color:#fff6dc}
+.pcm-mesa .mz-meta{font:italic 15px var(--pc-disp);color:var(--pc-dim);border-bottom:1px solid #efe6d41a;gap:10px}
+.pcm-mesa .mz-drop{min-height:130px;gap:12px 10px;padding:14px 12px}
+.pcm-mesa .mz-empty{font:italic 15px var(--pc-disp);color:#6e6658}
+.pcm-mesa .mz-hero{width:64px}
+.pcm-mesa .mz-face{width:60px;height:60px;margin:0 auto 2px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);font:600 22px var(--pc-disp);font-style:normal;color:#08090b}
+.pcm-mesa .mz-hero:hover .mz-face{transform:scale(1.06)}
+.pcm-mesa .mz-hero.sel .mz-face{outline:1.5px solid var(--pc-ouro);outline-offset:4px}
+.pcm-mesa .mz-hero small{font:600 15px var(--pc-disp);margin-top:3px;text-transform:none;letter-spacing:0}
+.pcm-mesa .mz-hp{height:2px;background:#efe6d41f;margin:0 8px}
+.pcm-mesa .mz-on{right:4px;top:0}
+.pcm-mesa .pcm-pov{position:absolute;left:50%;top:-6px;translate:-50% 0;min-height:0;padding:1px 8px;border:1px solid var(--pc-ouro);border-radius:2px;background:#08090bf0;color:var(--pc-ouro);font:italic 13px var(--pc-disp);white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s}
+.pcm-mesa .mz-hero:hover .pcm-pov,.pcm-mesa .pcm-pov:focus-visible{opacity:1;pointer-events:auto}
+.pcm-mesa .mz-col.off{background:repeating-linear-gradient(135deg,#0b0a08 0 10px,#0f0e0b 10px 20px);box-shadow:0 0 0 1px #efe6d41f}
+.pcm-mesa .mz-col.off .mz-thumb{height:80px;background:#0f0e0b}
+.pcm-mesa .mz-msg{background:#efe6d40a;border:0;border-bottom:1px solid #efe6d433;color:var(--pc-tx);font:italic 15px var(--pc-disp)}
+.pcm-mesa .mz-side{background:#08090b;border-left:1px solid #c9a56a33}
+.pcm-mesa .mz-side h2{font:600 28px var(--pc-disp)}
+.pcm-mesa .mz-h{font:italic 15px var(--pc-disp);color:var(--pc-ouro)}
+.pcm-mesa .mz-note{font:italic 14px var(--pc-disp)}
+.pcm-mesa .mz-li{background:#efe6d40a;font:600 15px var(--pc-disp)}.pcm-mesa .mz-li.req{border-left-color:var(--pc-ouro);background:#1a160f}
+.pcm-mesa .mz-ex{background:var(--pc-ouro);font:italic 12px var(--pc-disp)}
+.pcm-mesa .mz-selbar{background:#08090bf5;border:0;border-top:1.5px solid var(--pc-ouro);font:600 16px var(--pc-disp)}
+.pcm-mesa .mz-box{background:#0d0c0a;border:0;border-top:2px solid var(--pc-ouro)}.pcm-mesa .mz-box h2{font:600 26px var(--pc-disp)}
+.pcm-mesa .mz-opt{font-family:var(--pc-disp)}
+.pcm-mesa .mz-pov header{font-family:var(--pc-disp);text-transform:none;letter-spacing:0;background:#08090b;border-bottom:1px solid var(--pc-ouro)}
+/* Mundo: o editor fica igual; ganha moldura de ouro fino, cantos de tinta e a barra em serifa */
+body.ui-pincel .gms.pcm .gview[data-view="mapa"]{position:relative;background:#08090b}
+body.ui-pincel .gms.pcm .gview[data-view="mapa"]::after{content:"";position:absolute;inset:6px;pointer-events:none;z-index:5;box-shadow:inset 0 0 0 1px #c9a56a55,inset 0 0 40px #000a}
+body.ui-pincel .gms.pcm .medit-bar{font-family:var(--pc-disp);padding:8px 12px 10px}
+body.ui-pincel .gms.pcm .medit-bar button{border-radius:2px;font:600 15px var(--pc-disp);text-transform:none;letter-spacing:0;background:none;border:1px solid #efe6d433;color:var(--pc-tx)}
+body.ui-pincel .gms.pcm .medit-bar button.on,body.ui-pincel .gms.pcm .medit-bar button[aria-pressed="true"]{border-color:var(--pc-ouro);color:var(--pc-ouro)}
+/* Catálogo: abas no alto do painel largo; o resto em tinta e serifa */
+body.ui-pincel .gms.pcm .gph.pcm-cat{gap:0;padding-left:8px;background:#08090b;border-bottom:1px solid #c9a56a55}
+.pcm-abas{flex:1;display:flex;gap:2px;overflow-x:auto}
+body.ui-pincel .pcm-abas button{position:relative;isolation:isolate;min-height:0;padding:9px 22px 11px;border:0;border-radius:0;background:none;box-shadow:none;color:var(--pc-dim);font:600 19px var(--pc-disp);text-transform:none;letter-spacing:0;white-space:nowrap}
+body.ui-pincel .pcm-abas button:hover{background:none;color:var(--pc-tx)}
+body.ui-pincel .pcm-abas button.on{color:#fff6dc}
+.pcm-abas button.on::before{content:"";position:absolute;inset:2px -4px;z-index:-1;background:#1a160f;-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat}
+.pcm-abas button.on::after{content:"";position:absolute;left:22px;right:22px;bottom:6px;height:1.5px;background:var(--pc-ouro)}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gpanel{background:#0b0a08}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gbody{font-family:var(--pc-disp)}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gbody h4,body.ui-pincel .gms.pcm-catalogo .gside.L .gbody summary{font-family:var(--pc-disp);text-transform:none;letter-spacing:0}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gbody input[type=search],body.ui-pincel .gms.pcm-catalogo .gside.L .gbody input:not([type]){font:italic 16px var(--pc-disp)}
+body.ui-pincel .gms.pcm .maptools{gap:4px;padding:6px 8px;background:#08090bf0;border:0;border-top:1px solid #c9a56a66;box-shadow:0 8px 24px #000a}
+body.ui-pincel .gms.pcm .maptools>button,body.ui-pincel .gms.pcm .gm-map-menu>summary{min-height:0;border:1px solid #efe6d433;border-radius:2px;background:none;color:var(--pc-tx);font:600 16px var(--pc-disp);text-transform:none;letter-spacing:0}
+body.ui-pincel .gms.pcm .gm-map-menu>div{background:#08090bf5;border:0;border-left:2px solid var(--pc-ouro);font-family:var(--pc-disp)}
+body.ui-pincel .gms.pcm .gm-map-menu>div button{font:600 15px var(--pc-disp);text-transform:none;letter-spacing:0}
+/* Catálogo como modo: o painel largo ocupa o centro inteiro; botões e títulos sem caixa alta */
+body.ui-pincel .gms.pcm-catalogo.lwide .gside.L .gpanel{width:calc(100vw - var(--wr) - 8px);box-shadow:none}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gbody button,body.ui-pincel .gms.pcm-catalogo .gside.L .gbody b,body.ui-pincel .gms.pcm-catalogo .gside.L .gbody h3,body.ui-pincel .gms.pcm-catalogo .gside.L .gbody label{text-transform:none;letter-spacing:0}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gbody button{font-family:var(--pc-disp);font-weight:600;font-size:15px;border-radius:2px}
+body.ui-pincel .gms.pcm-catalogo .gside.L .gbody .bcard b,body.ui-pincel .gms.pcm-catalogo .gside.L .gbody h3{font-family:var(--pc-disp);font-weight:600}

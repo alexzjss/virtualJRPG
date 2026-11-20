@@ -25,7 +25,18 @@
       <div class="pcm-herois" aria-label="Heróis da cena">${herois.map(c => `<button type="button" class="pcm-h ${c.hp > 0 ? '' : 'ko'}" data-g="panel" data-id="f_${c.id}" style="--c:${E(c.color)}" title="${E(c.name)} · Vida ${c.hp}/${c.hpMax} · abre a ficha"><span class="rt">${foto(c)}</span><span class="vd"><i style="width:${pct(c.hp, c.hpMax)}%"></i></span></button>`).join('')}</div>
       <div class="pcm-acoes"><button type="button" class="pcm-selo ${nReq ? 'tem' : ''}" data-g="rtab" data-id="pedidos" aria-label="Pedidos: ${nReq}" title="Pedidos dos jogadores">Pedidos<em class="pc-num">${nReq}</em></button>${regras}${tools}</div></header>`;
   };
-  if (typeof gmLayout === 'function') { const L0 = gmLayout; g.gmLayout = gmLayout = function (body, center) { const h = L0(body, center); if (!on()) return h; return h.replace(/<header class="gtop">[\s\S]*?<\/header>/, m => topo(m, !!center.parts)).replace('<div class="gms ', '<div class="gms pcm '); }; }
+  // Catálogo: as cinco telas viram abas no alto do painel largo (bestiário, itens, skills, ofícios e armas)
+  const CAT = (typeof GTOOLS !== 'undefined' && GTOOLS['Catálogo']) || ['best', 'items', 'skills', 'ofcat', 'armas'];
+  const abasCat = h => { if (!sideOpen('L') || !CAT.includes(gui.L)) return h;
+    const abas = `<nav class="pcm-abas" aria-label="Catálogo">${CAT.map(k => `<button type="button" class="${gui.L === k ? 'on' : ''}" data-g="panel" data-id="${k}" aria-pressed="${gui.L === k}">${E(tabTitle(k))}</button>`).join('')}</nav>`;
+    return h.replace(/(<section class="gpanel" data-win="[^"]*">)<header class="gph"><b>[\s\S]*?<\/b>/, (m, a) => `${a}<header class="gph pcm-cat">${abas}`); };
+  if (typeof gmLayout === 'function') { const L0 = gmLayout; g.gmLayout = gmLayout = function (body, center) { const h = L0(body, center); if (!on()) return h;
+    const cat = sideOpen('L') && CAT.includes(gui.L);
+    return abasCat(h.replace(/<header class="gtop">[\s\S]*?<\/header>/, m => topo(m, !!center.parts))).replace('<div class="gms ', `<div class="gms pcm ${cat ? 'pcm-catalogo' : ''} `); }; }
+  // Mesa: cada herói com dono ganha "ver como" (a tela do jogador numa janela por cima, só para o mestre)
+  if (typeof MESA !== 'undefined') { const M0 = MESA.html; MESA.html = function () { const h = M0.apply(this, arguments); if (!on()) return h;
+    return h.replace(/<div class="mesa">/, '<div class="mesa pcm-mesa">').replace(/(<div class="mz-hero[^"]*" draggable="true" data-mz="h" data-id="([^"]+)"[^>]*>)([\s\S]*?<\/small>)<\/div>/g, (m, a, id, rest) => { const c = S.chars[id];
+      return c?.owner ? `${a}${rest}<button type="button" class="pcm-pov" data-mz="pov" data-k="${E(c.owner)}" title="Ver a tela de ${E(c.owner)}" aria-label="Ver como ${E(c.owner)}">ver como</button></div>` : m; }); }; }
 
   // ---------- HUD de combate do mestre ----------
   const ferramentas = () => {
