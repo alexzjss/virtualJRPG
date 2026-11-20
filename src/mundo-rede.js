@@ -93,7 +93,7 @@ function visFilter(c, sc, sid) {
   for (const [id, o] of Object.entries(sc.world.objs)) {
     if ((o.vis === 'oculto' || o.k === 'armadilha') && !o.rev) continue;
     if (o.k === 'inimigo' && S.chars[o.cfg?.ch] && !canSee(c, S.chars[o.cfg.ch], sid)) continue;
-    objs[id] = o;
+    objs[id] = o.k === 'armadilha' && o.cfg?.tent ? { ...o, cfg: (({ tent, ...r }) => r)(o.cfg) } : o; // quem já tentou perceber fica com o mestre
   }
   return { ...sc.world, objs };
 }

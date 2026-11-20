@@ -23,11 +23,11 @@ const NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userP
 // desfazer devolve isso e deixa intactas as outras cenas (e as batalhas delas) e quem está nelas.
 const undoBy = {};
 // pisou numa saída: pedido de passagem na fila do mestre (um por jogador); S.auto.pass ou o mestre jogando pelo jogador passam direto
-const passReq = (c, ch) => {
-  const ex = scene().exits.find(e => e.x === ch.x && e.y === ch.y); if (!ex || !S.scenes[ex.to]) return;
-  if (S.auto.pass || c.ctl || c.appr) return H.moveTo({ role: 'gm' }, { ids: [ch.id], scene: ex.to });
+const passReq = (c, ch, to, dest = '') => { // sem to: a saída 2D onde o herói pisou; com to: portal do 3D (dest = objeto de chegada)
+  if (!to) { const ex = scene().exits?.find(e => e.x === ch.x && e.y === ch.y); if (!ex) return; to = ex.to; } if (!S.scenes[to]) return;
+  if (S.auto.pass || c.ctl || c.appr) return H.moveTo({ role: 'gm' }, { ids: [ch.id], scene: to, dest });
   for (const [id, r] of Object.entries(S.reqs)) if (r.by === c.name) delete S.reqs[id];
-  S.reqs[rid()] = { by: c.name, ch: ch.id, cat: 'pass', t: 'pass', text: `passar para ${S.scenes[ex.to].name}`, n: ++S.seq, sc: S.scene, m: { id: ch.id, to: ex.to } };
+  S.reqs[rid()] = { by: c.name, ch: ch.id, cat: 'pass', t: 'pass', text: `passar para ${S.scenes[to].name}`, n: ++S.seq, sc: S.scene, m: { id: ch.id, to, dest } };
 };
 const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
 const undoPush = sid => { if (!okSc(sid)) return; const st = undoBy[sid] ??= [];
@@ -556,7 +556,7 @@ const H = {
     delete S.reqs[m.id];
     const mod = int(m.mod, -100, 100), n = S.seq;
     const rc = S.chars[r.m.id], rsc = r.sc !== undefined ? r.sc : rc && Object.hasOwn(S.scenes, rc.scene) ? rc.scene : null; // roda na cena em que o pedido nasceu
-    if (r.cat === 'pass') return void inScene(rsc, () => H.moveTo(c, { ids: [r.m.id], scene: r.m.to, exit: r.m.exit }));
+    if (r.cat === 'pass') return void inScene(rsc, () => H.moveTo(c, { ids: [r.m.id], scene: r.m.to, exit: r.m.exit, dest: r.m.dest }));
     inScene(rsc, () => H[r.t]({ role: 'player', name: r.by, appr: true, send() {} }, { ...r.m, mod: int(r.m.mod, -100, 100) + mod, secret: !!m.secret && r.cat === 'roll', txt: r.t === 'ofiUse' ? String(m.txt || '').slice(0, 200) : '', adv: r.cat === 'roll' && ['adv', 'dis'].includes(m.adv) ? m.adv : '' }));
     tell(r.by, S.seq === n && r.cat !== 'item' && r.cat !== 'camp' ? { kind: 'no', text: `${r.text}: não foi possível agora.` } : { kind: 'ok', text: `Aprovado: ${r.text}${mod ? ` (${mod > 0 ? '+' : ''}${mod})` : ''}` });
   },
@@ -757,4 +757,4 @@ const H = {
   },
 };
 
-export { H, NOUNDO, undoBy, undoClear, undoPush };
+export { H, NOUNDO, passReq, undoBy, undoClear, undoPush };

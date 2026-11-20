@@ -1,12 +1,12 @@
 // ===== mundo 3D: interagir com objetos do mapa (portas, baús, itens, placas…) =====
 // interact {id, obj, opt}: o herói precisa estar no mesmo andar, a até 1,5 casa do objeto, vendo a casa dele (névoa) e o objeto não pode
 // estar oculto. Quem decide se vira pedido é o net.js (gateOf → hooks.interGate): auto=false sempre pede; null segue S.auto.inter.
-import { S, log } from './state.js';
-import { H } from './handlers.js';
-import { can } from './rules.js';
-import { GM } from './config.js';
-import { hooks, wss } from './net.js';
-import { MH, unstuck } from './mundo.js';
+import { S, inScene, log } from './state.js';
+import { H, passReq } from './handlers.js';
+import { applySt, at, can, d100, hurt } from './rules.js';
+import { GM, MUNDO, RU } from './config.js';
+import { hooks, push, wss } from './net.js';
+import { MH, floorOf, place, unstuck } from './mundo.js';
 
 const EDGE = new Set(['porta', 'barreira']);
 const objOf = m => { const ch = S.chars[m?.id], sc = S.scenes[ch?.scene]; return { ch, sc, o: sc?.world?.objs?.[m?.obj] }; };
@@ -38,6 +38,60 @@ function soPara(c, msg) {
   wss.clients.forEach(x => x.role === 'player' && x.name === c.name && x.readyState === 1 && x.send(out));
 }
 const portaMuda = (sc, sid) => { unstuck(sc); MH.vision(sid); };
+let pend = false; const later = () => { if (pend) return; pend = true; queueMicrotask(() => { pend = false; push(false); }); }; // andar é QUIET: o que muda o state pede push
+// casa livre mais perto de (x, y): sem peça/aresta bloqueando e sem outro personagem em cima (anéis crescentes)
+function livre(sc, f, x0, y0, ch) {
+  const C = globalThis.MCOL, busy = new Set(Object.values(S.chars).filter(o => o !== ch && o.scene === ch.scene && o.pos?.f === f.id).map(o => o.x + ',' + o.y));
+  const ok = (x, y) => x >= 0 && y >= 0 && x < f.w && y < f.h && !busy.has(x + ',' + y) && !C.blockedAt(f, sc.world.objs, x + .5, y + .5, false);
+  for (let r = 0; r < Math.max(f.w, f.h); r++) for (let y = y0 - r; y <= y0 + r; y++) for (let x = x0 - r; x <= x0 + r; x++) if (Math.max(Math.abs(x - x0), Math.abs(y - y0)) === r && ok(x, y)) return [x, y];
+  return [Math.min(f.w - 1, Math.max(0, x0)), Math.min(f.h - 1, Math.max(0, y0))];
+}
+// chegada numa cena do 3D: objeto de destino, senão o "surgir" da cena, senão o centro do primeiro andar
+function arrive(ch, sc, dest) {
+  const w = sc.world, o = (dest && w.objs[dest]) || Object.values(w.objs).find(v => v?.k === 'surgir'), f = (o && floorOf(sc, o.f)) || w.floors[0]; if (!f) return;
+  const [x, y] = livre(sc, f, o ? o.x : Math.floor(f.w / 2), o ? o.y : Math.floor(f.h / 2), ch); place(ch, sc, f, x + .5, y + .5, ch.pos?.d);
+}
+const moveTo0 = H.moveTo;
+H.moveTo = (c, m) => { // a passagem de cena (saída 2D, portal ou mestre) põe o herói no lugar certo do 3D
+  moveTo0(c, m); if (c.role !== 'gm' || !m?.scene) return;
+  const sc = S.scenes[m.scene]; if (!sc?.world || !(m.dest || MUNDO || !sc.world.legacy)) return;
+  for (const id of Array.isArray(m.ids) ? m.ids : []) { const ch = S.chars[id]; if (ch?.scene === m.scene && !ch.enemy) inScene(m.scene, () => arrive(ch, sc, m.dest)); }
+};
+// ----- armadilhas: percepção passiva (SAB, uma vez por herói) a até 2 casas e esquiva (AGI) ao pisar -----
+const alvo = (ch, a, dif) => Math.min(95, Math.max(1, at(ch, a) - (dif || 0))); // dificuldade sai do atributo, como nos testes de porta e baú
+function pisou(ch, sc) {
+  if (!sc?.world || ch.enemy || ch.npc || ch.summon || !ch.pos || sc.battle?.active) return;
+  const sid = ch.scene;
+  for (const [id, t] of Object.entries(sc.world.objs)) {
+    if (t?.k !== 'armadilha' || t.f !== ch.pos.f) continue;
+    if (!t.rev && !t.cfg.tent?.[ch.id] && Math.max(Math.abs(t.x - ch.x), Math.abs(t.y - ch.y)) <= 2) {
+      const tg = alvo(ch, 'SAB', t.cfg.perc), r = d100(); t.cfg.tent = { ...t.cfg.tent, [ch.id]: 1 };
+      log(ch.name, `Percepção SAB ${tg}% → ${r}: ${r <= tg ? 'percebeu uma armadilha' : 'não percebeu nada'}`, r <= tg ? 'ok' : '', { to: GM });
+      if (r <= tg) { t.rev = true; log(ch.name, 'percebeu uma armadilha!', 'ok'); later(); }
+    }
+    if (t.x !== ch.x || t.y !== ch.y) continue;
+    const tg = alvo(ch, 'AGI', t.cfg.esq), r = d100(), ok = r <= tg, res = r <= Math.max(1, Math.floor(tg / 10)) ? 'CRÍTICO' : ok ? 'Sucesso' : r >= 96 ? 'DESASTRE' : 'Falha';
+    const dano = ok ? Math.floor((t.cfg.dano || 0) / 2) : t.cfg.dano || 0, cond = !ok && t.cfg.cond && Object.hasOwn(RU.ST, t.cfg.cond) ? t.cfg.cond : '';
+    const note = inScene(sid, () => { const n = dano > 0 ? hurt(ch, dano) || '' : ''; if (cond) applySt(ch, cond); return n; });
+    log(ch.name, `Armadilha! Esquiva AGI ${tg}% → ${r}: ${res}. ${dano} de dano${cond ? ' e ' + (RU.ST[cond]?.n || RU.ST[cond] || cond) : ''}.${note || ''}`, ok ? 'ok' : 'bad', { d: r, rr: { l: 'Esquiva · AGI', t: tg, res, c: ch.id } });
+    if (t.cfg.rearma) t.rev = true; else { delete sc.world.objs[id]; if (sc.draft?.objs) delete sc.draft.objs[id]; }
+    later();
+  }
+}
+// pisos 'perigo' (lava, veneno): 3% do HP máximo por segundo, no mínimo 1, fora da batalha
+function perigoTick() {
+  let hit = false; const P = globalThis.MPECAS;
+  for (const [sid, sc] of Object.entries(S.scenes)) {
+    if (!sc?.world || sc.battle?.active) continue;
+    for (const ch of Object.values(S.chars)) {
+      if (ch.scene !== sid || ch.enemy || ch.summon || !ch.pos || ch.x == null || !(ch.hp > 0)) continue;
+      const f = floorOf(sc, ch.pos.f); if (!f || P.tipoOf(P.cell(f, ch.x, ch.y)) !== 'perigo') continue;
+      inScene(sid, () => hurt(ch, Math.max(1, Math.round(ch.hpMax * .03)))); hit = true;
+    }
+  }
+  if (hit) push(false);
+}
+const tick = setInterval(() => { try { perigoTick(); } catch (e) { console.error('Falha no dano de perigo:', e); } }, 1000); tick.unref?.();
 const heroesIn = sid => Object.values(S.chars).filter(o => o.scene === sid && !o.enemy && !o.npc && !o.summon && o.pos && o.x != null);
 const toAll = (sid, msg) => { const out = JSON.stringify(msg); wss.clients.forEach(x => x.readyState === 1 && (x.role === 'gm' || x.role === 'table' || (x.role === 'player' && heroesIn(sid).some(h => h.owner === x.name))) && x.send(out)); };
 // abrir, fechar ou alternar portas e barreiras; mostrar, ocultar ou alternar os outros objetos. Devolve true se mexeu em porta/barreira
@@ -131,6 +185,12 @@ const objActs = {
     o.cfg.estado = o.cfg.estado === 'ligada' ? 'desligada' : 'ligada'; log(ch.name, 'puxou a alavanca.', '');
     if (portas) portaMuda(sc, ch.scene);
   },
+  escada(c, ch, o, m, sc) {
+    const p = o.cfg.para, f = p && floorOf(sc, p.f); if (!f) return;
+    const [x, y] = livre(sc, f, Math.min(p.x, f.w - 1), Math.min(p.y, f.h - 1), ch); place(ch, sc, f, x + .5, y + .5, ch.pos.d); ch._b = undefined;
+    log(ch.name, `foi para ${f.name}.`, '');
+  },
+  portal(c, ch, o) { if (o.cfg.to && o.cfg.to !== ch.scene && S.scenes[o.cfg.to]) passReq(c, ch, o.cfg.to, o.cfg.destino || ''); },
   placa(c, ch, o) {
     const text = String(o.cfg.texto || ''), img = String(o.cfg.imagem || '');
     soPara(c, { t: 'placa', text, img }); log(ch.name, `leu a placa: "${text.slice(0, 80)}"`, '', { to: GM });
@@ -152,4 +212,4 @@ H.dlgEnd = (c, m) => { const d = S.dlg?.[m.sc], ch = S.chars[d?.by]; if (d && (c
 const VERBO = { porta: 'abrir a porta', barreira: 'mexer na barreira', bau: 'abrir o baú', item: 'pegar', placa: 'ler a placa', npc: 'falar com', alavanca: 'puxar a alavanca', escada: 'usar a escada', portal: 'atravessar o portal' };
 hooks.interText = m => { const { o } = objOf(m); if (!o) return 'interagir'; const v = VERBO[o.k] || 'interagir'; return o.k === 'item' ? `${v} ${S.items[o.cfg?.item]?.name || 'o item'}` : o.k === 'npc' ? `${v} ${o.cfg?.nome || 'o NPC'}` : v; };
 
-export { aplicar, disparar, objActs, reach, zoneEnter };
+export { aplicar, disparar, objActs, perigoTick, pisou, reach, zoneEnter };

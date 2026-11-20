@@ -403,3 +403,47 @@ test('gatilho uma vez; quem=todos só com todos dentro', () => {
     sc.world.goal = ''; at(b, 7.5, 3.5); at(b, 8.5, 3.5); assert.equal(sc.world.goal, 'Todos juntos', 'sempre: dispara de novo'); void t2;
   } finally { sc.fogOn = false; }
 });
+
+// ----- armadilhas, perigos, escadas e portais (Task 5.3) -----
+test('armadilha: percepção revela para o grupo uma vez por herói; pisar sem ver rola esquiva e aplica condição', () => {
+  const sc = freshWorld(); nevoa(sc); const rnd = Math.random;
+  const ca = cli('Ana'), cb = cli('Bia'), a = hero('Ana', 0, 5), b = hero('Bia', 0, 7); at(a, 0.5, 5.5); at(b, 0.5, 7.5);
+  const t1 = put(sc, 't1', { k: 'armadilha', x: 4, y: 6, cfg: { perc: 10, esq: 10, dano: 20, elem: '', cond: '', rearma: true } });
+  const sab = () => S.log.filter(e => e.to === '@gm' && /Percepção/.test(e.text)).length;
+  try {
+    Math.random = () => .999; const n0 = sab();
+    at(b, 2.5, 7.5); assert.equal(sab(), n0 + 1, 'Bia rolou em segredo'); assert.ok(!t1.rev); assert.ok(t1.cfg.tent[b.id]);
+    at(b, 1.5, 7.5); at(b, 2.5, 7.5); assert.equal(sab(), n0 + 1, 'uma vez por herói');
+    Math.random = () => 0; at(a, 2.5, 5.5); assert.equal(t1.rev, true, 'Ana percebeu: revelada para o grupo');
+    assert.ok(!('tent' in (net.view(ca).scenes[S.focus].world.objs.t1.cfg || {})), 'o jogador não vê quem tentou');
+    const t2 = put(sc, 't2', { k: 'armadilha', x: 8, y: 2, cfg: { perc: 100, esq: 100, dano: 20, elem: 'fogo', cond: 'poison', rearma: false } });
+    Math.random = () => .999; const hp0 = a.hp; at(a, 8.5, 2.5);
+    assert.ok(a.hp < hp0 && hp0 - a.hp <= 20, 'dano cheio'); assert.ok(a.st.poison > 0, 'condição'); assert.equal(sc.world.objs.t2, undefined, 'sem rearmar, some');
+    const t3 = put(sc, 't3', { k: 'armadilha', x: 9, y: 9, cfg: { perc: 100, esq: 0, dano: 20, elem: '', cond: 'poison', rearma: true } }); delete a.st.poison;
+    Math.random = () => 0; const hp1 = a.hp; at(a, 9.5, 9.5);
+    assert.equal(hp1 - a.hp, 10, 'esquivou: metade'); assert.ok(!a.st.poison, 'sem condição'); assert.ok(sc.world.objs.t3, 'rearma'); assert.equal(t3.rev, true);
+  } finally { Math.random = rnd; sc.fogOn = false; }
+});
+test('perigo: lava tira 3% por segundo', () => {
+  const sc = freshWorld(); nevoa(sc); const ch = hero('Ana', 2, 2); at(ch, 2.5, 2.5); ch.hp = ch.hpMax;
+  const f = sc.world.floors[0], c = P.unpack(f.cell, f.w * f.h); c[2 * f.w + 2] = P.code('vulcao', 'perigo'); f.cell = P.pack(c); sc.world.v++;
+  try {
+    const p0 = net.pushes(); MW.perigoTick(); assert.equal(ch.hp, ch.hpMax - Math.max(1, Math.round(ch.hpMax * .03))); assert.ok(net.pushes() > p0);
+    at(ch, 4.5, 2.5); const hp = ch.hp; MW.perigoTick(); assert.equal(ch.hp, hp, 'fora da lava não perde');
+    at(ch, 2.5, 2.5); sc.battle = { active: true, ticks: {} }; MW.perigoTick(); assert.equal(ch.hp, hp, 'durante a batalha, não');
+  } finally { sc.battle = { active: false, ticks: {} }; sc.fogOn = false; }
+});
+test('escada troca de andar; portal vira pedido de passagem e chega no destino', () => {
+  const sc = freshWorld(), g = gmc(); draft(g, { o: 'floor', v: { id: 'f1', name: 'Porão', w: 8, h: 6 } }); handle(g, { t: 'wPub', sc: S.focus }); nevoa(sc); S.auto.inter = true;
+  const home = S.focus, c = cli('Ana'), ch = hero('Ana', 2, 5); at(ch, 2.5, 5.5);
+  put(sc, 'e1', { k: 'escada', x: 3, y: 5, cfg: { para: { f: 'f1', x: 2, y: 2 } } });
+  const before = new Set(Object.keys(S.scenes)); H.sceneAdd(gm, { name: 'Torre' }); const sid2 = Object.keys(S.scenes).find(k => !before.has(k)); MW.fixMundo();
+  const w2 = S.scenes[sid2].world; w2.objs.dst = { k: 'surgir', f: w2.floors[0].id, x: 4, y: 4, rot: 0, vis: 'visivel', auto: null, cfg: {} };
+  try {
+    inter(c, ch, 'e1'); assert.equal(ch.pos.f, 'f1'); assert.deepEqual([ch.x, ch.y], [2, 2]);
+    at(ch, 2.5, 5.5); handle(gm, { t: 'walkGm', id: ch.id, f: 'f0', x: 2.5, z: 5.5 }); assert.equal(ch.pos.f, 'f0');
+    put(sc, 'p1', { k: 'portal', x: 3, y: 5, cfg: { to: sid2, destino: 'dst' } }); S.auto.pass = false; for (const id of Object.keys(S.reqs)) delete S.reqs[id];
+    inter(c, ch, 'p1'); const rq = Object.entries(S.reqs).find(([, r]) => r.cat === 'pass'); assert.ok(rq, 'vira pedido de passagem'); assert.equal(ch.scene, home);
+    handle(gm, { t: 'reqOk', id: rq[0] }); assert.equal(ch.scene, sid2); assert.ok(Math.abs(ch.pos.x - 4.5) <= 1.01 && Math.abs(ch.pos.z - 4.5) <= 1.01, `chegou em ${ch.pos.x},${ch.pos.z}`);
+  } finally { S.auto.inter = false; sc.fogOn = false; ch.scene = home; for (const id of Object.keys(S.reqs)) delete S.reqs[id]; }
+});

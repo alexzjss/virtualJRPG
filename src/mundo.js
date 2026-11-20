@@ -242,6 +242,7 @@ Object.assign(H, {
       if (o.k === 'bau' && p.cfg?.aberto) o.cfg.aberto = p.cfg.aberto;
       if (o.k === 'bau' && p.cfg?.por) o.cfg.por = p.cfg.por;
       if (o.k === 'gatilho' && p.cfg?.usado) o.cfg.usado = true;
+      if (o.k === 'armadilha' && p.cfg?.tent) o.cfg.tent = p.cfg.tent;
       if (p.rev) o.rev = true;
     }
     for (const f of d.floors) { const o = old.floors.find(x => x.id === f.id); if (o && (o.w !== f.w || o.h !== f.h)) delete sc.seenW?.[f.id]; } // névoa do tamanho antigo não serve
@@ -254,6 +255,6 @@ Object.assign(H, {
 ['wDraft', 'wPub', 'wDiscard'].forEach(k => NOUNDO.add(k)); // o editor tem desfazer próprio
 ['wDraft', 'wDiscard'].forEach(k => QUIET.add(k)); // o rascunho não vai no push de todos
 
-import { zoneEnter } from './mundo-obj.js'; // interagir com objetos (usa MH e unstuck só dentro dos handlers)
-MH.onCell.push(zoneEnter); // gatilhos de área ao trocar de casa
-export { MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };
+import { perigoTick, pisou, zoneEnter } from './mundo-obj.js'; // interagir com objetos (usa MH e unstuck só dentro dos handlers)
+MH.onCell.push(pisou, zoneEnter); // armadilhas e gatilhos de área ao trocar de casa
+export { perigoTick, MH, OBJ_K, W_LEG, cleanObj, sendDraft, unstuck, cellOf, clock, fixMundo, fixWorld, floorOf, place, posFromCell, refreshLegacy, worldFromLegacy };
