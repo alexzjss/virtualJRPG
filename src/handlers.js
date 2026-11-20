@@ -18,7 +18,7 @@ const planOf = (C, a) => { const K = cmdOf(); if (K.for !== C || !K.plan) { K.pl
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
-const NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'tvSet', 'offMsg']);
+const NOUNDO = new Set(['undo', 'chat', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'tvSet', 'offMsg', 'uiSet']);
 // Desfazer por cena: cada cena tem a sua pilha. A foto guarda o estado global, a cena e os personagens que não estão em outra cena;
 // desfazer devolve isso e deixa intactas as outras cenas (e as batalhas delas) e quem está nelas.
 const undoBy = {};
@@ -31,7 +31,7 @@ const passReq = (c, ch, to, dest = '') => { // sem to: a saída 2D onde o herói
 };
 const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
 const undoPush = sid => { if (!okSc(sid)) return; const st = undoBy[sid] ??= [];
-  st.push(JSON.stringify({ sid, S: { ...S, log: undefined, users: undefined, scenes: undefined, chars: undefined, focus: undefined, tv: undefined }, sc: S.scenes[sid], chars: Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => !(okSc(ch.scene) && ch.scene !== sid))) }));
+  st.push(JSON.stringify({ sid, S: { ...S, log: undefined, users: undefined, scenes: undefined, chars: undefined, focus: undefined, tv: undefined, ui: undefined }, sc: S.scenes[sid], chars: Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => !(okSc(ch.scene) && ch.scene !== sid))) }));
   if (st.length > 20) st.shift(); };
 const undoClear = () => { for (const k of Object.keys(undoBy)) delete undoBy[k]; };
 
@@ -44,7 +44,7 @@ const H = {
   undo(c) { // desfaz a última ação do mestre nesta cena (até 20 por cena)
     const st = undoBy[S.scene];
     if (c.role !== 'gm' || !st?.length) return;
-    const p = JSON.parse(st.pop()), keep = { log: S.log, users: S.users, seq: S.seq, scenes: S.scenes, focus: S.focus, tv: S.tv };
+    const p = JSON.parse(st.pop()), keep = { log: S.log, users: S.users, seq: S.seq, scenes: S.scenes, focus: S.focus, tv: S.tv, ui: S.ui };
     const other = Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => okSc(ch.scene) && ch.scene !== p.sid));
     for (const k of Object.keys(S)) delete S[k];
     Object.assign(S, p.S, keep, { chars: { ...Object.fromEntries(Object.entries(p.chars).filter(([id]) => !other[id])), ...other } });
@@ -52,6 +52,7 @@ const H = {
     log('Mestre', 'desfez a última ação.');
   },
   logClear(c) { if (c.role === 'gm') S.log = []; }, // mestre apaga o chat e o histórico de todos
+  uiSet(c, { v }) { if (c.role === 'gm' && (v === '' || v === 'pincel')) S.ui = v; },
   delChar(c, m) { if (c.role === 'gm') { delete S.chars[m.id]; delete S.battle.ticks[m.id]; } },
   set(c, m) {
     const ch = getCh(c, m.id), f = String(m.f);

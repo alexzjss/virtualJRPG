@@ -17,6 +17,23 @@ const mk = (c, m) => { const before = new Set(Object.keys(S.chars)); H.addChar(g
 const sk = n => Object.keys(S.skills).find(k => S.skills[k].name === n);
 const isArm = s => /^armas-/.test(s.br || ''); // Árvore de Armas: bloco isolado (el 'fis', sem ligação com o resto da grade)
 
+test('uiSet: só o mestre troca a UI e todos veem, mesmo depois de desfazer', () => {
+  assert.equal(S.ui, '');
+  H.uiSet(ana, { v: 'pincel' });
+  assert.equal(S.ui, '');
+  handle(gm, { t: 'addChar', enemy: true });
+  handle(gm, { t: 'uiSet', v: 'pincel' });
+  assert.equal(view(gm).ui, 'pincel');
+  assert.equal(view(ana).ui, 'pincel');
+  H.uiSet(gm, { v: 'xyz' });
+  assert.equal(S.ui, 'pincel');
+  handle(gm, { t: 'undo' });
+  assert.deepEqual(S.chars, {});
+  assert.equal(S.ui, 'pincel');
+  H.uiSet(gm, { v: '' });
+  assert.equal(view(ana).ui, '');
+});
+
 test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1330); assert.ok(Object.keys(S.items).length >= 50); });
 test('grade: sem sobreposição; cada Vínculo, a Aura e o Ocultismo alcançam todos os seus nós passando só por eles e pelo tronco Marcial', () => {
   const ns = Object.values(S.skills); assert.equal(new Set(ns.map(s => s.gx + ',' + s.gy)).size, ns.length);
