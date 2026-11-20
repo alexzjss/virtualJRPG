@@ -154,6 +154,7 @@ function connect() {
   ws.onmessage = e => {
     let m; try { m = JSON.parse(e.data); } catch { return; }
     if (m.t === 'defs') { DEFS = m.d; DEFV = m.v; return; }
+    if (m.t === 'pos') return window.MINPUT?.onPos(m); // mundo 3D: posições agregadas e correções do servidor
     // vários estados no mesmo instante (rajada pelo túnel) viram um desenho só, no próximo quadro; aba escondida desenha já (sem rAF)
     if (m.t === 'state') { if (m.dv !== undefined && m.dv !== DEFV) return send({ t: 'sync' }); S = m.s; S.skills = DEFS.skills; S.items = DEFS.items; syncOfi(); if (gm && window.vjOpenAfterState) { const q = window.vjOpenAfterState, id = typeof q === 'string' ? q : S.bestiary?.[q.id] ? q.id : Object.keys(S.bestiary || {}).find(k => !q.before.includes(k)); if (id && S.bestiary?.[id]) { gOpen('f_' + id); window.vjOpenAfterState = ''; } } netRender(); }
     if (m.t === 'ping') { const p = { x: m.x, y: m.y }; pings.push(p); render(); setTimeout(() => { pings = pings.filter(o => o !== p); render(); }, 2500); }

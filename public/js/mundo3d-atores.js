@@ -93,7 +93,7 @@ export class Actors {
       // movimento visto pela própria interpolação: rumo e velocidade de quadro a quadro
       if (a.last && dt > 0) { const dx = p.x - a.last.x, dz = p.z - a.last.z, v = Math.hypot(dx, dz) / dt; a.moving = v > .3 ? v : 0; if (a.moving) a.dir = Math.atan2(dx, dz); }
       a.last = { x: p.x, z: p.z };
-      const mode = a.c?._m || S.chars[id]?._m || 'a', d = a.moving ? a.dir : Number.isFinite(p.d) ? p.d : a.dir ?? 0;
+      const mode = p.m || a.c?._m || S.chars[id]?._m || 'a', d = a.moving ? a.dir : Number.isFinite(p.d) ? p.d : a.dir ?? 0;
       if (a.moving || a.face.d === undefined) a.face = { ...facing(d, yaw), d };
       this.setImg(a, a.c || S.chars[id], a.face.back && !a.npc ? 'b' : 'f');
       const jt = a.jump ? (now - a.jump) / PULO_MS : 1, jy = jt < 1 ? Math.sin(jt * Math.PI) * PULO_H : 0; if (jt >= 1) a.jump = 0;
