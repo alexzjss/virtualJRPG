@@ -171,7 +171,8 @@ function fixChar(ch, id, live) {
   if (live && !(ch.scene === null && !ch.enemy) && !Object.hasOwn(S.scenes, ch.scene)) ch.scene = S.focus; // herói com cena null está fora de cena
 }
 // aplica todas as migrações ao estado atual (ao abrir, ao trocar de campanha, ao restaurar um backup)
-const migrate = isNew => { const lg = takeLegacy(); preFix(); migrateA(lg); migrateB(isNew); };
+const MIG = []; // passos de migração registrados por outros módulos (ex.: src/mundo.js), rodados a cada abertura de campanha
+const migrate = isNew => { const lg = takeLegacy(); preFix(); migrateA(lg); migrateB(isNew); MIG.forEach(f => f()); };
 migrate(fresh);
 let saveT = null;
 const flush = () => { if (!saveT) return; clearTimeout(saveT); saveT = null; try { writeState(); } catch (e) { console.error('Falha ao salvar:', e.message); } };
@@ -217,4 +218,4 @@ function adopt(o, isNew = false, after = () => {}) {
   }
 }
 
-export { BK, BLANK, S, inScene, migrateBackdrop, ctxScene, adopt, backup, backupOnStart, diaryFile, fin, flush, flushDiary, fresh, isObj, log, migrate, migrateItems, newScene, save, saveT, slug, writeState };
+export { BK, BLANK, MIG, S, inScene, migrateBackdrop, ctxScene, adopt, backup, backupOnStart, diaryFile, fin, flush, flushDiary, fresh, isObj, log, migrate, migrateItems, newScene, save, saveT, slug, writeState };

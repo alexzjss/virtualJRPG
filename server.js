@@ -12,6 +12,7 @@ import { seed } from './src/seed.js';
 import { H } from './src/handlers.js';
 import { view, handle, start, server, push } from './src/net.js';
 import { fix, importPack, autoBackup } from './src/campaign.js';
+import './src/mundo.js'; // mundo 3D: world por cena, migração do 2D, movimento e editor
 
 if (fresh) { seed(); fix(); }
 prep();

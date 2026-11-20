@@ -7,7 +7,7 @@
     "audit": "node tools/audit.js",
     "start": "node server.js",
     "start:watch": "node --watch --watch-path=server.js --watch-path=content.js --watch-path=tree.js --watch-path=src --watch-path=arvore --watch-path=public/rules.js --watch-path=public/oficios.js --watch-path=public/armas.js --watch-path=tools/watch.js tools/watch.js",
-    "test": "node --test tools/test.js tools/test-rede.js tools/test-cenas.js tools/test-terreno.js tools/test-mundo.js",
+    "test": "node --test tools/test.js tools/test-rede.js tools/test-cenas.js tools/test-terreno.js tools/test-mundo.js tools/test-mundo-srv.js",
     "sim": "node tools/sim.js",
     "offline": "node server.js --offline",
     "exe": "node tools/build-exe.mjs",
