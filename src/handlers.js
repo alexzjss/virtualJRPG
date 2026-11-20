@@ -20,7 +20,7 @@ const planOf = (C, a) => { const K = cmdOf(); if (K.for !== C || !K.plan) { K.pl
 import { OFI_ACT, hasNode, haveMats, itemId, matsText, narrar, nodeOf, ofiRoll, spawnCompanions, takeMats, trapStart } from './oficios.js';
 
 
-const NOUNDO = new Set(['undo', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'tvSet', 'offMsg', 'uiSet']);
+const NOUNDO = new Set(['undo', 'fog', 'move', 'roll', 'userAdd', 'userPass', 'userDel', 'reqNo', 'autoSet', 'logClear', 'sceneAdd', 'sceneDel', 'sceneGo', 'moveTo', 'offMsg', 'uiSet']);
 // Desfazer por cena: cada cena tem a sua pilha. A foto guarda o estado global, a cena e os personagens que não estão em outra cena;
 // desfazer devolve isso e deixa intactas as outras cenas (e as batalhas delas) e quem está nelas.
 const undoBy = {};
@@ -33,7 +33,7 @@ const passReq = (c, ch, to, dest = '') => { // sem to: a saída 2D onde o herói
 };
 const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
 const undoPush = sid => { if (!okSc(sid)) return; const st = undoBy[sid] ??= [];
-  st.push(JSON.stringify({ sid, S: { ...S, log: undefined, users: undefined, scenes: undefined, chars: undefined, focus: undefined, tv: undefined, ui: undefined }, sc: S.scenes[sid], chars: Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => !(okSc(ch.scene) && ch.scene !== sid))) }));
+  st.push(JSON.stringify({ sid, S: { ...S, log: undefined, users: undefined, scenes: undefined, chars: undefined, focus: undefined, ui: undefined }, sc: S.scenes[sid], chars: Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => !(okSc(ch.scene) && ch.scene !== sid))) }));
   if (st.length > 20) st.shift(); };
 const undoClear = () => { for (const k of Object.keys(undoBy)) delete undoBy[k]; };
 
@@ -46,7 +46,7 @@ const H = {
   undo(c) { // desfaz a última ação do mestre nesta cena (até 20 por cena)
     const st = undoBy[S.scene];
     if (c.role !== 'gm' || !st?.length) return;
-    const p = JSON.parse(st.pop()), keep = { log: S.log, users: S.users, seq: S.seq, scenes: S.scenes, focus: S.focus, tv: S.tv, ui: S.ui };
+    const p = JSON.parse(st.pop()), keep = { log: S.log, users: S.users, seq: S.seq, scenes: S.scenes, focus: S.focus, ui: S.ui };
     const other = Object.fromEntries(Object.entries(S.chars).filter(([, ch]) => okSc(ch.scene) && ch.scene !== p.sid));
     for (const k of Object.keys(S)) delete S[k];
     Object.assign(S, p.S, keep, { chars: { ...Object.fromEntries(Object.entries(p.chars).filter(([id]) => !other[id])), ...other } });
@@ -205,9 +205,7 @@ const H = {
     for (const [k, ch] of Object.entries(S.chars)) if (ch.enemy && ch.scene === id) delete S.chars[k]; // inimigos da cena apagada vão junto
     for (const sc of Object.values(S.scenes)) sc.exits = (sc.exits || []).filter(e => e.to !== id);
     if (S.focus === id) S.focus = Object.keys(S.scenes)[0];
-    if (S.tv === id) S.tv = S.focus;
   },
-  tvSet(c, m) { if (c.role === 'gm' && Object.hasOwn(S.scenes, m.id)) S.tv = m.id; }, // cena que a TV mostra
   offMsg(c, m) { if (c.role === 'gm') S.offMsg = String(m.v ?? '').slice(0, 300); }, // recado da tela de espera
   moveTo(c, m) { // leva heróis para uma cena (ou para fora de cena, scene null): saem da batalha da cena antiga e entram na da nova
     if (c.role !== 'gm') return;
@@ -430,7 +428,7 @@ const H = {
   },
   // ----- descanso e acampamento -----
   camp(c, m) { if (c.role === 'gm') S.camp = { open: !!m.on, acts: {} }; },
-  pause(c, m) { if (c.role === 'gm') S.paused = !!m.on; }, // mesa em pausa: jogadores e TV veem a tela de título
+  pause(c, m) { if (c.role === 'gm') S.paused = !!m.on; }, // mesa em pausa: jogadores veem a tela de título
   campAct(c, m) { const ch = S.chars[m.id]; if (S.camp.open && can(c, ch) && !ch.enemy && (CAMP.includes(m.k) || hasNode(ch, n => n.camp === m.k))) { S.camp.acts[m.id] = m.k; (S.camp.with ??= {})[m.id] = S.chars[m.w] && !S.chars[m.w].enemy && m.w !== m.id ? m.w : ''; } },
   rest(c, m) { // Sanidade não volta com descanso: só itens, skills, "conversar" no acampamento ou o mestre
     if (c.role !== 'gm' || S.battle.active) return;

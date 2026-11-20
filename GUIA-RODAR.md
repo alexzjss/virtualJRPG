@@ -27,8 +27,7 @@ Jogador ──link do convite──▶
 
 1. Abra o programa. Espere a janela **Sessão** mostrar **Internet: Aberta** e o **código da sessão** (ex.: `lago-verde-mesa-norte`). A janela preta do programa também mostra o código.
 2. Clique em **Copiar convite** e cole no grupo. O convite já leva o código no link.
-3. TV ou segundo monitor: `http://localhost:3000/table`, login `mestre` e a sua chave (ou a conta de um jogador).
-4. Ao terminar, **feche a janela do programa**. O link para de funcionar e tudo fica salvo em `data/`.
+3. Ao terminar, **feche a janela do programa**. O link para de funcionar e tudo fica salvo em `data/`.
 
 **Se a internet não abrir**, a janela Sessão mostra o motivo e o programa tenta de novo a cada minuto. Enquanto isso, quem está na mesma rede Wi-Fi entra pelo endereço local que aparece lá (`http://192.168.x.x:3000/player`). Libere a porta 3000 no firewall se for preciso.
 

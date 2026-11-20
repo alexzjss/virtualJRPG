@@ -100,7 +100,7 @@ wss.on('error', () => {}); // o erro de porta ocupada é tratado no server.on('e
 
 const strip = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, battle: undefined, enc: undefined, note: undefined, gmNote: undefined, pins: v.pins && Object.fromEntries(Object.entries(v.pins).filter(([, p]) => !p.gm)) }]));
 // cada cliente só recebe o que pode ver (rolagens secretas e notas do mestre ficam de fora)
-// jogadores e mesa não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
+// jogadores não recebem os números dos inimigos (HP vira %), nem inimigos fora da cena ou sob a névoa
 // fraquezas do inimigo para jogadores: Identificar revela tudo; o acerto revela só o elemento usado (S.lore, por tipo)
 const scrub = ch => { const k = 100 / (ch.hpMax || 1), L0 = S.lore?.[ch.tpl || ch.name], lr = { w: Array.isArray(L0?.w) ? L0.w : [], r: Array.isArray(L0?.r) ? L0.r : [] }; return { id: ch.id, name: ch.name, enemy: true, owner: '', el: ch.resist.find(e => e !== 'fis') || 'fis', boss: ch.boss, color: ch.color, img: ch.img, imgF: ch.imgF, imgB: ch.imgB, imgP: ch.imgP, imgS: ch.imgS, imgK: ch.imgK, fxK: ch.fxK, x: ch.x, y: ch.y, scene: ch.scene, st: ch.st, dead: ch.dead, brk: ch.brk, shield: Math.ceil((ch.shield || 0) * k), form: ch.form, hp: Math.ceil(ch.hp * k), hpMax: 100,
   imgL: ch.imgL, box: ch.box,
@@ -117,10 +117,9 @@ const lan = () => Object.values(os.networkInterfaces()).flat().filter(i => i && 
 const onlineAccts = () => [...new Set([...wss.clients].filter(o => o.role === 'player' && o.acct && o.readyState === 1).map(o => String(o.acct).toLowerCase()))];
 // ---------- cenas separadas: cada cliente vê a cena dele ----------
 const okSc = id => typeof id === 'string' && Object.hasOwn(S.scenes, id);
-// cena de um cliente: mestre = foco; TV = a cena escolhida para ela; jogador = a do herói ativo (null = fora de cena; sem heróis = foco)
+// cena de um cliente: mestre = foco; jogador = a do herói ativo (null = fora de cena; sem heróis = foco)
 const sceneOfClient = c => {
   if (c.role === 'gm') return S.focus;
-  if (c.role === 'table') return okSc(S.tv) ? S.tv : S.focus;
   const mine = Object.values(S.chars).filter(ch => !ch.enemy && !ch.summon && ch.owner === c.name), h = mine.find(ch => ch.id === c.hero) || mine.find(ch => okSc(ch.scene)) || mine[0];
   return !h ? S.focus : okSc(h.scene) ? h.scene : null;
 };
@@ -148,7 +147,7 @@ const view = c => {
 // não tem a versão atual. O resto ("state") segue a cada mudança, bem mais leve pelo túnel.
 let defs = { v: 0, json: '' }, defsDirty = true;
 const curDefs = () => { if (defsDirty) { defsDirty = false; const json = JSON.stringify({ skills: S.skills, items: S.items }); if (json !== defs.json) defs = { v: defs.v + 1, json }; } return defs; };
-// Segredo da árvore: jogador e mesa recebem como silhueta "???" os nós que os personagens deles ainda não alcançam (não é vizinho do
+// Segredo da árvore: jogadores recebem como silhueta "???" os nós que seus personagens ainda não alcançam (não é vizinho do
 // que já aprenderam, ou exige um Vínculo/Despertar que não têm). Nós que algum herói já tem e técnicas fora da grade ficam à vista.
 const RUL = globalThis.RULES;
 const reachable = (ch, s, id) => {
@@ -166,14 +165,14 @@ const reachable = (ch, s, id) => {
 const hidCache = new Map();
 const hiddenSkills = c => {
   if (c.role === 'gm' || !c.role) return [];
-  const sig = defs.v + '|' + c.role + '|' + (c.role === 'table' ? '' : c.name) + '|' + Object.values(S.chars).filter(ch => !ch.enemy).map(ch => [ch.id, ch.owner, (ch.skills || []).join(','), (ch.vinc || []).join(','), (ch.aw || []).join(',')].join(':')).join(';');
+  const sig = defs.v + '|' + c.name + '|' + Object.values(S.chars).filter(ch => !ch.enemy).map(ch => [ch.id, ch.owner, (ch.skills || []).join(','), (ch.vinc || []).join(','), (ch.aw || []).join(',')].join(':')).join(';');
   const hit = hidCache.get(sig); if (hit) return hit;
   if (hidCache.size > 64) hidCache.clear();
   const out = hiddenRaw(c); hidCache.set(sig, out); return out;
 };
 const hiddenRaw = c => {
   const heroes = Object.values(S.chars).filter(ch => !ch.enemy), owned = new Set(heroes.flatMap(ch => ch.skills || []));
-  const mine = c.role === 'table' ? heroes : heroes.filter(ch => ch.owner === c.name);
+  const mine = heroes.filter(ch => ch.owner === c.name);
   return Object.keys(S.skills).filter(id => { const s = S.skills[id]; return s.gx != null && !owned.has(id) && !mine.some(ch => reachable(ch, s, id)); });
 };
 const silhouette = s => ({ name: '???', d: '', kind: s.kind === 'passive' ? 'passive' : s.kind === 'form' ? 'form' : 'dmg', attr: '', el: s.el, power: 0, cost: 0, res: s.res, gx: s.gx, gy: s.gy, wx: s.wx, wy: s.wy, ln: s.ln, br: s.br, root: s.root, xp: s.xp, cam: s.cam, secret: 1 });
@@ -230,7 +229,7 @@ function handle(c, m) {
   if (typeof m.t !== 'string' || !Object.hasOwn(H, m.t)) return;
   const ch0 = S.chars[m.id];
   if (ch0 && !ch0.enemy && ch0.scene === null && OFFSTAGE.has(m.t) && c.role !== 'gm') return;
-  const sid = NOSCENE.has(m.t) ? null : sceneOfMsg(c, m);
+  const sid = sceneOfMsg(c, m);
   inScene(sid, () => handleIn(c, m, sid));
 }
 function handleIn(c, m, sid) {
@@ -290,7 +289,7 @@ function onMsg(c, raw) {
     if (!m || typeof m !== 'object' || Array.isArray(m)) return;
     if (m.t === 'hello') {
       const bad = msg => c.send(JSON.stringify({ t: 'err', bad: true, msg })), name = String(m.name || '').trim().slice(0, 30), pass = String(m.pass || '');
-      // a mesa (TV) entra com a chave do mestre (login "mestre") ou com a conta de um jogador
+      if (m.role !== 'gm' && m.role !== 'player') return bad('Papel inválido.');
       const kIp = 'ip:' + c.ip, kAcc = 'acc:' + name.toLowerCase();
       if (blocked(kIp) || (name && blocked(kAcc))) return bad('Muitas tentativas erradas. Aguarde alguns minutos e tente de novo.');
       const miss = msg => { penalize(kIp); if (name) penalize(kAcc); return bad(msg); };
@@ -299,12 +298,11 @@ function onMsg(c, raw) {
         c.role = 'player'; c.name = String(m.as).slice(0, 30); if (m.ctl) c.ctl = c.appr = true; else c.peek = true; // ctl: o mestre joga por esse jogador, sem fila de pedidos
         return sendState(c);
       }
-      const asGm = m.role === 'gm' || (m.role === 'table' && name.toLowerCase() === 'mestre');
-      if (asGm) { if (!same(m.role === 'gm' ? m.key : pass, KEY)) return miss('Chave do mestre incorreta.'); c.role = m.role === 'gm' ? 'gm' : 'table'; }
-      else if (m.role === 'player' || m.role === 'table') {
+      if (m.role === 'gm') { if (!same(m.key, KEY)) return miss('Chave do mestre incorreta.'); c.role = 'gm'; }
+      else {
         if (!checkUser(name, pass)) return miss('Login ou senha incorretos. As contas são criadas pelo mestre: confira com ele.');
-        c.role = m.role; c.acct = name; if (m.role === 'player') c.name = name; // a TV não mostra os sussurros do dono da conta
-      } else return;
+        c.role = 'player'; c.acct = c.name = name;
+      }
       clean(kAcc); // acertou: zera o contador da conta (o do IP continua)
       c.defsV = -1; // login novo sempre recebe as definições
       sendState(c); if (c.role !== 'gm') gmSync(); return;
@@ -314,7 +312,6 @@ function onMsg(c, raw) {
     if (m.t === 'activeHero') { const ch = S.chars[m.id]; if (c.role === 'player' && ch && !ch.enemy && ch.owner === c.name && c.hero !== ch.id) { c.hero = ch.id; sendState(c); } return; } // herói escolhido na tela: decide a cena que o jogador vê
     if (c.role !== 'gm' && (flood(c, 'all', 80) || (m.t === 'ping' && flood(c, 'ping', 12)))) return;
     if (m.t === 'ping') { // marcação temporária no mapa: só retransmite, não altera o estado
-      if (c.role === 'table') return;
       const p = JSON.stringify({ t: 'ping', x: int(m.x, 0, 99), y: int(m.y, 0, 99) }), sid = sceneOfClient(c);
       if (sid === null) return;
       return wss.clients.forEach(o => o.role && o.readyState === 1 && (o.role === 'gm' ? S.focus === sid : sceneOfClient(o) === sid) && o.send(p)); // só quem está na mesma cena
@@ -330,7 +327,7 @@ function start() {
   server.listen(PORT, () => {
     if (process.stdout.isTTY && process.env.VJ_OPEN !== '0') openGm();
     const ips = lan();
-    console.log(`\n  virtualJRPG rodando\n\n  Mestre:     http://localhost:${PORT}/gm   (chave: ${KEY})\n  Mesa (TV):  http://localhost:${PORT}/table   (login "mestre" + a chave, ou a conta de um jogador)${ips.length ? `\n  Mesma rede Wi-Fi: ${ips.map(u => u + '/player').join('  ou  ')}` : ''}\n\n  Contas dos jogadores: crie na janela "Sessão" do painel do mestre.\n  Dados salvos em: ${DATA}\n  Feche esta janela para encerrar.\n`);
+    console.log(`\n  virtualJRPG rodando\n\n  Mestre:     http://localhost:${PORT}/gm   (chave: ${KEY})${ips.length ? `\n  Mesma rede Wi-Fi: ${ips.map(u => u + '/player').join('  ou  ')}` : ''}\n\n  Contas dos jogadores: crie na janela "Sessão" do painel do mestre.\n  Dados salvos em: ${DATA}\n  Feche esta janela para encerrar.\n`);
     if (process.env.VJ_TUNNEL === '0') return console.log('  Túnel desligado (VJ_TUNNEL=0): só a rede local funciona.\n');
     startTunnel({ port: PORT, dir: DATA, onChange: i => {
       net = i; wss.clients.forEach(o => o.role === 'gm' && sendState(o));

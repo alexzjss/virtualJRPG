@@ -7,13 +7,11 @@ Mesa virtual de RPG com regras próprias (d100, CTB, Aura/Sanidade/Limite).
 
 - `/gm` — painel do mestre (a chave é sorteada na primeira vez e fica em `data/gm-key.txt`; para usar a sua, defina `GM_KEY`). A janela **Sessão** cria as contas e copia o convite.
 - `/player` — fichas do jogador (login e senha criados pelo mestre)
-- `/table` — mesa compartilhada (mapa 2D + batalha JRPG), somente leitura; entra com a conta de um jogador ou login `mestre` + chave
 - `docs/index.html` — página de entrada opcional (GitHub Pages). Só é usada se você definir `VJ_PORTAL`; sem isso o convite já leva direto ao link do túnel e nada precisa ser publicado
-- `/painel` — as três telas lado a lado (mestre, jogador e mesa) para acompanhar e mexer em tudo ao mesmo tempo; cada quadro é a tela real, então o que muda em um aparece nos outros na hora. Pede a chave do mestre, o nome e a senha do jogador uma vez e usa `⤢` para ver uma tela inteira
+- `/painel` — telas do mestre e do jogador na mesma página. Pede a chave do mestre, o nome e a senha do jogador uma vez. Use `⤢` para ver uma tela inteira.
 
 Ao iniciar, o servidor abre sozinho um túnel gratuito do Cloudflare (baixa o `cloudflared` na primeira vez) e mostra o **código da sessão**. Veja `GUIA-RODAR.md`.
 
-Chat: texto livre, `/r 2d6+1` para rolar (aceita somas como `/r 2d6+1d4+3` e `/r d20-1`), `/w nome mensagem` (ou `/w mestre …`) para sussurrar.
 Estado e uploads ficam em `data/`.
 
 ## Uso pessoal, direto do seu computador
@@ -26,7 +24,7 @@ Nada precisa ser publicado no GitHub: baixe (ou clone) a pasta e rode dela.
 Janela **Campanha** do mestre:
 - **Guardar**, **Nova campanha** e **Abrir** trocam de campanha sem fechar o programa (ficam em `data/campanhas/`). As contas dos jogadores valem para todas.
 - **Exportar / Importar arquivo** leva uma campanha inteira para outro computador (as senhas não vão no arquivo).
-- **Diário**: tudo o que é público no histórico fica em `data/diario/`, sem o limite de linhas do chat. "Marcar início de sessão" separa as sessões.
+- **Diário**: o registro público fica em `data/diario/`. "Marcar início de sessão" separa as sessões.
 - **Pacote de conteúdo**: skills, itens, bestiário e encontros num arquivo. Ao importar, o que tem o mesmo nome é atualizado e o resto é somado.
 - **Cópias de segurança**: ao iniciar, a cada 10 minutos (se algo mudou), antes de trocar de campanha e no botão "Copiar agora". Guarda as 30 mais recentes; "Restaurar" volta a qualquer uma.
 
@@ -36,15 +34,15 @@ Janela **Campanha** do mestre:
 - Janela **Som**: trilha por link ou arquivo enviado (MP3, OGG, WAV, M4A até 40 MB), lista de faixas, trilha própria por cena, ambiências e efeitos prontos (sintetizados, sem arquivos). Todos ouvem em sincronia; cada pessoa ajusta ou silencia o próprio volume no canto da tela. Golpes, críticos, erros e curas também têm som.
 
 ## Mostrar a todos
-Na janela **Cena**, "Mostrar a todos" abre um texto e/ou uma imagem (carta, retrato, pista) na tela de cada jogador e na mesa. O jogador fecha quando quiser e pode rever; "Recolher" tira de todas as telas.
+Na janela **Cena**, "Mostrar a todos" abre um texto ou imagem na tela de cada jogador. O jogador pode fechar e rever. "Recolher" tira de todas as telas.
 
 ## Interface
 - Perguntas e confirmações aparecem em janelas do próprio jogo (nada de caixas do navegador); exclusões pedem confirmação.
 - Barra de ferramentas no mapa: zoom, enquadrar, régua, área, sinal e, para o mestre, marcador e névoa. Funciona no toque.
 - **Ctrl+K** (mestre): busca rápida de painéis, cenas, fichas, ações, sons e inimigos; "Restaurar os painéis" volta ao arranjo padrão. Tecla **?**: lista de atalhos.
-- Histórico com filtro (tudo, conversa, rolagens) e hora de cada linha ao passar o mouse.
+- O registro mostra as rolagens e os eventos de jogo, com a hora de cada linha ao passar o mouse.
 - O jogador é avisado quando chega a vez dele (aviso, som, vibração e título da aba); o mestre vê na aba quantos pedidos esperam.
-- Mudança de cena mostra o nome da cena em destaque para jogadores e mesa.
+- Mudança de cena mostra o nome da cena em destaque para os jogadores.
 - **Mestre em painéis fixos:** as janelas viraram abas em quatro docas (duas à esquerda, duas à direita). Arraste uma aba para outra doca; arraste a borda de uma lateral para mudar a largura. O arranjo fica salvo no navegador. Bestiário, Skills, Itens, Catálogo, Forja e as fichas abertas se abrem por cima do centro (⇤ encolhe para a doca; Esc fecha a ficha). Em batalha o centro mostra o palco em cima, a barra de ações do turno (mesma lista do jogador, teclas 1–9) e o mapa embaixo, com divisor arrastável.
 - **Menos botões:** a Cena deixa à mostra a batalha (botão principal), personagens, descanso, cenas, clima e névoa; mapa, grade, recursos e fundo da batalha ficam em seções **Mais…** (a que estiver aberta é lembrada). Nos cartões de Fichas, **⋯** (ou botão direito) abre Ver como, Assumir, Tirar do mapa, Salvar no bestiário e condições; as ações em lote só aparecem com fichas selecionadas.
 - **Combate encenado** (cerca de 1,5 s por ação, igual para mestre, jogadores e mesa): o dado vira um número que gira; Crítico e Fraqueza ganham um corte com o retrato; Limite e Expansão de Domínio, uma cena curta com o retrato (ou a letra e o kanji do Vínculo); Quebra estilhaça, o nocaute derruba o cartão; o turno inimigo escurece o palco com a faixa vermelha; a batalha abre com uma entrada e termina numa tela de resultado (XP, ouro, espólios, dano, críticos e nocautes de cada herói). Condições viram ícones animados e a ordem de turnos traz mini retratos.
@@ -81,7 +79,7 @@ Rolagem de atributo, ação de combate (ataque, skill, item), aprender skill, it
 - Mapa: roda do mouse = zoom, botão do meio ou Espaço+arrastar = mover, `0` = recentrar
 - Alt+arrastar = régua em casas; duplo clique no mapa = ping para todos
 - Clique direito no token = menu; duplo clique no token = abrir a ficha
-- Batalha: `1`–`9` = comandos, Tab = trocar alvo, Enter = chat, Esc = fechar/cancelar
+- Batalha: `1`–`9` = comandos, Tab = trocar alvo, Esc = fechar/cancelar
 - Mestre: arrastar as abas entre as docas monta o arranjo, salvo no navegador
 
 ## Balanceamento

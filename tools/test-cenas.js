@@ -7,11 +7,11 @@ const { H, S, current, derive, view, handle, order } = await import('../server.j
 const { inScene, adopt } = await import('../src/state.js');
 const { delay, endTurn } = await import('../src/rules.js');
 process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: true, force: true }); } catch {} }); // registrado depois do servidor: roda após a última gravação ao sair
-const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' }, tv = { role: 'table' };
+const gm = { role: 'gm' }, ana = { role: 'player', name: 'Ana' }, bia = { role: 'player', name: 'Bia' };
 const reset = () => {
   S.chars = {}; S.log.length = 0; S.reqs = {}; S.auto.pass = false;
   for (const k of Object.keys(S.scenes)) if (k !== S.focus) delete S.scenes[k];
-  Object.assign(S.scenes[S.focus], { battle: { active: false, ticks: {} }, exits: [] }); S.tv = S.focus;
+  Object.assign(S.scenes[S.focus], { battle: { active: false, ticks: {} }, exits: [] });
 };
 const mk = (c, m = {}) => { const before = new Set(Object.keys(S.chars)); H.addChar(gm, c.role === 'player' ? { ...m, owner: c.name } : m); const ch = S.chars[Object.keys(S.chars).find(k => !before.has(k))]; derive(ch); ch.hp = ch.hpMax; ch.x = ch.y = 0; return ch; };
 const newScene = name => { const before = S.focus; handle(gm, { t: 'sceneAdd', name }); const id = S.focus; S.focus = before; return id; };
@@ -32,13 +32,14 @@ test('ponteiros: S.scene/S.battle seguem o contexto e não vão para o save', ()
 });
 
 test('migração: save antigo com S.battle e S.scene vira batalha da cena e foco', () => {
-  const old = { chars: { h: { name: 'Velho', owner: 'Ana', scene: 'x', x: 1, y: 1 } }, scenes: { x: { name: 'Antiga', cols: 20, rows: 12 }, y: { name: 'Outra', cols: 20, rows: 12 } }, scene: 'y', battle: { active: true, ticks: { h: 5 } }, log: [] };
+  const old = { chars: { h: { name: 'Velho', owner: 'Ana', scene: 'x', x: 1, y: 1 } }, scenes: { x: { name: 'Antiga', cols: 20, rows: 12 }, y: { name: 'Outra', cols: 20, rows: 12 } }, scene: 'y', tv: 'x', battle: { active: true, ticks: { h: 5 } }, log: [] };
   const keep = JSON.parse(JSON.stringify(S));
   adopt(old);
   assert.equal(S.focus, 'y'); assert.equal(S.scene, 'y'); assert.equal(S.scenes.y.battle.active, true); assert.deepEqual(S.scenes.y.battle.ticks, { h: 5 });
   assert.ok(Number.isInteger(S.battle.seed) && S.battle.seed >= 1 && S.battle.seed < 2 ** 31);
   assert.equal(S.scenes.x.battle.active, false); assert.deepEqual(S.scenes.x.exits, []);
   assert.ok(!Object.keys(S).includes('battle'));
+  assert.equal(Object.hasOwn(S, 'tv'), false, 'a TV antiga é removida ao abrir a campanha');
   adopt(keep);
 });
 
@@ -52,14 +53,13 @@ test('moveTo: heróis vão separados; fora de cena; trocar o foco não arrasta n
   handle(bia, { t: 'moveTo', ids: [a.id], scene: B }); assert.equal(a.scene, A, 'só o mestre move entre cenas');
 });
 
-test('visão: cada jogador vê a própria cena; fora de cena só a tela de espera; TV vê a cena dela', () => {
+test('visão: cada jogador vê a própria cena; fora de cena só a tela de espera', () => {
   const { A, B, a, b, ea, eb } = split();
   const va = view(ana), vb = view(bia);
   assert.equal(va.scene, A); assert.equal(vb.scene, B);
   assert.ok(va.chars[ea.id] && !va.chars[eb.id], 'Ana não vê o inimigo da Mina'); assert.ok(vb.chars[eb.id] && !vb.chars[ea.id]);
   assert.deepEqual(Object.keys(va.scenes[B]), ['name'], 'das outras cenas, só o nome');
   assert.equal(va.scenes[A].battle, undefined);
-  S.tv = B; assert.equal(view(tv).scene, B);
   const vg = view(gm); assert.equal(vg.scene, S.focus); assert.ok(vg.battle && vg.scenes[B].battle, 'o mestre recebe as batalhas de todas as cenas');
   handle(gm, { t: 'offMsg', v: 'Volto já' }); handle(gm, { t: 'moveTo', ids: [b.id], scene: null });
   const vo = view(bia); assert.equal(vo.off, 'Volto já'); assert.equal(vo.scene, '_off'); assert.ok(!Object.values(vo.chars).some(o => o.enemy)); assert.equal(vo.battle.active, false);

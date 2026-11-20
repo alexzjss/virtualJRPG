@@ -93,7 +93,7 @@ function perigoTick() {
 }
 const tick = setInterval(() => { try { perigoTick(); } catch (e) { console.error('Falha no dano de perigo:', e); } }, 1000); tick.unref?.();
 const heroesIn = sid => Object.values(S.chars).filter(o => o.scene === sid && !o.enemy && !o.npc && !o.summon && o.pos && o.x != null);
-const toAll = (sid, msg) => { const out = JSON.stringify(msg); wss.clients.forEach(x => x.readyState === 1 && (x.role === 'gm' || x.role === 'table' || (x.role === 'player' && heroesIn(sid).some(h => h.owner === x.name))) && x.send(out)); };
+const toAll = (sid, msg) => { const out = JSON.stringify(msg); wss.clients.forEach(x => x.readyState === 1 && (x.role === 'gm' || (x.role === 'player' && heroesIn(sid).some(h => h.owner === x.name))) && x.send(out)); };
 // abrir, fechar ou alternar portas e barreiras; mostrar, ocultar ou alternar os outros objetos. Devolve true se mexeu em porta/barreira
 function aplicar(sc, sid, id, acao) {
   const o = sc.world.objs[id]; if (!o) return false;

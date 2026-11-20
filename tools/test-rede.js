@@ -57,6 +57,16 @@ test('login: muitas tentativas erradas bloqueiam, até para a senha certa', asyn
   } finally { s.stop(); }
 });
 
+test('TV removida: login table é recusado e a página retorna 404', async () => {
+  const s = await boot(tmp(), { GM_KEY: 'chave' }); assert.ok(!s.failed, s.out());
+  try {
+    const invalid = await hello(s.p, { role: 'inexistente' });
+    assert.deepEqual(invalid, { t: 'err', bad: true, msg: 'Papel inválido.' });
+    assert.deepEqual(await hello(s.p, { role: 'table', name: 'mestre', pass: 'chave' }), invalid);
+    for (const page of ['/table', '/table.html']) assert.equal((await fetch(`http://127.0.0.1:${s.p}${page}`)).status, 404);
+  } finally { s.stop(); }
+});
+
 test('state.json corrompido: restaura o backup mais recente; sem backup, recusa subir sem apagar nada', async () => {
   const data = tmp(), a = await boot(data); assert.ok(!a.failed, a.out());
   await poke(a.p, fs.readFileSync(path.join(data, 'gm-key.txt'), 'utf8').trim()); a.stop(); await new Promise(r => setTimeout(r, 400));

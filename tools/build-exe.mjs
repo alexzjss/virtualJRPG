@@ -29,7 +29,6 @@ COMO USAR
 3. Abra http://localhost:3000/gm, entre com a chave e use a janela "Sessão":
    - crie uma conta (login e senha) para cada jogador e escolha o personagem dela;
    - no dia, clique em "Copiar convite" e cole no grupo. Os jogadores só abrem o link, sem instalar nada.
-4. TV ou segundo monitor: http://localhost:3000/table, login "mestre" e a sua chave.
 Ao fechar esta janela, o link dos jogadores para de funcionar. Sem internet, o jogo continua na mesma rede Wi-Fi.
 
 DADOS

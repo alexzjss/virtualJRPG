@@ -122,7 +122,7 @@ function preFix() { // antes das migrações: coleções que não são objetos d
 function fixShape() {
   for (const k of ['reqs', 'users']) if (!isObj(S[k])) S[k] = {};
   if (S.ui !== 'pincel') S.ui = '';
-  if (!Object.hasOwn(S.scenes, S.tv)) S.tv = S.focus;
+  delete S.tv;
   S.offMsg = String(S.offMsg ?? '').slice(0, 300);
   S.paused = !!S.paused;
   if (!isObj(S.camp)) S.camp = { open: false, acts: {} };

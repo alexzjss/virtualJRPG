@@ -1,4 +1,4 @@
-// Teste de fumaça da interface: sobe o jogo no mesmo processo, abre mestre, jogadores e mesa no Chromium (Playwright)
+// Teste de fumaça da interface: sobe o jogo no mesmo processo e abre mestre e jogadores no Chromium (Playwright)
 // e exercita a batalha, o acampamento, os pedidos e a aba Ofícios. Falha com erro de console, botão quebrado ou estado errado.
 //   npm run ui                      (todas as telas, desktop e celular)
 //   UI_SHOTS=pasta npm run ui       (guarda capturas de tela em pasta)
@@ -66,13 +66,11 @@ try {
   const gmP = await open('gm', '/gm', { login: { p: 'chave' } });
   const ana = await open('ana', '/player', { login: { n: 'ana', p: '1234' }, phone: true });
   const bia = await open('bia', '/player', { login: { n: 'bia', p: '1234' } });
-  const mesa = await open('mesa', '/table', { login: { n: 'mestre', p: 'chave' } });
   const anaD = await open('ana-pc', '/player', { login: { n: 'ana', p: '1234' } }); // a mesma Ana no computador: HUD e leque do palco 3D (a `ana` acima é o celular, que mantém o painel antigo)
 
   await section('exploração: telas sem batalha', async () => {
-    await until(async () => (await mesa.locator('#app').innerHTML()).length > 500, 'mesa desenhada');
-    for (const p of [gmP, ana, bia, mesa]) check(p === mesa ? (await p.locator('#app').innerHTML()).length > 500 : (await p.locator('#app').innerText()).length > 50, `${p.who}: tela vazia`); // a mesa é só mapa e cartões, quase sem texto
-    await shot(gmP, 'explora'); await shot(ana, 'explora'); await shot(mesa, 'explora');
+    for (const p of [gmP, ana, bia]) check((await p.locator('#app').innerText()).length > 50, `${p.who}: tela vazia`);
+    await shot(gmP, 'explora'); await shot(ana, 'explora');
   });
 
   const go = m => handle(gmc, m); // mensagens do mestre direto no motor (montar o cenário); o que está sob teste vai pela tela
@@ -94,7 +92,7 @@ try {
     check(await ana.locator('.cmd-go .go').isEnabled() === true, 'Agir já vem mirado no primeiro inimigo de pé (mira automática na sua vez)');
     check(await until(() => vis(bia, '.hudw.dim'), 'HUD apagado fora da vez'), 'Bia (PC) deveria ver o HUD apagado fora da vez');
     check(/Vez de Shinkai/i.test(await txt(bia, '.hud-cmd')) && !(await vis(bia, '.lq .stroke')), 'Bia não deveria ver o leque na vez da Shinkai');
-    await shot(ana, 'batalha'); await shot(bia, 'batalha'); await shot(mesa, 'batalha'); await shot(gmP, 'batalha');
+    await shot(ana, 'batalha'); await shot(bia, 'batalha'); await shot(gmP, 'batalha');
   });
 
   await section('batalha no PC: palco 3D, HUD e leque no teclado', async () => {
@@ -106,8 +104,7 @@ try {
       check(n >= 1 && n <= esp && await vis(anaD, '.hud-mini'), 'minimapa abaixo da ordem, com um ponto por token visível (' + n + ' de ' + esp + ')');
       check(await anaD.locator('.hud-mini .mk.drag').count() >= 1 && await anaD.evaluate(() => [...document.querySelectorAll('.hud-mini .mk.drag')].every(d => S.chars[d.dataset.mk].owner === name)), 'só os tokens da Ana arrastam no minimapa');
       await anaD.locator('.hud-mini .mt').click(); check(await anaD.locator('.hud-mini.off').count() === 1, 'clicar em "Mapa" recolhe o minimapa');
-      await anaD.locator('.hud-mini .mt').click(); check(await anaD.locator('.hud-mini.off').count() === 0, 'clicar de novo expande o minimapa');
-      check(await mesa.evaluate(() => !document.querySelector('.hud-mini .mk.drag')), 'na tela da mesa nenhum ponto do minimapa arrasta'); }
+      await anaD.locator('.hud-mini .mt').click(); check(await anaD.locator('.hud-mini.off').count() === 0, 'clicar de novo expande o minimapa'); }
     check(/SHINKAI/i.test(await txt(anaD, '.hud-order .ot.now .otn')) && await anaD.locator('.hud-order .ot .otn').count() >= 4, 'ordem estilo FFX: plaquetas com nome, a da vez no topo');
     check(await until(() => anaD.evaluate(() => { const m = document.querySelector('.lq .lqm .lqc'), t = document.querySelector('.lq .lqt .lqin'), r = PALCO3D.rectOf(LEQUE.ctx()?.actor?.id); if (!m || !t || !r) return false; const a = m.getBoundingClientRect(), b = t.getBoundingClientRect(), near = x => Math.min(Math.abs(x.left - r.right), Math.abs(x.right - r.left)) < 50;
       return near(a) && (near(b) || b.top >= a.bottom - 2) && !document.querySelector('.hud-br .hud-cmd'); }), 'coluna assentada no herói'), 'comandos presos ao herói: coluna no ombro e comandos de turno do outro lado');
@@ -256,13 +253,13 @@ try {
   });
 
   await section('faixa de clima, Cadeia e Domínio', async () => {
-    for (const p of [ana, bia, mesa]) {
+    for (const p of [ana, bia]) {
       check(await vis(p, '.fbar .wx'), `${p.who}: faixa de clima ausente`);
       check(await vis(p, '.fbar .chain'), `${p.who}: barra de Cadeia ausente`);
     }
     S.battle.chain.h = 60; S.battle.dom = { by: mikhail.id, side: false, name: 'Santuário Teste', ttl: 3, ally: [], foe: [], pow: 50 }; push();
     await until(async () => /60%/.test(await txt(ana, '.fbar .chain')), 'Cadeia 60% na tela da Ana');
-    await until(async () => /Santuário Teste/i.test(await txt(mesa, '.fbar .dom')), 'Domínio na mesa');
+    await until(async () => /Santuário Teste/i.test(await txt(bia, '.fbar .dom')), 'Domínio na tela da Bia');
     check(/Santuário Teste \(3\)/i.test(await txt(ana, '.fbar .dom')), 'Domínio mostra a duração');
     check(/60/.test(await ana.locator('.fbar .chain b').evaluate(e => e.getAttribute('style'))), 'barra de Cadeia sem largura');
     await shot(ana, 'faixa');
@@ -284,9 +281,9 @@ try {
     check(await noise(ana, () => { shinkai.brv = 0; S.battle.chain.h = 40; }) > 0, 'Cadeia subindo deveria tocar um tique');
     check(await noise(ana, () => { S.battle.chain.h = 100; }) > 0, 'Cadeia cheia deveria tocar o acorde');
     check(await vis(ana, '.fbar .chain.full'), 'Cadeia cheia deveria ganhar a classe full');
-    check(await noise(mesa, () => { S.battle.dom = { by: mikhail.id, side: false, name: 'Domínio Teste', ttl: 3, ally: [], foe: [], pow: 50 }; }) > 0, 'Domínio abrindo deveria tocar na mesa');
-    check(await vis(mesa, '.stage3d.dom-on .domfx'), 'mesa: o palco deveria escurecer com o Domínio');
-    check(await noise(mesa, () => { delete S.battle.dom; }) > 0, 'Domínio acabando deveria tocar na mesa');
+    check(await noise(bia, () => { S.battle.dom = { by: mikhail.id, side: false, name: 'Domínio Teste', ttl: 3, ally: [], foe: [], pow: 50 }; }) > 0, 'Domínio abrindo deveria tocar no PC');
+    await until(() => vis(bia, '.stage3d.dom-on .domfx'), 'o palco no PC escurece com o Domínio');
+    check(await noise(bia, () => { delete S.battle.dom; }) > 0, 'Domínio acabando deveria tocar no PC');
     // som desligado: nada toca
     await ana.click('[data-a=meT]'); await ana.click('.pop [data-a=mute]');
     check(await noise(ana, () => { shinkai.ten = 1; }) === 0, 'com o som desligado nada deveria tocar');
@@ -334,14 +331,14 @@ try {
     check(/passa a vez|Passar a Vez|entrega/i.test(battleLog()) || current() === mikhail.id, 'registro da passagem de vez');
     // chefe: barra de Quebra
     const brkSh = `.p3d .bb[data-tgt="${bossCh.id}"] .sh`; // a Quebra do chefe é o escudo ◆n no mini do recorte
-    check(await vis(mesa, brkSh), 'mesa: barra de Quebra do chefe ausente');
-    check(new RegExp('◆' + brk0 + '$').test((await txt(mesa, brkSh)).trim()), 'Quebra cheia no começo');
+    check(await vis(bia, brkSh), 'Bia: barra de Quebra do chefe ausente');
+    check(new RegExp('◆' + brk0 + '$').test((await txt(bia, brkSh)).trim()), 'Quebra cheia no começo');
     for (let i = 0; i < 8 && !(bossCh.brk.cur < brk0 || bossCh.st.broken); i++) {
       check(toTurn(mikhail.id), 'vez da Mikhail'); await myTurn(bia, mikhail.id, 'turno da Bia'); await atkAt(bia, bossCh.id, 'o chefe');
     }
     check(bossCh.brk.cur < brk0 || bossCh.st.broken, 'fraqueza no chefe deveria reduzir a Quebra');
-    await until(async () => !!bossCh.st.broken || !new RegExp('◆' + brk0 + '$').test((await txt(mesa, brkSh)).trim()), 'mesa mostra a Quebra reduzida');
-    await shot(mesa, 'quebra');
+    await until(async () => !!bossCh.st.broken || !new RegExp('◆' + brk0 + '$').test((await txt(bia, brkSh)).trim()), 'Bia vê a Quebra reduzida');
+    await shot(bia, 'quebra');
     // Ataque Total: todo inimigo vivo Derrubado ou Quebrado
     for (const f of [bossCh, minion]) if (!f.st.down && !f.st.broken) go({ t: 'st', id: f.id, k: 'down' }); // o botão do mestre alterna a condição
     check(toTurn(mikhail.id), 'vez da Mikhail para o Ataque Total'); const pg = bia; // a vez de quem tem tela aberta (o Thomas não tem)
