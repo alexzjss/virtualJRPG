@@ -15,8 +15,10 @@ import { LEVA10SH } from './leva10sh.js';
 import { LEVA10H } from './leva10h.js';
 import { LEVA10M } from './leva10m.js';
 import { LEVA10AU } from './leva10au.js';
+import { ESTENDER12 } from './leva12/index.js';
 
 export const LEVA10 = { ...LEVA10K, ...LEVA10S, ...LEVA10A, ...LEVA10I, ...LEVA10F, ...LEVA10AM, ...LEVA10T, ...LEVA10SH, ...LEVA10H, ...LEVA10M, ...LEVA10AU };
+for (const [b, ns] of Object.entries(ESTENDER12)) LEVA10[b] = [...(LEVA10[b] || []), ...ns]; // Leva 12: nós novos no fim das linhas que já existem
 
 // base → nós novos. Herdam do primeiro nó da linha o atributo, o tipo de aura (cat) e a arma exigida (req).
 const REP = [];

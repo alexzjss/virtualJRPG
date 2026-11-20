@@ -3,6 +3,7 @@
 // as mais magras da árvore. Cada nó é a mesma técnica levada mais longe; o poder vem da camada (arvore/camadas.js).
 import { N } from './l8.js';
 import { RENOMES } from './temas.js';
+import { ABRIR12 } from './leva12/index.js';
 
 export const LINHAS11 = {
   // ---------- Marcial (só status físicos) ----------
@@ -274,7 +275,7 @@ export const LINHAS11 = {
 export function abrir(TREE) {
   const nomes = new Set(Object.values(TREE).flatMap(t => (t.branches || []).flat()).map(s => s.n));
   const antigo = Object.fromEntries(Object.entries(RENOMES).map(([o, v]) => [v[0], o])); // a base pode ainda ter o nome de antes de arvore/temas.js
-  for (const [nome, ns] of Object.entries(LINHAS11)) {
+  for (const [nome, ns] of Object.entries({ ...LINHAS11, ...ABRIR12 })) {
     const acha = n => Object.values(TREE).find(t => t.branches?.some(b => !b.de && b.some(s => s.n === n)));
     const base = acha(nome) ? nome : antigo[nome], t = base && acha(base);
     if (!t) throw new Error(`Leva 11: técnica-base "${nome}" não encontrada`);
