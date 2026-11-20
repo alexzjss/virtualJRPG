@@ -5,6 +5,17 @@
 import { N } from '../l8.js';
 export const ESTENDER = {};
 export const ABRIR = {
+  'Corte Radioativo': [
+    N('Corte Radioativo Duplo', 'Dois cortes, o segundo já dentro da ferida do primeiro.', 'd8/5 x2', 'st rad 1'),
+    N('Corte Que Corrói por Dentro', 'A lâmina deixa um brilho verde que corrói de dentro.', 'd9/5', 'st rad 2; st defDn 1'),
+    N('Corte Radioativo Largo', 'O corte abre em arco e toca todos na frente.', 'd9/7 a', 'st rad 1'),
+    N('Corte Que Contamina', 'O que a lâmina toca adoece junto.', 'd12/7', 'st rad 2; st poison 1'),
+    N('Corte Radioativo Profundo', 'Entra fundo e acha o que a pele escondia.', 'd14/8', 'pierce 40; st rad 2'),
+    N('Corte Radioativo Detonador', 'A radiação guardada na ferida estoura de uma vez.', 'd14/9', 'det rad 6; st rad 2'),
+    N('Corte Que Apodrece o Osso', 'A ferida não fecha e o osso fica quebradiço.', 'd16/10', 'st rad 3; st defDn 2'),
+    N('Corte Radioativo Total', 'Um arco largo de lâmina brilhando em verde.', 'd18/12 a', 'st rad 3; brk 1'),
+    N('Corte Radioativo Supremo', 'Um único corte que deixa o alvo brilhando até o fim.', 'd26/14', 'det rad 8; st rad 3; pierce 50'),
+  ],
   'Lança Tóxica': [
     N('Lança Tóxica Dupla', 'Duas lanças, duas feridas pingando.', 'd8/6 x2', 'st poison 1'),
     N('Lança Tóxica Farpada', 'A farpa prende a ponta na carne.', 'd12/6', 'st poison 2; st defDn 1'),
