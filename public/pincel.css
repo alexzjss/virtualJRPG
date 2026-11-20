@@ -138,3 +138,72 @@ body.ui-pincel .p3d .bb .mini .hp>i:not(.trail){background:linear-gradient(90deg
 body.ui-pincel .hand b{display:none} /* a mão continua marcando o alvo; o nome fica em cima do recorte */
 /* mapa pequeno: embaixo, à esquerda */
 .pc-hud .hud-mini{position:absolute;left:24px;top:auto;bottom:22px;margin:0}
+/* ===== leque no ombro (leque.js): as faixas viram pinceladas de tinta com folha de ouro ===== */
+body.ui-pincel .lq .stroke,body.ui-pincel .lq .lqtac .hk{position:relative;isolation:isolate;display:flex;align-items:center;gap:12px;min-height:0;padding:14px 50px 14px 30px;font:600 40px/1 var(--pc-disp);letter-spacing:0;text-transform:none;color:var(--pc-tx);text-shadow:0 2px 6px #000;background:none;border:0;border-radius:0;box-shadow:none;clip-path:none;transform:none;filter:none;white-space:nowrap;transition:translate .15s,filter .15s}
+body.ui-pincel .lq .stroke::before,body.ui-pincel .lq .lqtac .hk::before{content:"";display:block;position:absolute;inset:-4px -8px;z-index:-1;background:var(--pc-tinta);border:0;box-shadow:none;clip-path:none;opacity:.93;-webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat;mask:var(--pc-traco) 0 0/100% 100% no-repeat;transition:none}
+body.ui-pincel .lq .stroke::after{content:"";display:block;position:absolute;inset:-4px -8px;left:-8px;right:-8px;bottom:-4px;height:auto;z-index:-1;opacity:1;background:repeating-linear-gradient(55deg,#c9a56acc 0 1.5px,transparent 1.5px 7px),repeating-linear-gradient(-55deg,#c9a56a88 0 1px,transparent 1px 9px),radial-gradient(ellipse at 90% 50%,#c9a56a66,transparent 60%);
+  -webkit-mask:var(--pc-traco) 0 0/100% 100% no-repeat,linear-gradient(90deg,transparent 64%,#000 86%);-webkit-mask-composite:source-in;mask:var(--pc-traco) 0 0/100% 100% no-repeat,linear-gradient(90deg,transparent 64%,#000 86%);mask-composite:intersect}
+body.ui-pincel .lq .rad.w>.stroke::before,body.ui-pincel .lq .rad.w>.stroke::after{transform:scaleX(-1)}
+body.ui-pincel .lq .rad.w>.stroke{flex-direction:row-reverse;padding:14px 30px 14px 50px}
+body.ui-pincel .lq .rad>.stroke.tacb{padding:14px 30px 14px 50px;font-size:34px}body.ui-pincel .lq .rad>.stroke.tacb::after{display:block}
+body.ui-pincel .lq .stroke:hover,body.ui-pincel .lq .stroke:focus-visible,body.ui-pincel .lq .lqtac .hk:hover{translate:6px 0;filter:drop-shadow(0 0 10px #c9a56a55);background:none;color:var(--pc-tx)}
+body.ui-pincel .lq .rad.w>.stroke:hover{translate:-6px 0}
+body.ui-pincel .lq .stroke:hover::before{background:var(--pc-tinta)}
+body.ui-pincel .lq .stroke.on,body.ui-pincel .lq .rad.sel>.stroke{translate:8px 0;transform:none;color:#fff6dc;filter:drop-shadow(0 0 12px #c9a56a66);text-decoration:underline 1.5px var(--pc-ouro);text-underline-offset:9px}
+body.ui-pincel .lq .rad.w.sel>.stroke{translate:-8px 0}
+body.ui-pincel .lq .stroke.on::before,body.ui-pincel .lq .rad.sel>.stroke::before{background:var(--pc-tinta)}
+body.ui-pincel .lq .rad.sel::before{display:none}
+body.ui-pincel .lq .rad.dim{opacity:.55}
+body.ui-pincel .lq .stroke.blk{filter:none;opacity:.5}
+body.ui-pincel .lq .stroke.mini{padding:8px 34px 8px 22px;font-size:21px}
+body.ui-pincel .lq .stroke.mini::after{display:none}
+body.ui-pincel .lq .stroke small{margin-left:2px;font:italic 500 22px var(--pc-disp);letter-spacing:0;color:var(--pc-ouro);text-transform:none;text-decoration:none}
+body.ui-pincel .lq .stroke .key,body.ui-pincel .lq .lqtac .hk .key{position:static;order:-1;flex:none;min-width:34px;height:34px;padding:0 7px;border-radius:15px;border:1.5px solid rgba(239,230,212,.65);background:#0b0d10;color:var(--pc-tx);font:600 14px/1 var(--pc-num);letter-spacing:0;display:inline-grid;place-items:center;text-decoration:none}
+body.ui-pincel .lq .rad.w>.stroke .key{order:1}
+/* abrir o leque: cada pincelada se pinta em ~120 ms, em cascata */
+body.ui-pincel .lqm.burst .rad{animation:none}
+body.ui-pincel .lqm.burst .rad>.stroke::before,body.ui-pincel .lqm.burst .rad>.stroke::after{animation:pc-pinta .12s ease-out both;animation-delay:calc(var(--i,0) * 40ms)}
+body.ui-pincel .lqm.burst .rad>.stroke{animation:pc-surge .16s ease-out both;animation-delay:calc(var(--i,0) * 40ms)}
+@media (prefers-reduced-motion:reduce){body.ui-pincel .lqm.burst .rad>.stroke,body.ui-pincel .lqm.burst .rad>.stroke::before,body.ui-pincel .lqm.burst .rad>.stroke::after{animation:none}}
+/* "Mais": Defender, Concentrar, Coragem e Passar em pinceladas menores, numa coluna */
+body.ui-pincel .lq .lqtac{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:8px 0 0;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+body.ui-pincel .lq .lqtac:not(.open){display:none}
+body.ui-pincel .lq .lqtac .hk,body.ui-pincel .lq .lqtac .stroke{padding:10px 38px 10px 24px;font-size:28px;border-radius:0}
+body.ui-pincel .lq .lqtac .hk.on{color:var(--pc-ouro)}
+body.ui-pincel .lq .lqtac .hk.off{opacity:.45}
+body.ui-pincel .lq .rad.w .lqtac{left:auto;right:0;align-items:flex-end}
+/* lista de itens e resumo da mira */
+body.ui-pincel .lq .lqsub>.stroke:not(.mini){font-size:24px;padding:10px 40px 10px 24px}
+/* as regras antigas do leque radial (.lqm.rad-on .lqsub>.stroke, faixa preta com borda branca) pesam mais: anula aqui com o mesmo peso */
+body.ui-pincel .lqm.rad-on .lqsub>.stroke{width:auto;min-width:300px;font-family:var(--pc-disp);font-weight:600;letter-spacing:0;text-transform:none;color:var(--pc-tx);text-shadow:0 2px 6px #000;transform:none}
+body.ui-pincel .lqm.rad-on .lqsub>.stroke.mini{min-width:0;font-size:21px;padding:8px 34px 8px 22px}
+body.ui-pincel .lqm.rad-on .lqsub>.stroke::before{background:var(--pc-tinta);border:0;clip-path:none;box-shadow:none}
+body.ui-pincel .lqm.rad-on .lqsub>.stroke:hover::before,body.ui-pincel .lqm.rad-on .lqsub>.stroke.on::before{background:var(--pc-tinta);border:0;box-shadow:none}
+body.ui-pincel .lqm.rad-on .lqsub>.stroke:nth-child(even){margin-left:0}
+body.ui-pincel .lqm.rad-on .lqsub>.stroke.on{color:#fff6dc;transform:none}
+body.ui-pincel .lqm.rad-on .lqsub>.stroke small,body.ui-pincel .lqm.rad-on .lqsub>.stroke.on small{margin-left:auto;font:italic 500 19px var(--pc-disp);color:var(--pc-ouro)}
+body.ui-pincel .lq .lq-sum{width:320px;padding:12px 18px;background:radial-gradient(ellipse at 40% 50%,#08090bf0 45%,#08090b99 75%,transparent);border:0}
+body.ui-pincel .lq .lq-sum b{font:600 24px/1.15 var(--pc-disp);letter-spacing:0;text-transform:none}body.ui-pincel .lq .lq-sum b span{color:var(--pc-ouro)}
+body.ui-pincel .lq .lq-sum small{font:italic 16px var(--pc-disp);color:var(--pc-dim);letter-spacing:0}
+body.ui-pincel .lq .lq-all{border-top-color:var(--pc-ouro);background:#08090bf2;transform:none;clip-path:none}
+/* skills em abas: grupos em cima, pinceladas na lista e a descrição ao lado */
+.pc-skills{display:grid;grid-template-columns:440px 320px;grid-template-areas:"abas abas" "lista desc";gap:10px 26px;align-items:start}
+.pc-abas{grid-area:abas;display:flex;flex-wrap:wrap;gap:2px 4px;margin-bottom:4px}
+body.ui-pincel .lq .pc-abas .stroke{padding:7px 28px 7px 18px;font-size:19px}
+body.ui-pincel .lq .pc-abas .stroke::after{display:none}
+body.ui-pincel .lq .pc-abas .stroke:not(.on){color:var(--pc-dim)}
+body.ui-pincel .lq .pc-abas .stroke.on{translate:0 0;color:var(--pc-ouro)}
+.pc-lista{grid-area:lista;display:flex;flex-direction:column;gap:6px;max-height:430px;overflow:auto;padding:4px 18px 4px 4px}
+body.ui-pincel .lq .pc-sk{width:100%;box-sizing:border-box;padding:10px 26px 10px 20px;font-size:24px;gap:10px}
+body.ui-pincel .lq .pc-sk .nm{font:inherit;letter-spacing:0;text-transform:none;color:inherit;flex:1;overflow:hidden;text-overflow:ellipsis}
+.pc-sk .el{flex:none;width:11px;height:11px;border-radius:50%;background:var(--e);box-shadow:0 0 8px var(--e)}
+.pc-sk .star{color:var(--pc-ouro);font-size:16px}
+.pc-sk .af{font:600 15px var(--pc-num);color:#7dffb0}.pc-sk .af.r{color:#ff8a8a}.pc-sk .af.q{color:var(--pc-dim)}
+.pc-sk .cost{display:inline-flex;align-items:center;gap:5px;font:600 13px var(--pc-num);color:#9fd0ff;text-decoration:none}
+.pc-sk .cost i{display:inline-grid;place-items:center;width:24px;height:24px;font-style:normal;font-size:14px;color:var(--pc-tx);position:relative}
+.pc-sk .cost i::before{content:"";position:absolute;inset:3px;rotate:45deg;border:1.5px solid #9fd0ff;background:#13406e;z-index:-1}
+.pc-skdesc{grid-area:desc;padding:16px 22px;font:italic 19px/1.45 var(--pc-disp);color:var(--pc-tx);background:radial-gradient(ellipse at 40% 50%,#08090bf0 45%,#08090bb3 72%,transparent);text-shadow:0 1px 4px #000}
+.pc-skdesc b{display:block;font:600 24px var(--pc-disp);font-style:normal;color:var(--pc-ouro)}
+.pc-skdesc small{display:block;margin:2px 0 6px;font:italic 16px var(--pc-disp);color:var(--pc-dim)}.pc-skdesc small .af.w{color:#7dffb0}
+.pc-skdesc p{margin:0 0 6px}.pc-skdesc .why{color:#ff9aa6}
+.pc-skills .vazio{font:italic 18px var(--pc-disp);color:var(--pc-dim)}

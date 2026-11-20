@@ -42,6 +42,19 @@ const LEQUE = (() => {
   const usables = c => [...new Set([...wSk(c), ...c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive')])].filter(k => SK(k));
   const six = c => PALCO3D.pickSix(c.skPin || [], c.skUse || {}, usables(c));
   const flat = () => skGroups(cx.actor, S.chars[tgt], skQ).flatMap(g => g.items);
+  // Pincelada: Skills abre em abas pelos grupos (Atalhos, Arma, Dano, Cura...); setas laterais trocam de aba, as verticais andam na aba; a descrição fica ao lado
+  let pcGrp = 0; const pcDesc = new Map();
+  const pcGroups = c => skGroups(c, S.chars[tgt]);
+  const pcItems = c => { const G = pcGroups(c); if (pcGrp >= G.length) pcGrp = 0; return G[pcGrp]?.items || []; };
+  const pcDescOf = x => { const s2 = x.s, AF = { w: 'alvo fraco', r: 'alvo resiste', '?': 'alvo ainda não testado' };
+    return `<b>${esc(s2.name)}</b><small>${esc(KIND[s2.kind] || s2.kind)} · ${esc(EL[s2.el] || s2.el)}${s2.power ? ` · Poder ${s2.power}` : ''}${x.aff ? ` · <span class="af ${x.aff === 'w' ? 'w' : ''}">${AF[x.aff]}</span>` : ''}</small><p>${esc(desc(s2))}</p>${x.why ? `<p class="why">Bloqueada: ${esc(x.why)}</p>` : ''}`; };
+  const pcSkills = (c, sel) => { const G = pcGroups(c), L = pcItems(c), AF = { w: '▲', r: '▼', '?': '?' }; pcDesc.clear();
+    const tabs = `<div class="pc-abas" role="tablist">${G.map((g, i) => `<div class="stroke pc-aba ${i === pcGrp ? 'on' : ''}" role="tab" aria-selected="${i === pcGrp}" data-lq="grp" data-v="${i}">${esc(g.label)}</div>`).join('')}</div>`;
+    const rows = L.map((x, j) => { pcDesc.set(x.id, pcDescOf(x)); const s2 = x.s;
+      return `<div class="stroke pc-sk ${sel === j ? 'on' : ''} ${x.off ? 'blk' : ''}" role="button" data-lq="skp" data-v="${esc(x.id)}" style="--e:${ELC[s2.el] || '#888'};--i:${j}" ${x.off ? `title="${esc(x.why)}"` : ''}>${x.pin ? '<span class="star">★</span>' : ''}<span class="el"></span><span class="nm">${esc(s2.name)}</span>${x.aff ? `<span class="af ${x.aff === 'r' ? 'r' : x.aff === '?' ? 'q' : ''}">${AF[x.aff]}</span>` : ''}<span class="cost">${s2.limit ? 'Limite' : `<i>${s2.cost}</i>${s2.res === 'san' ? 'SAN' : 'AU'}`}</span></div>`; }).join('');
+    const cur = L[Math.min(sel, L.length - 1)];
+    return `<div class="pc-skills">${tabs}<div class="pc-lista">${rows || '<p class="vazio">Nenhuma skill neste grupo.</p>'}</div><div class="pc-skdesc">${cur ? pcDesc.get(cur.id) : ''}</div></div>`; };
+  if (typeof document !== 'undefined') document.addEventListener('mouseover', e => { const r = e.target.closest?.('.pc-sk[data-v]'); if (!r) return; const d = r.closest('.pc-skills')?.querySelector('.pc-skdesc'), h = pcDesc.get(r.dataset.v); if (d && h && d.dataset.v !== r.dataset.v) { d.dataset.v = r.dataset.v; d.innerHTML = h; } });
   const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
   // inimigos de pé, da esquerda para a direita na tela
   const foes = () => { const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB, PALCO3D.frameNow(inB));
@@ -52,7 +65,9 @@ const LEQUE = (() => {
   const hint = n => { const b = app.querySelector(`.hk[data-a=${n}]`); if (b) b.click(); return !!b; }; // as dicas de baixo são botões: o clique passa pelo mesmo caminho do mouse
 
   // ordem do leque radial (as setas giram nesta ordem) e posição de cada faixa: [comando, tecla, rótulo, x, y, inclinação]
-  const radial = (c, gun) => [['atk', 1, 'Atacar', 56, 118, 9], ['sk', 2, 'Skills', 64, -132, -11], ['it', 3, 'Itens', 34, -38, 2], ['def', 4, 'Defender', 150, 44, -5],
+  const PCL = () => typeof PC !== 'undefined' && PC.on(); // UI Pincelada: Atacar, Skills, Itens, Limite e "Mais" (Defender, Concentrar, Coragem, Passar)
+  const radial = (c, gun) => PCL() ? [['lim', 'L', 'Limite', 46, -150, -13], ['it', 3, 'Itens', 74, -76, -5], ['sk', 2, 'Skills', 86, 0, 0], ['atk', 1, 'Atacar', 64, 78, 9],
+    ...(gun ? [['aim', 'Q', 'Mirar parte', -24, -70, 8]] : []), ['tac', 'Tab', 'Mais', -30, 14, -5]] : [['atk', 1, 'Atacar', 56, 118, 9], ['sk', 2, 'Skills', 64, -132, -11], ['it', 3, 'Itens', 34, -38, 2], ['def', 4, 'Defender', 150, 44, -5],
     ...(gun ? [['aim', 'Q', 'Mirar parte', -48, 8, 7]] : []), ['tac', 'Tab', 'Tática', -60, -96, -9]];
   // pincelada da coluna: o atalho é uma marca discreta no canto (sem a faixa de dicas)
   const stroke = (lq, key, label, small, o = {}) => `<div class="stroke ${o.on ? 'on' : ''} ${o.blk ? 'blk' : ''} ${o.cls || ''}" role="button" data-lq="${lq}" ${o.v != null ? `data-v="${esc(o.v)}"` : ''} ${o.a ? `data-a="${o.a}"` : ''} ${o.title ? `title="${esc(o.title)}"` : ''}>${key === '' ? '' : `<span class="key">${key}</span>`}${label}${small ? `<small>${small}</small>` : ''}</div>`;
@@ -135,7 +150,7 @@ const LEQUE = (() => {
   return {
     state,
     // limpa tudo (a ação saiu ou a vez mudou)
-    reset() { state.mode = 'menu'; state.sel = 0; from = 'menu'; aimOpen = false; tacOpen = false; },
+    reset() { state.mode = 'menu'; state.sel = PCL() ? 3 : 0; from = 'menu'; aimOpen = false; tacOpen = false; pcGrp = 0; }, // na Pincelada o leque nasce em Atacar
     off() { cx = null; },
     lift,
     // âncora da vista tática/linha de alcance (palco3d.js): só enquanto o leque está na mira
@@ -152,7 +167,7 @@ const LEQUE = (() => {
       if (!cx || !cx.my || cx.wait || cx.gm || !(cx.actor.id in S.battle.ticks)) return null;
       const c = cx.actor, mode = state.mode, wp = eq(c, 'arma'), t = S.chars[tgt];
       let s = null, name = ARMAS.prof(wp).atkN || 'Ataque', ct = ARMAS.prof(wp).ct || 100;
-      const id = mode === 'skills' && state.sel < 6 ? six(c)[state.sel] : (mode === 'all' || mode === 'aim') && pick.k === 'sk' ? pick.id : null;
+      const id = mode === 'skills' && PCL() ? pcItems(c)[state.sel]?.id : mode === 'skills' && state.sel < 6 ? six(c)[state.sel] : (mode === 'all' || mode === 'aim') && pick.k === 'sk' ? pick.id : null;
       if (id && SK(id)) { s = SK(id); name = s.name; ct = s.ct || 100; }
       else if (mode === 'items' || (mode === 'aim' && pick.k === 'it')) { const k = mode === 'items' ? Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons')[state.sel]?.[0] : pick.id; if (!S.items[k]) return null; name = S.items[k].name; ct = 100; }
       else if (mode === 'menu' && state.sel > 0) return null; // Skills/Itens no menu ainda não escolheram nada
@@ -186,19 +201,19 @@ const LEQUE = (() => {
       const sks = c.skills.filter(k => S.skills[k] && S.skills[k].kind !== 'passive'), wsks = wSk(c), cons = Object.entries(c.inv).filter(([k]) => S.items[k]?.type === 'cons');
       if ((pick.k === 'sk' && !sks.includes(pick.id) && !wsks.includes(pick.id)) || (pick.k === 'it' && !(c.inv[pick.id] > 0))) pick = { ...ATK };
       const t = S.chars[tgt], s = skSel(), it = pick.k === 'it' ? S.items[pick.id] : null, wp = eq(c, 'arma'), mode = state.mode;
-      const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : mode === 'skills' ? 6 : radial(c, canAim()).length - 1));
+      const sel = Math.max(0, Math.min(state.sel, mode === 'items' ? cons.length - 1 : mode === 'skills' ? (PCL() ? Math.max(0, pcItems(c).length - 1) : 6) : radial(c, canAim()).length - 1));
       const back1 = mode !== 'menu' ? stroke('back', 'Esc', 'Voltar', '', { cls: 'mini' }) : '';
       const tp = typeof HUD !== 'undefined' && HUD.turnSplit ? HUD.turnSplit(c, inB) : { def: '', tac: '' }; // Coragem vale também na mira
       // Tática (estilo Persona 5): Defender fica na coluna; Concentrar, Coragem, Mirar parte e Passar ficam num grupo que abre com Tab. Fechado, o grupo continua na página (escondido) para os atalhos 5–8 e Q funcionarem
-      const tac = (o = {}) => stroke('tac', 'Tab', 'Tática', tacOpen ? '▾' : '▸', { cls: `mini tacb ${o.cls || ''}`, on: tacOpen || o.on, title: 'Concentrar, Coragem e Passar' })
-        + `<div class="lqtac ${tacOpen ? 'open' : ''}" role="group" aria-label="Tática" ${tacOpen ? '' : 'hidden'}>${tp.tac}</div>`;
+      const tac = (o = {}) => stroke('tac', 'Tab', PCL() ? 'Mais' : 'Tática', tacOpen ? '▾' : '▸', { cls: `mini tacb ${o.cls || ''}`, on: tacOpen || o.on, title: 'Concentrar, Coragem e Passar' })
+        + `<div class="lqtac ${tacOpen ? 'open' : ''}" role="group" aria-label="${PCL() ? 'Mais' : 'Tática'}" ${tacOpen ? '' : 'hidden'}>${PCL() ? tp.def : ''}${tp.tac}</div>`;
       let main = '', sub = '', row = 0;
       if (mode !== 'aim') {
         // leque radial (Persona 5): cada comando numa faixa inclinada em volta do ombro; x, y em px (sem escala) a partir do ombro, lado direito (o .lq.l espelha)
         const RO = radial(c, canAim()), onK = mode === 'menu' ? RO[Math.min(sel, RO.length - 1)]?.[0] : mode === 'items' ? 'it' : 'sk';
-        const info = { atk: esc(ARMAS.prof(wp).atkN || 'Ataque'), sk: sks.length + wsks.length, it: cons.length, aim: aim ? esc(PL[aim]) : '', tac: tacOpen ? '▾' : '▸' };
+        const info = { atk: esc(ARMAS.prof(wp).atkN || 'Ataque'), sk: sks.length + wsks.length, it: cons.length, aim: aim ? esc(PL[aim]) : '', tac: tacOpen ? '▾' : '▸', lim: c.limit >= 100 ? 'pronto' : c.limit + '%' };
         main += '<div class="lqr">' + RO.map(([k, key, label, x, y, t], i) => {
-          const o = { on: onK === k, cls: mode !== 'menu' && onK !== k ? 'dim' : '' };
+          const o = { on: onK === k, cls: (mode !== 'menu' && onK !== k ? 'dim' : '') + (k === 'lim' && c.limit < 100 ? ' blk' : '') };
           const inner = k === 'def' ? tp.def.replace('class="hk ', `class="hk ${o.on ? 'on' : ''} ${o.cls} `) : k === 'tac' ? tac(o) : stroke(k, key, label, info[k], { ...o, title: k === 'atk' ? wpnLine(wp, c) : '' });
           return `<div class="rad ${x < 0 ? 'w' : 'e'} ${o.on ? 'sel' : ''}" style="--x:${x};--y:${y};--t:${t}deg;--i:${i}">${inner}</div>`; }).join('') + '</div>';
         if (gmO && c.enemy && mode === 'menu') main += stroke('ai', 'I', 'IA decide', '', { a: 'ai', cls: 'mini gmai' });
@@ -207,6 +222,8 @@ const LEQUE = (() => {
       if (mode === 'items') {
         row = 2;
         sub = back1 + cons.map(([k, q], j) => stroke('item', '', esc(S.items[k].name), `×${q} · ${esc(String(idesc(S.items[k])).slice(0, 46))}`, { v: k, on: sel === j })).join('') || '<div class="lq-sum"><b>Nenhum consumível no inventário.</b></div>';
+      } else if (mode === 'skills' && PCL()) {
+        row = 1; sub = back1 + pcSkills(c, sel);
       } else if (mode === 'skills') {
         row = 1;
         const S6 = six(c), AF = { w: '▲', r: '▼', '?': '?' }, dia = s2 => `<span class="cost"><span class="lqd"><b>${s2.limit ? '∞' : s2.cost}</b></span>${s2.limit ? '' : s2.res === 'san' ? 'SAN' : 'AU'}</span>`;
@@ -226,7 +243,7 @@ const LEQUE = (() => {
         if (canAim()) main += stroke('aim', 'Q', 'Mirar parte', aim ? esc(PL[aim]) : '', { on: aimOpen, cls: 'mini' });
         const allies = battlers().filter(o => !o.enemy && o.id !== c.id && o.hp > 0);
         if (allies.length && !allySide() && cands().some(o => o.enemy)) main += stroke('pass', 'P', 'Fraqueza passa', esc(passTo ? S.chars[passTo]?.name || '' : 'ninguém'), { cls: 'mini', title: 'Se acertar uma fraqueza, passa a vez para este aliado' });
-        main += `<div class="lqdef">${tp.def}</div>` + tac() + back1;
+        main += (PCL() ? '' : `<div class="lqdef">${tp.def}</div>`) + tac() + back1;
         main += `<div class="lq-sum"><small>Sua ação${braveOn ? ' · com Coragem' : ''}</small><b>${esc(label)} <span>→</span> ${selfSk(s) ? 'em si' : t ? esc(t.name) : '<u>sem alvo</u>'}${canAim() && aim ? ` · ${esc(PL[aim])}` : ''}</b>${off ? `<small class="offside">⚠ ${off}${armed ? ': Enter de novo confirma' : ''}</small>` : ''}${w ? `<small class="why">${esc(w)}</small>` : ''}</div>`;
         if (canAim() && aimOpen) { row = 1; sub = `<div class="lq-aim">${aimBox()}</div>`; }
       }
@@ -241,6 +258,10 @@ const LEQUE = (() => {
       if (cx.gm && name === 'ai') { this.reset(); return send({ t: 'ai' }); }
       if (cx.gm && name === 'next') { this.reset(); aim = null; return send({ t: 'next' }); }
       if (name === 'atk') { pick = { ...ATK }; return go('aim', 'menu'); }
+      if (name === 'sk' && PCL() && pcGroups(c).length) { pcGrp = 0; return go('skills', 'menu'); }
+      if (name === 'grp') { pcGrp = +v || 0; state.sel = 0; return render(); }
+      if (name === 'lim') { const L = usables(c).filter(k => SK(k)?.limit && !blocked(c, SK(k), k)); if (c.limit < 100 || !L.length) return toast(c.limit < 100 ? `Limite em ${c.limit}%` : 'Nenhuma técnica de Limite', 'no');
+        pick = { k: 'sk', id: L[0] }; if (selfSk(SK(L[0]))) { tgt = c.id; return goAct(c.id); } return go('aim', 'menu'); }
       if (name === 'sk' && six(c).length) return go('skills', 'menu');
       if (name === 'sk' || name === 'all') { if (pick.k !== 'sk') { const f = flat()[0]; if (f) pick = { k: 'sk', id: f.id }; } if (state.mode === 'all') return; listFrom = state.mode === 'skills' ? 'skills' : 'menu'; return go('all'); }
       if (name === 'skp') { const s2 = SK(v); if (!s2 || blocked(c, s2, v)) return; pick = { k: 'sk', id: v }; if (selfSk(s2)) { tgt = c.id; return goAct(c.id); } return go('aim', 'skills'); }
@@ -275,6 +296,8 @@ const LEQUE = (() => {
       if (!cx.my || cx.wait) return false;
       if (mode === 'all' && skKey(e)) return true; // letras filtram a lista; Shift+F fixa
       if (/^[1-3]$/.test(k) && mode === 'menu') { click(['atk', 'sk', 'it'][k - 1]); return true; }
+      if (/^[lL]$/.test(k) && mode === 'menu' && PCL()) { click('lim'); return true; }
+      if (mode === 'skills' && PCL() && (k === 'ArrowLeft' || k === 'ArrowRight')) { const n = pcGroups(c).length; if (n) { pcGrp = (pcGrp + (k === 'ArrowLeft' ? n - 1 : 1)) % n; state.sel = 0; render(); } return true; }
       if (e.target.matches?.('button') && (k === 'Enter' || k === ' ')) return false; // o botão focado já age no clique
       if (cx.gm && /^[iI]$/.test(k) && mode === 'menu' && c.enemy) { click('ai'); return true; }
       // 4–8: a fileira do canto (jogador e mestre)
@@ -286,6 +309,7 @@ const LEQUE = (() => {
         const d = k === 'ArrowUp' ? 1 : -1; // ↑ sobe na coluna
         if (mode === 'menu') { const n = radial(c, canAim()).length; state.sel = (state.sel - d + n) % n; } // ↑↓ giram pelo leque
         else if (mode === 'items') { const n = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons').length; if (!n) return true; state.sel = (state.sel - d + n) % n; }
+        else if (mode === 'skills' && PCL()) { const n = pcItems(c).length; if (!n) return true; state.sel = (state.sel - d + n) % n; }
         else if (mode === 'skills') { const n = six(c).length, L = [...Array(n).keys(), 6], i = Math.max(0, L.indexOf(state.sel)); state.sel = L[(i - d + L.length) % L.length]; } // as 6 e, no fim, "Todas"
         else if (mode === 'all') { const l = flat(); if (!l.length) return true; const i = l.findIndex(x => pick.k === 'sk' && x.id === pick.id); pick = { k: 'sk', id: l[(i + (d > 0 ? l.length - 1 : 1) + (i < 0 ? 1 : 0)) % l.length].id }; }
         else return false;
@@ -299,6 +323,7 @@ const LEQUE = (() => {
       }
       if (k === 'Enter') {
         if (mode === 'menu') { const k2 = radial(c, canAim())[state.sel]?.[0]; if (k2 === 'def') hint('defend'); else if (k2) click(k2); }
+        else if (mode === 'skills' && PCL()) { const x = pcItems(c)[state.sel]; if (x) click('skp', x.id); }
         else if (mode === 'skills') { const id = six(c)[state.sel]; if (state.sel === 6) click('all'); else if (id) click('skp', id); }
         else if (mode === 'items') { const e2 = Object.entries(c.inv).filter(([i]) => S.items[i]?.type === 'cons')[state.sel]; if (e2) click('item', e2[0]); }
         else if (mode === 'all') { if (pick.k === 'sk') go('aim', 'all'); }
