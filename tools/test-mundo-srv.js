@@ -602,3 +602,24 @@ test('trégua: depois da luta, o sobrevivente colado no herói não recomeça na
     at(a, e1.pos.x - .4, e1.pos.z); ia(6); assert.ok(sc.battle.active, 'depois da trégua, o toque vale de novo');
   } finally { fim(); }
 });
+
+test('gerador: wGen escreve no rascunho do andar, trocando os objetos dele, e o jogador não gera', async () => {
+  await import('../public/js/mundo-gerar.js');
+  const sc = freshWorld(), g = gmc(), p = cli('Ana'), off = [join(g), join(p)];
+  try {
+    draft(g, { o: 'floor', v: { id: 'f1', name: 'Porão', w: 20, h: 20 } }, { o: 'obj', id: 'velho', v: { k: 'bau', f: 'f1', x: 1, y: 1, cfg: {} } }, { o: 'obj', id: 'fica', v: { k: 'placa', f: 'f0', x: 1, y: 1, cfg: { texto: 'oi' } } });
+    handle(p, { t: 'wGen', sc: S.focus, f: 'f1', tipo: 'masmorra', tema: 'castelo', w: 40, h: 36, seed: 7 });
+    assert.equal(sc.draft.floors.find(f => f.id === 'f1').w, 20, 'jogador não gera');
+    handle(g, { t: 'wGen', sc: S.focus, f: 'f1', tipo: 'masmorra', tema: 'castelo', w: 40, h: 36, seed: 7 });
+    const f = sc.draft.floors.find(o => o.id === 'f1'), ref = globalThis.MGERAR.gerar('masmorra', 'castelo', 40, 36, 7);
+    assert.deepEqual([f.w, f.h, f.cell, f.wallH, f.wallV], [40, 36, ref.floor.cell, ref.floor.wallH, ref.floor.wallV]);
+    assert.equal(sc.draft.objs.velho, undefined, 'os objetos antigos do andar saem'); assert.equal(sc.draft.objs.fica.k, 'placa', 'os dos outros andares ficam');
+    const novos = Object.entries(sc.draft.objs).filter(([, o]) => o.f === 'f1');
+    assert.equal(novos.length, Object.keys(ref.objs).length); assert.ok(novos.every(([id]) => id.startsWith('f1-')));
+    assert.ok(novos.some(([, o]) => o.k === 'surgir') && novos.some(([, o]) => o.k === 'porta' && o.cfg.estado === 'fechada'));
+    assert.equal(sc.world.floors.length, 1, 'o publicado não muda');
+    assert.ok(g.sent.some(m => m.t === 'draft' && m.d?.floors?.some(o => o.id === 'f1' && o.w === 40)));
+    handle(g, { t: 'wGen', sc: S.focus, f: 'f1', tipo: 'nada', w: 40, h: 36, seed: 7 }); // tipo desconhecido: nada muda
+    assert.equal(sc.draft.floors.find(o => o.id === 'f1').cell, ref.floor.cell);
+  } finally { off.forEach(f => f()); delete sc.draft; }
+});

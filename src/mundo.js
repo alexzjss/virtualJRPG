@@ -6,7 +6,8 @@ import { H, NOUNDO } from './handlers.js';
 import { can } from './rules.js';
 import { QUIET, wss } from './net.js';
 import '../public/js/mundo-colisao.js';
-const P = globalThis.MPECAS;
+import '../public/js/mundo-gerar.js';
+const P = globalThis.MPECAS, G = globalThis.MGERAR;
 
 const W_LEG = 80; // cenas migradas mantêm o tamanho (até 80); andares novos vão até 64 (wDraft)
 const fin = (v, d = 0) => Number.isFinite(+v) && v !== null && v !== '' ? +v : d;
@@ -251,9 +252,19 @@ Object.assign(H, {
     fixMundo(); unstuck(sc); sendDraft(m.sc);
   },
   wDiscard(c, m) { const sc = S.scenes[m.sc]; if (c.role !== 'gm' || !sc?.draft) return; delete sc.draft; sendDraft(m.sc); },
+  wGen(c, m) { // gerador: o andar inteiro do rascunho vira o mapa da semente; os objetos dele são trocados pelos gerados (ids "andar-gN")
+    const sc = S.scenes[m.sc]; if (c.role !== 'gm' || !sc?.world || !G.TIPOS.includes(m.tipo)) return;
+    if (!sc.draft) sc.draft = structuredClone(sc.world);
+    const d = sc.draft, f = d.floors.find(o => o.id === m.f); if (!f) return;
+    const r = G.gerar(m.tipo, P.TEMAS.includes(m.tema) ? m.tema : d.tema, int(m.w, 16, W_NEW, f.w), int(m.h, 16, W_NEW, f.h), int(m.seed, 0, 2 ** 31 - 1));
+    Object.assign(f, r.floor);
+    for (const [id, o] of Object.entries(d.objs)) if (o.f === f.id) delete d.objs[id];
+    for (const [id, o] of Object.entries(r.objs)) { const v = cleanObj({ ...o, f: f.id }, d); if (v) d.objs[f.id + '-' + id] = v; }
+    sendDraft(m.sc);
+  },
 });
-['wDraft', 'wPub', 'wDiscard'].forEach(k => NOUNDO.add(k)); // o editor tem desfazer próprio
-['wDraft', 'wDiscard'].forEach(k => QUIET.add(k)); // o rascunho não vai no push de todos
+['wDraft', 'wPub', 'wDiscard', 'wGen'].forEach(k => NOUNDO.add(k)); // o editor tem desfazer próprio
+['wDraft', 'wDiscard', 'wGen'].forEach(k => QUIET.add(k)); // o rascunho não vai no push de todos
 
 import { perigoTick, pisou, zoneEnter } from './mundo-obj.js'; // interagir com objetos (usa MH e unstuck só dentro dos handlers)
 MH.onCell.push(pisou, zoneEnter); // armadilhas e gatilhos de área ao trocar de casa

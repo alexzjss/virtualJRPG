@@ -175,3 +175,55 @@ test('som: piso por tema e tipo, ambiência por tema', async () => {
   assert.deepEqual(['floresta', 'caverna', 'neve', 'vulcao', 'pantano', 'praia', 'castelo', 'deserto'].map(M.ambOf),
     ['floresta', 'caverna', 'vento', 'caldeira', 'pantano', 'mar', 'vento', 'vento']);
 });
+
+// ----- gerador -----
+// casas andáveis alcançadas do surgir: BFS que respeita as arestas (porta conta como aberta; cerca e parede fecham)
+const alcance = (f, x0, y0) => {
+  const seen = new Uint8Array(f.w * f.h), q = [[x0, y0]]; seen[y0 * f.w + x0] = 1;
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i];
+    for (const [dx, dy, e] of [[1, 0, P.edgeV(f, x + 1, y)], [-1, 0, P.edgeV(f, x, y)], [0, 1, P.edgeH(f, x, y + 1)], [0, -1, P.edgeH(f, x, y)]]) {
+      const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= f.w || ny >= f.h || seen[ny * f.w + nx]) continue;
+      if (P.blocksWalk(P.cell(f, nx, ny)) || P.edgeBlocksWalk(e, true)) continue; seen[ny * f.w + nx] = 1; q.push([nx, ny]);
+    }
+  }
+  return seen;
+};
+const GERA = [['masmorra', 'castelo'], ['aberto', 'floresta'], ['vila', 'campo'], ['caverna', 'caverna']];
+test('gerador: mesma semente, mesmo mapa', async () => {
+  await import('../public/js/mundo-gerar.js'); const G = globalThis.MGERAR;
+  for (const [tipo, tema] of GERA) {
+    const a = G.gerar(tipo, tema, 48, 40, 1234), b = G.gerar(tipo, tema, 48, 40, 1234), c = G.gerar(tipo, tema, 48, 40, 99);
+    assert.deepEqual(a, b, tipo); assert.notDeepEqual(a.floor.cell, c.floor.cell, tipo + ': outra semente, outro mapa');
+    assert.equal(a.floor.w, 48); assert.equal(a.floor.h, 40);
+  }
+});
+test('gerador: todo andável é alcançável do surgir, nos 4 tipos, 50 sementes cada', async () => {
+  await import('../public/js/mundo-gerar.js'); const G = globalThis.MGERAR;
+  for (const [tipo, tema] of GERA) for (let s = 1; s <= 50; s++) {
+    const w = 24 + (s * 7) % 41, h = 20 + (s * 11) % 45, { floor: f, objs } = G.gerar(tipo, tema, w, h, s * 7919);
+    const sg = Object.values(objs).filter(o => o.k === 'surgir'); assert.equal(sg.length, 1, `${tipo} ${s}: um surgir`);
+    assert.ok(!P.blocksWalk(P.cell(f, sg[0].x, sg[0].y)), `${tipo} ${s}: surgir em casa andável`);
+    const seen = alcance(f, sg[0].x, sg[0].y); let soltas = 0, anda = 0;
+    for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) if (!P.blocksWalk(P.cell(f, x, y))) { anda++; if (!seen[y * f.w + x]) soltas++; }
+    assert.equal(soltas, 0, `${tipo} semente ${s}: ${soltas} casas andáveis presas`);
+    assert.ok(anda > w * h * .15, `${tipo} ${s}: mapa com chão (${anda})`);
+    for (const o of Object.values(objs)) if (o.k !== 'porta') assert.ok(seen[o.y * f.w + o.x], `${tipo} ${s}: ${o.k} alcançável`);
+  }
+});
+test('gerador: masmorra tem portas nas junções e ao menos 1 baú', async () => {
+  await import('../public/js/mundo-gerar.js'); const G = globalThis.MGERAR;
+  for (let s = 1; s <= 20; s++) {
+    const { floor: f, objs } = G.gerar('masmorra', 'castelo', 56, 48, s), os = Object.values(objs), tipo = (x, y) => P.decode(P.cell(f, x, y))?.tipo;
+    assert.ok(os.some(o => o.k === 'bau'), `semente ${s}: baú`);
+    const portas = os.filter(o => o.k === 'porta'); assert.ok(portas.length >= 1, `semente ${s}: porta`);
+    assert.equal(new Set(portas.map(o => o.cfg.e + o.x + ',' + o.y)).size, portas.length, `semente ${s}: uma porta por aresta`);
+    for (const o of portas) {
+      const e = o.cfg.e, v = e === 'h' ? P.edgeH(f, o.x, o.y) : P.edgeV(f, o.x, o.y); assert.equal(v, 2, 'a aresta da porta é porta');
+      const [a, b] = e === 'h' ? [tipo(o.x, o.y - 1), tipo(o.x, o.y)] : [tipo(o.x - 1, o.y), tipo(o.x, o.y)];
+      assert.deepEqual([a, b].sort(), ['chao', 'trilha'], `semente ${s}: porta entre sala e corredor (${a}/${b})`);
+    }
+    const n = (k, a, b) => { const c = os.filter(o => o.k === k).length; assert.ok(c >= a && c <= b, `${k}: ${c}`); };
+    n('armadilha', 1, 3); n('bau', 2, 4); // 1 a 3 baús e o baú maior da sala mais distante
+  }
+});

@@ -39,12 +39,12 @@
         ${T === 'objeto' ? `<label>Objeto <select data-mo="obj">${OBJ_NOMES.map(([k, l]) => opt(k, l, E.objK)).join('')}</select></label>` : ''}
         ${EDGE_TOOL[T] ? '<small>Arraste pelas bordas das casas. Shift apaga.</small>' : T === 'nevoa' ? '<small>Revela; com Shift esconde. Vale na hora.</small>' : T === 'mover' ? '<small>Arraste um herói: ele vai na hora.</small>' : T === 'objeto' ? '<small>Clique numa casa. Shift+clique apaga.</small>' : ''}
       </div>
-      <div class="medit-floors" aria-label="Andares">${tabs}<button type="button" data-mfa="add" title="Novo andar">+</button><button type="button" data-mfa="ren" title="Renomear o andar">Renomear</button><button type="button" data-mfa="size" title="Mudar o tamanho do andar">Tamanho</button><button type="button" data-mfa="del" title="Apagar o andar">Apagar</button></div>
+      <div class="medit-floors" aria-label="Andares">${tabs}<button type="button" data-mfa="add" title="Novo andar">+</button><button type="button" data-mfa="gen" title="Gerar o andar: masmorra, área aberta, vila ou caverna">Gerar</button><button type="button" data-mfa="ren" title="Renomear o andar">Renomear</button><button type="button" data-mfa="size" title="Mudar o tamanho do andar">Tamanho</button><button type="button" data-mfa="del" title="Apagar o andar">Apagar</button></div>
       <div class="medit-pub"><button type="button" data-mdis ${dr ? '' : 'disabled'}>Descartar</button><button type="button" class="own" data-mpub ${dr ? '' : 'disabled'}>Publicar${E.pubN ? ` <em class="gbdg">${E.pubN}</em>` : ''}</button></div>
     </div>`;
     return `<div class="medit" style="--medw:${width()}%">${bar}
       <section class="medit-2d" aria-label="Grid do mapa (vista de cima)"><canvas class="medit-cv"></canvas>
-        <div class="medit-info"><b>${esc(f?.name || 'Sem andar')}</b> <small>${f ? f.w + '×' + f.h : ''}${dr ? ' · rascunho' : ' · publicado'}</small></div>${inspect()}</section>
+        <div class="medit-info"><b>${esc(f?.name || 'Sem andar')}</b> <small>${f ? f.w + '×' + f.h : ''}${dr ? ' · rascunho' : ' · publicado'}</small></div>${inspect()}${genHtml()}</section>
       <i class="medit-div" role="separator" aria-orientation="vertical" aria-label="Divisor entre o grid e o 3D" title="Arraste para mudar a largura"></i>
       <section class="medit-3d mundo-slot" data-mundo aria-label="Mapa em 3D ao vivo">${bar3d()}</section>
     </div>`;
@@ -112,7 +112,7 @@
     const cv = root.querySelector('.medit-cv'); E.cv = cv;
     if (!ro && g.ResizeObserver) ro = new ResizeObserver(() => draw());
     if (ro && cv && !cv._ro) { cv._ro = true; ro.observe(cv); }
-    draw();
+    draw(); genDraw();
   }
   // divisor: arrasta e guarda a largura em gui.medW (persistida com o resto da doca)
   addEventListener('pointerdown', e => {
@@ -279,12 +279,14 @@
     if (b.hasAttribute('data-mpub')) { if (typeof send === 'function') send({ t: 'wPub', sc: id }); resetStacks(); return; }
     if (b.hasAttribute('data-mdis')) { if (await ask({ title: 'Descartar o rascunho?', text: 'Todas as mudanças desde o último Publicar vão sumir.', ok: 'Descartar', danger: true }) !== true) return; if (typeof send === 'function') send({ t: 'wDiscard', sc: id }); delete DR[id]; resetStacks(); return render(); }
     const a = b.dataset.mfa; if (!a || !w || !f) return;
+    if (a === 'gen') return genOpen();
     if (a === 'add') { let n = w.floors.length, nid; do nid = 'f' + n++; while (w.floors.some(o => o.id === nid)); ops([{ o: 'floor', v: { id: nid, name: 'Andar ' + (w.floors.length + 1), w: Math.min(64, f.w), h: Math.min(64, f.h) } }]); E.floor = nid; return render(); }
     if (a === 'ren') { const v = await ask({ title: 'Renomear andar', input: f.name, ok: 'Renomear' }); if (typeof v === 'string' && v.trim()) { ops([{ o: 'floor', v: { id: f.id, name: v.trim().slice(0, 30), w: f.w, h: f.h } }]); render(); } return; }
     if (a === 'size') { const v = await ask({ title: 'Tamanho do andar', text: 'Largura × altura, até 64×64. O que ficar de fora some.', input: `${f.w}x${f.h}`, ok: 'Mudar' }); const m = typeof v === 'string' && v.match(/(\d+)\s*[x×*]\s*(\d+)/); if (m) { ops([{ o: 'floor', v: { id: f.id, name: f.name, w: Math.min(64, Math.max(4, +m[1])), h: Math.min(64, Math.max(4, +m[2])) } }]); render(); } return; }
     if (a === 'del') { if (w.floors.length < 2) return typeof toast === 'function' && toast('O mapa precisa de pelo menos um andar.', 'no'); if (await ask({ title: `Apagar "${f.name}"?`, text: 'O andar e os objetos dele somem. Dá para desfazer antes de publicar.', ok: 'Apagar', danger: true }) !== true) return; ops([{ o: 'floor', v: { id: f.id, del: true } }]); E.floor = w.floors.find(o => o.id !== f.id)?.id; return render(); }
   });
   document.addEventListener('change', e => {
+    const mgo = e.target.closest?.('.medit [data-mgo]'); if (mgo && E.gen) { const k = mgo.dataset.mgo; E.gen[k] = k === 'w' || k === 'h' ? Math.max(16, Math.min(64, Math.round(+mgo.value) || 16)) : mgo.value; if (k === 'tipo') E.gen.tema = GEN_TEMA[mgo.value] || E.gen.tema; return render(); }
     const md = e.target.closest?.('.medit [data-md]'); if (md) return onDlgField(md);
     const mg = e.target.closest?.('.medit [data-mg]'); if (mg) return onAcao(mg);
     const ins = e.target.closest?.('.medit [data-mi]'); if (ins) return onInspect(ins);
@@ -303,6 +305,7 @@
     if ((e.ctrlKey || e.metaKey) && !e.altKey) { if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); } return; }
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     const t = !g.MINPUT?.forced && { b: 'pincel', g: 'balde', w: 'parede' }[k]; if (t && !e.repeat) { e.preventDefault(); E.tool = t; return render(); }
+    if (e.key === 'Escape' && E.gen) { e.preventDefault(); E.gen = null; return render(); }
     if (e.key === 'Escape' && (E.tool !== 'sel' || E.rect)) { e.preventDefault(); E.tool = 'sel'; E.rect = null; if (E.st) strokeEnd(); return render(); }
     if (k === 'q' || k === 'r') e.preventDefault(); // Q/R giram o 3D (mundo3d.js) sem trocar a vista da doca
   }, true);
@@ -478,8 +481,57 @@
     d.casas = d.zona ? [...d.casas, [cx, cy]] : d.casas.filter(([x, y]) => x !== cx || y !== cy);
   }
 
+  // ----- janela Gerar: tipo, tema, tamanho e semente com prévia (o mesmo gerador do servidor); Aplicar manda wGen e o servidor
+  // troca o andar inteiro do rascunho, que volta pelo canal draft. O desfazer local não cobre isso: Descartar volta ao publicado.
+  const GEN_NOME = { masmorra: 'Masmorra', aberto: 'Área aberta', vila: 'Vila', caverna: 'Caverna' };
+  const GEN_TEMA = { masmorra: 'castelo', aberto: 'floresta', vila: 'campo', caverna: 'caverna' };
+  const semente = () => Math.floor(Math.random() * 2 ** 31);
+  async function genOpen() {
+    const f = floor(); if (!f) return;
+    if (!g.MGERAR) { try { await import('/js/mundo-gerar.js'); } catch (err) { console.error(err); return typeof toast === 'function' && toast('O gerador não carregou.', 'no'); } }
+    E.gen = { tipo: 'masmorra', tema: GEN_TEMA.masmorra, w: Math.max(16, Math.min(64, f.w)), h: Math.max(16, Math.min(64, f.h)), seed: semente() };
+    render(); document.querySelector('.medit-gen select')?.focus();
+  }
+  function genHtml() {
+    const G = E.gen; if (!G || !g.MGERAR) return '';
+    const opt = (v, l, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`;
+    return `<div class="medit-gen" role="dialog" aria-label="Gerar andar">
+      <header><b>Gerar andar</b><small>${esc(floor()?.name || '')}</small><button type="button" data-mgen="x" aria-label="Fechar">✕</button></header>
+      <div class="medit-genf">
+        <label>Tipo <select data-mgo="tipo">${g.MGERAR.TIPOS.map(t => opt(t, GEN_NOME[t] || t, G.tipo)).join('')}</select></label>
+        <label>Tema <select data-mgo="tema">${P.TEMAS.map(t => opt(t, TEMA_NOME[t] || t, G.tema)).join('')}</select></label>
+        <label>Largura <input type="number" min="16" max="64" value="${G.w}" data-mgo="w"></label>
+        <label>Altura <input type="number" min="16" max="64" value="${G.h}" data-mgo="h"></label>
+      </div>
+      <canvas class="medit-gencv" aria-label="Prévia do andar gerado"></canvas>
+      <footer><small>Semente ${G.seed}</small><button type="button" data-mgen="seed">Outra semente</button><button type="button" class="own" data-mgen="ok">Aplicar</button></footer>
+      <p class="medit-gennota">Aplicar troca o andar inteiro no rascunho, com os objetos dele. Desfazer não volta isso; Descartar volta ao publicado.</p>
+    </div>`;
+  }
+  function genDraw() {
+    const cv = document.querySelector('.medit-gencv'), G = E.gen; if (!cv || !G || !g.MGERAR) return;
+    const key = [G.tipo, G.tema, G.w, G.h, G.seed].join('|'); if (E.genK !== key) { E.genK = key; E.genR = g.MGERAR.gerar(G.tipo, G.tema, G.w, G.h, G.seed); }
+    const { floor: f, objs } = E.genR, dpr = devicePixelRatio || 1, r = cv.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const x = cv.getContext('2d'), cs = Math.min(r.width / f.w, r.height / f.h), ox = (r.width - cs * f.w) / 2, oy = (r.height - cs * f.h) / 2;
+    x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, r.width, r.height);
+    const cell = P.unpack(f.cell, f.w * f.h);
+    for (let y = 0; y < f.h; y++) for (let i = 0; i < f.w; i++) { x.fillStyle = cellColor(cell[y * f.w + i]); x.fillRect(ox + i * cs, oy + y * cs, Math.ceil(cs), Math.ceil(cs)); }
+    const wh = P.unpack(f.wallH, f.w * (f.h + 1)), wv = P.unpack(f.wallV, (f.w + 1) * f.h); x.lineWidth = Math.max(1, cs / 4); x.lineCap = 'round';
+    const line = (e, x0, y0, x1, y1) => { const c = e === 1 ? '#c9c4b8' : ARESTA[e]?.[0]; if (!c) return; x.strokeStyle = c; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); };
+    for (let y = 0; y <= f.h; y++) for (let i = 0; i < f.w; i++) line(wh[y * f.w + i], ox + i * cs, oy + y * cs, ox + (i + 1) * cs, oy + y * cs);
+    for (let y = 0; y < f.h; y++) for (let i = 0; i <= f.w; i++) line(wv[y * (f.w + 1) + i], ox + i * cs, oy + y * cs, ox + i * cs, oy + (y + 1) * cs);
+    for (const o of Object.values(objs)) { if (o.k === 'porta') continue; x.fillStyle = ICONE_COR[o.k] || '#f4efe4'; x.strokeStyle = '#0b0b10'; x.lineWidth = 1.5; x.beginPath(); x.arc(ox + (o.x + .5) * cs, oy + (o.y + .5) * cs, Math.max(3, cs * .5), 0, Math.PI * 2); x.fill(); x.stroke(); }
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest?.('.medit [data-mgen]'); if (!b || !E.gen) return; const k = b.dataset.mgen;
+    if (k === 'x') { E.gen = null; return render(); }
+    if (k === 'seed') { E.gen.seed = semente(); return render(); }
+    if (k === 'ok') { const f = floor(); if (!f || typeof send !== 'function') return; send({ t: 'wGen', sc: sid(), f: f.id, ...E.gen }); resetStacks(); E.pubN = 1; E.gen = null; return render(); }
+  });
+
   g.MEDIT = {
-    html, mount, draw, ops, undo, redo, world, inspect, ctx3d, onAsView, floor: null,
+    html, mount, draw, ops, undo, redo, world, inspect, ctx3d, onAsView, floor: null, get gen() { return E.gen; },
     get tool() { return E.tool; }, set tool(v) { E.tool = v; },
     get brush() { return E.brush; }, set brush(v) { E.brush = Math.max(1, Math.min(7, +v || 1)); },
     get tema() { return E.tema; }, set tema(v) { E.tema = v; }, get tipo() { return E.tipo; }, set tipo(v) { E.tipo = v; },

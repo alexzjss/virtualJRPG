@@ -122,3 +122,14 @@
 .mh-mwho{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .mh-mwho .chb{transform:skewX(-8deg)}
 @media (prefers-reduced-motion:reduce){.mundo-slot>.mh-menu{animation:none}}
+/* janela Gerar do editor: por cima do grid, com a prévia do andar */
+.medit-gen{position:absolute;inset:8px;z-index:3;display:grid;grid-template-rows:auto auto minmax(160px,1fr) auto auto;gap:8px;background:#0b0b10f5;border:1px solid var(--line,#34343d);border-radius:6px;padding:10px;font-size:13px}
+.medit-gen header{display:flex;align-items:center;gap:8px}
+.medit-gen header small{color:var(--dim,#a8a5b2);flex:1}
+.medit-gen header button{padding:2px 8px;min-height:24px}
+.medit-genf{display:flex;flex-wrap:wrap;gap:6px 12px}
+.medit-genf input{width:64px}
+.medit-gencv{width:100%;height:100%;min-height:0;background:#05070c;border-radius:4px}
+.medit-gen footer{display:flex;align-items:center;gap:8px}
+.medit-gen footer small{flex:1;color:var(--dim,#a8a5b2)}
+.medit-gennota{margin:0;color:var(--dim,#a8a5b2);font-size:12px}
