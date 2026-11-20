@@ -1779,6 +1779,17 @@ test('camadas e temas: ramos de até 10, posição = camada, kit atual até a 5,
   assert.deepEqual(validar(TREE), []);
 });
 
+test('evolução lógica: a técnica-base vem antes das variações do próprio nome (X antes de X Dupla, X Detonador, X Supremo...)', async () => {
+  const { TREE } = await import('../tree.js'), { baseDe, EVOL_EXCECAO } = await import('../arvore/camadas.js');
+  const ruins = [];
+  for (const [el, t] of Object.entries(TREE)) {
+    if (el === 'armas') continue;
+    const m = new Map(t.branches.filter(b => !b.de).flatMap(b => b.map(s => [s.n, s])));
+    for (const [n, s] of m) { const b = baseDe(n, m.keys()); if (b && !EVOL_EXCECAO.has(n) && m.get(b).cam >= s.cam) ruins.push(`${el}: ${n} (camada ${s.cam}) não vem depois de ${b} (camada ${m.get(b).cam})`); }
+  }
+  assert.deepEqual(ruins, []);
+});
+
 test('a mandala liga todos os caminhos e o preço cresce para cada afinidade e pré-requisito', async () => {
   const { PAIS } = await import('../arvore/camadas.js');
   const ids = new Map(Object.entries(S.skills).map(([id, s]) => [s.name, id]));

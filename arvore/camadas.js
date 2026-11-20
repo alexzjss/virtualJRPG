@@ -241,11 +241,43 @@ export const VAGAS = [];
 const FLAT = new Map(); // passivas do 1º ramo do Marcial: mantêm o bônus de sempre
 const TREINO = new Set(); // Treinos de atributo: o bônus sobe devagar com a camada, não pela curva de dano
 const FINAL = /(Supremo|Suprema|Primordial|Sem Limite|Definitivo|Final)$/;
+
+// Evolução lógica (Leva 12): a técnica-base vem antes das variações do próprio nome (X → X Dupla → X Detonador → X Supremo).
+// Se a variação caiu numa camada igual ou menor que a da base (mesmo ramo ou ramos diferentes do setor), as duas trocam de casa.
+// Fora da troca ficam a raiz do setor, o kit atual, Limites, fortes, domínios, duplas/trios e invocações. Só vale em ramos sem `de`.
+export const EVOLUCOES = [];
+const SUFIXO = /^(Dupla|Duplo|Tripla|Triplo|Total|Plena|Pleno|Absoluto|Absoluta|Supremo|Suprema|Final|Perfeito|Perfeita|Gigante|Largo|Larga|Detonador|Detonadora|Infinita|Infinito|Em Cadeia|Em Todos|Que .+|Acumulada|Acumulado|Retardada|Dividida|Calcinante|Certeiro|Sangrento|Sangrenta)$/;
+// variações de nome que são outra ideia (ou cuja base já está na camada 10 / é do kit): ficam como estão
+export const EVOL_EXCECAO = new Set(['Faísca Acumulada', 'Graça Absoluta', 'Ressurreição Plena', 'Praga Total', 'Arsenal Infinito']);
+export const baseDe = (nome, nomes) => { let b = null; for (const k of nomes) if (nome.startsWith(k + ' ') && SUFIXO.test(nome.slice(k.length + 1)) && (!b || k.length > b.length)) b = k; return b; };
+function evoluir(el, t, fixos, raiz, plano, layerOf) {
+  const livre = new Map();
+  t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; b.forEach((s, i) => livre.set(s.n, { b, bi, i, s, raiz: b === raiz })); });
+  const deps = new Map();
+  for (const x of livre.values()) for (const p of String(x.s.pre || '').split('|')) if (p && !/^Aperfeiçoamento/.test(p)) (deps.get(p) ?? deps.set(p, []).get(p)).push(x.s.n);
+  const linha = new Map(t.branches.filter(b => b.de).map(b => [b.de, b.length])); // a linha precisa chegar à camada 10: base mais baixa pede mais nós
+  const preso = x => x.i === 0 || x.raiz || KIT.has(x.s.n) || x.s.limit || forte(x.s) || x.s.dom || x.s.duo || x.s.trio || x.s.summon || x.s.aw;
+  const bom = (n, L) => { if (linha.has(n) && L + linha.get(n) < CAM) return false; for (const p of String(livre.get(n)?.s.pre || '').split('|')) if (p && layerOf.has(p) && layerOf.get(p) >= L) return false; for (const d of deps.get(n) || []) if (layerOf.has(d) && layerOf.get(d) <= L) return false; return true; };
+  for (let volta = 0; volta < 4; volta++) {
+    let mexeu = false;
+    for (const v of [...livre.values()]) {
+      const nb = baseDe(v.s.n, livre.keys()), B = nb && livre.get(nb); if (!B || v.s === B.s) continue;
+      const lv = layerOf.get(v.s.n), lb = layerOf.get(B.s.n); if (lv >= lb || preso(v) || preso(B)) continue;
+      layerOf.set(v.s.n, lb); layerOf.set(B.s.n, lv);
+      if (!bom(v.s.n, lb) || !bom(B.s.n, lv)) { layerOf.set(v.s.n, lv); layerOf.set(B.s.n, lb); continue; }
+      const ev = plano.find(e => e[0] === v.s), eb = plano.find(e => e[0] === B.s);
+      [ev[1], eb[1]] = [eb[1], ev[1]]; [ev[2], eb[2]] = [eb[2], ev[2]];
+      v.b[v.i] = B.s; B.b[B.i] = v.s; [v.b, B.b] = [B.b, v.b]; [v.i, B.i] = [B.i, v.i]; [v.bi, B.bi] = [B.bi, v.bi];
+      EVOLUCOES.push(`${el}: ${B.s.n} (camada ${lv}) antes de ${v.s.n} (camada ${lb})`); mexeu = true;
+    }
+    if (!mexeu) break;
+  }
+}
 export const LINHAS = []; // linhas de variação que não chegam à camada 10 (a Leva 10 completa todas)
 const temaDe = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return ['ofensiva', 'controle', 'defesa', 'maestria', 'especial'][c.indexOf(Math.max(...c))]; };
 const vaga = (el, ramo, b, tema) => { if (b.length < CAM) VAGAS.push({ el, ramo, tem: b.length, faltam: Array.from({ length: CAM - b.length }, (_, k) => b.length + k + 1), tema: tema || temaDe(b) }); };
 export function camadas(TREE, preencher) {
-  VAGAS.length = 0;
+  VAGAS.length = 0; EVOLUCOES.length = 0;
   const plano = []; // [nó, camada, casa]: primeiro decide tudo, depois aplica (duplas acertam a camada juntas)
   const layerOf = new Map(), marca = (s, L, i) => { plano.push([s, L, i]); layerOf.set(s.n, L); };
   for (const [el, t] of Object.entries(TREE)) {
@@ -260,6 +292,7 @@ export function camadas(TREE, preencher) {
     preencher?.(el, t.branches.filter(b => !b.de && !fixos.has(b))); // casas livres (arvore/leva9.js)
     for (const b of fixos) b.forEach((s, i) => { marca(s, i + 1, 0); if (b === t.branches[1]) TREINO.add(s); else if (s.k === 'passive') FLAT.set(s, [s.p, s.xp]); }); // ramos iniciais do Marcial: a posição também é a camada
     t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; ordenar(b, b === raiz); b.forEach((s, i) => marca(s, i + 1, i)); vaga(el, bi, b); });
+    evoluir(el, t, fixos, raiz, plano, layerOf);
   }
   // Árvore de Armas: cada tipo tem 3 ramos (o 1º leva o nome do tipo); o excesso passa para o irmão mais curto; os primordiais só ordenam
   const A = TREE.armas;
