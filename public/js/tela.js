@@ -3,6 +3,9 @@ let appHtml = '', appNode = null;
 const setApp = h => { const x = gridFull && S.chars[gridFull] ? `<div class="modal"><header><b>Habilidades · ${esc(S.chars[gridFull].name)}</b><button data-a="gridFull" data-id="">Fechar</button></header>${skillPage(S.chars[gridFull])}</div>` : ''; h += x;
   if (h === appHtml && appNode && appNode === app.firstElementChild && appNode.isConnected) return false; app.innerHTML = h; appHtml = h; appNode = app.firstElementChild; return true; };
 let gmWasB = null, gmFocus = null, lastHero = null; // null até o primeiro desenho: abrir a página no meio da batalha também põe o palco na frente
+// mundo 3D: ligado pelo servidor (VJ_MUNDO=1) ou por ?mundo=1, só no PC; o canvas fica fora do #app e segue o [data-mundo]
+const mundoOn = () => (S.mundo || /[?&]mundo=1/.test(location.search)) && innerWidth > 700 && !!window.MUNDO;
+const mapOr3d = () => mundoOn() ? '<section class="mundo-slot" data-mundo></section>' : map();
 function render() {
   const ae = document.activeElement;
   if (drag || wdrag || cdrag || (typeof mzDrag !== "undefined" && mzDrag) || (gm && (gdragTab || gres)) || ae?.matches?.('#app select')) { pending = true; return; }
@@ -69,7 +72,7 @@ function render() {
     const page = !c ? `<section class="card"><h3>Bem-vindo, ${esc(name)}</h3><p>Você entrou na campanha. O mestre ainda não ligou um personagem à sua conta: assim que ele fizer isso, a ficha aparece aqui sozinha.</p></section>`
       : pg === 'pers' ? persPage(c) : pg === 'hab' ? skillPage(c) : pg === 'ofi' ? oficiosPage(c) : pg === 'itens' ? itemsPage(c)
       : pg === 'hist' ? `<section class="card hist"><h3>Diário de ${esc(c.name)}</h3><textarea aria-label="Diário" data-id="${c.id}" data-f="bio" placeholder="História, aparência, objetivos, anotações da campanha…">${esc(c.bio)}</textarea></section>`
-      : S.off ? `<section class="offwait"><div><b>Fora de cena</b><p>${esc(S.off)}</p></div></section>` : chaseBar() + (actor ? bat3 ? battle(false, ((lq) => HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + lq)(LEQUE.html(actor, cur))) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : map() + mesaTools(c));
+      : S.off ? `<section class="offwait"><div><b>Fora de cena</b><p>${esc(S.off)}</p></div></section>` : chaseBar() + (actor ? bat3 ? battle(false, ((lq) => HUD.html({ actorId: actor.id, dim: cur !== actor, unread }) + lq)(LEQUE.html(actor, cur))) : battle() + command(actor, cur) : b ? battle() + '<p class="card none">Seu personagem não está nesta batalha.</p>' : mapOr3d() + mesaTools(c));
     const pgIn = lastPg !== pg + (c?.id || '') ? 'enter' : '';
     if (chatOpen) chatSeen = S.seq;
     lastPg = pg + (c?.id || '');
@@ -79,7 +82,7 @@ function render() {
       ${ctl ? `<div class="peek ctl">Você está <b>jogando por ${esc(asWho)}</b>: o que fizer aqui acontece na hora, sem passar pela fila de pedidos.</div>` : asWho ? `<div class="peek">Você está vendo a tela de <b>${esc(asWho)}</b>. Só para olhar: nada do que clicar aqui acontece.</div>` : ''}
       <div class="pl ${chatOpen ? '' : 'nochat'} pg-${pg} ${bat3 ? 'bat3' : ''}"><main class="${pgIn}">${page}</main><aside class="chatcol ${chatOpen ? '' : 'shut'}"><div class="panel"><header><b>Chat e histórico</b><button class="ghost" data-a="chatT" aria-label="Fechar chat">Fechar</button></header>${log}</div></aside></div>${pg === 'mesa' && actor ? '' : reqBar()}${rollSheet()}${ctxMenu()}`);
     lastReq = (myReq() || [])[0] || null;
-  } else setApp(`<main>${chaseBar()}${b ? battle(false, innerWidth > 700 ? HUD.html({ table: true }) : '') : map() + party()}</main>`);
+  } else setApp(`<main>${chaseBar()}${b ? battle(false, innerWidth > 700 ? HUD.html({ table: true }) : '') : mapOr3d() + party()}</main>`);
   { const maps = skMount ? app.querySelectorAll(`.skmap[data-cid="${skMount.key}"]`) : [], skm = maps[maps.length - 1]; // a mandala reencaixa o mesmo canvas, com a câmera de antes; uma por vez (a última aberta)
     if (skm && skMount) { MANDALA.mount(skm, skMount); skMount.fresh.forEach(id => MANDALA.learned(id)); } }
   if (editFocus) { editFocus = false; const el = app.querySelector('.edin'); if (el) { el.focus(); el.select(); } }
@@ -89,6 +92,7 @@ function render() {
   app.querySelectorAll('span[data-a],span[data-edit],[data-tab],[data-node],.unit[data-tgt],span[data-tgt],[data-aim],[data-cz],.hud,.scard').forEach(el => { el.tabIndex = 0; el.setAttribute('role', 'button'); if (el.title) el.setAttribute('aria-label', el.title); });
   PALCO3D.local.aim = LEQUE.camTarget(); // liga a vista tática da mira e ancora a linha de alcance (hover não faz o palco oscilar)
   PALCO3D.sync(b ? app.querySelector('[data-p3d]') : null);
+  window.MUNDO?.sync(S, { role, me: role === 'player' ? lastHero : null, follow: role === 'player' ? lastHero : null });
   if (typeof LEQUE !== 'undefined') LEQUE.lift(); // a coluna de comandos vai para o topo do #app (acima do palco)
   fx();
 }

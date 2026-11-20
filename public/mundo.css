@@ -1,0 +1,6 @@
+/* ===== mundo 3D explorável ===== */
+/* O canvas do three.js fica fixo no body (fora do #app) e acompanha o retângulo do .mundo-slot. Ele passa por cima do fluxo do #app,
+   mas não pega o mouse: quem recebe clique e roda é o slot, e o que for HUD dentro do slot sobe acima do canvas. */
+.mw3d{position:fixed;z-index:5;pointer-events:none;display:block}
+.mundo-slot{position:relative;display:block;height:calc(100vh - 120px);min-height:360px;border-radius:6px;overflow:hidden;background:transparent;outline:none}
+.mundo-slot>*{position:relative;z-index:6}

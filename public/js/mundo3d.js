@@ -1,0 +1,120 @@
+// ===== mundo 3D explorável (three.js): renderer, câmera isométrica, montagem e sincronização =====
+// O canvas mora fora do #app (fixo no body, atrás da HUD), como o palco 3D: o render() reescreve o #app por string e só chama
+// MUNDO.sync(S, ctx). O #app marca o retângulo com [data-mundo]. Unidades: 1 casa = 1; x → X, z → Z, Y para cima.
+import * as T from '/vendor/three.module.js';
+import { buildFloor, setCutaway } from './mundo3d-pecas.js';
+import { Actors } from './mundo3d-atores.js';
+import { Fx } from './mundo3d-fx.js';
+
+const TILT = 35 * Math.PI / 180, ROT_MS = 250;
+const ZOOMS = ['perto', 'medio', 'andar'], ZH = { perto: 8, medio: 14 };
+let renderer = null, scene = null, cam = null, root = null, floorG = null, actors = null, fx = null, lost = false;
+let S = null, ctx = {}, key = '', running = false, slot = null;
+const view = { yawK: 0, yaw: Math.PI / 4, yaw0: Math.PI / 4, yawT: 0, zoom: 'medio', tx: 0, tz: 0, pan: null, follow: null, free: null };
+const fpsBuf = []; let lastT = 0;
+
+function ensure() {
+  if (renderer || lost === 'dead') return !!renderer;
+  try { renderer = new T.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' }); } catch (e) { console.error('Mundo 3D sem WebGL:', e); lost = 'dead'; return false; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  renderer.outputColorSpace = T.SRGBColorSpace;
+  const el = renderer.domElement; el.className = 'mw3d'; el.setAttribute('aria-hidden', 'true'); el.style.display = 'none';
+  document.body.appendChild(el);
+  el.addEventListener('webglcontextlost', ev => { ev.preventDefault(); lost = true; stopLoop(); });
+  el.addEventListener('webglcontextrestored', () => { lost = false; key = ''; if (S) sync(S, ctx); });
+  scene = new T.Scene(); root = new T.Group(); scene.add(root);
+  cam = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
+  actors = new Actors(T, root); fx = new Fx(T, scene, renderer);
+  return true;
+}
+const sceneId = () => S?.scene;
+const worldOf = () => { const sc = S?.scenes?.[sceneId()]; if (!sc) return null; return ctx.edit ? S.draft?.[sceneId()] || sc.world : sc.world; };
+const floorFor = w => { if (!w) return null; const id = ctx.floor || view.follow && S.chars[view.follow]?.pos?.f || w.floors[0]?.id; return w.floors.find(f => f.id === id) || w.floors[0]; };
+function resize() {
+  if (!slot || !renderer) return;
+  const r = slot.getBoundingClientRect(), el = renderer.domElement;
+  Object.assign(el.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+  if (el._w !== w || el._h !== h) { renderer.setSize(w, h, false); el._w = w; el._h = h; }
+}
+function camHeight(f) { return view.zoom === 'andar' ? Math.max(f?.w || 20, f?.h || 20) + 2 : ZH[view.zoom]; }
+function placeCam(f) {
+  const el = renderer.domElement, asp = (el._w || 1) / (el._h || 1), hh = camHeight(f) / 2;
+  Object.assign(cam, { left: -hh * asp, right: hh * asp, top: hh, bottom: -hh }); cam.updateProjectionMatrix();
+  const D = 60, cx = view.tx + (view.pan?.dx || 0), cz = view.tz + (view.pan?.dz || 0);
+  cam.position.set(cx + Math.sin(view.yaw) * Math.cos(TILT) * D, Math.sin(TILT) * D, cz + Math.cos(view.yaw) * Math.cos(TILT) * D);
+  cam.lookAt(cx, 0, cz);
+}
+// alvo da câmera: herói seguido (posição interpolada), câmera livre do mestre, ou o centro do andar
+function target(f, now) {
+  if (view.free) return view.free;
+  const id = view.follow, p = id && (globalThis.MINPUT?.poseOf(id, now) || S.chars[id]?.pos);
+  if (p && (!f || p.f === f.id)) return { x: p.x, z: p.z };
+  if (ctx.frame) return ctx.frame(S, f); // TV: enquadra o grupo
+  return { x: (f?.w || 0) / 2, z: (f?.h || 0) / 2 };
+}
+function frame(now) {
+  if (!running) return;
+  const dt = Math.min(.1, (now - (lastT || now)) / 1000); lastT = now;
+  fpsBuf.push(dt); if (fpsBuf.length > 90) fpsBuf.shift();
+  const w = worldOf(), f = floorFor(w);
+  if (view.yawT) { const k = Math.min(1, (now - view.yawT) / ROT_MS), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; view.yaw = view.yaw0 + (Math.PI / 4 + view.yawK * Math.PI / 2 - view.yaw0) * e; if (k >= 1) view.yawT = 0; }
+  const t = target(f, now), s = 1 - Math.exp(-dt * 8); view.tx += (t.x - view.tx) * s; view.tz += (t.z - view.tz) * s;
+  resize(); placeCam(f);
+  actors.update(S, f, now, dt, view.yaw, ctx);
+  if (floorG) setCutaway(floorG, view.follow && S.chars[view.follow]?.pos, view.yaw);
+  fx.update(now, dt, cam, f);
+  globalThis.MHUD?.tick?.(now);
+  renderer.render(scene, cam);
+}
+function startLoop() { if (running || !renderer || lost) return; running = true; lastT = 0; renderer.setAnimationLoop(frame); }
+function stopLoop() { running = false; renderer?.setAnimationLoop(null); }
+function rebuild(w, f) {
+  if (floorG) { root.remove(floorG); floorG.traverse(o => { o.geometry?.dispose?.(); const m = o.material; if (m) { m.map?.dispose(); m.dispose(); } }); floorG = null; }
+  if (!f) return;
+  const pal = globalThis.TERRENO3D?.paleta;
+  floorG = buildFloor(T, f, w, pal, { quality: quality() }); root.add(floorG);
+  fx.setWorld(w, f, pal, quality());
+  actors.setFloor(f, w);
+}
+const quality = () => { const q = document.documentElement.dataset.q || globalThis.ANIMFX?.settings?.quality || 'auto'; return q === 'alta' || q === 'high' ? 'alta' : q === 'baixa' || q === 'low' ? 'baixa' : 'media'; };
+
+function sync(S0, c = {}) {
+  S = S0; ctx = c;
+  slot = document.querySelector('[data-mundo]');
+  const on = !!slot && S && !S.battle?.active;
+  if (!on) { if (renderer) { renderer.domElement.style.display = 'none'; stopLoop(); } return; }
+  if (!ensure()) return;
+  const el = renderer.domElement; el.style.display = '';
+  if (!view.follow || !S.chars[view.follow]) view.follow = c.follow || null;
+  const w = worldOf(), f = floorFor(w), k = [sceneId(), w?.v, f?.id, ctx.edit ? 'e' : 'p', f?.cell?.length, quality()].join('|') + (ctx.edit && f ? f.cell + f.wallH + f.wallV : '');
+  if (k !== key) { key = k; rebuild(w, f); }
+  actors.sync(S, f, w, ctx);
+  fx.sync(S, f, w, ctx);
+  resize(); startLoop();
+}
+// ----- controles de câmera -----
+const rot = d => { view.yaw0 = view.yaw; view.yawK = (view.yawK + d + 4) % 4; view.yawT = performance.now(); };
+const zoom = d => { const i = ZOOMS.indexOf(view.zoom); view.zoom = ZOOMS[Math.max(0, Math.min(2, i + d))]; };
+const pan = (dx, dy) => { const h = camHeight(null) / (renderer?.domElement._h || 600), c = Math.cos(view.yaw), s = Math.sin(view.yaw); view.pan = { dx: (view.pan?.dx || 0) + (-dx * c + dy * s / Math.sin(TILT)) * h, dz: (view.pan?.dz || 0) + (dx * s + dy * c / Math.sin(TILT)) * h }; };
+const panEnd = () => { view.pan = null; };
+const follow = id => { view.follow = id; view.free = null; };
+const free = (x, z) => { view.free = x == null ? null : { x, z }; };
+// rumo das teclas: W vai para "cima da tela" no chão, girado com a câmera
+const axes = () => { const y = view.yaw; return { fwd: { x: -Math.sin(y), z: -Math.cos(y) }, right: { x: Math.cos(y), z: -Math.sin(y) } }; };
+const screen = id => { const p = S?.chars?.[id]?.pos; if (!p || !renderer) return null; return project(p.x, actors.height(id), p.z); };
+function project(x, y, z) { const v = new T.Vector3(x, y, z).project(cam), el = renderer.domElement, r = el.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, vis: v.z > -1 && v.z < 1 }; }
+function pick(cx, cy) { if (!renderer) return null; const r = renderer.domElement.getBoundingClientRect(), ray = new T.Raycaster(); ray.setFromCamera(new T.Vector2((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), cam); const hit = new T.Vector3(); if (!ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), hit)) return null; const f = floorFor(worldOf()); return { f: f?.id, x: hit.x, z: hit.z }; }
+const fps = () => fpsBuf.length ? Math.round(fpsBuf.length / fpsBuf.reduce((a, b) => a + b, 0)) : 0;
+const pause = () => { stopLoop(); if (renderer) renderer.domElement.style.display = 'none'; };
+const resume = () => { key = ''; if (S) sync(S, ctx); };
+const info = () => renderer ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, fps: fps() } : null;
+
+// teclas e roda da câmera (Q/R giram, a roda troca o zoom); só valem com o mundo na tela e fora de campos de texto
+const typing = () => document.activeElement?.matches?.('input,textarea,select,[contenteditable]');
+addEventListener('keydown', e => { if (!running || typing() || e.ctrlKey || e.altKey || e.metaKey) return; const k = e.key.toLowerCase(); if (k === 'q') rot(-1); else if (k === 'r') rot(1); });
+let wheelT = 0;
+addEventListener('wheel', e => { if (!running || !e.target.closest?.('[data-mundo]')) return; e.preventDefault(); const t = performance.now(); if (t - wheelT < 180) return; wheelT = t; zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+
+globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, T };
+if (typeof render === 'function') try { render(); } catch {}

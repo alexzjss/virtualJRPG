@@ -700,6 +700,6 @@
   }
   if (typeof document !== 'undefined') { if (document.head) thumbs(); else addEventListener('DOMContentLoaded', thumbs); }
   const sd = ry => { const r = ry * Math.PI / 180; return SUN[0] * Math.cos(r) + SUN[2] * Math.sin(r) > 0 ? -1 : 1; }; // recortes: espelha quando o sol fica à direita na tela
-  g.TERRENO3D = { montar, construir, cam, hx, sd, shore, grade, gradeAll, horaDe, HORAS, TEMAS };
+  g.TERRENO3D = { montar, construir, cam, hx, sd, shore, grade, gradeAll, horaDe, HORAS, TEMAS, paleta: { SKY, SKYT, CEIL, INK, SUN, COPAS_CEL, CRIST, grade: gradeAll } };
   g.montarTerreno3D = montar;
 })(globalThis);
