@@ -4,8 +4,9 @@
 import * as T from '/vendor/three.module.js';
 import { buildFloor, setCutaway, tickPecas, disposeFloor } from './mundo3d-pecas.js';
 import { Actors } from './mundo3d-atores.js';
-import { Fx, fogData, shatter } from './mundo3d-fx.js';
+import { Fx, fogData, shatter, tvBox } from './mundo3d-fx.js';
 import './mundo-hud.js'; // prompt do E, diálogo e placa (MHUD)
+import './mundo-som.js'; // passos, ambiência e efeitos (MSOM)
 
 const TILT = 35 * Math.PI / 180, ROT_MS = 250;
 const ZOOMS = ['perto', 'medio', 'andar'], ZH = { perto: 8, medio: 14 };
@@ -65,7 +66,7 @@ function resize() {
   const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
   if (el._w !== w || el._h !== h) { renderer.setSize(w, h, false); el._w = w; el._h = h; }
 }
-function camHeight(f) { return view.zoom === 'andar' ? Math.max(f?.w || 20, f?.h || 20) + 2 : ZH[view.zoom]; }
+function camHeight(f) { if (ctx.role === 'table' && view.hTV) return view.hTV; return view.zoom === 'andar' ? Math.max(f?.w || 20, f?.h || 20) + 2 : ZH[view.zoom]; }
 function placeCam(f) {
   const el = renderer.domElement, asp = (el._w || 1) / (el._h || 1), hh = camHeight(f) / 2;
   Object.assign(cam, { left: -hh * asp, right: hh * asp, top: hh, bottom: -hh }); cam.updateProjectionMatrix();
@@ -78,8 +79,13 @@ function target(f, now) {
   if (view.free) return view.free;
   const id = view.follow, p = id && (globalThis.MINPUT?.poseOf(id, now) || S.chars[id]?.pos);
   if (p && (!f || p.f === f.id)) return { x: p.x, z: p.z };
-  if (ctx.frame) return ctx.frame(S, f); // TV: enquadra o grupo
+  if (ctx.role === 'table' && f) return tvTarget(f, now); // TV: enquadra o grupo
   return { x: (f?.w || 0) / 2, z: (f?.h || 0) / 2 };
+}
+// TV: os heróis da cena da TV neste andar (posição desenhada); sem nenhum, o andar inteiro
+function tvTarget(f, now) {
+  const el = renderer.domElement, pts = Object.values(S.chars).filter(c => !c.enemy && c.scene === S.scene && c.pos?.f === f.id).map(c => globalThis.MINPUT?.poseOf?.(c.id, now) || c.pos);
+  return tvBox(pts, f, view.yaw, (el._w || 16) / (el._h || 9));
 }
 function frame(now) {
   if (!running) return;
@@ -88,14 +94,15 @@ function frame(now) {
   autoTune(now, dt);
   const w = worldOf(), f = floorFor(w);
   if (view.yawT) { const k = Math.min(1, (now - view.yawT) / ROT_MS), e = k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; view.yaw = view.yaw0 + (Math.PI / 4 + view.yawK * Math.PI / 2 - view.yaw0) * e; if (k >= 1) view.yawT = 0; }
-  const t = target(f, now), s = 1 - Math.exp(-dt * 8); view.tx += (t.x - view.tx) * s; view.tz += (t.z - view.tz) * s;
+  const t = target(f, now), s = 1 - Math.exp(-dt * (ctx.role === 'table' ? 5 : 8)); view.tx += (t.x - view.tx) * s; view.tz += (t.z - view.tz) * s; // TV: ~600 ms
+  if (t.h) view.hTV = view.hTV ? view.hTV + (t.h - view.hTV) * s : t.h;
   resize(); placeCam(f);
   actors.update(S, f, now, dt, view.yaw, ctx); fx.inimigos(S, f, w, now);
   setCutaway(floorG, view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos), view.yaw, T); tickPecas(now);
   const hp = view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos);
   fx.torch(hp && hp.f === f?.id ? hp : null, w?.hora === "noite" || tema(f, hp) === "caverna");
   fx.update(now, dt, cam, f, { x: view.tx, z: view.tz }, ctx);
-  globalThis.MHUD?.tick?.(now);
+  globalThis.MHUD?.tick?.(now); globalThis.MSOM?.tick?.(now);
   renderer.render(scene, cam);
 }
 function startLoop() { if (running || !renderer || lost) return; running = true; lastT = 0; renderer.setAnimationLoop(frame); }
@@ -116,7 +123,7 @@ function sync(S0, c = {}) {
   if (S?.battle?.active) { if (!paused) { quebra(); pause(); } return; } // batalha: o mundo quebra em cacos e a GPU fica para o palco e o luz.js
   if (paused) { paused = false; if (lost === true) teardown(); }
   const on = !!slot && S;
-  if (!on) { if (renderer) { renderer.domElement.style.display = 'none'; stopLoop(); } globalThis.MHUD?.off?.(); return; }
+  if (!on) { if (renderer) { renderer.domElement.style.display = 'none'; stopLoop(); } globalThis.MHUD?.off?.(); globalThis.MSOM?.off?.(); return; }
   if (!ensure()) return;
   const el = renderer.domElement; el.style.display = '';
   if (!view.follow || !S.chars[view.follow]) view.follow = c.follow || null;
@@ -146,7 +153,7 @@ function quebra() {
 }
 // pausa (batalha): para o laço, libera o mapa de sombra; na Média e na Baixa derruba o contexto para devolver a memória da GPU
 function pause() {
-  paused = true; stopLoop(); globalThis.MHUD?.off?.(); if (!renderer) return;
+  paused = true; stopLoop(); globalThis.MHUD?.off?.(); globalThis.MSOM?.off?.(); if (!renderer) return;
   renderer.domElement.style.display = 'none';
   if (fx?.sol.shadow.map) { fx.sol.shadow.map.dispose(); fx.sol.shadow.map = null; }
   renderer.renderLists.dispose();

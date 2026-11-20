@@ -149,3 +149,29 @@ test('estilhaço: 40 triângulos (12 na Baixa) cobrindo a tela inteira, com o me
   assert.ok(!pts.has('160,125'), 'os vértices de dentro saem da grade');
   assert.ok(pts.has('0,0') && pts.has('800,500'), 'os cantos ficam');
 });
+
+test('TV: enquadra os heróis com 2 casas de margem; sem heróis, o andar inteiro', async () => {
+  const { tvBox } = await import('../public/js/mundo3d-fx.js');
+  const f = { w: 30, h: 20 }, yaw = Math.PI / 4, S35 = Math.sin(35 * Math.PI / 180);
+  const r = { x: Math.cos(yaw), z: -Math.sin(yaw) }, fw = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
+  const pts = [{ x: 2, z: 3 }, { x: 20, z: 4 }, { x: 10, z: 15 }], b = tvBox(pts, f, yaw, 16 / 9);
+  for (const p of pts) { // cada herói, com a margem, cabe na tela
+    const du = (p.x - b.x) * r.x + (p.z - b.z) * r.z, dv = ((p.x - b.x) * fw.x + (p.z - b.z) * fw.z) * S35;
+    assert.ok(Math.abs(du) + 2 <= b.h / 2 * 16 / 9 + 1e-9, 'largura'); assert.ok(Math.abs(dv) + 2 * S35 <= b.h / 2 + 1e-9, 'altura');
+  }
+  const us = pts.map(p => (p.x - b.x) * r.x + (p.z - b.z) * r.z), vs = pts.map(p => (p.x - b.x) * fw.x + (p.z - b.z) * fw.z);
+  assert.ok(Math.abs(Math.max(...us) + Math.min(...us)) < 1e-9 && Math.abs(Math.max(...vs) + Math.min(...vs)) < 1e-9, 'o grupo no meio da tela');
+  assert.equal(tvBox([{ x: 5, z: 5 }], f, yaw, 16 / 9).h, 8, 'um herói só: nunca mais perto que 8');
+  const a = tvBox([], f, yaw, 16 / 9); assert.ok(Math.abs(a.x - 15) < 1e-9 && Math.abs(a.z - 10) < 1e-9, 'sem heróis: o centro do andar');
+  assert.ok(a.h >= b.h, 'sem heróis: o andar inteiro');
+});
+
+test('som: piso por tema e tipo, ambiência por tema', async () => {
+  await import('../public/js/mundo-som.js'); const M = globalThis.MSOM;
+  const d = (tema, tipo = 'chao') => ({ tema, tipo });
+  assert.deepEqual(['floresta', 'campo', 'pantano', 'castelo', 'caverna', 'ruinas', 'praia', 'deserto', 'neve'].map(t => M.pisoDe(d(t))),
+    ['grama', 'grama', 'grama', 'pedra', 'pedra', 'pedra', 'areia', 'areia', 'neve']);
+  assert.equal(M.pisoDe(d('floresta', 'agua')), 'agua');
+  assert.deepEqual(['floresta', 'caverna', 'neve', 'vulcao', 'pantano', 'praia', 'castelo', 'deserto'].map(M.ambOf),
+    ['floresta', 'caverna', 'vento', 'caldeira', 'pantano', 'mar', 'vento', 'vento']);
+});
