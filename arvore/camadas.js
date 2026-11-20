@@ -245,23 +245,50 @@ const FINAL = /(Supremo|Suprema|Primordial|Sem Limite|Definitivo|Final)$/;
 // Evolução lógica (Leva 12): a técnica-base vem antes das variações do próprio nome (X → X Dupla → X Detonador → X Supremo).
 // Se a variação caiu numa camada igual ou menor que a da base (mesmo ramo ou ramos diferentes do setor), as duas trocam de casa.
 // Fora da troca ficam a raiz do setor, o kit atual, Limites, fortes, domínios, duplas/trios e invocações. Só vale em ramos sem `de`.
+// Pares curados [base, variação] que o sufixo do nome não revela. A variação nunca fica abaixo da base (Leva 12).
+export const PARES = [
+  ['Halo', 'Halo Purificador'], ['Halo', 'Halo de Cura'], ['Julgamento', 'Julgamento Solar'], ['Julgamento', 'Julgamento do Sol'],
+  ['Broto de Carne', 'Brotos Estranhos'], ['Broto de Carne', 'Mordida do Broto'], ['Broto de Carne', 'Brotar a Marca'], ['Broto de Carne', 'Brotar na Dor'],
+  ['Carapaça', 'Carapaça Crescida'], ['Carapaça', 'Carapaça Súbita'], ['Carapaça', 'Couraça Quitinosa'],
+  ['Mutação Comum', 'Mutação Defensiva'], ['Mutação Comum', 'Mutação Acumulada'], ['Mutação Comum', 'Mutação Hemorrágica'],
+  ['Meia-Vida', 'Ritual: Meia-Vida Acelerada'], ['Raio Fraco', 'Raio Gama'], ['Raio Fraco', 'Raio Mutagênico'], ['Raio Fraco', 'Raio Gama Concentrado'],
+  ['Regeneração Lenta', 'Regeneração Selvagem'], ['Regeneração Lenta', 'Regenerar Membro'],
+  ['Fornalha', 'Grande Fornalha de Kagutsuchi'], ['Fênix Rubra', 'Fênix Que Queima o Céu'], ['Chama Branca', 'Chama Dupla'],
+  ['Hemorragia Interna', 'Hemorragia Forçada'], ['Hemorragia Forçada', 'Hemorragia Final'], ['Hemorragia Total', 'Hemorragia Final'],
+  ['Maré Rubra: Shukketsu', 'Ritual: Maré Escarlate Eterna'], ['Banho de Sangue', 'Banho Rubro'], ['Noite Vermelha', 'Noite de Sangue'],
+  ['Rajada de Estilhaços', 'Chuva de Estilhaços'], ['Seixo Veloz', 'Seixo Imantado'], ['Seixo Veloz', 'Bala de Cascalho'],
+  ['Reflexo Elétrico', 'Reflexo Elétrico Puro'], ['Primeiro Vendaval', 'Vendaval'],
+  ['Ritual: Condenação', 'Ritual: Condenação Eterna'], ['Exorcismo Sumário', 'Ritual: Grande Exorcismo'],
+  ['Sombra Gêmea', 'Lâmina da Sombra Gêmea'], ['Clone de Sombra', 'Clones de Sombra'], ['Clones de Sombra', 'Duplo Ilusório'], ['Sono Reparador', 'Sono Que Refaz'],
+  ['Tsunami Contido', 'Tsunami Sem Fim'],
+  // Armas
+  ['Dança das Seis Lâminas', 'Dança das Doze Lâminas'], ['Cem Socos', 'Cem Socos Largos'], ['Cem Socos Largos', 'Mil Socos'],
+  ['Respiração Contada', 'Pulmão Parado'], ['Pulmão Parado', 'Atirador de Elite'], ['Atirador de Elite', 'Tiro do Século'], ['Tiro do Século', 'Tiro de Dois Quilômetros'],
+  ['Carga da Falange', 'Carga Final'], ['Superfície Polida', 'Espelho Refletor'], ['Superfície Polida', 'Salão dos Mil Reflexos'],
+  ['Chicote de Domador', 'Açoite do Tirano'], ['Chicote de Domador', 'Mil Estalos'], ['Nuvem de Shuriken', 'Mil Lâminas Noturnas'],
+  ['Flecha Dupla', 'Flecha Atravessadora'], ['Salva de Flechas', 'Três Flechas na Corda'], ['Manivela e Trava', 'Trava Perfeita'], ['Besta de Cerco', 'Virote de Cerco'],
+  ['Lenhador de Homens', 'Fúria do Berserker'], ['Braço de Muralha', 'Muralha de Carne'], ['Braço de Muralha', 'Muralha Que Anda'], ['Braço de Muralha', 'Cidadela Viva'],
+  ['Duelo de Sabres', 'Estilo Três Espadas'],
+];
 export const EVOLUCOES = [];
 const SUFIXO = /^(Dupla|Duplo|Tripla|Triplo|Total|Plena|Pleno|Absoluto|Absoluta|Supremo|Suprema|Final|Perfeito|Perfeita|Gigante|Largo|Larga|Detonador|Detonadora|Infinita|Infinito|Em Cadeia|Em Todos|Que .+|Acumulada|Acumulado|Retardada|Dividida|Calcinante|Certeiro|Sangrento|Sangrenta)$/;
 // variações de nome que são outra ideia (ou cuja base já está na camada 10 / é do kit): ficam como estão
 export const EVOL_EXCECAO = new Set(['Faísca Acumulada', 'Graça Absoluta', 'Ressurreição Plena', 'Praga Total', 'Arsenal Infinito']);
 export const baseDe = (nome, nomes) => { let b = null; for (const k of nomes) if (nome.startsWith(k + ' ') && SUFIXO.test(nome.slice(k.length + 1)) && (!b || k.length > b.length)) b = k; return b; };
-function evoluir(el, t, fixos, raiz, plano, layerOf) {
+function evoluir(el, ramos, linhas, raiz, plano, layerOf) {
   const livre = new Map();
-  t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; b.forEach((s, i) => livre.set(s.n, { b, bi, i, s, raiz: b === raiz })); });
+  ramos.forEach((b, bi) => { b.forEach((s, i) => livre.set(s.n, { b, bi, i, s, raiz: b === raiz })); });
   const deps = new Map();
   for (const x of livre.values()) for (const p of String(x.s.pre || '').split('|')) if (p && !/^Aperfeiçoamento/.test(p)) (deps.get(p) ?? deps.set(p, []).get(p)).push(x.s.n);
-  const linha = new Map(t.branches.filter(b => b.de).map(b => [b.de, b.length])); // a linha precisa chegar à camada 10: base mais baixa pede mais nós
+  const linha = new Map(linhas.map(b => [b.de, b.length])); // a linha precisa chegar à camada 10: base mais baixa pede mais nós
   const preso = x => x.i === 0 || x.raiz || KIT.has(x.s.n) || x.s.limit || forte(x.s) || x.s.dom || x.s.duo || x.s.trio || x.s.summon || x.s.aw;
   const bom = (n, L) => { if (linha.has(n) && L + linha.get(n) < CAM) return false; for (const p of String(livre.get(n)?.s.pre || '').split('|')) if (p && layerOf.has(p) && layerOf.get(p) >= L) return false; for (const d of deps.get(n) || []) if (layerOf.has(d) && layerOf.get(d) <= L) return false; return true; };
   for (let volta = 0; volta < 4; volta++) {
     let mexeu = false;
-    for (const v of [...livre.values()]) {
-      const nb = baseDe(v.s.n, livre.keys()), B = nb && livre.get(nb); if (!B || v.s === B.s) continue;
+    const pares = [...livre.values()].map(v => [v, baseDe(v.s.n, livre.keys())]).filter(([, b]) => b).map(([v, b]) => [v, livre.get(b)]);
+    for (const [a, b] of PARES) if (livre.has(a) && livre.has(b)) pares.push([livre.get(b), livre.get(a)]);
+    for (const [v, B] of pares) {
+      if (!B || v.s === B.s) continue;
       const lv = layerOf.get(v.s.n), lb = layerOf.get(B.s.n); if (lv >= lb || preso(v) || preso(B)) continue;
       layerOf.set(v.s.n, lb); layerOf.set(B.s.n, lv);
       if (!bom(v.s.n, lb) || !bom(B.s.n, lv)) { layerOf.set(v.s.n, lv); layerOf.set(B.s.n, lb); continue; }
@@ -292,7 +319,7 @@ export function camadas(TREE, preencher) {
     preencher?.(el, t.branches.filter(b => !b.de && !fixos.has(b))); // casas livres (arvore/leva9.js)
     for (const b of fixos) b.forEach((s, i) => { marca(s, i + 1, 0); if (b === t.branches[1]) TREINO.add(s); else if (s.k === 'passive') FLAT.set(s, [s.p, s.xp]); }); // ramos iniciais do Marcial: a posição também é a camada
     t.branches.forEach((b, bi) => { if (b.de || fixos.has(b)) return; ordenar(b, b === raiz); b.forEach((s, i) => marca(s, i + 1, i)); vaga(el, bi, b); });
-    evoluir(el, t, fixos, raiz, plano, layerOf);
+    evoluir(el, t.branches.filter(b => !b.de && !fixos.has(b)), t.branches.filter(b => b.de), raiz, plano, layerOf);
   }
   // Árvore de Armas: cada tipo tem 3 ramos (o 1º leva o nome do tipo); o excesso passa para o irmão mais curto; os primordiais só ordenam
   const A = TREE.armas;
@@ -303,6 +330,7 @@ export function camadas(TREE, preencher) {
     espalharFortes(brs, new Set([brs[0][0]]));
     brs.forEach((b, j) => { ordenar(b, j === 0); b.forEach((s, i) => marca(s, i + 1, i)); vaga('armas', wt + '-' + j, b, 'arma: ' + wt); });
   }
+  evoluir('armas', [...Object.values(A.prim), ...Object.values(A.tipos).flat()], [], new Set(), plano, layerOf);
   // linhas de variação: começam na camada da base + 1 (combinação de Vínculos, v2, + 2) e sobem uma camada por nó até a 10.
   // Cada Vínculo secundário abre um caminho próprio a partir do tronco comum.
   LINHAS.length = 0;
