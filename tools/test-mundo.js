@@ -89,3 +89,44 @@ test('fx: névoa por casa (0 escuro, 128 lembrado, 255 visível)', async () => {
   assert.deepEqual([...d], [0, 128, 255, 0]);
   assert.deepEqual([...fogData(4, 1, P.pack(seen), null)], [0, 255, 255, 0]); // sem visão calculada, o visto vale como visível
 });
+
+// ----- visão -----
+await import('../public/js/mundo-visao.js');
+const V = globalThis.MVIS;
+const ve = (bits, x, y) => bits[y * 10 + x] === 1;
+test('visão: parede corta, porta fechada corta, porta aberta e grade não, denso corta atrás', () => {
+  const pa = sala(s => { for (let y = 0; y < 10; y++) s.v(4, y, 1); });
+  assert.ok(ve(V.fov(pa, {}, 1, 5, 8), 1, 5)); assert.ok(ve(V.fov(pa, {}, 1, 5, 8), 3, 5)); assert.ok(!ve(V.fov(pa, {}, 1, 5, 8), 5, 5)); assert.ok(!ve(V.fov(pa, {}, 1, 5, 8), 6, 2));
+  const po = sala(s => { for (let y = 0; y < 10; y++) s.v(4, y, y === 5 ? 2 : 1); });
+  const porta = estado => ({ d: { k: 'porta', f: 'f0', x: 4, y: 5, cfg: { e: 'v', estado } } });
+  assert.ok(!ve(V.fov(po, porta('fechada'), 1, 5, 8), 5, 5));
+  assert.ok(ve(V.fov(po, porta('aberta'), 1, 5, 8), 5, 5)); assert.ok(ve(V.fov(po, porta('aberta'), 1, 5, 8), 7, 5));
+  const gr = sala(s => { for (let y = 0; y < 10; y++) s.v(4, y, 4); });
+  assert.ok(ve(V.fov(gr, {}, 1, 5, 8), 6, 5));
+  const de = sala(s => s.c(3, 5, 'denso'));
+  const b = V.fov(de, {}, 1, 5, 8); assert.ok(ve(b, 3, 5)); assert.ok(!ve(b, 5, 5)); assert.ok(ve(b, 5, 2)); // a sombra do denso é um cone atrás dele, não a linha toda
+  assert.ok(ve(V.fov(sala(s => s.c(1, 5, 'denso')), {}, 1, 5, 8), 1, 5)); // a origem sempre se vê
+  assert.ok(!ve(V.fov(sala(), {}, 0, 0, 3), 9, 9)); // fora do raio
+});
+test('visão: raio 8 de dia, 4+2 à noite com tocha, caverna sempre noite', () => {
+  assert.equal(V.radius('dia', 'campo', false), 8); assert.equal(V.radius('tarde', 'campo', false), 6); assert.equal(V.radius('noite', 'campo', false), 4);
+  assert.equal(V.radius('noite', 'campo', true), 6); assert.equal(V.radius('dia', 'caverna', false), 4); assert.equal(V.radius('dia', 'caverna', true), 6);
+  assert.equal(V.radius(undefined, 'campo', false), 8);
+});
+test('visão: simetria — se A vê B, B vê A', () => {
+  let seed = 7; const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const f = sala(s => { for (let i = 0; i < 14; i++) s.c(rnd(10), rnd(10), 'denso'); for (let i = 0; i < 18; i++) s.v(rnd(11), rnd(10), 1); for (let i = 0; i < 18; i++) s.h(rnd(10), rnd(11), 1); });
+  let vistos = 0;
+  for (let i = 0; i < 200; i++) {
+    const ax = rnd(10), ay = rnd(10), bx = rnd(10), by = rnd(10);
+    const ab = ve(V.fov(f, {}, ax, ay, 12), bx, by), ba = ve(V.fov(f, {}, bx, by, 12), ax, ay);
+    assert.equal(ab, ba, `(${ax},${ay}) ↔ (${bx},${by})`); vistos += ab;
+  }
+  assert.ok(vistos > 20 && vistos < 190, 'mapa misto: ' + vistos);
+});
+test('visão: bits em base64 ida e volta e OU de duas visões', () => {
+  const a = new Uint8Array(100), b = new Uint8Array(100); a[3] = 1; b[97] = 1; b[3] = 1;
+  const o = V.orBits(a, b); assert.equal(o[3], 1); assert.equal(o[97], 1); assert.equal(o.reduce((s, x) => s + x, 0), 2);
+  const r = new Uint8Array(4097); for (let i = 0; i < r.length; i += 3) r[i] = 1;
+  assert.deepEqual(V.fromB64(V.toB64(r), r.length), r); assert.ok(V.toB64(r).length < 800);
+});
