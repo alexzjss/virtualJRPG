@@ -6,7 +6,8 @@ import { ATTRS, BBG, CAMP, CLIMA, EL, GMF, NEW, NUM, PARTS, R, ROLES, SCH, STK, 
 import { AR, GM, OF, RU } from './config.js';
 import { hash, okName } from './auth.js';
 import { kick, push, tell, tell0 } from './net.js';
-import { manualPlan, runPlan, derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun, placeTurn } from './rules.js';
+import { IMAGE_FIELDS, setImage } from './png-box.js';
+import { manualPlan, runPlan, derive, modsOf, cantUse, effSkill, chqMeta, chqResolve, iaExtra, autoTel, defWindow, canPar, parNode, aiPlan, aiRun, placeTurn, okImage } from './rules.js';
 function fireCmd(C, a) { // a janela fechou (ou o mestre pulou): o inimigo executa o plano guardado
   if (S.battle.cmd === C) { try { if (S.battle.active && current() === a.id) { const plan = planOf(C, a); if (C.chq) chqResolve(a, plan, C); else runPlan(a, plan); } } catch (e) { console.error(e); } if (S.battle.cmd === C) S.battle.cmd = null; }
 }
@@ -61,15 +62,16 @@ const H = {
     const g = c.role === 'gm';
     if (f.startsWith('attrs.')) { if (g && ATTRS.includes(f.slice(6))) ch.attrs[f.slice(6)] = int(m.v, 1, 100); } // o mestre define os atributos
     else if (f.startsWith('bon.')) { if (g && Object.hasOwn(BASE, f.slice(4))) ch.bon[f.slice(4)] = int(m.v, -999, 999); }
-    else if ((GMF.has(f) || NUM[f] || f === 'limit') && !g) return; // recursos e posição só pelo mestre (o jogador move o token com 'move')
+    else if ((GMF.has(f) || NUM[f] || f === 'limit' || f === 'shield') && !g) return; // recursos e posição só pelo mestre (o jogador move o token com 'move')
     else if (f === 'limit') ch.limit = int(m.v, 0, 100);
+    else if (f === 'shield') { if (!Number.isFinite(ch.hpMax)) derive(ch); ch.shield = int(m.v, 0, ch.hpMax); }
     else if (NUM[f]) { ch[f] = int(m.v); if (f === 'hp' && ch.hp > 0) { delete ch.dead; delete ch.dying; } }
     else if (f === 'name') { ch.name = String(m.v).slice(0, 30) || '?'; if (ch.enemy && S.bestiary[ch.id] === ch) ch.tpl = ch.name; }
     else if (f === 'boss' && g && ch.enemy) ch.boss = !!m.v;
     else if (f === 'bossFx' && g && ch.enemy) { const P = ['ascensao', 'eclipse', 'tempestade', 'mare', 'erupcao', 'julgamento', 'enxame', 'fenda'], v = m.v, ok = x => P.includes(x) ? x : null; ch.bossFx = v && typeof v === 'object' && !Array.isArray(v) ? { in: ok(v.in), hit: ok(v.hit), col: /^#[0-9a-f]{6}$/i.test(v.col || '') ? v.col : '' } : null; } // cenas de chefe (luz-cenas): mesma regra de LUZP.sanBossFx
     else if (f === 'color' && /^#[0-9a-f]{6}$/i.test(m.v)) ch.color = m.v;
-    else if (f === 'img') ch.img = okUrl(m.v) ? m.v : '';
-    else if (f === 'imgF' || f === 'imgP' || f === 'imgB') ch[f] = okUrl(m.v) ? m.v : ''; // imagens de batalha: inimigos também podem ter frente e costas
+    else if (IMAGE_FIELDS.includes(f)) setImage(ch, f, okImage(m.v) ? m.v : '');
+    else if (f === 'imgL') ch.imgL = !!m.v;
     else if (f === 'imgS') ch.imgS = Math.min(2.5, Math.max(0.5, +m.v || 1));
     else if (f === 'imgK') { const v = m.v, k = v?.k, n = (x, a, b, d) => Math.min(b, Math.max(a, Number.isFinite(+x) && x !== null && x !== '' ? +x : d)); if (k === 'f' || k === 'b' || k === 'p') { if (!ch.imgK || typeof ch.imgK !== 'object') ch.imgK = {}; ch.imgK[k] = { x: n(v.x, -1, 1, 0), y: n(v.y, -1, 1, 0), z: n(v.z, 0.5, 3, 1) }; } } // enquadre da imagem no palco
     else if (f === 'fxK') { const v = m.v, k = v?.k, a = v?.a, n = x => Math.min(1, Math.max(0, Number.isFinite(+x) ? +x : .5)); if ((k === 'f' || k === 'b') && ['hand', 'weapon', 'head', 'feet', 'core', 'eyes'].includes(a)) { ch.fxK ??= {}; ch.fxK[k] ??= {}; ch.fxK[k][a] = { x: n(v.x), y: n(v.y) }; } }

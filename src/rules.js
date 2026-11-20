@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { S, log, newScene } from './state.js';
 import { AR, OF, RU } from './config.js';
 import { ATTRS, BODY, CTRL, DOT, ELCOL, EXTRA, FOIL, PARTS, PL, R, RESN, ROLES, ROLE_N, STN, TIER, VN } from './consts.js';
+import { localImage, measureImages } from './png-box.js';
 
 // recalcula máximos de personagens e modelos antes de enviar o estado
 const prep = (list = Object.values(S.chars), full = true) => { list.forEach(derive); list.forEach(normSlots); if (!full) return; const hs = Object.values(S.chars).filter(c => !c.enemy && !c.summon); for (const c of hs) c.bondMax = Math.max(0, ...hs.filter(o => o !== c).map(o => bondLv(c, o))); for (const [k, b] of Object.entries(S.bestiary)) { b.id = k; b.bon ??= { hpMax: 0, auraMax: 0, sanMax: 0 }; b.body ??= {}; b.vinc ??= []; derive(b); b.hp = b.hpMax; } };
@@ -26,6 +27,7 @@ const d100 = () => 1 + Math.floor(Math.random() * 100);
 const rid = () => crypto.randomBytes(4).toString('hex');
 const int = (v, lo = 0, hi = 9999) => Math.min(hi, Math.max(lo, Math.round(+v) || 0));
 const okUrl = v => /^(https?:\/\/[^\s'"()<>]+|\/(uploads|maps|enemies)\/[\w.-]+)$/.test(v);
+export const okImage = v => typeof v === 'string' && (okUrl(v) || localImage(v));
 const can = (c, ch) => ch && (c.role === 'gm' || (c.role === 'player' && ch.owner === c.name));
 const scene = () => S.scenes[S.scene];
 const eq = (ch, slot) => slot === 'arma' && ch.st?.disarm ? undefined : S.items[ch.equip[slot]]; // Desarmado: a arma não conta
@@ -818,7 +820,7 @@ function manualPlan(a, m, mod) {
 }
 const runPlan = (a, plan) => plan?.manual ? doAct(a, plan.manual.m, plan.manual.mod) : aiRun(a, plan);
 const newChar = (id, enemy, owner) => ({ id, name: enemy ? 'Inimigo' : 'Herói', owner, enemy, scene: S.scene,
-  color: enemy ? '#e60012' : '#00b7ff', img: '', attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
+  color: enemy ? '#e60012' : '#00b7ff', img: '', imgL: false, attrs: Object.fromEntries(ATTRS.map(a => [a, enemy ? R.enemyAttr : 40])), marks: {}, hp: 999, aura: 999, san: 999,
   limit: 0, xp: 0, gold: 0, x: 0, y: 0, ...structuredClone(EXTRA), xpR: enemy ? R.enemyXp : 0, goldR: enemy ? 10 : 0, arma: 8, armor: 0, weak: [], resist: [], skills: [], st: {}, inv: {}, equip: {} });
 // monta um modelo de inimigo a partir das tabelas de content.js (skills por nome ou por filtro)
 const makeFoe = (name, color, attrs, weak, resist, skills, o = {}) => {
@@ -826,7 +828,7 @@ const makeFoe = (name, color, attrs, weak, resist, skills, o = {}) => {
   const ch = { ...newChar('', true, ''), name, color, weak, resist, skills: ids, ...o }; Object.assign(ch.attrs, attrs); return ch;
 };
 const loadScenes = () => SCENES.forEach(sc => { S.scenes[rid()] = newScene(sc.name, { bg: sc.bg, note: sc.note, gather: sc.gather.map(n => Object.keys(S.items).find(k => S.items[k].name === n)).filter(Boolean), shop: { open: false, stock: sc.stock.map(n => Object.keys(S.items).find(k => S.items[k].name === n)).filter(Boolean) } }); });
-const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => { const id = rid(); return [id, { ...ch, id }]; })); };
+const loadBestiary = () => { S.bestiary = Object.fromEntries(buildBestiary(makeFoe).map(ch => { const id = rid(); measureImages(ch); return [id, { ...ch, id }]; })); };
 // o mestre também edita os modelos do bestiário com as mesmas ações de ficha
 // passivas aplicam o bônus de forma permanente; sg = -1 desfaz (quando o mestre tira a skill)
 const bonus = (ch, k, v) => { if (ATTRS.includes(k)) ch.attrs[k] = int(ch.attrs[k] + v, 1, 100); else if (Object.hasOwn(BASE, k)) { ch.bon[k] += v; ch[k.slice(0, -3)] = Math.max(0, ch[k.slice(0, -3)] + v); } };

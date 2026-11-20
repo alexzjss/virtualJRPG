@@ -1,6 +1,7 @@
 // Testes das regras e permissões: node --test tools/test.js
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'fs'; import os from 'os'; import path from 'path';
+import { deflateSync } from 'node:zlib';
 process.env.VJ_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'vjtest-'));
 const { H, S, current, derive, view, handle, migrateItems, modsOf, basicOf, finPlan, slotMax: slotMaxOf } = await import('../server.js'); const RU = globalThis.RULES;
 process.on('exit', () => { try { fs.rmSync(process.env.VJ_DATA, { recursive: true, force: true }); } catch {} }); // registrado depois do servidor: roda após a última gravação ao sair
@@ -33,6 +34,124 @@ test('uiSet: só o mestre troca a UI e todos veem, mesmo depois de desfazer', ()
   assert.equal(S.ui, 'pincel');
   H.uiSet(gm, { v: '' });
   assert.equal(view(ana).ui, '');
+});
+
+function mkPng(W, H, pixel, { depth = 8, color = 6, filters = [0], interlace = 0, palette, transparency } = {}) {
+  const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[color];
+  const bytes = Math.ceil(W * channels * depth / 8), stride = Math.ceil(channels * depth / 8);
+  const chunk = (name, data) => {
+    const part = Buffer.alloc(12 + data.length);
+    part.writeUInt32BE(data.length);
+    part.write(name, 4);
+    data.copy(part, 8);
+    let crc = ~0;
+    for (const byte of part.subarray(4, part.length - 4)) {
+      crc ^= byte;
+      for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+    part.writeUInt32BE(~crc >>> 0, part.length - 4);
+    return part;
+  };
+  const header = Buffer.alloc(13), raw = Buffer.alloc((bytes + 1) * H);
+  header.writeUInt32BE(W); header.writeUInt32BE(H, 4);
+  header[8] = depth; header[9] = color; header[12] = interlace;
+  let prior = Buffer.alloc(bytes);
+  for (let y = 0; y < H; y++) {
+    const row = Buffer.alloc(bytes), pos = y * (bytes + 1), filter = raw[pos] = filters[y % filters.length];
+    for (let x = 0; x < W; x++) pixel(x, y).forEach((v, c) => {
+      const index = x * channels + c;
+      if (depth === 16) row.writeUInt16BE(v, index * 2);
+      else if (depth === 8) row[index] = v;
+      else row[(index * depth) >> 3] |= v << (8 - depth - ((index * depth) & 7));
+    });
+    for (let i = 0; i < bytes; i++) {
+      const l = row[i - stride] || 0, u = prior[i], ul = prior[i - stride] || 0;
+      const best = [l, u, ul].reduce((a, b) => Math.abs(l + u - ul - b) < Math.abs(l + u - ul - a) ? b : a);
+      raw[pos + 1 + i] = row[i] - ([0, l, u, Math.floor((l + u) / 2), best][filter] || 0);
+    }
+    prior = row;
+  }
+  const compressed = deflateSync(raw), mid = Math.floor(compressed.length / 2);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header),
+    ...(palette ? [chunk('PLTE', palette)] : []), ...(transparency ? [chunk('tRNS', transparency)] : []),
+    chunk('IDAT', compressed.subarray(0, mid)), chunk('IDAT', compressed.subarray(mid)), chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+test('opaqueBox: mede RGBA, RGBA de 16 bits e desfaz os cinco filtros', async () => {
+  const { opaqueBox } = await import('../src/png-box.js');
+  const png = mkPng(10, 20, (x, y) => [x, y, x + y, x >= 2 && x < 7 && y >= 5 && y < 19 ? 16 : 15], { filters: [0, 1, 2, 3, 4] });
+  assert.deepEqual(opaqueBox(png), { x: 2, y: 5, w: 5, h: 14, W: 10, H: 20 });
+  assert.deepEqual(opaqueBox(mkPng(3, 2, (x, y) => [25, 90, 255, x === 1 && y === 1 ? 16 * 257 : 15 * 257], { depth: 16, filters: [1, 4] })),
+    { x: 1, y: 1, w: 1, h: 1, W: 3, H: 2 });
+  assert.deepEqual(opaqueBox(mkPng(3, 1, x => [25, x === 2 ? 16 : 0], { color: 4 })), { x: 2, y: 0, w: 1, h: 1, W: 3, H: 1 });
+});
+
+test('opaqueBox: transparência por paleta ou cor, RGB sem alpha e arquivos recusados', async () => {
+  const { opaqueBox } = await import('../src/png-box.js');
+  const full = mkPng(3, 2, () => [1, 2, 3], { color: 2 });
+  assert.deepEqual(opaqueBox(full), { x: 0, y: 0, w: 3, h: 2, W: 3, H: 2 });
+  for (const depth of [2, 8]) {
+    const indexed = mkPng(4, 1, x => [x % 3], { depth, color: 3, palette: Buffer.alloc(9), transparency: Buffer.from([0, 15]), filters: [1] });
+    assert.deepEqual(opaqueBox(indexed), { x: 2, y: 0, w: 1, h: 1, W: 4, H: 1 });
+  }
+  const gray = mkPng(3, 1, x => [x === 1 ? 8 : 9], { color: 0, transparency: Buffer.from([0, 9]) });
+  assert.deepEqual(opaqueBox(gray), { x: 1, y: 0, w: 1, h: 1, W: 3, H: 1 });
+  const huge = Buffer.from(full); huge.writeUInt32BE(16e6 + 1, 16);
+  const pixel = () => [0, 0, 0, 0];
+  for (const png of [
+    mkPng(1, 1, pixel), mkPng(1, 1, pixel, { interlace: 1 }), mkPng(1, 1, pixel, { filters: [5] }),
+    huge, full.subarray(0, full.length - 1), Buffer.from('lixo'), Buffer.from([0xff, 0xd8, 0xff]), Buffer.from('RIFF0000WEBP'),
+  ]) assert.equal(opaqueBox(png), null);
+});
+
+test('set: mede imagens, publica recortes inimigos e protege direção e escudo', async () => {
+  reset();
+  const { boxOfUrl } = await import('../src/png-box.js');
+  const dir = path.join(process.env.VJ_DATA, 'uploads'), url = '/uploads/pincel.png';
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'pincel.png'), mkPng(3, 4, (x, y) => [0, 0, 0, x === 1 && y > 1 ? 255 : 0]));
+  const box = { x: 1, y: 2, w: 1, h: 2, W: 3, H: 4 }, hero = mk(ana, {}), foe = mk(gm, { enemy: true });
+  H.set(ana, { id: hero.id, f: 'imgF', v: url });
+  assert.deepEqual(hero.box.imgF, box);
+  H.set(ana, { id: hero.id, f: 'imgF', v: '' });
+  assert.deepEqual(hero.box, {});
+  const publicUrl = '/enemies/satan-renascido-frente.png';
+  assert.ok(boxOfUrl(publicUrl));
+  H.set(gm, { id: foe.id, f: 'imgF', v: publicUrl });
+  H.set(gm, { id: foe.id, f: 'imgL', v: true });
+  assert.deepEqual(view(ana).chars[foe.id].box.imgF, boxOfUrl(publicUrl));
+  assert.equal(view(ana).chars[foe.id].imgL, true);
+  assert.equal(boxOfUrl('https://example.org/pincel.png'), null);
+  assert.equal(boxOfUrl('//example.org/pincel.png'), null);
+  assert.equal(boxOfUrl('/uploads/%2e%2e/pincel.png'), null);
+
+  H.set(ana, { id: hero.id, f: 'imgL', v: true });
+  H.set(bia, { id: hero.id, f: 'imgL', v: false });
+  assert.equal(hero.imgL, true);
+  for (const who of [gm, ana]) H.set(who, { id: hero.id, f: 'shield', v: who === gm ? 30.2 : 15 });
+  assert.equal(hero.shield, 30);
+  H.set(gm, { id: hero.id, f: 'shield', v: hero.hpMax + 20 });
+  assert.equal(hero.shield, hero.hpMax);
+  H.set(gm, { id: hero.id, f: 'shield', v: -10 });
+  assert.equal(hero.shield, 0);
+});
+
+test('migração: mede imagens de fichas antigas ao abrir a campanha', async () => {
+  const { adopt } = await import('../src/state.js');
+  const keep = structuredClone(S);
+  const dir = path.join(process.env.VJ_DATA, 'uploads'), url = '/uploads/legado.png';
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'legado.png'), mkPng(2, 1, x => [0, 0, 0, x ? 255 : 0]));
+  const old = { chars: { h: { name: 'Herói', imgP: url } }, bestiary: { e: { name: 'Inimigo', imgB: url } }, log: [] };
+  try {
+    adopt(old);
+    const box = { x: 1, y: 0, w: 1, h: 1, W: 2, H: 1 };
+    assert.deepEqual(S.chars.h.box, { imgP: box });
+    assert.deepEqual(S.bestiary.e.box, { imgB: box });
+    assert.equal(S.chars.h.imgL, false);
+  } finally { adopt(keep); }
 });
 
 test('bestiário inicial e grade são criados', () => { assert.ok(Object.keys(S.bestiary).length >= 30); assert.equal(Object.keys(S.skills).length, TOTAL); assert.ok(TOTAL >= 1330); assert.ok(Object.keys(S.items).length >= 50); });

@@ -4,7 +4,8 @@ import { DATA, GM, KEY } from './config.js';
 import { BK, BLANK, S, adopt, backup, diaryFile, flushDiary, log, slug } from './state.js';
 import { fixMedia } from './media.js';
 import { seed } from './seed.js';
-import { int, newChar, okUrl, prep, rid } from './rules.js';
+import { int, newChar, okImage, okUrl, prep, rid } from './rules.js';
+import { IMAGE_FIELDS, measureImages } from './png-box.js';
 import { H, NOUNDO, undoClear } from './handlers.js';
 import { ATTRS, BBG, CLIMA, EL, ITYPES, NEW, PARTS, R, SCH, STK, TIER } from './consts.js';
 import { blocked, ipOf, penalize, same } from './auth.js';
@@ -41,7 +42,7 @@ function cleanCampaign(o) {
   for (const k of ['chars', 'scenes', 'bestiary', 'skills', 'items', 'encounters', 'contracts', 'tracks']) if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) o[k] = Object.fromEntries(Object.entries(o[k]).filter(([id, v]) => okKey(id) && v && typeof v === 'object'));
   for (const coll of ['skills', 'items']) if (o[coll]) for (const [id, d] of Object.entries(o[coll])) o[coll][id] = cleanDef(coll, d);
   for (const ch of [...Object.values(o.chars || {}), ...Object.values(o.bestiary || {})]) {
-    if (!okUrl(ch.img)) ch.img = '';
+    for (const f of IMAGE_FIELDS) if (!okImage(ch[f])) ch[f] = '';
     ch.cat = ['demonio', 'humano', 'chefe'].includes(ch.cat) ? ch.cat : undefined; ch.tpl = ch.tpl == null ? undefined : str(ch.tpl, 40);
     if (ch.st && typeof ch.st === 'object') ch.st = Object.fromEntries(Object.entries(ch.st).filter(([k]) => STK.includes(k)));
     if (!PARTS.includes(ch.weakPart)) delete ch.weakPart;
@@ -73,9 +74,11 @@ function cleanDef(coll, o) { // só passam os campos do esquema, já no tipo cer
 }
 function cleanFoe(o, map) {
   const ch = newChar('', true, ''), str = (v, n) => String(v ?? '').slice(0, n), els = a => Array.isArray(a) ? [...new Set(a.filter(e => EL.includes(e)))] : [];
-  Object.assign(ch, { name: str(o.name, 30) || '?', color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : ch.color, img: okUrl(o.img) ? o.img : '', imgF: okUrl(o.imgF) ? o.imgF : '', imgB: okUrl(o.imgB) ? o.imgB : '', imgP: okUrl(o.imgP) ? o.imgP : '', weak: els(o.weak), resist: els(o.resist), vinc: els(o.vinc),
+  Object.assign(ch, { name: str(o.name, 30) || '?', color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : ch.color, imgL: !!o.imgL, weak: els(o.weak), resist: els(o.resist), vinc: els(o.vinc),
     skills: [...new Set((Array.isArray(o.skills) ? o.skills : []).map(k => map.skills[k]).filter(Boolean))], xpR: int(o.xpR), goldR: int(o.goldR), arma: int(o.arma, 0, 99), armor: int(o.armor, 0, 99), boss: !!o.boss,
     cat: ['demonio', 'humano', 'chefe'].includes(o.cat) ? o.cat : 'demonio', tpl: str(o.tpl || o.name, 40), gmNote: str(o.gmNote, 3000), bio: str(o.bio, 3000) });
+  for (const f of IMAGE_FIELDS) ch[f] = okImage(o[f]) ? o[f] : '';
+  measureImages(ch);
   if (PARTS.includes(o.weakPart)) ch.weakPart = o.weakPart;
   if (Object.hasOwn(R.rank, o.rank)) ch.rank = o.rank;
   for (const a of ATTRS) ch.attrs[a] = int(o.attrs?.[a] ?? ch.attrs[a], 1, 100);

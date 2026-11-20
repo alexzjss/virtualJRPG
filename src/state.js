@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { SUBST } from '../arvore/substitutas.js';
 import { DATA, FILE, OF } from './config.js';
 import { ATTRS, BBG, BBHORAS, BBTEMAS, CLIMA, EL, EXTRA, it, sk } from './consts.js';
+import { IMAGE_FIELDS, measureImages } from './png-box.js';
 
 
 // ---------- estado ----------
@@ -159,7 +160,9 @@ function fixChar(ch, id, live) {
   const arr = (k, ok) => { ch[k] = Array.isArray(ch[k]) ? [...new Set(ch[k].filter(ok))] : []; }, obj = k => { if (!isObj(ch[k])) ch[k] = {}; }, str = v => typeof v === 'string';
   ch.id = id; ch.enemy = !!ch.enemy; ch.name = String(ch.name ?? '?').slice(0, 30) || '?'; ch.owner = ch.enemy ? '' : String(ch.owner ?? '').slice(0, 30);
   if (!/^#[0-9a-f]{6}$/i.test(ch.color)) ch.color = ch.enemy ? '#e60012' : '#00b7ff';
-  for (const k of ['img', 'imgF', 'imgB', 'imgP']) if (!str(ch[k])) ch[k] = '';
+  for (const k of IMAGE_FIELDS) if (!str(ch[k])) ch[k] = '';
+  ch.imgL = !!ch.imgL;
+  measureImages(ch);
   ch.imgS = Math.min(2.5, Math.max(0.5, fin(ch.imgS, 1))); if (!isObj(ch.imgK)) ch.imgK = {}; if (!isObj(ch.fxK)) ch.fxK = {};
   for (const k of Object.keys(ch.fxK)) if (!['f', 'b'].includes(k)) delete ch.fxK[k];
   for (const k of ['f', 'b']) { if (!isObj(ch.fxK[k])) { delete ch.fxK[k]; continue; } for (const a of Object.keys(ch.fxK[k])) { const p = ch.fxK[k][a]; if (!['hand', 'weapon', 'head', 'feet', 'core', 'eyes'].includes(a) || !isObj(p)) delete ch.fxK[k][a]; else ch.fxK[k][a] = { x: Math.min(1, Math.max(0, fin(p.x, .5))), y: Math.min(1, Math.max(0, fin(p.y, .5))) }; } }
