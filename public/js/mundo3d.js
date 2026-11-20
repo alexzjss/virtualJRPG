@@ -2,7 +2,7 @@
 // O canvas mora fora do #app (fixo no body, atrás da HUD), como o palco 3D: o render() reescreve o #app por string e só chama
 // MUNDO.sync(S, ctx). O #app marca o retângulo com [data-mundo]. Unidades: 1 casa = 1; x → X, z → Z, Y para cima.
 import * as T from '/vendor/three.module.js';
-import { buildFloor, setCutaway } from './mundo3d-pecas.js';
+import { buildFloor, setCutaway, tickPecas, disposeFloor } from './mundo3d-pecas.js';
 import { Actors } from './mundo3d-atores.js';
 import { Fx } from './mundo3d-fx.js';
 
@@ -62,7 +62,7 @@ function frame(now) {
   const t = target(f, now), s = 1 - Math.exp(-dt * 8); view.tx += (t.x - view.tx) * s; view.tz += (t.z - view.tz) * s;
   resize(); placeCam(f);
   actors.update(S, f, now, dt, view.yaw, ctx);
-  if (floorG) setCutaway(floorG, view.follow && S.chars[view.follow]?.pos, view.yaw);
+  setCutaway(floorG, view.follow && (globalThis.MINPUT?.poseOf?.(view.follow, now) || S.chars[view.follow]?.pos), view.yaw, T); tickPecas(now);
   fx.update(now, dt, cam, f);
   globalThis.MHUD?.tick?.(now);
   renderer.render(scene, cam);
@@ -70,7 +70,7 @@ function frame(now) {
 function startLoop() { if (running || !renderer || lost) return; running = true; lastT = 0; renderer.setAnimationLoop(frame); }
 function stopLoop() { running = false; renderer?.setAnimationLoop(null); }
 function rebuild(w, f) {
-  if (floorG) { root.remove(floorG); floorG.traverse(o => { o.geometry?.dispose?.(); const m = o.material; if (m) { m.map?.dispose(); m.dispose(); } }); floorG = null; }
+  if (floorG) { root.remove(floorG); disposeFloor(floorG); floorG = null; }
   if (!f) return;
   const pal = globalThis.TERRENO3D?.paleta;
   floorG = buildFloor(T, f, w, pal, { quality: quality() }); root.add(floorG);
@@ -87,7 +87,7 @@ function sync(S0, c = {}) {
   if (!ensure()) return;
   const el = renderer.domElement; el.style.display = '';
   if (!view.follow || !S.chars[view.follow]) view.follow = c.follow || null;
-  const w = worldOf(), f = floorFor(w), k = [sceneId(), w?.v, f?.id, ctx.edit ? 'e' : 'p', f?.cell?.length, quality()].join('|') + (ctx.edit && f ? f.cell + f.wallH + f.wallV : '');
+  const w = worldOf(), f = floorFor(w), k = [sceneId(), w?.v, f?.id, ctx.edit ? 'e' : 'p', f?.cell?.length, quality(), f ? [...(globalThis.MCOL?.openIdx(w.objs, f.id) || [])].sort().join() : ''].join('|') + (ctx.edit && f ? f.cell + f.wallH + f.wallV : '');
   if (k !== key) { key = k; rebuild(w, f); }
   actors.sync(S, f, w, ctx);
   fx.sync(S, f, w, ctx);
@@ -116,5 +116,5 @@ addEventListener('keydown', e => { if (!running || typing() || e.ctrlKey || e.al
 let wheelT = 0;
 addEventListener('wheel', e => { if (!running || !e.target.closest?.('[data-mundo]')) return; e.preventDefault(); const t = performance.now(); if (t - wheelT < 180) return; wheelT = t; zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
-globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, T };
+globalThis.MUNDO = { sync, rot, zoom, pan, panEnd, follow, free, axes, screen, project, pick, pause, resume, fps, info, view, get el() { return renderer?.domElement || null; }, get floor() { return floorG; }, draw: () => { if (running) frame(performance.now()); }, T };
 if (typeof render === 'function') try { render(); } catch {}
