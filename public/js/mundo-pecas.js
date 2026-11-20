@@ -24,8 +24,8 @@
   const blocksWalk = c => !c || BLOCK.has(tipoOf(c));
   const jumpable = c => tipoOf(c) === 'baixo';
   const blocksSight = c => tipoOf(c) === 'denso';
-  const edgeBlocksWalk = (e, open) => e === 1 || e === 3 || e === 4 || e === 5 || (e === 2 && !open);
-  const edgeBlocksSight = (e, open) => e === 1 || e === 3 || (e === 2 && !open);
+  const edgeBlocksWalk = (e, open) => e === 1 || e === 4 || e === 5 || ((e === 2 || e === 3) && !open); // porta e barreira abertas deixam passar
+  const edgeBlocksSight = (e, open) => e === 1 || ((e === 2 || e === 3) && !open);
   const edgeJumpable = e => e === 5;
   g.MPECAS = { TEMAS, TIPOS, ARESTA, code, decode, tipoOf, pack, unpack, cells, hEdges, vEdges, newFloor, cell, edgeH, edgeV, blocksWalk, jumpable, blocksSight, edgeBlocksWalk, edgeBlocksSight, edgeJumpable };
 })(globalThis);

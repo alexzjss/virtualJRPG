@@ -205,7 +205,9 @@ const battleWatch = () => {
   B.end = end;
 };
 // dirty: as definições (skills/itens) podem ter mudado; só o mestre as edita, então ações de jogador e timers de comando passam false
+let nPush = 0; const pushes = () => nPush; // contador para os testes (o mundo 3D garante que andar não dispara push)
 const push = (dirty = true) => {
+  nPush++;
   try {
     ofiSync(); pruneReqs();
     // cada personagem é preparado dentro da cena dele (fichas, bloqueios e fila leem a batalha daquela cena)
@@ -220,7 +222,9 @@ const push = (dirty = true) => {
 };
 // executa uma mensagem de cliente; pedidos de jogador que exigem aprovação entram na fila em vez de acontecer
 // heróis fora de cena não andam nem agem no mapa ou na batalha (ficha, inventário e ofícios fora de batalha continuam)
-const OFFSTAGE = new Set(['move', 'act', 'defend', 'focus', 'allOut']);
+const OFFSTAGE = new Set(['move', 'walk', 'act', 'defend', 'focus', 'allOut']);
+// ações que mudam o estado em memória sem push completo (o mundo 3D manda as posições pelo canal pos)
+const QUIET = new Set(['walk']);
 // conversa não pertence a uma cena: roda sem contexto (não ganha a marca de cena no histórico)
 const NOSCENE = new Set(['chat']);
 function handle(c, m) {
@@ -241,7 +245,7 @@ function handleIn(c, m, sid) {
       m: { node: m.node, rec: m.rec, rune: m.rune, el2: m.el2, sig: m.sig, nm: m.nm, part: m.part, part2: m.part2, id: m.id, w: m.w, attr: m.attr, mod: m.mod, skill: m.skill, target: m.target, aim: m.aim, item: m.item, k: m.k, pass: m.pass, brave: m.brave } };
     return push(false);
   }
-  try { H[m.t](c, m); } catch (e) { console.error(e); } push(c.role === 'gm');
+  try { H[m.t](c, m); } catch (e) { console.error(e); } if (!QUIET.has(m.t)) push(c.role === 'gm');
 }
 // o que o jogador pede e o mestre precisa aprovar, por tipo (S.auto[tipo] = true dispensa a aprovação)
 const GATE = { roll: 'roll', act: 'act', learn: 'learn', use: 'item', equip: 'item', drop: 'item', buy: 'item', sell: 'item', forge: 'item', campAct: 'camp', ofiUse: 'roll', ofiLearn: 'learn', craft: 'item', reroll: 'roll', defend: 'act', focus: 'act', allOut: 'act' };
@@ -335,4 +339,4 @@ function start() {
   });
 }
 
-export { sceneOfClient, sceneOfMsg, hiddenSkills, defsFor, curDefs, GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };
+export { QUIET, pushes, sceneOfClient, sceneOfMsg, hiddenSkills, defsFor, curDefs, GATE, gateOf, handle, hiddenFoe, hooks, kick, lan, net, pruneReqs, pubChars, push, reqText, scrub, sendState, server, start, strip, tell, tell0, view, wss };
