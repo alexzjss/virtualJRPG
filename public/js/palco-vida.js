@@ -7,6 +7,12 @@
   const U = id => typeof PALCO3D !== 'undefined' ? PALCO3D.unitOf(id) : null;
   const elCol = c => { try { return ELC[mainEl(c)] || '#fff'; } catch { return '#fff'; } };
   const swap = (u, key, cur, pre) => { for (const k of (u[key] || '').split(' ').filter(Boolean)) u.el.classList.remove(pre + k); for (const k of cur.split(' ').filter(Boolean)) u.el.classList.add(pre + k); u[key] = cur; };
+  const passo = u => {
+    if (reduced()) return;
+    u.passoAt = g.CENA?.now() ?? performance.now();
+    u.el.classList.remove('passo'); void u.inner.offsetWidth; u.el.classList.add('passo');
+    clearTimeout(u.passoT); u.passoT = setTimeout(() => u.el.classList.remove('passo'), 260);
+  };
   const unit = (u, c) => {
     const pose = PFX.poseOf(c).join(' '); if (u.pose !== pose) swap(u, 'pose', pose, 'pose-');
     if (c.hp > 0) u.el.classList.remove('inked');
@@ -62,5 +68,5 @@
   // pose final: vit (pulo e brilho), cai (deitam um a um), foge (correm para a câmera com poeira)
   const pose = (ids, cls, step = 150) => ids.forEach((id, i) => setTimeout(() => { const u = U(id); if (!u) return; u.el.classList.add('end-' + cls);
     if (cls === 'foge') { const p = mk('i', 'puff', u.el); setTimeout(() => p.remove(), 900); } }, reduced() ? 0 : i * step));
-  g.PVIDA = { unit, ghosts, action, qteRing, inkOut, enter, pose };
+  g.PVIDA = { unit, passo, ghosts, action, qteRing, inkOut, enter, pose };
 })(globalThis);

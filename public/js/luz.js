@@ -198,7 +198,7 @@
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const unit = id => document.querySelector(`.p3d .bb[data-tgt="${CSS.escape(id || '')}"]`) || document.querySelector(`.stage .unit[data-tgt="${CSS.escape(id || '')}"]`) || document.querySelector(`.tok[data-id="${CSS.escape(id || '')}"]`);
   const rect = id => { const u = unit(id); if (!u) return null; const im = u.querySelector(':scope > .bbi > img') || u; const r = im.getBoundingClientRect(); return r.width ? r : u.getBoundingClientRect(); };
-  const point = (id, r, anchor = 'core') => { if (!r) return { x: L.W / 2, y: L.H / 2 }; const el = unit(id), k = el?.dataset.kind || 'f', saved = g.S?.chars?.[id]?.fxK?.[k]?.[anchor], A = saved ? [saved.x, saved.y] : ({ hand: [.64, .42], weapon: [.72, .46], head: [.5, .18], feet: [.5, .9], core: [.5, .48], eyes: [.5, .24] }[anchor] || [.5, .48]); return { x: r.left + r.width * A[0], y: r.top + r.height * A[1] }; };
+  const point = (id, r, anchor = 'core') => { if (!r) return { x: L.W / 2, y: L.H / 2 }; const el = unit(id), k = el?.dataset.kind || 'f', saved = (typeof S === 'undefined' ? g.S : S)?.chars?.[id]?.fxK?.[k]?.[anchor], A = saved ? [saved.x, saved.y] : ({ hand: [.64, .42], weapon: [.72, .46], head: [.5, .18], feet: [.5, .9], core: [.5, .48], eyes: [.5, .24] }[anchor] || [.5, .48]); return { x: r.left + r.width * (el?.classList.contains('esp') ? 1 - A[0] : A[0]), y: r.top + r.height * A[1] }; };
   const target = r => r ? { x: r.left + r.width * .5, y: r.top + r.height * .45 } : { x: L.W * .65, y: L.H * .48 };
   const foot = r => r ? { x: r.left + r.width * .5, y: r.bottom - r.height * .04 } : { x: L.W * .65, y: L.H * .62 };
   const scale = r => r ? clamp(r.height / 210, .45, 1.8) : 1;

@@ -17,13 +17,26 @@
   // distância entre dois tokens: casas (Chebyshev, como RULES) e metros quando a cena tem escala
   const rangeOf = (a, b, unit) => { if (!a || !b || a.x == null || a.y == null || b.x == null || b.y == null) return null; const casas = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)); return { casas, m: unit > 0 ? +(casas * unit).toFixed(2) : null }; };
   // posição (x, z) de cada combatente: do grid; sem posição, slot de reserva do seu lado; depois separa quem ficou colado
-  const formation = (chars, fr) => {
+  const formation = (chars, fr, arc = false) => {
     const M = new Map(), ids = [];
     let ih = 0, ie = 0;
     const placed = c => c.x != null && c.y != null;
     for (const c of chars) { if (placed(c)) M.set(c.id, toWorld(c.x, c.y, fr)); ids.push(c.id); }
     const bossId = chars.find(c => c.enemy && c.boss && !placed(c))?.id, nFoe = chars.filter(c => c.enemy && !placed(c)).length, C = Math.min(COLS_F, nFoe), mid = (C - 1) / 2;
-    for (const c of chars) {
+    if (arc) {
+      for (const enemy of [false, true]) {
+        const reserve = chars.filter(c => !!c.enemy === enemy && !placed(c)), z = enemy ? -fr.D : 0;
+        const opponents = chars.filter(c => !!c.enemy !== enemy && placed(c)).map(c => M.get(c.id));
+        const target = opponents.length ? opponents.reduce((p, o) => ({ x: p.x + o.x / opponents.length, z: p.z + o.z / opponents.length }), { x: 0, z: 0 }) : { x: 0, z: enemy ? 0 : -fr.D };
+        const d = Math.hypot(target.x, target.z - z);
+        const dx = d > 1 ? target.x / d : 0, dz = d > 1 ? (target.z - z) / d : enemy ? 1 : -1;
+        reserve.forEach((c, i) => {
+          const cols = enemy ? COLS_F : 4, row = Math.floor(i / cols), count = Math.min(cols, reserve.length - row * cols);
+          const side = (i % cols - (count - 1) / 2) * 350, back = row * 290 + 155 * (side / Math.max(350, (count - 1) * 175)) ** 2;
+          M.set(c.id, { x: n0(Math.round(-dz * side - dx * back)), z: n0(Math.round(z + dx * side - dz * back)) });
+        });
+      }
+    } else for (const c of chars) {
       if (placed(c)) continue;
       if (c.id === bossId) { M.set(c.id, { x: 0, z: n0(-fr.D - 250) }); continue; } // chefe: centro, mais ao fundo
       if (!c.enemy) { const i = ih++, [x, z] = POS_H[i % 4]; M.set(c.id, { x, z: n0(z - 260 * Math.floor(i / 4)) }); }
@@ -35,7 +48,10 @@
       for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
         const a = M.get(ids[i]), b = M.get(ids[j]), dz = a.z - b.z; if (Math.hypot(a.x - b.x, dz) >= MIN_SEP) continue;
         const need = Math.sqrt(MIN_SEP * MIN_SEP - dz * dz), gap = Math.ceil((need - Math.abs(a.x - b.x)) / 2), dir = a.x <= b.x ? -1 : 1; // a para a esquerda, a menos que já esteja à direita
-        a.x = n0(a.x + dir * gap); b.x = n0(b.x - dir * gap); moved = true;
+        const fixedA = arc && placed(chars[i]) && !placed(chars[j]), fixedB = arc && placed(chars[j]) && !placed(chars[i]);
+        if (!fixedA) a.x = n0(a.x + dir * gap * (fixedB ? 2 : 1));
+        if (!fixedB) b.x = n0(b.x - dir * gap * (fixedA ? 2 : 1));
+        moved = true;
       }
       if (!moved) break; }
     return M;
@@ -123,13 +139,17 @@
  <text x="100" y="${back ? 300 : 290}" font-family="Anton,Impact" font-size="120" text-anchor="middle" fill="${back ? col : '#000'}" opacity="${back ? .9 : .75}">${L}</text></svg>`);
   };
   // kind: f frente (imgF → img → silhueta), b costas (imgB → silhueta de costas), p retrato (imgP → frente com recorte do topo → silhueta); bad: URLs que falharam, ignoradas
-  const imgSrc = (c, kind, bad = []) => {
+  const imgSrc = (c, kind, bad = [], reuse = false) => {
     const ok = u => typeof u === 'string' && u && !bad.includes(u);
-    if (kind === 'b') return ok(c.imgB) ? { url: c.imgB, fallback: false } : { url: silhouette(c, true), fallback: true };
+    if (kind === 'b') {
+      if (ok(c.imgB)) return { url: c.imgB, fallback: false };
+      if (!reuse) return { url: silhouette(c, true), fallback: true };
+    }
     if (kind === 'p' && ok(c.imgP)) return { url: c.imgP, fallback: false };
     const u = [c.imgF, c.img].find(ok);
     if (u) return kind === 'p' ? { url: u, fallback: false, crop: 'top' } : { url: u, fallback: false };
-    return { url: silhouette(c, false), fallback: true };
+    if (reuse && ok(c.imgB)) return { url: c.imgB, fallback: false };
+    return { url: silhouette(c, kind === 'b'), fallback: true };
   };
 
   // Heróis e inimigos mostram frente ou costas conforme o lado da câmera; sem imgB, o inimigo mantém a frente.
@@ -141,6 +161,34 @@
     const k = c?.imgK?.[kind]; if (!k || typeof k !== 'object' || !src || src.fallback) return '';
     const n = (v, a, b, d) => Math.min(b, Math.max(a, Number.isFinite(+v) && v !== null && v !== '' ? +v : d)), x = n(k.x, -1, 1, 0), y = n(k.y, -1, 1, 0), z = n(k.z, .5, 3, 1);
     return kind === 'p' ? `translate(${+(x * 100).toFixed(1)}%,${+(y * 100).toFixed(1)}%) scale(${z})` : `translate(calc(${x} * var(--h)),calc(${y} * var(--h))) scale(${z})`;
+  };
+  const cropOf = (c, src, h) => {
+    const box = !src.fallback && c.box?.[src.field];
+    if (!box?.w || !box.h || !box.W || !box.H) return null;
+    const k = h / box.h, x = (box.x + box.w / 2) / box.W, y = (box.y + box.h) / box.H;
+    return { width: box.w * k, imageH: box.H * k, left: -box.x * k, top: -box.y * k, x, y };
+  };
+
+  const actionLocks = new Map();
+  const aimLocks = (state = typeof S === 'undefined' ? null : S, localAim) => {
+    if (!state?.battle?.active) return {};
+    const { battle, chars, scene } = state, locks = Object.create(null);
+    for (let i = (state.log?.length || 0) - 1; i >= 0; i--) {
+      const e = state.log[i], f = e.fx;
+      if (e.sc && e.sc !== scene) continue;
+      if (e.who === 'Mestre' && e.text === 'Batalha iniciada!') break;
+      if (f?.a && !f.passive && f.a in battle.ticks && !(f.a in locks)) locks[f.a] = f.id;
+    }
+    if (typeof S !== 'undefined' && state === S) {
+      const prev = actionLocks.get(scene);
+      const actual = { ...(prev?.seed === battle.seed && prev.locks), ...locks };
+      actionLocks.set(scene, { seed: battle.seed, locks: actual });
+      for (const [actor, target] of Object.entries(actual)) if (actor in battle.ticks) locks[actor] = target;
+    }
+    const id = battle.order?.[0];
+    if (localAim === undefined && typeof LEQUE !== 'undefined' && LEQUE.ctx()?.actor?.id === id && LEQUE.ctx()?.shown) localAim = LEQUE.aimTarget();
+    if (id && !chars[id]?.enemy && localAim) locks[id] = localAim;
+    return { ...locks };
   };
 
   // as 6 skills do leque: fixadas (na ordem de pins), depois as mais usadas (contagem > 0, decrescente, empate pelo id); só as usáveis, sem repetir
@@ -170,7 +218,7 @@
   const QCYCLE = ['auto', 'high', 'medium', 'low'], QNAME = { auto: 'Auto', high: 'Alta', medium: 'Média', low: 'Baixa' };
   const frameNow = inB => { const sc = S.scenes[S.scene] || {}; return frame(S.battle.ax || RULES.axisOf(inB), sc.cols, sc.rows); }; // enquadre atual (batalha sem eixo gravado calcula na hora)
   const lungeMs = dist => clamp(Math.round(250 + dist * .12), 300, 700); // ida e volta da investida, pela distância percorrida (px)
-  const P = { lane: { w: 0, side: 1 }, ACT, ORB, pickSide, mood, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
+  const P = { lane: { w: 0, side: 1 }, ACT, ORB, pickSide, mood, rotP, rotX, fitCam, MODES, rangeOf, lungeMs, frameNow, frame, toWorld, formation, lastFrame: () => lastFr, cameraFor, imgSrc, imgFit, aimLocks, unitKind, pickSix, previewSlot, local, lunge: () => Promise.resolve(), shake() {}, sync() {}, rectOf: () => null };
 
   // ----- montagem no navegador -----
   let floor = null, rl = null, rb = null, floorKey = '', root = null, atw = null, world = null, scn = null, grp = null, host = null, ro = null, camKey = '', scnKey = '', biomeClass = '', settle = 0, hs1 = 0, hs2 = 0;
@@ -267,7 +315,51 @@
     return base;
   };
   const setCls = (u, k, on) => { if (u.cls[k] !== on) { u.cls[k] = on; u.el.classList.toggle(k, on); } };
-  const setImg = u => { const k = unitKind(u.c, camRy), s = imgSrc(u.c, k, u.bad), t = imgFit(u.c, k, s); u.el.dataset.kind = k; u.url = s.url; u.fb = s.fallback; if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; } if (u.fit !== t) { u.fit = t; u.img.style.transform = t; } };
+  const penciled = () => document.body.classList.contains('ui-pincel');
+  const setImg = u => {
+    const c = u.c, k = unitKind(c, camRy), style = penciled(), s = imgSrc(c, k, u.bad, style);
+    s.field = k === 'b' && s.url === c.imgB ? 'imgB' : s.url === c.imgF ? 'imgF' : s.url === c.img ? 'img' : 'imgB';
+    const kind = style && !s.fallback ? (s.field === 'imgB' ? 'b' : 'f') : k;
+    const t = imgFit(c, kind, s), b = style ? cropOf(c, s, parseFloat(u.h)) : null;
+    u.el.dataset.kind = kind; u.url = s.url; u.fb = s.fallback; u.crop = b;
+    if (u.src !== s.url) { u.src = s.url; u.img.src = s.url; }
+    if (u.fit !== t) { u.fit = t; u.img.style.transform = t; }
+    setCls(u, 'recorte', !!b);
+    const key = b ? Object.values(b).join(',') : '';
+    if (u.cropKey !== key) {
+      u.cropKey = key;
+      for (const [n, v] of Object.entries({ w: b?.width, ih: b?.imageH, ix: b?.left, iy: b?.top, ox: b && b.x * 100, oy: b && b.y * 100 })) {
+        if (b) u.el.style.setProperty('--bb-' + n, v + (n.startsWith('o') ? '%' : 'px'));
+        else u.el.style.removeProperty('--bb-' + n);
+      }
+    }
+  };
+  const aimUnits = (F, v) => {
+    const on = penciled() && !!g.MIRA_R;
+    const list = [...els.values()].map(u => u.c), targets = on ? g.MIRA_R.targets(list, { seed: S.battle.seed, locks: aimLocks() }) : {};
+    const screen = new Map();
+    if (on) for (const { id } of list) {
+      const p = els.get(id).home || F.get(id);
+      if (!p) continue;
+      const r = rotP(p, v.ry), q = rotX({ ...r, y: 0 }, v.rx || 0);
+      screen.set(id, PERSP * (q.x + v.tx) / Math.max(1, PERSP - q.z - v.tz));
+    }
+    for (const u of els.values()) {
+      const id = u.c.id, target = targets[id], x = screen.get(id), tx = screen.get(target);
+      const flip = Number.isFinite(tx) ? g.MIRA_R.faceLeft(x, tx, !u.fb && u.c.imgL) : null;
+      const next = on ? flip ?? u.mirror ?? (!u.fb && !!u.c.imgL) : false;
+      if (flip !== null) u.facing = tx < x ? -1 : 1;
+      if (!on) u.facing = null;
+      if (u.mirror !== next) {
+        if (on && u.mirror != null && flip != null) g.PVIDA?.passo(u);
+        u.mirror = next;
+      }
+      setCls(u, 'esp', next);
+      if (target) u.el.dataset.mira = target;
+      else delete u.el.dataset.mira;
+    }
+    g.LUZ?.kick();
+  };
   const mkUnit = c => {
     const e = el('div', 'bb unit ' + (c.enemy ? 'foe' : 'hero')), u = { el: e, cls: {}, bad: [], src: '', pos: '', h: '', mini: '' };
     e.dataset.tgt = c.id; e.tabIndex = 0; e.setAttribute('role', 'button'); el('i', 'shadow', e); el('i', 'ring', e);
@@ -301,7 +393,7 @@
   const miniSh = (u, hp, sp) => { if (!u.shb || typeof PFX === 'undefined') return; const g2 = PFX.shieldSeg(hp, sp); u.shb.style.left = g2.l + '%'; u.shb.style.width = g2.w + '%'; };
   const units = () => {
     const inB = Object.values(S.chars).filter(c => c.id in S.battle.ticks), cur = S.chars[timeline(1)[0]];
-    const fr = frameNow(inB), F = formation(inB, fr), V = new Map(); // V: onde cada um aparece agora (o inimigo da vez já avançou)
+    const fr = frameNow(inB), F = formation(inB, fr, penciled()), V = new Map(); // V: onde cada um aparece agora (o inimigo da vez já avançou)
     const picking = typeof LEQUE !== 'undefined' && !!LEQUE.aimTarget(), pickable = new Set(picking ? LEQUE.aimList().map(c => c.id) : []);
     root.classList.toggle('selecting', picking); root.dataset.pick = picking ? '1' : '';
     for (const [id, u] of els) if (!inB.some(c => c.id === id)) { u.el.remove(); els.delete(id); }
@@ -339,8 +431,10 @@
     const rx = v.rx || 0, k = `${v.tx},${v.ty},${v.tz},${v.ry},${rx}`, tr = `translate3d(${v.tx}px,${v.ty}px,${v.tz}px) rotateX(${rx}deg) rotateY(${v.ry}deg)`; // rotateX sempre presente: a transição interpola função a função
     if (!camLock) world.dataset.cam = tr; // o enquadramento do turno (a fumaça confere a volta depois da investida)
     if (rst) rst.hidden = !!camLock || !mine;
-    if (k === camKey) return; camKey = k; world.style.transform = tr; world.style.setProperty('--bry', v.ry + 'deg'); world.style.setProperty('--brx', rx + 'deg'); if (typeof TERRENO3D !== 'undefined') { world.style.setProperty('--hx', TERRENO3D.hx(v.ry)); world.style.setProperty('--sd', TERRENO3D.sd(v.ry)); TERRENO3D.cam(v, root.clientHeight || 860); } // copas com o brilho do lado do sol; some o que tapar a luta // os recortes giram de volta: sempre de frente para a câmera (a figura também inclina para ela)
+    if (k === camKey) { aimUnits(F, v); return; }
+    camKey = k; world.style.transform = tr; world.style.setProperty('--bry', v.ry + 'deg'); world.style.setProperty('--brx', rx + 'deg'); if (typeof TERRENO3D !== 'undefined') { world.style.setProperty('--hx', TERRENO3D.hx(v.ry)); world.style.setProperty('--sd', TERRENO3D.sd(v.ry)); TERRENO3D.cam(v, root.clientHeight || 860); } // copas com o brilho do lado do sol; some o que tapar a luta // os recortes giram de volta: sempre de frente para a câmera (a figura também inclina para ela)
     if (unitKind({}, v.ry) !== unitKind({}, camRy)) { camRy = v.ry; for (const u of els.values()) if (u.c) setImg(u); } else camRy = v.ry;
+    aimUnits(F, v);
     if (!camLock && v0.fast) { world.classList.add('fast'); clearTimeout(fastT); fastT = setTimeout(() => !camLock && world.classList.remove('fast'), 500); } // o anel de defesa dura ~1,3 s: a câmera não pode levar 1,1 s para chegar
   };
 
@@ -427,6 +521,8 @@
   P.linger = ms => { lingerUntil = Math.max(lingerUntil, performance.now() + ms); };
   P.miniHp = (id, hp, sp) => { const u = els.get(id); if (!u?.hpi) return; u.mini = null; trailBar(u, hp + '%'); if (sp != null) miniSh(u, hp, sp); }; // o coreo desce a mini barra a cada batida
   P.unitOf = id => els.get(id) || null;
+  P.facing = id => els.get(id)?.facing;
+  P.sun = () => g.TERRENO3D?.sd(camRy) === -1 ? 1 : -1;
   P.posOf = id => lastF?.get(id) || null;
   P.rectOf = id => els.get(id)?.el.getBoundingClientRect() || null;
   g.PALCO3D = P;

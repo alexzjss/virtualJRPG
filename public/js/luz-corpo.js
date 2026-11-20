@@ -8,31 +8,48 @@
   const VS = `#version 300 es
   precision highp float;
   layout(location=0) in vec2 aG;
-  uniform vec2 uRes; uniform vec4 uRect; uniform vec4 uD1; uniform vec4 uD2; uniform float uT;
-  out vec2 vUv; out float vH;
+  uniform vec2 uRes; uniform vec4 uRect; uniform vec4 uD1; uniform vec4 uD2; uniform vec4 uBody; uniform float uT;
+  out vec2 vUv;
   void main(){
-    float hf = 1. - aG.y, w = uRect.z, h = uRect.w, dir = uD2.z;
-    vec2 p = vec2((aG.x - .5) * w, -hf * h);
+    float w = uRect.z, h = uRect.w, dir = uD2.z;
+    float hf = clamp(1. - aG.y / uBody.y, 0., 1.);
+    vec2 p = (aG - uBody.xy) * uRect.zw;
+    if (uBody.w != 0.) {
+      vec2 q = uRect.xy + uBody.xy * uRect.zw + vec2(p.x * .7 + p.y * uBody.w * .42, -p.y * .14);
+      gl_Position = vec4(q.x / uRes.x * 2. - 1., 1. - q.y / uRes.y * 2., 0., 1.);
+      vUv = vec2(mix(aG.x, 1. - aG.x, uBody.z), aG.y);
+      return;
+    }
     float sq = uD1.y; p.y *= 1. + sq; p.x /= sqrt(max(.2, 1. + sq));
     p.x *= mix(1., cos(uD1.z), hf);
     if (hf > .6667) { float k = (hf - .6667) * 3.; p.x += 3. * uD2.w * k * k * sin(uT * 1.6 + hf * 2.); }
     float th = uD1.x * pow(hf, 1.2) * dir, c = cos(th), s = sin(th);
     p = vec2(p.x * c - p.y * s, p.x * s + p.y * c);
     p += vec2(uD2.x * h * dir, uD2.y * h) + uD1.w * vec2(sin(uT * 90.), .5 * cos(uT * 77.));
-    vec2 foot = vec2(uRect.x + w * .5, uRect.y + h), q = foot + p;
+    vec2 foot = uRect.xy + uBody.xy * uRect.zw, q = foot + p;
     gl_Position = vec4(q.x / uRes.x * 2. - 1., 1. - q.y / uRes.y * 2., 0., 1.);
-    vUv = aG; vH = hf;
+    vUv = vec2(mix(aG.x, 1. - aG.x, uBody.z), aG.y);
   }`;
   const FS = `#version 300 es
   precision mediump float;
-  in vec2 vUv; in float vH; uniform sampler2D uTex; uniform vec4 uTint; uniform vec4 uLook; uniform vec2 uPx; out vec4 o;
+  in vec2 vUv; uniform sampler2D uTex; uniform vec4 uTint; uniform vec4 uLook; uniform vec2 uPx;
+  uniform highp vec4 uBody; uniform vec4 uLight; uniform vec3 uElement; out vec4 o;
   void main(){
     vec4 c = texture(uTex, vUv); float a = c.a; if (a < .003) discard;
+    if (uBody.w != 0.) { o = vec4(vec3(.018, .014, .026) * a, a) * .3; return; }
     vec3 rgb = c.rgb / a;
     float gray = dot(rgb, vec3(.299, .587, .114)); rgb = mix(vec3(gray), rgb, uLook.y) * uLook.x;
-    float n = min(min(texture(uTex, vUv + vec2(uPx.x, 0.)).a, texture(uTex, vUv - vec2(uPx.x, 0.)).a), min(texture(uTex, vUv + vec2(0., uPx.y)).a, texture(uTex, vUv - vec2(0., uPx.y)).a));
-    float rim = clamp((a - n) * 2.5, 0., 1.);
-    rgb += uTint.rgb * uTint.a * (rim * 1.4 + .18);
+    if (uLight.a != 0.) {
+      float sun = uLight.a * (1. - 2. * uBody.z);
+      float edge = texture(uTex, vUv + uPx * vec2(sun, -.55)).a;
+      float rim = pow(clamp((a - edge) * 1.5, 0., 1.), 1.5);
+      rgb *= mix(vec3(.78), .64 + .42 * uLight.rgb, .4 + .42 * (vUv.x * sun + max(0., -sun)));
+      rgb += mix(uLight.rgb, uElement, .22) * (.055 + rim * .36);
+    }
+    if (uTint.a > 0.) {
+      float n = min(min(texture(uTex, vUv + vec2(uPx.x, 0.)).a, texture(uTex, vUv - vec2(uPx.x, 0.)).a), min(texture(uTex, vUv + vec2(0., uPx.y)).a, texture(uTex, vUv - vec2(0., uPx.y)).a));
+      rgb += uTint.rgb * uTint.a * (clamp((a - n) * 2.5, 0., 1.) * 1.4 + .18);
+    }
     rgb = mix(rgb, vec3(1.), uLook.w);
     float al = a * uLook.z; o = vec4(rgb * al, al);
   }`;
@@ -41,7 +58,7 @@
   function setup(gl) {
     prog = gl.createProgram(); gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VS)); gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-    for (const k of ['uRes', 'uRect', 'uD1', 'uD2', 'uT', 'uTex', 'uTint', 'uLook', 'uPx']) U[k] = gl.getUniformLocation(prog, k);
+    for (const k of ['uRes', 'uRect', 'uD1', 'uD2', 'uT', 'uTex', 'uTint', 'uLook', 'uPx', 'uBody', 'uLight', 'uElement']) U[k] = gl.getUniformLocation(prog, k);
     const v = [], idx = [];
     for (let r = 0; r <= ROWS; r++) for (let c = 0; c <= COLS; c++) v.push(c / COLS, r / ROWS);
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const a = r * (COLS + 1) + c, b = a + 1, d = a + COLS + 1, e = d + 1; idx.push(a, b, d, b, e, d); }
@@ -75,9 +92,10 @@
   const units = () => document.querySelectorAll('.p3d .bb[data-tgt]');
   const elOf = id => document.querySelector(`.p3d .bb[data-tgt="${CSS.escape(id || '')}"]`);
   const has = id => !!(L.active() && elOf(id)?.classList.contains('malha'));
-  // frente de quem age: para o lado do grupo oposto na tela
-  const facing = id => { const c = g.S?.chars?.[id], me = elOf(id)?.getBoundingClientRect(); if (!c || !me) return 1; let sx = 0, n = 0;
-    for (const u of units()) { const o = g.S?.chars?.[u.dataset.tgt]; if (!o || !!o.enemy === !!c.enemy) continue; const r = u.getBoundingClientRect(); sx += r.left + r.width / 2; n++; }
+  const state = () => typeof S !== 'undefined' ? S : g.S;
+  const facing = id => { const aim = g.PALCO3D?.facing(id); if (aim) return aim;
+    const c = state()?.chars?.[id], me = elOf(id)?.getBoundingClientRect(); if (!c || !me) return 1; let sx = 0, n = 0;
+    for (const u of units()) { const o = state()?.chars?.[u.dataset.tgt]; if (!o || !!o.enemy === !!c.enemy || o.hp <= 0 || o.dead) continue; const r = u.getBoundingClientRect(); sx += r.left + r.width / 2; n++; }
     return n ? Math.sign(sx / n - (me.left + me.width / 2)) || 1 : 1; };
   const play = (id, kind, opts = {}) => { if (reduced() || !has(id)) return; const s = S0(id), ms = (MS[kind] || 860) / Math.max(.5, Math.min(2, g.ANIMFX?.settings?.speed || 1));
     s.curves = s.curves.filter(c => c.kind !== kind); s.curves.push({ kind, t0: now(), ms, opts: { dir: facing(id), ...opts }, hold: kind === 'cai' || kind === 'ko' }); L.kick(); };
@@ -86,14 +104,21 @@
   const flash = (id, ms = 160) => { if (!has(id)) return; S0(id).flash = now() + ms; L.kick(); };
   const ghosts = (id, dir = 1) => { if (reduced() || !has(id)) return; S0(id).ghost = { t0: now(), dir }; play(id, 'dodge', { dir: -dir }); };
   // ----- vento do clima -----
-  const wind = () => { const sc = g.S?.scenes?.[g.S?.scene], cl = sc?.clima || g.S?.battle?.clima || ''; return /chuva|neve|cinza|brasa|nebl|vento|tempest/.test(String(cl)) ? .6 : .3; };
+  const wind = s => /chuva|neve|cinza|brasa|nebl|vento|tempest/.test(s?.scenes?.[s.scene]?.clima || '') ? .6 : .3;
+  const HOUR = { dia: '#f6deaf', tarde: '#e6a883', noite: '#9aa9df' };
+  const BIOME = { floresta: '#a4c398', pantano: '#99ac86', praia: '#a9cbd6', neve: '#c8dfef', caverna: '#a5a2c0', vulcao: '#ec9c77', deserto: '#e5bd83' };
+  const lightOf = root => {
+    const h = L.rgb(HOUR[root.dataset.mood] || HOUR.dia), b = L.rgb(BIOME[root.dataset.biome?.split('-')[0]] || HOUR.dia);
+    return h.map((v, i) => v * .72 + b[i] * .28);
+  };
   // ----- desenho -----
   const D = { bend: 0, squash: 0, twist: 0, dx: 0, dy: 0, shake: 0 };
   let lastRects = '', still = 0;
   function draw(t) {
     const gl = L.gl, root = document.querySelector('.p3d');
     if (!root || root.style.display === 'none' || !L.active()) return false;
-    const list = []; let sig = '', anim = false;
+    const list = [], palco = g.PALCO3D, s0 = state(), sun = document.body.classList.contains('ui-pincel') ? palco.sun() : 0;
+    let sig = '', anim = false;
     for (const el of units()) {
       const id = el.dataset.tgt, img = el.querySelector(':scope > .bbi > img'); if (!img) continue;
       const src = img.currentSrc || img.src, tx = src ? texOf(src) : null;
@@ -101,14 +126,26 @@
       el.classList.toggle('malha', ok); if (!ok) continue;
       const r = img.getBoundingClientRect(); if (!r.width || !r.height) continue;
       sig += `${id}:${r.left | 0},${r.top | 0},${r.width | 0};`;
-      list.push({ id, el, r, tx });
+      const u = palco.unitOf(id), mirror = u?.mirror ? 1 : 0, x = u?.crop?.x ?? .5;
+      list.push({ id, el, r, tx, mirror, pivotX: mirror ? 1 - x : x, pivotY: u?.crop?.y ?? 1, passoAt: u?.passoAt });
     }
     if (!list.length) return false;
-    list.sort((a, b) => a.r.bottom - b.r.bottom); // do fundo (mais alto na tela) para a frente
+    list.sort((a, b) => a.r.top + a.r.height * a.pivotY - b.r.top - b.r.height * b.pivotY); // da posição dos pés ao fundo até a frente
     gl.useProgram(prog); gl.bindVertexArray(vao); gl.uniform2f(U.uRes, L.W, L.H); gl.uniform1f(U.uT, t / 1000); gl.uniform1i(U.uTex, 0); gl.activeTexture(gl.TEXTURE0);
-    const w = reduced() ? 0 : wind();
+    const w = reduced() ? 0 : wind(s0);
+    gl.uniform4f(U.uLight, ...lightOf(root), sun);
+    const box = u => gl.uniform4f(U.uRect, u.r.left, u.r.top, u.r.width, u.r.height);
+    if (sun) for (const u of list) {
+      if (u.el.classList.contains('ko') || u.el.classList.contains('inked')) continue;
+      box(u);
+      gl.bindTexture(gl.TEXTURE_2D, u.tx.tex);
+      gl.uniform4f(U.uBody, u.pivotX, u.pivotY, u.mirror, sun);
+      gl.drawElements(gl.TRIANGLES, nIdx, gl.UNSIGNED_SHORT, 0);
+    }
     for (const u of list) {
-      const s = st.get(u.id), c = g.S?.chars?.[u.id] || {}, d = { ...D };
+      const s = st.get(u.id), c = s0?.chars?.[u.id] || {}, d = { ...D };
+      const step = (t - u.passoAt) / 220;
+      if (step >= 0 && step < 1) { d.dy -= Math.sin(step * Math.PI) * .045; anim = true; }
       // pose contínua (ferido curva, KO deitado) + curvas em curso
       const pose = typeof g.PFX !== 'undefined' ? g.PFX.poseOf(c) : [];
       if (pose.includes('ferido')) { d.bend += .1; d.squash -= .04; }
@@ -126,9 +163,11 @@
       if (lim && !tk) { [tr, tg, tb] = L.rgb('#ffd36a'); tk = .35 + .25 * Math.sin(t / 220); anim = true; }
       const fl = s && t < s.flash ? (s.flash - t) / 160 * .7 : 0; if (fl) anim = true;
       gl.bindTexture(gl.TEXTURE_2D, u.tx.tex);
+      gl.uniform4f(U.uBody, u.pivotX, u.pivotY, u.mirror, 0);
+      gl.uniform3f(U.uElement, ...L.rgb(typeof mainEl === 'function' ? ELC[mainEl(c)] || '#fff' : '#fff'));
       gl.uniform4f(U.uTint, tr, tg, tb, tk); gl.uniform2f(U.uPx, 2 / u.tx.w, 2 / u.tx.h);
       const look = (k, a) => gl.uniform4f(U.uLook, ko ? .45 : pose.includes('ferido') ? .82 : 1, ko ? 0 : pose.includes('ferido') ? .8 : 1, a, k);
-      gl.uniform4f(U.uRect, u.r.left, u.r.top, u.r.width, u.r.height);
+      box(u);
       // fantasmas da esquiva: três cópias atrás, mais apagadas
       if (s?.ghost) { const k = (t - s.ghost.t0) / 520; if (k < 1) { anim = true; [.45, .3, .15].forEach((a, i) => { gl.uniform4f(U.uD1, d.bend * .5, d.squash, d.twist, 0); gl.uniform4f(U.uD2, d.dx + (i + 1) * .12 * (1 - k), d.dy, s.ghost.dir, w); look(.3, a * (1 - k)); gl.drawElements(gl.TRIANGLES, nIdx, gl.UNSIGNED_SHORT, 0); }); } else s.ghost = null; }
       gl.uniform4f(U.uD1, d.bend, d.squash, d.twist, d.shake); gl.uniform4f(U.uD2, d.dx, d.dy, dir, w); look(fl, alpha);

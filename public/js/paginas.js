@@ -125,6 +125,7 @@ function imgBattle(c) {
   return `<div class="card wide imgb"><h3>Imagens de batalha <small>como aparece no palco 3D do computador</small></h3>
     <p class="hint">Use PNG com fundo transparente para o melhor resultado.</p>
     <div class="imgq">${['f', 'b', 'p'].map(quadro).join('')}</div>
+    <label class="imgs"><input type="checkbox" data-id="${c.id}" data-f="imgL"${c.imgL ? ' checked' : ''}> Minha imagem olha para a esquerda</label>
     <label class="imgs">Tamanho na cena <input type="range" min="0.5" max="2.5" step="0.1" data-id="${c.id}" data-f="imgS" value="${sz}"><output>${sz.toFixed(1).replace('.', ',')}×</output></label></div>`;
 }
 // acampamento aberto: o que este herói faz nesta noite (fica na ficha e na aba Acampamento do menu do mundo)
