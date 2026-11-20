@@ -11,7 +11,7 @@ import { RU } from './config.js';
 import { BBG } from './consts.js';
 import { MH, floorOf, place } from './mundo.js';
 
-const TICK = .2, ALERTA = 1, PERDE = 6, PERTO = .8, VAGA = 4, EPS = 1e-9;
+const TREGUA = 5, TICK = .2, ALERTA = 1, PERDE = 6, PERTO = .8, VAGA = 4, EPS = 1e-9;
 const RUN = new Map(); // id do objeto → { path: [[x, y], …], pk: 'x,y' do destino }
 const P = () => globalThis.MPECAS, C = () => globalThis.MCOL;
 const base = o => o.cfg?.modo === 'vagar' ? 'vagar' : o.cfg?.modo === 'patrulha' && o.cfg.rota?.length ? 'patrulha' : 'parado';
@@ -86,9 +86,10 @@ function tickIA(sid, dt = TICK) {
     const f = floorOf(sc, e.pos.f); if (!f) continue;
     const ia = o.ia ||= { s: base(o), t: 0, i: 0, dir: 1 }, s0 = ia.s, cx = e.x, cy = e.y;
     let run = RUN.get(id); if (!run) RUN.set(id, run = { path: [], pk: '' });
-    const toque = heroes.find(h => h.pos.f === e.pos.f && Math.hypot(h.pos.x - e.pos.x, h.pos.z - e.pos.z) < PERTO);
+    const calmo = ia.paz > EPS; if (calmo) ia.paz = Math.max(0, ia.paz - dt); // trégua depois da luta: não vê nem encosta
+    const toque = !calmo && heroes.find(h => h.pos.f === e.pos.f && Math.hypot(h.pos.x - e.pos.x, h.pos.z - e.pos.z) < PERTO);
     if (toque) { engage(sid, toque, o, ia.s === 'persegue' ? 'alcance' : 'toque'); return; } // encostou (ou foi alcançado): começa a batalha
-    const viu = heroes.find(h => h.id === ia.alvo && sees(o, h)) || heroes.find(h => sees(o, h));
+    const viu = calmo ? null : heroes.find(h => h.id === ia.alvo && sees(o, h)) || heroes.find(h => sees(o, h));
     if (viu && ia.s !== 'alerta' && ia.s !== 'persegue') { ia.s = 'alerta'; ia.t = 0; ia.alvo = viu.id; ia.ult = [viu.x, viu.y]; run.pk = ''; }
     if (ia.s === 'alerta') {
       if (viu) { ia.alvo = viu.id; ia.ult = [viu.x, viu.y]; olha(e, sc, f, viu); }
@@ -207,7 +208,7 @@ function fimMundo(sc, part) {
   for (const [id, o] of Object.entries(sc.world.objs)) {
     const e = o?.k === 'inimigo' && S.chars[o.cfg?.ch]; if (!e) continue;
     if (e.hp <= 0) { delete sc.world.objs[id]; if (sc.draft?.objs) delete sc.draft.objs[id]; RUN.delete(id); }
-    else if (part.has(e.id)) { o.ia = { i: 0, dir: 1, ...o.ia, s: 'volta', t: 0, alvo: null }; RUN.delete(id); }
+    else if (part.has(e.id)) { o.ia = { i: 0, dir: 1, ...o.ia, s: 'volta', t: 0, alvo: null, paz: TREGUA }; RUN.delete(id); }
   }
   if (sc.climaAuto) { sc.clima = ''; delete sc.climaAuto; }
 }

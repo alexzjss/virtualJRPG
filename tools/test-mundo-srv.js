@@ -593,3 +593,12 @@ test('entrada tardia: quem persegue e alcança um combatente entra no fim da fil
     const T = T0(); assert.ok(e2.id in T, 'entrou'); assert.ok(T[e2.id] > Math.max(...Object.entries(T).filter(([k]) => k !== e2.id).map(([, v]) => v)), 'no fim da fila');
   } finally { fim(); }
 });
+test('trégua: depois da luta, o sobrevivente colado no herói não recomeça na hora; passados 5 s, sim', () => {
+  const sc = freshWorld(); nevoa(sc); sc.fogOn = false;
+  const a = hero('Ana', 5, 5), e1 = foe(6, 5); at(a, 5.5, 5.5); at(e1, 6.1, 5.5); const o = inim(sc, e1, { modo: 'parado' });
+  try {
+    ia(1); assert.ok(sc.battle.active); fim(); at(e1, 6.1, 5.5);
+    ia(20); assert.ok(!sc.battle.active, 'trégua de 5 s'); assert.ok(!['alerta', 'persegue'].includes(o.ia.s), 'não persegue: só volta ao lugar');
+    at(a, e1.pos.x - .4, e1.pos.z); ia(6); assert.ok(sc.battle.active, 'depois da trégua, o toque vale de novo');
+  } finally { fim(); }
+});

@@ -165,3 +165,56 @@ function streakTex(T) { // risco de chuva: linha fina inclinada, transparente em
   g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,1)'); x.strokeStyle = g; x.lineWidth = 4; x.lineCap = 'round'; x.beginPath(); x.moveTo(19, 3); x.lineTo(14, 29); x.stroke();
   STREAK = new T.CanvasTexture(cv); return STREAK;
 }
+
+// ----- transição em estilhaço (o mundo quebra e cai, o palco aparece por baixo) -----
+// shards: malha de cols×rows células, cada uma em 2 triângulos (Alta/Média 5×4 = 40, Baixa 3×2 = 12). Os vértices de dentro saem
+// da grade em até ±24% da célula (assim nenhum triângulo vira do avesso); os da borda andam só ao longo da borda; os cantos ficam.
+const GRADE = { alta: [5, 4], media: [5, 4], baixa: [3, 2] };
+export function shards(w, h, q = 'media', rand = Math.random) {
+  const [cols, rows] = GRADE[q] || GRADE.media, cw = w / cols, chh = h / rows, J = .24, v = [];
+  for (let j = 0; j <= rows; j++) for (let i = 0; i <= cols; i++) {
+    const bx = i === 0 || i === cols, by = j === 0 || j === rows;
+    v.push([i * cw + (bx ? 0 : (rand() - .5) * 2 * J * cw), j * chh + (by ? 0 : (rand() - .5) * 2 * J * chh)]);
+  }
+  const at = (i, j) => v[j * (cols + 1) + i], out = [];
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1);
+    if ((i + j) % 2) out.push([a, b, c], [a, c, d]); else out.push([a, b, d], [b, c, d]); // diagonais alternadas: cacos menos repetidos
+  }
+  return out;
+}
+// shatter: copia o quadro do canvas do mundo (chamar logo depois de um render, no mesmo turno) para uma tela 2D por cima, na mesma
+// posição; em 700 ms cada caco gira 90–270°, cai com aceleração e some a partir dos 450 ms. Movimento reduzido: só esmaece (250 ms).
+export function shatter(renderer, done, q = 'media') {
+  const src = renderer?.domElement || renderer, r = src?.getBoundingClientRect?.();
+  if (!r || r.width < 2 || r.height < 2) { done?.(); return null; }
+  const k = Math.min(2, globalThis.devicePixelRatio || 1), W = Math.round(r.width * k), Hh = Math.round(r.height * k);
+  const img = document.createElement('canvas'); img.width = W; img.height = Hh;
+  try { img.getContext('2d').drawImage(src, 0, 0, W, Hh); } catch { done?.(); return null; }
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = Hh; cv.className = 'mw3d-caco'; cv.setAttribute('aria-hidden', 'true');
+  Object.assign(cv.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  document.body.appendChild(cv);
+  const x = cv.getContext('2d'), calmo = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches, DUR = calmo ? 250 : 700;
+  const cx0 = W / 2, cy0 = Hh / 2, ps = shards(W, Hh, q).map(t => {
+    const cx = (t[0][0] + t[1][0] + t[2][0]) / 3, cy = (t[0][1] + t[1][1] + t[2][1]) / 3, dx = cx - cx0, dy = cy - cy0, L = Math.hypot(dx, dy) || 1;
+    return { t, cx, cy, vx: dx / L * (80 + Math.random() * 140) * k, vy: -(40 + Math.random() * 140) * k, rot: (Math.PI / 2 + Math.random() * Math.PI) * (Math.random() < .5 ? -1 : 1), atraso: Math.random() * 60 };
+  });
+  const G = 2600 * k, t0 = performance.now();
+  const passo = now => {
+    const e = now - t0; x.clearRect(0, 0, W, Hh);
+    if (e >= DUR) { cv.remove(); done?.(); return; }
+    if (calmo) { x.globalAlpha = 1 - e / DUR; x.drawImage(img, 0, 0); }
+    else for (const p of ps) {
+      const s = Math.max(0, e - p.atraso) / 1000, a = e < 450 ? 1 : 1 - (e - 450) / (DUR - 450); if (a <= 0) continue;
+      x.save(); x.globalAlpha = a;
+      x.translate(p.cx + p.vx * s, p.cy + p.vy * s + G * s * s / 2); x.rotate(p.rot * Math.min(1, s * 1000 / DUR)); x.scale(1 - s * .2, 1 - s * .2); x.translate(-p.cx, -p.cy);
+      x.beginPath(); x.moveTo(...p.t[0]); x.lineTo(...p.t[1]); x.lineTo(...p.t[2]); x.closePath();
+      x.save(); x.clip(); x.drawImage(img, 0, 0); x.restore();
+      x.lineWidth = 2 * k; x.strokeStyle = 'rgba(255,255,255,.85)'; x.stroke(); // fio branco na quebra
+      x.restore();
+    }
+    requestAnimationFrame(passo);
+  };
+  passo(t0); // o primeiro quadro já sai agora: o canvas do mundo some logo em seguida
+  return cv;
+}

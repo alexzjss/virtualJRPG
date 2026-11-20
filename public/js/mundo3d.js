@@ -4,7 +4,7 @@
 import * as T from '/vendor/three.module.js';
 import { buildFloor, setCutaway, tickPecas, disposeFloor } from './mundo3d-pecas.js';
 import { Actors } from './mundo3d-atores.js';
-import { Fx } from './mundo3d-fx.js';
+import { Fx, shatter } from './mundo3d-fx.js';
 import './mundo-hud.js'; // prompt do E, diálogo e placa (MHUD)
 
 const TILT = 35 * Math.PI / 180, ROT_MS = 250;
@@ -113,7 +113,7 @@ function rebuild(w, f) {
 function sync(S0, c = {}) {
   S = S0; ctx = c;
   slot = document.querySelector('[data-mundo]');
-  if (S?.battle?.active) { if (!paused) pause(); return; } // batalha: a GPU fica para o palco e o luz.js
+  if (S?.battle?.active) { if (!paused) { quebra(); pause(); } return; } // batalha: o mundo quebra em cacos e a GPU fica para o palco e o luz.js
   if (paused) { paused = false; if (lost === true) teardown(); }
   const on = !!slot && S;
   if (!on) { if (renderer) { renderer.domElement.style.display = 'none'; stopLoop(); } return; }
@@ -139,6 +139,11 @@ const screen = id => { const p = S?.chars?.[id]?.pos; if (!p || !renderer) retur
 function project(x, y, z) { const v = new T.Vector3(x, y, z).project(cam), el = renderer.domElement, r = el.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, vis: v.z > -1 && v.z < 1 }; }
 function pick(cx, cy) { if (!renderer) return null; const r = renderer.domElement.getBoundingClientRect(), ray = new T.Raycaster(); ray.setFromCamera(new T.Vector2((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), cam); const hit = new T.Vector3(); if (!ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), hit)) return null; const f = floorFor(worldOf()); return { f: f?.id, x: hit.x, z: hit.z }; }
 const fps = () => fpsBuf.length ? Math.round(fpsBuf.length / fpsBuf.reduce((a, b) => a + b, 0)) : 0;
+// estilhaço: um último quadro (o buffer do WebGL só vale no mesmo turno do render) copiado para os cacos, se o mundo estava na tela
+function quebra() {
+  if (!renderer || !running || lost || renderer.domElement.style.display === 'none') return;
+  try { renderer.render(scene, cam); shatter(renderer, null, quality()); } catch (e) { console.warn('Mundo: estilhaço falhou', e); }
+}
 // pausa (batalha): para o laço, libera o mapa de sombra; na Média e na Baixa derruba o contexto para devolver a memória da GPU
 function pause() {
   paused = true; stopLoop(); if (!renderer) return;

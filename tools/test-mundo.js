@@ -135,3 +135,17 @@ test('fx: visão atual em base64 (vinda do servidor) vale como o Set', async () 
   const seen = new Uint8Array(1), vis = new Uint8Array(1); seen[0] = 0b0110; vis[0] = 0b0100;
   assert.deepEqual([...fogData(4, 1, P.pack(seen), P.pack(vis))], [0, 128, 255, 0]);
 });
+
+test('estilhaço: 40 triângulos (12 na Baixa) cobrindo a tela inteira, com o meio deslocado', async () => {
+  const { shards } = await import('../public/js/mundo3d-fx.js');
+  const area = t => Math.abs((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])) / 2;
+  for (const [q, n] of [['alta', 40], ['media', 40], ['baixa', 12]]) {
+    const ts = shards(800, 500, q, () => .9);
+    assert.equal(ts.length, n, q);
+    assert.ok(Math.abs(ts.reduce((s, t) => s + area(t), 0) - 800 * 500) < 1e-6, 'sem buraco nem sobreposição');
+    for (const t of ts) for (const [x, y] of t) assert.ok(x >= 0 && x <= 800 && y >= 0 && y <= 500, 'dentro da tela');
+  }
+  const pts = new Set(shards(800, 500, 'alta', () => .9).flat().map(p => p.join()));
+  assert.ok(!pts.has('160,125'), 'os vértices de dentro saem da grade');
+  assert.ok(pts.has('0,0') && pts.has('800,500'), 'os cantos ficam');
+});
