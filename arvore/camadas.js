@@ -113,7 +113,7 @@ function aplicar(s, L, idx) {
 // ordena um ramo em casas fixas: a raiz fica; Limites em 4/7/10; o kit atual (com os `pre` dele no ramo) nas casas 1–5, a âncora
 // (Canhão de Aura) na 5, domínios do kit na 5; fortes da 7 em diante; o resto preenche pelo nível antigo. Por fim, um `pre` que ficou
 // depois de quem o pede troca de casa com ele, se a troca não tirar ninguém da faixa dele.
-const ANCORA = { 'Canhão de Aura': 4 };
+const ANCORA = { 'Canhão de Aura': 4, 'Canhão de Aura Gélido': 5, 'Aura de Navalha': 6 }; // o Gélido evolui do Canhão: casa 6 (única exceção à faixa 1–5 do kit)
 const LIMT = new Map(); // Limite → camada (4, 7 ou 10) pelo terço de poder dele dentro do setor
 const terços = nos => { const ls = nos.filter(s => s.limit).sort((x, y) => (x.xp || 0) - (y.xp || 0)); ls.forEach((s, i) => LIMT.set(s, Math.max(forte(s) ? 7 : 0, LIM[Math.min(2, Math.floor(i * 3 / ls.length))]))); };
 // Impressão semântica usada para ordenar técnicas de função próxima dentro do mesmo ramo.
@@ -179,7 +179,7 @@ function ordenar(b, fixo) {
   // Skills já usadas pelos personagens ocupam as primeiras casas do ramo (após a raiz).
   // A ordem interna é XP crescente, preservando os pré-requisitos explícitos.
   const faixa = s => s.n in ANCORA ? [ANCORA[s.n], ANCORA[s.n]] : kit.has(s) ? [0, Math.min(4, n - 1)] : forte(s) ? [Math.min(6, n - 1), n - 1] : [0, n - 1];
-  fill(rest.filter(s => kit.has(s) && s.n in ANCORA), ANCORA['Canhão de Aura'], ANCORA['Canhão de Aura']);
+  for (const [nome, casa] of Object.entries(ANCORA)) fill(rest.filter(s => s.n === nome), casa, casa);
   fill(rest.filter(s => kit.has(s) && s.dom && !(s.n in ANCORA)), 0, Math.min(4, n - 1));
   fill(rest.filter(s => kit.has(s) && !s.dom && !(s.n in ANCORA)), 0, Math.min(4, n - 1));
   // Limites depois do kit, na casa do terço deles no setor (4, 7 ou 10); ocupada, vai para a próxima livre
@@ -240,6 +240,7 @@ function caber(bs, fixos) {
 export const VAGAS = [];
 const FLAT = new Map(); // passivas do 1º ramo do Marcial: mantêm o bônus de sempre
 const TREINO = new Set(); // Treinos de atributo: o bônus sobe devagar com a camada, não pela curva de dano
+const FINAL = /(Supremo|Suprema|Primordial|Sem Limite|Definitivo|Final)$/;
 export const LINHAS = []; // linhas de variação que não chegam à camada 10 (a Leva 10 completa todas)
 const temaDe = b => { const c = [0, 0, 0, 0, 0]; b.forEach(s => c[temaNo(s)]++); return ['ofensiva', 'controle', 'defesa', 'maestria', 'especial'][c.indexOf(Math.max(...c))]; };
 const vaga = (el, ramo, b, tema) => { if (b.length < CAM) VAGAS.push({ el, ramo, tem: b.length, faltam: Array.from({ length: CAM - b.length }, (_, k) => b.length + k + 1), tema: tema || temaDe(b) }); };
@@ -273,7 +274,7 @@ export function camadas(TREE, preencher) {
   // Cada Vínculo secundário abre um caminho próprio a partir do tronco comum.
   LINHAS.length = 0;
   for (const [el, t] of Object.entries(TREE)) for (const [bi, b] of t.branches.entries()) if (b.de) {
-    const L0 = layerOf.get(b.de) ?? 1, min = s => Math.max(L0 + (s.v2 ? 2 : 1), forte(s) ? 7 : 0), rest = [...b].sort((x, y) => KIT.has(y.n) - KIT.has(x.n)), ord = [];
+    const L0 = layerOf.get(b.de) ?? 1, min = s => Math.max(L0 + (s.v2 ? 2 : 1), forte(s) ? 7 : 0), rest = [...b].sort((x, y) => KIT.has(y.n) - KIT.has(x.n) || FINAL.test(x.n) - FINAL.test(y.n)), ord = []; // o nó final da linha (Supremo, Primordial...) fica por último
     while (rest.length) {
       const c = Math.min(CAM, L0 + 1 + ord.length), i = rest.findIndex(s => min(s) <= c), s = rest.splice(i < 0 ? rest.reduce((m, x, k) => min(x) < min(rest[m]) ? k : m, 0) : i, 1)[0];
       ord.push(s);

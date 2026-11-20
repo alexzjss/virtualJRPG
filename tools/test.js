@@ -1758,7 +1758,7 @@ test('camadas e temas: ramos de até 10, posição = camada, kit atual até a 5,
     b.forEach((s, i) => assert.equal(s.cam, i + 1, `${s.n}: casa ${i + 1}, camada ${s.cam}`));
   });
   const all = Object.values(TREE).flatMap(t => t.branches.flat());
-  for (const s of all.filter(s => ATUAIS.has(s.n))) assert.ok(s.cam <= 5, `${s.n} na camada ${s.cam}`);
+  for (const s of all.filter(s => ATUAIS.has(s.n))) assert.ok(s.cam <= (s.n === 'Canhão de Aura Gélido' ? 6 : 5), `${s.n} na camada ${s.cam}`);
   assert.ok(all.filter(s => forte(s)).filter(s => s.cam < 7).length <= 2, 'fortes abaixo da 7');
   // Cada linha alcança a camada 10; variantes de outro Vínculo são opcionais.
   const cam = new Map(all.map(s => [s.n, s.cam]));
