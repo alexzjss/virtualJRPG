@@ -13,3 +13,14 @@
 .medit-div{display:block;cursor:col-resize;background:var(--line,#34343d);transition:background .15s}
 .medit-div:hover{background:var(--gold,#ffc93c)}
 .medit .medit-3d{height:auto;min-height:0;border-radius:0 6px 6px 0}
+.medit{grid-template-rows:auto 1fr}
+.medit-bar{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:6px 0 8px}
+.medit-tools,.medit-floors,.medit-pub{display:flex;flex-wrap:wrap;gap:3px}
+.medit-tools button,.medit-floors button{padding:4px 8px;min-height:26px}
+.medit-tools button.on,.medit-floors button.on{background:var(--red,#e4002b)}
+.medit-opts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+.medit-opts small{color:var(--dim,#a8a5b2)}
+.medit-opts select{max-width:150px}
+.medit-floors{padding-left:8px;border-left:1px solid var(--line,#34343d)}
+.medit-pub{margin-left:auto}
+.medit-pub .gbdg{margin-left:4px}
