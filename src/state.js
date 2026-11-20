@@ -121,6 +121,7 @@ function preFix() { // antes das migrações: coleções que não são objetos d
 }
 function fixShape() {
   for (const k of ['reqs', 'users']) if (!isObj(S[k])) S[k] = {};
+  if (S.uiV !== 1) { S.ui = 'pincel'; S.uiV = 1; } // adota a Pincelada ao atualizar; as escolhas seguintes ficam salvas
   if (S.ui !== 'pincel') S.ui = '';
   delete S.tv;
   S.offMsg = String(S.offMsg ?? '').slice(0, 300);

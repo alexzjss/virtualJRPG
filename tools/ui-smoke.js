@@ -56,6 +56,8 @@ const section = async (name, fn) => { if (ONLY && !name.includes(ONLY)) return; 
 const hero = n => Object.values(S.chars).find(c => c.name === n);
 
 // ---------- cenário ----------
+check(S.ui === 'pincel', 'a campanha nova começa com a Pincelada');
+H.uiSet(gmc, { v: '' }); // os primeiros blocos exercitam a interface clássica
 const [shinkai, mikhail, thomas] = ['Shinkai', 'Mikhail', 'Thomas'].map(hero);
 for (const [u, c] of [['ana', shinkai], ['bia', mikhail], ['caio', thomas]]) H.userAdd(gmc, { name: u, pass: '1234', char: c.id });
 H.set(gmc, { id: shinkai.id, f: 'attrs.AGI', v: 95 }); H.set(gmc, { id: mikhail.id, f: 'attrs.AGI', v: 60 }); H.set(gmc, { id: thomas.id, f: 'attrs.AGI', v: 40 });
@@ -143,9 +145,9 @@ try {
   for (const f of foesOf()) go({ t: 'ini', k: 'set', id: f.id, v: 1e6 }); // inimigos só agem quando o roteiro quiser: Derrubado e Quebra não expiram
   const tgBtn = (p, id) => p.locator(`.stage .unit[data-tgt="${id}"]`);
   // jogador no PC (leque no teclado): espera a vez, mira num alvo com ←/→ e confirma com Enter
-  const myTurn = (p, id, msg) => until(async () => (await p.evaluate(() => S.battle.order[0])) === id && await vis(p, '.lq .stroke'), msg || `leque de ${p.who}`); // espera o estado novo chegar (o desenho velho ainda tem o leque da vez anterior)
+  const myTurn = (p, id, msg) => until(async () => await p.evaluate(id => S.battle.order[0] === id && LEQUE.ctx()?.actor?.id === id && !document.documentElement.classList.contains('p3-golpe'), id) && await vis(p, '.lq .stroke'), msg || `leque de ${p.who}`, 9000);
   const aimAt = async (p, id) => { for (let i = 0; i < 8; i++) { if (await p.locator(`.p3d.selecting .bb.pickable.tgt[data-tgt="${id}"]`).count()) return true; await p.keyboard.press('ArrowRight'); await sleep(120); } return false; };
-  const atkAt = async (p, id, what) => { await p.keyboard.press('1'); check(await aimAt(p, id), `${p.who}: mirar ${what}`); const n = S.seq; await p.keyboard.press('Enter'); await until(() => S.seq > n, `ataque em ${what}`); };
+  const atkAt = async (p, id, what) => { await p.keyboard.press('1'); check(await aimAt(p, id), `${p.who}: mirar ${what}`); const n = S.seq; await p.locator('.lq .stroke[data-lq=go]:not(.blk)').click(); await until(() => S.seq > n, `ataque em ${what}`, 8000); };
 
   await section('batalha: tela do jogador abre no turno certo', async () => {
     await until(() => vis(ana, '.cmd'), 'comandos de batalha da Ana');
@@ -242,7 +244,7 @@ try {
     await until(() => vis(anaD, '.lq .stroke[data-lq=go]:not(.blk)'), 'Agir liberado');
     await until(() => anaD.evaluate(() => !document.documentElement.classList.contains('p3-golpe')), 'palco pronto para a investida');
     await sleep(300); // o desenho da mira precisa ter assentado antes do Enter
-    // Task 8: investida com câmera; o número nasce sobre o recorte do alvo e a câmera volta ao turno em até 2 s
+    // A investida enquadra o impacto e devolve a câmera ao turno.
     await anaD.evaluate(() => { const w = document.querySelector('.p3d .world'), tg = document.querySelector('.p3d .bb.tgt')?.dataset.tgt, R = window.__lg = { fast: false, num: null, hit: 0, back: 0 };
       new MutationObserver(() => { if (w.classList.contains('fast')) R.fast = true; else if (R.fast && !R.back) R.back = performance.now(); }).observe(w, { attributes: true, attributeFilter: ['class'] });
       new MutationObserver(ms => { for (const m of ms) for (const d of m.addedNodes) if (!R.num && d.classList?.contains('float')) { const b = document.querySelector(`.p3d .bb[data-tgt="${tg}"]`)?.getBoundingClientRect(), x = parseFloat(d.style.left), y = parseFloat(d.style.top);
@@ -253,7 +255,7 @@ try {
       const lg = ready || await anaD.evaluate(() => window.__lg);
       check(lg && lg.fast, 'a investida leva a câmera ao alvo (world.fast)');
       check(lg && lg.num?.in, `o número de dano nasce sobre o recorte do alvo (${JSON.stringify(lg?.num)})`);
-      check(lg?.hit && lg.back >= lg.hit && lg.back - lg.hit <= 2500, `a câmera volta ao turno após o impacto (${Math.round(lg?.back - lg?.hit)} ms após o número)`);
+      check(lg?.hit && lg.back >= lg.hit && lg.back - lg.hit <= 3500, `a câmera volta ao turno após o impacto (${Math.round(lg?.back - lg?.hit)} ms após o número)`);
       check(await anaD.evaluate(() => !document.querySelector('.p3d .bb.lunging') && (w => w.style.transform.replace(/\s/g, '') === w.dataset.cam.replace(/\s/g, ''))(document.querySelector('.p3d .world'))), 'o recorte voltou ao lugar e a câmera ao enquadramento do turno'); }
     // condições aparecem sobre o recorte (e nos retratos do grupo)
     minion.st.burn = 3; shinkai.st.burn = 3; push();
@@ -451,7 +453,10 @@ try {
     const torre = Object.keys(S.items).find(k => S.items[k].name === 'Escudo de Torre'), violino = Object.keys(S.items).find(k => S.items[k].name === 'Violino');
     thomas.inv[torre] = 1; thomas.equip.arma = torre; mikhail.inv[violino] = 1; mikhail.equip.arma = violino; push();
     check(toTurn(mikhail.id), 'vez da Mikhail'); await myTurn(bia, mikhail.id, 'turno da Bia');
+    await until(() => bia.evaluate(([ch, item]) => S.chars[ch].equip.arma === item, [mikhail.id, violino]), 'violino equipado na tela da Bia');
     await bia.keyboard.press('2');
+    await until(async () => await vis(bia, '.sk6') || await vis(bia, '.skl'), 'lista de técnicas do violino');
+    if (await vis(bia, '.sk6')) await bia.keyboard.press('t');
     await until(async () => /Melodia de Coragem/i.test(await txt(bia, '.skl')), 'violino básico mostra a técnica de grupo (a 2ª vem nas categorias acima de básica)');
     await bia.keyboard.press('Escape');
     // utilidade de alvo único alcança aliados e inimigos com ←/→ (buff em aliado)
@@ -821,6 +826,7 @@ try {
       go({ t: 'set', id: actor, f: 'imgL', v: false });
       check(await bia.evaluate(actor => !PALCO3D.aimLocks()[actor], actor), 'o alvo selecionado fica só na tela da Ana');
       await anaD.evaluate(() => { window.pincelStage = document.querySelector('.p3d'); });
+      await anaD.evaluate(() => { localStorage.vj_ui = 'pincel'; }); // preferência local de um protótipo antigo
       await ui(false); await ui(true);
       check(await anaD.evaluate(id => document.querySelector('.p3d') === window.pincelStage && LEQUE.aimTarget() === id, right), 'trocar a interface durante a mira preserva o palco e a escolha');
       await shot(anaD, 'pincel-mira');

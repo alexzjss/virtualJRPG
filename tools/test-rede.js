@@ -82,10 +82,21 @@ test('state.json corrompido: restaura o backup mais recente; sem backup, recusa 
   const d = await boot(d2); assert.ok(d.failed); assert.match(d.out(), /corrompido/); assert.ok(fs.readdirSync(d2).some(f => f.startsWith('state-corrompido'))); // guardado, não apagado
 });
 
-// todas as mensagens que chegam até o primeiro "state" (ou erro), mais as que vierem depois de enviar "extra"
-const talk = (p, key, extra = []) => new Promise(res => { const ws = new WebSocket(`ws://127.0.0.1:${p}`), got = []; let sent = false;
+// O login e cada mensagem adicional neste teste devolvem um estado.
+const talk = (p, key, extra = []) => new Promise((resolve, reject) => {
+  const ws = new WebSocket(`ws://127.0.0.1:${p}`), got = [];
+  let states = 0;
+  const timeout = setTimeout(() => { reject(new Error(`Chegaram ${states} de ${extra.length + 1} estados.`)); ws.close(); }, 15_000);
+  ws.once('error', e => { clearTimeout(timeout); reject(e); });
+  ws.once('close', () => { clearTimeout(timeout); reject(new Error('A conexão fechou antes de receber os estados.')); });
   ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', role: 'gm', key })));
-  ws.on('message', d => { const m = JSON.parse(d); got.push(m); if (m.t === 'state' && !sent) { sent = true; extra.forEach(x => ws.send(JSON.stringify(x))); setTimeout(() => { ws.close(); res(got); }, 500); } }); });
+  ws.on('message', d => {
+    const m = JSON.parse(d); got.push(m);
+    if (m.t !== 'state') return;
+    if (++states === 1) for (const x of extra) ws.send(JSON.stringify(x));
+    if (states === extra.length + 1) { clearTimeout(timeout); resolve(got); ws.close(); }
+  });
+});
 
 test('estado leve: skills e itens vão uma vez em "defs"; os estados seguintes não os repetem', async () => {
   const data = tmp(), s = await boot(data, { GM_KEY: 'chave' }); assert.ok(!s.failed, s.out());

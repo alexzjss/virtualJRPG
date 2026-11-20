@@ -37,7 +37,7 @@ Janela **Campanha** do mestre:
 Na janela **Cena**, "Mostrar a todos" abre um texto ou imagem na tela de cada jogador. O jogador pode fechar e rever. "Recolher" tira de todas as telas.
 
 ## Interface
-- Em **Sessão → Interface**, o mestre pode ligar a **Pincelada** para a mesa inteira.
+- A **Pincelada** é a interface padrão da mesa. O mestre pode voltar à interface clássica em **Sessão → Interface**.
 - Perguntas e confirmações aparecem em janelas do próprio jogo (nada de caixas do navegador); exclusões pedem confirmação.
 - Barra de ferramentas no mapa: zoom, enquadrar, régua, área, sinal e, para o mestre, marcador e névoa. Funciona no toque.
 - **Regras** no topo (ou **?** no teclado): guia pesquisável de ações, comandos, efeitos, mecânicas e atalhos para mestre e jogadores. **Ctrl+K** (mestre) abre a busca rápida de painéis, cenas, fichas, ações, sons e inimigos. "Restaurar os painéis" volta ao arranjo padrão.

@@ -1,14 +1,11 @@
 @echo off
-rem Inicia o virtualJRPG a partir dos arquivos do projeto (sem .exe).
-rem Duplo clique neste arquivo. Precisa do Node.js 22 ou mais novo.
-rem Instala as dependencias na primeira vez, cria a chave do mestre em data\gm-key.txt
-rem e sobe o servidor em modo watch: mudancas no codigo/skills reiniciam o jogo sozinhas.
-rem O servidor abre o tunel do Cloudflare e mostra o codigo da sessao.
-cd /d "%~dp0"
+setlocal
+pushd "%~dp0" || exit /b 1
 
-where node >nul 2>&1
+node -e "process.exit(Number(process.versions.node.split('.')[0]) < 22 ? 1 : 0)" >nul 2>&1
 if errorlevel 1 (
-  echo Node.js nao encontrado. Instale a versao 22 LTS em https://nodejs.org e abra este arquivo de novo.
+  echo Instale o Node.js 22 ou mais recente em https://nodejs.org e abra este arquivo de novo.
+  popd
   pause
   exit /b 1
 )
@@ -19,21 +16,19 @@ goto pronto
 
 :instalar
 echo Instalando dependencias ^(so na primeira vez^)...
-call npm ci --no-audit --no-fund
+call npm.cmd ci --no-audit --no-fund
 if errorlevel 1 (
   echo Falha ao instalar as dependencias. Veja a mensagem acima.
+  popd
   pause
   exit /b 1
 )
 
 :pronto
-if not exist data mkdir data
-if not "%GM_KEY%"=="" goto subir
-if not exist data\gm-key.txt node -e "console.log(require('crypto').randomBytes(5).toString('hex'))" > data\gm-key.txt
-set /p GM_KEY=<data\gm-key.txt
-
-:subir
-rem "iniciar.bat offline" (ou o arquivo iniciar-sem-internet.bat) nao abre o tunel: so este computador e a rede Wi-Fi entram.
 if /i "%~1"=="offline" set VJ_TUNNEL=0
-npm run start:watch
-pause
+if not defined VJ_OPEN set VJ_OPEN=1
+node tools\launch.js
+set "VJ_LAUNCH_EXIT=%errorlevel%"
+popd
+if not "%VJ_LAUNCH_EXIT%"=="0" pause
+exit /b %VJ_LAUNCH_EXIT%

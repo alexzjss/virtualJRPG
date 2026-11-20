@@ -20,9 +20,11 @@ const isArm = s => /^armas-/.test(s.br || ''); // Árvore de Armas: bloco isolad
 const gridSkills = () => Object.entries(S.skills).filter(([id]) => /^g\d+$/.test(id));
 
 test('uiSet: só o mestre troca a UI e todos veem, mesmo depois de desfazer', () => {
-  assert.equal(S.ui, '');
-  H.uiSet(ana, { v: 'pincel' });
-  assert.equal(S.ui, '');
+  assert.equal(S.ui, 'pincel');
+  H.uiSet(ana, { v: '' });
+  assert.equal(S.ui, 'pincel');
+  H.uiSet(gm, { v: '' });
+  assert.equal(view(ana).ui, '');
   const ids = Object.keys(S.chars);
   handle(gm, { t: 'addChar', enemy: true });
   handle(gm, { t: 'uiSet', v: 'pincel' });

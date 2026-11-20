@@ -1,4 +1,3 @@
-import { spawn as runCmd } from 'child_process';
 import { Readable } from 'stream';
 import { WebSocketServer } from 'ws';
 import { startTunnel } from '../tunnel.js';
@@ -15,13 +14,11 @@ import { S, inScene, log, newScene, save } from './state.js';
 import { SK, modsOf, breakCheck, delay, can, current, int, ofiSync, order, prep, reseat, rid, scene, usable } from './rules.js';
 import { H, NOUNDO, undoPush } from './handlers.js';
 import { nodeOf } from './oficios.js';
+import { openGm } from './browser.js';
 
 
 // ---------- http ----------
 const hooks = { api: null, store: () => ({ camps: [], backups: [] }), view: (c, v) => v, foeSeen: ch => !!scene().seen[ch.x + ',' + ch.y], interGate: () => null, interText: () => 'interagir' }; // foeSeen: o mundo 3D troca pela visão atual do grupo // preenchido por campaign.js (rotas /api e listas de campanhas e cópias)
-// abre o painel do mestre no navegador já com a chave (ela vai depois do #, que nunca sai do computador)
-const openGm = () => { const url = `http://localhost:${PORT}/gm#k=${encodeURIComponent(KEY)}`, [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
-  try { runCmd(cmd, args, { stdio: 'ignore', detached: true, windowsHide: true }).on('error', () => {}).unref(); } catch {} };
 // cabeçalhos de segurança: nada de adivinhar tipo, nada de abrir a mesa dentro de outro site, e o endereço (com o código da sessão) não vaza para links externos
 const SEC = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'SAMEORIGIN', 'Cross-Origin-Resource-Policy': 'same-origin' };
 // as páginas só executam scripts do próprio servidor: mesmo que um nome ou texto malicioso escape da limpeza, não vira código
@@ -325,7 +322,7 @@ function start() {
     if (SEA) { console.error('Feche esta janela para sair.'); setInterval(() => {}, 1 << 30); } else process.exit(1);
   });
   server.listen(PORT, () => {
-    if (process.stdout.isTTY && process.env.VJ_OPEN !== '0') openGm();
+    if (process.stdout.isTTY && process.env.VJ_OPEN !== '0') openGm(PORT, KEY);
     const ips = lan();
     console.log(`\n  virtualJRPG rodando\n\n  Mestre:     http://localhost:${PORT}/gm   (chave: ${KEY})${ips.length ? `\n  Mesma rede Wi-Fi: ${ips.map(u => u + '/player').join('  ou  ')}` : ''}\n\n  Contas dos jogadores: crie na janela "Sessão" do painel do mestre.\n  Dados salvos em: ${DATA}\n  Feche esta janela para encerrar.\n`);
     if (process.env.VJ_TUNNEL === '0') return console.log('  Túnel desligado (VJ_TUNNEL=0): só a rede local funciona.\n');

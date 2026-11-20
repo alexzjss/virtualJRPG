@@ -4,7 +4,7 @@
 (g => {
   const lsUi = () => { try { return localStorage.vj_ui || ''; } catch { return ''; } };
   const state = () => typeof S === 'undefined' ? g.S : S;
-  const on = () => state()?.ui === 'pincel' || lsUi() === 'pincel';
+  const on = () => (state()?.ui ?? lsUi()) === 'pincel';
   const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   // pincelada com rótulo: o = { x, y, w, rot, k (tecla), cls, esq (cresce para a esquerda), extra (html à direita), i (ordem na cascata), attrs (atributos extras) }
   const traco = (txt, o = {}) => `<button type="button" class="pc-traco ${o.cls || ''} ${o.esq ? 'esq' : ''}" style="${o.x != null ? `left:${o.x}px;` : ''}${o.y != null ? `top:${o.y}px;` : ''}width:${o.w || 320}px;--rot:${o.rot || 0}deg;--i:${o.i || 0}" ${o.attrs || ''}>`
