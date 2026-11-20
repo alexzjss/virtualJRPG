@@ -8,6 +8,7 @@ const LEQUE = (() => {
   const donoOn = c => !c.enemy && !!c.owner && (S.online || []).includes(String(c.owner).toLowerCase()); // o jogador dono do herói está conectado (o mestre só age por ele se quiser)
   const ATK = { k: 'atk', id: 'atk' };
   const battlers = () => Object.values(S.chars).filter(o => o.id in S.battle.ticks && !o.dead);
+  const positions = inB => PALCO3D.formation(inB, PALCO3D.frameNow(inB), PCL());
   const esq = (a, b) => a - b;
   const skSel = () => pick.k === 'sk' ? SK(pick.id) : null;
   const bothSides = () => skSel()?.kind === 'util'; // utilidade pode mirar aliado (buff, limpeza) ou inimigo (debuff): ←/→ alcançam os dois lados
@@ -17,7 +18,7 @@ const LEQUE = (() => {
   // alvos possíveis: todos na mesa (os dois lados, caídos e invocações; o jogador não vê o inimigo furtivo), da esquerda para a direita na tela (←/→ andam por eles)
   const cands = () => {
     if (!cx) return [];
-    const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB, PALCO3D.frameNow(inB));
+    const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = positions(inB);
     const l = selfSk(skSel()) ? [cx.actor] : battlers().filter(o => gm || o.enemy === cx.actor.enemy || !o.st?.stealth);
     return l.sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0));
   };
@@ -57,7 +58,7 @@ const LEQUE = (() => {
   if (typeof document !== 'undefined') document.addEventListener('mouseover', e => { const r = e.target.closest?.('.pc-sk[data-v]'); if (!r) return; const d = r.closest('.pc-skills')?.querySelector('.pc-skdesc'), h = pcDesc.get(r.dataset.v); if (d && h && d.dataset.v !== r.dataset.v) { d.dataset.v = r.dataset.v; d.innerHTML = h; } });
   const toAim = () => { aimOpen = true; go('aim', state.mode === 'aim' ? from : state.mode); };
   // inimigos de pé, da esquerda para a direita na tela
-  const foes = () => { const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = PALCO3D.formation(inB, PALCO3D.frameNow(inB));
+  const foes = () => { const inB = Object.values(S.chars).filter(o => o.id in S.battle.ticks), F = positions(inB);
     return inB.filter(o => o.enemy && o.hp > 0 && !o.dead).sort((a, b) => esq(F.get(a.id)?.x ?? 0, F.get(b.id)?.x ?? 0)); };
   const setZoom = id => { if ((PALCO3D.local.zoom || null) === (id || null)) return; PALCO3D.local.zoom = id || null; render(); };
   const zoomStep = d => { const l = foes(); if (!l.length) return; const i = l.findIndex(o => o.id === PALCO3D.local.zoom), n = l[(i + d + l.length) % l.length].id;
