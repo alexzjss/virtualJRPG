@@ -4,7 +4,7 @@
 import { S, inScene } from './state.js';
 import { hooks, sceneOfClient, wss } from './net.js';
 import { MUNDO } from './config.js';
-import { MH } from './mundo.js';
+import { MH, sendDraft } from './mundo.js';
 
 const dirty = new Map(); // cena → ids com posição nova
 const VIS = { now: () => null }; // visão atual do grupo por cena (Task 4.2); null = tudo visível
@@ -44,6 +44,7 @@ hooks.view = (c, v) => {
   v.scenes = { ...v.scenes }; // no mestre, v.scenes ainda é o próprio S.scenes
   for (const [k, sc] of Object.entries(v.scenes || {})) if (sc && (sc.world || sc.draft)) v.scenes[k] = { ...sc, draft: undefined, world: visFilter(c, S.scenes[k], k) };
   v.mundo = MUNDO;
+  if (c.role === 'gm' && !c._draftOk && c.send) { c._draftOk = true; queueMicrotask(() => { for (const [k, sc] of Object.entries(S.scenes || {})) if (sc?.draft) sendDraft(k, c); }); } // mestre que acabou de conectar: os rascunhos vão logo depois do primeiro state
   return v;
 };
 

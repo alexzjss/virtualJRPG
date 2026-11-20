@@ -149,3 +149,71 @@ test('view: ninguém recebe draft no state; jogador não recebe objeto oculto se
   assert.ok(sc.world.objs.o1, 'o filtro não mexe no estado');
   delete sc.draft;
 });
+
+// ----- rascunho do mestre -----
+const gmc = () => ({ ...cli('Mestre'), role: 'gm' });
+const draft = (c, ...ops) => handle(c, { t: 'wDraft', sc: S.focus, ops });
+
+test('rascunho: jogador não recebe; publicar aplica, sobe v e tira legacy', () => {
+  const sc = freshWorld(), g = gmc(), p = cli('Ana'), off = [join(g), join(p)], code = P.code('castelo', 'denso'), v0 = sc.world.v;
+  try {
+    handle(p, { t: 'wDraft', sc: S.focus, ops: [{ o: 'cells', f: 'f0', l: [[1, 1, code]] }] }); assert.equal(sc.draft, undefined);
+    draft(g, { o: 'cells', f: 'f0', l: [[1, 1, code]] }, { o: 'goal', v: 'Achar a chave' });
+    assert.equal(P.cell(sc.draft.floors[0], 1, 1), code); assert.notEqual(P.cell(sc.world.floors[0], 1, 1), code);
+    assert.ok(g.sent.some(m => m.t === 'draft' && m.sc === S.focus && m.d.goal === 'Achar a chave'));
+    assert.ok(!p.sent.some(m => m.t === 'draft')); assert.ok(!p.sent.some(m => m.t === 'state' && JSON.stringify(m).includes('Achar a chave')));
+    handle(g, { t: 'wPub', sc: S.focus });
+    assert.equal(P.cell(sc.world.floors[0], 1, 1), code); assert.equal(sc.world.v, v0 + 1); assert.equal(sc.world.legacy, false);
+    assert.equal(sc.draft, undefined); assert.equal(sc.world.goal, 'Achar a chave');
+    draft(g, { o: 'goal', v: 'outro' }); handle(g, { t: 'wDiscard', sc: S.focus });
+    assert.equal(sc.draft, undefined); assert.equal(sc.world.goal, 'Achar a chave');
+  } finally { off.forEach(f => f()); }
+});
+
+test('rascunho: limites recusam andar 65×65, código 99 e objeto de tipo desconhecido', () => {
+  const sc = freshWorld(), g = gmc();
+  draft(g, { o: 'floor', v: { id: 'f1', name: 'Grande', w: 65, h: 65 } });
+  assert.ok(!sc.draft?.floors.some(f => f.id === 'f1'));
+  draft(g, { o: 'floor', v: { id: 'f1', name: 'Porão', w: 64, h: 64 } });
+  assert.equal(sc.draft.floors.find(f => f.id === 'f1').w, 64);
+  const c0 = P.cell(sc.world.floors[0], 0, 0);
+  draft(g, { o: 'cells', f: 'f0', l: [[0, 0, 99]] }, { o: 'edge', f: 'f0', k: 'h', l: [[0, 0, 6]] });
+  assert.equal(P.cell(sc.draft.floors[0], 0, 0), c0); assert.equal(P.edgeH(sc.draft.floors[0], 0, 0), 0);
+  draft(g, { o: 'obj', id: 'x1', v: { k: 'dragao', f: 'f0', x: 1, y: 1 } }, { o: 'obj', id: 'x2', v: { k: 'placa', f: 'f0', x: 2, y: 1, cfg: { texto: 'a'.repeat(900), lixo: 1 } } });
+  assert.equal(sc.draft.objs.x1, undefined); assert.equal(sc.draft.objs.x2.cfg.texto.length, 800); assert.equal(sc.draft.objs.x2.cfg.lixo, undefined);
+  const nos = Object.fromEntries(Array.from({ length: 80 }, (_, i) => ['n' + i, { fala: 'oi', escolhas: [{ txt: 'tchau', vai: 'n0', faz: 'fim' }] }]));
+  draft(g, { o: 'obj', id: 'x3', v: { k: 'npc', f: 'f0', x: 3, y: 1, cfg: { nome: 'Velho', dialogo: { ini: 'n0', nos } } } });
+  assert.equal(Object.keys(sc.draft.objs.x3.cfg.dialogo.nos).length, 60);
+  delete sc.draft;
+});
+
+test('publicar mantém porta aberta por jogador no publicado', () => {
+  const sc = freshWorld(), g = gmc();
+  draft(g, { o: 'edge', f: 'f0', k: 'h', l: [[3, 3, 2]] }, { o: 'obj', id: 'd1', v: { k: 'porta', f: 'f0', x: 3, y: 3, cfg: { e: 'h', estado: 'fechada' } } },
+    { o: 'obj', id: 'b1', v: { k: 'bau', f: 'f0', x: 5, y: 5, vis: 'oculto', cfg: { modo: 'uma', ouro: 10 } } });
+  handle(g, { t: 'wPub', sc: S.focus }); assert.equal(sc.world.objs.d1.cfg.estado, 'fechada');
+  draft(g, { o: 'cells', f: 'f0', l: [[1, 1, P.code('campo', 'baixo')]] }); // o rascunho nasce com a porta fechada
+  sc.world.objs.d1.cfg.estado = 'aberta'; sc.world.objs.b1.cfg.aberto = true; sc.world.objs.b1.rev = true; // durante a sessão: abriu a porta, abriu e revelou o baú
+  handle(g, { t: 'wPub', sc: S.focus });
+  assert.equal(sc.world.objs.d1.cfg.estado, 'aberta'); assert.equal(sc.world.objs.b1.cfg.aberto, true); assert.equal(sc.world.objs.b1.rev, true);
+  assert.equal(P.cell(sc.world.floors[0], 1, 1), P.code('campo', 'baixo'));
+});
+
+test('publicar com parede sobre herói o empurra para casa livre', () => {
+  const sc = freshWorld(), g = gmc(), c = cli('Ana'), ch = hero('Ana', 2, 2), off = [join(g), join(c)];
+  try {
+    draft(g, { o: 'cells', f: 'f0', l: [[2, 2, P.code(sc.world.tema, 'denso')]] }); handle(g, { t: 'wPub', sc: S.focus });
+    const f = sc.world.floors[0];
+    assert.ok(!globalThis.MCOL.blockedAt(f, sc.world.objs, ch.pos.x, ch.pos.z, false), `preso em ${ch.pos.x},${ch.pos.z}`);
+    assert.ok(Math.hypot(ch.pos.x - 2.5, ch.pos.z - 2.5) <= 1.01); assert.deepEqual([ch.x, ch.y], [Math.floor(ch.pos.x), Math.floor(ch.pos.z)]);
+    assert.ok(c.sent.some(m => m.t === 'pos' && m.fix?.[0] === ch.id));
+  } finally { off.forEach(f => f()); }
+});
+
+test('rascunho: mestre que conecta recebe o rascunho no canal draft', async () => {
+  const sc = freshWorld(), g = gmc(); draft(g, { o: 'goal', v: 'Rascunho guardado' });
+  const novo = gmc(), p = cli('Ana'); net.view(novo); net.view(p); await sleep(0);
+  assert.ok(novo.sent.some(m => m.t === 'draft' && m.sc === S.focus && m.d?.goal === 'Rascunho guardado'));
+  assert.ok(!p.sent.some(m => m.t === 'draft'));
+  delete sc.draft;
+});
