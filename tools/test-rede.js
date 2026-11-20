@@ -12,12 +12,13 @@ const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a
 async function boot(data, env = {}) {
   const p = await freePort(), child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: p, VJ_DATA: data, VJ_TUNNEL: '0', GM_KEY: '', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = ''; child.stdout.on('data', d => out += d); child.stderr.on('data', d => out += d);
-  for (let i = 0; i < 150; i++) { // espera subir (ou morrer)
+  const deadline = Date.now() + 45_000; // a árvore de habilidades pode demorar para carregar com a suíte em paralelo
+  while (Date.now() < deadline) {
     if (child.exitCode !== null) break;
     try { if ((await fetch(`http://127.0.0.1:${p}/api/hi`)).ok) return { p, child, out: () => out, stop: () => child.kill() }; } catch {}
     await new Promise(r => setTimeout(r, 100));
   }
-  child.kill(); return { p, child, failed: true, out: () => out, stop() {} };
+  child.kill(); return { p, child, failed: true, out: () => out || `Servidor não respondeu ao /api/hi na porta ${p}.`, stop() {} };
 }
 const tmps = [], tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'vjrede-')); tmps.push(d); return d; };
 process.on('exit', () => { for (const d of tmps) try { fs.rmSync(d, { recursive: true, force: true }); } catch {} }); // as pastas de dados dos servidores de teste não ficam para trás
