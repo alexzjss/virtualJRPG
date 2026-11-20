@@ -143,6 +143,8 @@ function fixShape() {
     const B = sc.battle; if (!isObj(B.ticks)) B.ticks = {};
     for (const [id, t] of Object.entries(B.ticks)) if (!Number.isFinite(t) || !S.chars[id]) delete B.ticks[id];
     B.active = !!B.active;
+    if (!B.active) delete B.seed;
+    else if (!Number.isInteger(B.seed) || B.seed < 1 || B.seed >= 2 ** 31) B.seed = crypto.randomInt(1, 2 ** 31);
     sc.enc = Array.isArray(sc.enc) ? [...new Set(sc.enc.filter(k => typeof k === 'string' && Object.hasOwn(S.encounters || {}, k)))] : [];
     sc.exits = Array.isArray(sc.exits) ? sc.exits.filter(e => isObj(e) && Object.hasOwn(S.scenes, e.to) && e.to !== sid).map(e => ({ id: String(e.id || Math.random().toString(36).slice(2, 8)), x: Math.max(0, Math.round(fin(e.x))), y: Math.max(0, Math.round(fin(e.y))), to: e.to })) : [];
   }

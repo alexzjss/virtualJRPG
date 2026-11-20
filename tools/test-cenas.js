@@ -35,6 +35,7 @@ test('migração: save antigo com S.battle e S.scene vira batalha da cena e foco
   const keep = JSON.parse(JSON.stringify(S));
   adopt(old);
   assert.equal(S.focus, 'y'); assert.equal(S.scene, 'y'); assert.equal(S.scenes.y.battle.active, true); assert.deepEqual(S.scenes.y.battle.ticks, { h: 5 });
+  assert.ok(Number.isInteger(S.battle.seed) && S.battle.seed >= 1 && S.battle.seed < 2 ** 31);
   assert.equal(S.scenes.x.battle.active, false); assert.deepEqual(S.scenes.x.exits, []);
   assert.ok(!Object.keys(S).includes('battle'));
   adopt(keep);
@@ -68,6 +69,11 @@ test('batalhas simultâneas: cada cena tem a sua fila, e uma não mexe na outra'
   handle(gm, { t: 'battle', on: true }); // na cena em foco (A)
   inScene(B, () => handle(gm, { t: 'sceneGo', id: B })); handle(gm, { t: 'battle', on: true }); S.focus = A;
   assert.ok(S.scenes[A].battle.active && S.scenes[B].battle.active);
+  const seedA = S.scenes[A].battle.seed, seedB = S.scenes[B].battle.seed;
+  for (const seed of [seedA, seedB]) assert.ok(Number.isInteger(seed) && seed >= 1 && seed < 2 ** 31);
+  assert.equal(view(ana).battle.seed, seedA);
+  assert.equal(view(bia).battle.seed, seedB);
+  assert.equal(view(gm).battle.seed, seedA);
   assert.deepEqual(Object.keys(S.scenes[A].battle.ticks).sort(), [a.id, ea.id].sort());
   assert.deepEqual(Object.keys(S.scenes[B].battle.ticks).sort(), [b.id, eb.id].sort());
   const curB = inScene(B, () => current()), tB = { ...S.scenes[B].battle.ticks };
@@ -75,10 +81,13 @@ test('batalhas simultâneas: cada cena tem a sua fila, e uma não mexe na outra'
   const curA = inScene(A, () => current()), ca = S.chars[curA];
   if (ca.enemy) handle(gm, { t: 'act', id: ca.id, skill: 'atk', target: a.id }); else handle(ana, { t: 'act', id: a.id, skill: 'atk', target: ea.id });
   if (S.scenes[A].battle.cmd) inScene(A, () => H.cmdSkip(gm));
+  assert.equal(S.scenes[A].battle.seed, seedA);
   assert.deepEqual(S.scenes[B].battle.ticks, tB, 'a fila de B não andou'); assert.equal(inScene(B, () => current()), curB);
   assert.ok(S.scenes[B].battle.order.length > 0 && S.scenes[A].battle.order.length > 0, 'cada cena tem a sua previsão de turnos');
   // encerrar A não toca em B
   handle(gm, { t: 'battle', on: false }); assert.equal(S.scenes[A].battle.active, false); assert.equal(S.scenes[B].battle.active, true);
+  assert.equal(view(ana).battle.seed, undefined);
+  assert.equal(view(bia).battle.seed, seedB);
   // entrar numa cena em batalha põe o herói na fila de lá; sair tira da fila
   handle(gm, { t: 'moveTo', ids: [a.id], scene: B }); assert.ok(a.id in S.scenes[B].battle.ticks);
   handle(gm, { t: 'moveTo', ids: [a.id], scene: A }); assert.ok(!(a.id in S.scenes[B].battle.ticks));

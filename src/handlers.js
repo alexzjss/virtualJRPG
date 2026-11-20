@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { BASICS, ITEMS_V, VEHICLES, buildItems, buildSkills } from '../content.js';
 import { BASE, addLimit, aiAct, allDown, allOut, applySt, at, at0, bondAdd, breakVow, can, current, d100, delay, doAct, doDefend, doFocus, endTurn, evolveCh, fitBoss, genFoe, getCh, healBody, hurt, int, loadBestiary, loadScenes, lvl, newChar, normSlots, ofiSync, okUrl, onMap, partyRef, passive, pick, rid, rollExpr, sanPen, scene, skipping, slotMax, slotted, spawn, spot, trig, usable, vows } from './rules.js';
 import { S, inScene, log, newScene } from './state.js';
@@ -267,7 +268,7 @@ const H = {
       pcs.forEach(o => { delete o.sharp; });
     }
     const end = !m.on && S.battle.active ? (m.win ? 'win' : pcs.length && pcs.every(p => p.hp <= 0) ? 'lose' : 'flee') : ''; // o palco faz a pose final certa
-    S.battle = { active: !!m.on, ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
+    S.battle = { active: !!m.on, ...(m.on && { seed: S.battle.seed ?? randomInt(1, 2 ** 31) }), ticks: {}, n: 0, stats: {}, chain: { h: 0, e: 0 }, wx: { k: scene().wx || '', ttl: 0 } };
     if (m.on) Object.values(S.chars).filter(ch => onMap(ch) && ch.hp > 0 && !ch.dead).forEach(ch => { ch.bt = {}; ch.shield = 0; ch.stk = {}; ch.rxT = 0; ch.lastSk = ''; ch.brk = ch.boss ? { max: 3, cur: 3 } : ch.rank === 'elite' ? { max: 2, cur: 2 } : undefined; if (!ch.brk) delete ch.brk; S.battle.ticks[ch.id] = delay(ch); });
     if (m.on) S.battle.ax = RU.axisOf(Object.keys(S.battle.ticks).map(k => S.chars[k])); // eixo do palco 3D: fixo até o mestre reenquadrar
     if (m.on) Object.keys(S.battle.ticks).forEach(k => trig(S.chars[k], 'start'));
