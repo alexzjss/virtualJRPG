@@ -247,19 +247,18 @@ const FINAL = /(Supremo|Suprema|Primordial|Sem Limite|Definitivo|Final)$/;
 // Fora da troca ficam a raiz do setor, o kit atual, Limites, fortes, domínios, duplas/trios e invocações. Só vale em ramos sem `de`.
 // Pares curados [base, variação] que o sufixo do nome não revela. A variação nunca fica abaixo da base (Leva 12).
 export const PARES = [
-  ['Halo', 'Halo Purificador'], ['Halo', 'Halo de Cura'], ['Julgamento', 'Julgamento Solar'], ['Julgamento', 'Julgamento do Sol'],
-  ['Broto de Carne', 'Brotos Estranhos'], ['Broto de Carne', 'Mordida do Broto'], ['Broto de Carne', 'Brotar a Marca'], ['Broto de Carne', 'Brotar na Dor'],
+  ['Halo', 'Halo Purificador'], ['Julgamento', 'Julgamento Solar'], ['Julgamento', 'Julgamento do Sol'],
   ['Carapaça', 'Carapaça Crescida'], ['Carapaça', 'Carapaça Súbita'], ['Carapaça', 'Couraça Quitinosa'],
   ['Mutação Comum', 'Mutação Defensiva'], ['Mutação Comum', 'Mutação Acumulada'], ['Mutação Comum', 'Mutação Hemorrágica'],
   ['Meia-Vida', 'Ritual: Meia-Vida Acelerada'], ['Raio Fraco', 'Raio Gama'], ['Raio Fraco', 'Raio Mutagênico'], ['Raio Fraco', 'Raio Gama Concentrado'],
   ['Regeneração Lenta', 'Regeneração Selvagem'], ['Regeneração Lenta', 'Regenerar Membro'],
-  ['Fornalha', 'Grande Fornalha de Kagutsuchi'], ['Fênix Rubra', 'Fênix Que Queima o Céu'], ['Chama Branca', 'Chama Dupla'],
+  ['Fornalha', 'Grande Fornalha de Kagutsuchi'],
   ['Hemorragia Interna', 'Hemorragia Forçada'], ['Hemorragia Forçada', 'Hemorragia Final'], ['Hemorragia Total', 'Hemorragia Final'],
-  ['Maré Rubra: Shukketsu', 'Ritual: Maré Escarlate Eterna'], ['Banho de Sangue', 'Banho Rubro'], ['Noite Vermelha', 'Noite de Sangue'],
-  ['Rajada de Estilhaços', 'Chuva de Estilhaços'], ['Seixo Veloz', 'Seixo Imantado'], ['Seixo Veloz', 'Bala de Cascalho'],
-  ['Reflexo Elétrico', 'Reflexo Elétrico Puro'], ['Primeiro Vendaval', 'Vendaval'],
+  ['Maré Rubra: Shukketsu', 'Ritual: Maré Escarlate Eterna'],
+  ['Rajada de Estilhaços', 'Chuva de Estilhaços'],
+  ['Reflexo Elétrico', 'Reflexo Elétrico Puro'],
   ['Ritual: Condenação', 'Ritual: Condenação Eterna'], ['Exorcismo Sumário', 'Ritual: Grande Exorcismo'],
-  ['Sombra Gêmea', 'Lâmina da Sombra Gêmea'], ['Clone de Sombra', 'Clones de Sombra'], ['Clones de Sombra', 'Duplo Ilusório'], ['Sono Reparador', 'Sono Que Refaz'],
+  ['Sombra Gêmea', 'Lâmina da Sombra Gêmea'], ['Clone de Sombra', 'Clones de Sombra'], ['Sono Reparador', 'Sono Que Refaz'],
   ['Tsunami Contido', 'Tsunami Sem Fim'],
   // Armas
   ['Dança das Seis Lâminas', 'Dança das Doze Lâminas'], ['Cem Socos', 'Cem Socos Largos'], ['Cem Socos Largos', 'Mil Socos'],
@@ -283,19 +282,31 @@ function evoluir(el, ramos, linhas, raiz, plano, layerOf) {
   const linha = new Map(linhas.map(b => [b.de, b.length])); // a linha precisa chegar à camada 10: base mais baixa pede mais nós
   const preso = x => x.i === 0 || x.raiz || KIT.has(x.s.n) || x.s.limit || forte(x.s) || x.s.dom || x.s.duo || x.s.trio || x.s.summon || x.s.aw;
   const bom = (n, L) => { if (linha.has(n) && L + linha.get(n) < CAM) return false; for (const p of String(livre.get(n)?.s.pre || '').split('|')) if (p && layerOf.has(p) && layerOf.get(p) >= L) return false; for (const d of deps.get(n) || []) if (layerOf.has(d) && layerOf.get(d) <= L) return false; return true; };
+  const trocar = (x, y) => { // x e y trocam de casa e de camada, se nenhuma regra (pré-requisitos, linha até a 10, kit, fortes) quebrar
+    if (preso(x) || preso(y) || x.s === y.s) return false;
+    const lx = layerOf.get(x.s.n), ly = layerOf.get(y.s.n);
+    layerOf.set(x.s.n, ly); layerOf.set(y.s.n, lx);
+    if (!bom(x.s.n, ly) || !bom(y.s.n, lx)) { layerOf.set(x.s.n, lx); layerOf.set(y.s.n, ly); return false; }
+    const ex = plano.find(e => e[0] === x.s), ey = plano.find(e => e[0] === y.s);
+    [ex[1], ey[1]] = [ey[1], ex[1]]; [ex[2], ey[2]] = [ey[2], ex[2]];
+    x.b[x.i] = y.s; y.b[y.i] = x.s; [x.b, y.b] = [y.b, x.b]; [x.i, y.i] = [y.i, x.i]; [x.bi, y.bi] = [y.bi, x.bi];
+    return true;
+  };
   for (let volta = 0; volta < 4; volta++) {
     let mexeu = false;
     const pares = [...livre.values()].map(v => [v, baseDe(v.s.n, livre.keys())]).filter(([, b]) => b).map(([v, b]) => [v, livre.get(b)]);
     for (const [a, b] of PARES) if (livre.has(a) && livre.has(b)) pares.push([livre.get(b), livre.get(a)]);
     for (const [v, B] of pares) {
-      if (!B || v.s === B.s) continue;
-      const lv = layerOf.get(v.s.n), lb = layerOf.get(B.s.n); if (lv >= lb || preso(v) || preso(B)) continue;
-      layerOf.set(v.s.n, lb); layerOf.set(B.s.n, lv);
-      if (!bom(v.s.n, lb) || !bom(B.s.n, lv)) { layerOf.set(v.s.n, lv); layerOf.set(B.s.n, lb); continue; }
-      const ev = plano.find(e => e[0] === v.s), eb = plano.find(e => e[0] === B.s);
-      [ev[1], eb[1]] = [eb[1], ev[1]]; [ev[2], eb[2]] = [eb[2], ev[2]];
-      v.b[v.i] = B.s; B.b[B.i] = v.s; [v.b, B.b] = [B.b, v.b]; [v.i, B.i] = [B.i, v.i]; [v.bi, B.bi] = [B.bi, v.bi];
-      EVOLUCOES.push(`${el}: ${B.s.n} (camada ${lv}) antes de ${v.s.n} (camada ${lb})`); mexeu = true;
+      if (!B || v.s === B.s || EVOL_EXCECAO.has(v.s.n)) continue;
+      const lv = layerOf.get(v.s.n), lb = layerOf.get(B.s.n); if (lv > lb) continue;
+      const nome = `${el}: ${B.s.n} antes de ${v.s.n}`;
+      // 1) troca direta; 2) a variação sobe trocando com um nó livre de camada acima da base; 3) a base desce trocando com um nó livre abaixo da variação
+      if (lv < lb && trocar(v, B)) { EVOLUCOES.push(nome); mexeu = true; continue; }
+      const todos = [...livre.values()].filter(y => y !== v && y !== B);
+      const sobe = todos.filter(y => layerOf.get(y.s.n) > lb).sort((x, y) => layerOf.get(x.s.n) - layerOf.get(y.s.n));
+      if (sobe.some(y => trocar(v, y))) { EVOLUCOES.push(nome + ' (variação sobe)'); mexeu = true; continue; }
+      const desce = todos.filter(y => layerOf.get(y.s.n) < lv).sort((x, y) => layerOf.get(y.s.n) - layerOf.get(x.s.n));
+      if (desce.some(y => trocar(B, y))) { EVOLUCOES.push(nome + ' (base desce)'); mexeu = true; }
     }
     if (!mexeu) break;
   }
